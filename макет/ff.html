@@ -1,0 +1,2062 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>PANNO — Feel It & Remember</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poiret+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    /* ===== НОВАЯ ЭЛЕГАНТНАЯ СХЕМА: ЧЁРНЫЙ, ЗЕЛЁНЫЙ, БЕЖЕВЫЙ ===== */
+    :root {
+      --bg1: #23372f;
+      --bg2: #1d2f28;
+      --bg3: #2a4036;
+      --bg4: #0e1311;
+      --gold: #a08a61;
+      --gold-dim: rgba(160,138,97,0.62);
+      --gold-bright: #c4a777;
+      --card-bg: #1d2f28;
+      --card-bg2: #23372f;
+      --text: #f0ede8;
+      --text-dim: rgba(240,237,232,0.55);
+      --text-mid: rgba(240,237,232,0.8);
+      --danger: #c45c5c;
+      --success: #7aad6a;
+      --radius: 18px;
+      --radius-sm: 12px;
+      --font-display: 'Poiret One', sans-serif;
+      --font-body: 'Cormorant Garamond', Georgia, serif;
+      --glass: rgba(29,47,40,0.8);
+      --glass-border: rgba(160,138,97,0.2);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: #efefef;
+      font-family: var(--font-display);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    /* ===== УСТРОЙСТВО — ГЛУБОКИЙ ГРАДИЕНТ, КАРТОЧКИ БЕЗ ПРОЗРАЧНОСТИ ===== */
+    .device {
+      width: 393px;
+      height: 852px;
+      max-width: 100vw;
+      max-height: 100vh;
+      position: relative;
+      overflow: hidden;
+      background: 
+        radial-gradient(120% 90% at 25% 18%, rgba(255,255,255,0.06), rgba(255,255,255,0) 55%),
+        radial-gradient(120% 120% at 75% 85%, rgba(0,0,0,0.28), rgba(0,0,0,0) 60%),
+        linear-gradient(180deg, var(--bg3), var(--bg2) 55%, var(--bg1));
+    }
+
+    @media (max-width: 420px) {
+      .device { width: 100vw; height: 100vh; }
+    }
+    @media (min-width: 421px) {
+      .device { border-radius: 44px; border: 8px solid #0a0a0a; box-shadow: 0 40px 100px rgba(0,0,0,0.7); }
+    }
+
+    /* ===== ЭКРАНЫ ===== */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s, transform 0.4s cubic-bezier(0.4,0,0.2,1);
+      transform: translateX(24px);
+      z-index: 1;
+      overflow: hidden;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: none;
+      z-index: 10;
+    }
+
+    /* ===== ФОНОВОЕ РАСТЕНИЕ ===== */
+    .bg-plant {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      filter: blur(4px) brightness(0.28);
+      z-index: 0;
+      pointer-events: none;
+    }
+    .grain-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      opacity: 0.1;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+      mix-blend-mode: overlay;
+      pointer-events: none;
+    }
+
+    /* ===== СКРОЛЛ ===== */
+    .scrollable {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .scrollable::-webkit-scrollbar { display: none; }
+
+    /* ===== ИНТРО ===== */
+    #intro {
+      background: transparent;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      z-index: 100;
+    }
+    .intro-content {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .intro-logo {
+      font-family: var(--font-display);
+      font-size: 78px;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      text-shadow: 0 0 60px rgba(160,138,97,0.15);
+      overflow: hidden;
+    }
+    .intro-logo span {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(35px);
+      animation: letterIn 0.7s ease forwards;
+    }
+    @keyframes letterIn { to { opacity: 1; transform: translateY(0); } }
+    .intro-sub {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--gold-dim);
+      text-transform: uppercase;
+      font-size: 14px;
+      letter-spacing: 0.1em;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 1.2s forwards;
+      transform: translateY(12px);
+    }
+    .intro-sub .amp {
+      font-family: var(--font-body);
+      font-style: italic;
+      color: var(--gold);
+      font-size: 28px;
+    }
+    .intro-enter {
+      margin-top: 44px;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 1.8s forwards;
+      transform: translateY(12px);
+    }
+    .intro-enter button {
+      background: transparent;
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      font-family: var(--font-display);
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 15px 44px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.35s;
+    }
+    .intro-enter button:active {
+      background: var(--gold);
+      color: var(--bg4);
+    }
+    @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+    /* ===== ВЫБОР РЕСТОРАНА ===== */
+    #restaurant-select { background: transparent; }
+    .rs-header { padding: 60px 24px 24px; text-align: center; position: relative; z-index: 2; }
+    .rs-header h2 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--gold-dim);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 400;
+    }
+    .rs-cards {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 18px;
+      padding: 0 24px 40px;
+      position: relative;
+      z-index: 2;
+    }
+    .rs-card {
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 26px 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      cursor: pointer;
+      transition: all 0.25s;
+      position: relative;
+    }
+    .rs-card:active { transform: scale(0.97); }
+    .rs-card-icon {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: rgba(160,138,97,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: var(--gold);
+      flex-shrink: 0;
+    }
+    .rs-card-info { flex: 1; }
+    .rs-card-info h3 {
+      font-family: var(--font-display);
+      font-size: 21px;
+      color: var(--gold);
+      letter-spacing: 0.04em;
+      font-weight: 400;
+      margin-bottom: 3px;
+    }
+    .rs-card-info p {
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+    .rs-card.disabled { opacity: 0.45; }
+
+    /* ===== TAB BAR ===== */
+    .tab-bar {
+      display: flex;
+      justify-content: space-around;
+      align-items: flex-end;
+      padding: 6px 0 28px;
+      background: linear-gradient(transparent, rgba(14,19,17,0.95) 30%);
+      position: relative;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+    .tab-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: color 0.2s;
+      padding: 6px 10px;
+      text-transform: uppercase;
+    }
+    .tab-item.active { color: var(--gold); }
+    .tab-item svg {
+      width: 21px; height: 21px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .tab-qr { position: relative; margin-top: -22px; }
+    .tab-qr-circle {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(160,138,97,0.3);
+      transition: transform 0.2s;
+    }
+    .tab-qr-circle:active { transform: scale(0.92); }
+    .tab-qr-circle svg {
+      width: 24px; height: 24px;
+      stroke: var(--bg4);
+      fill: none;
+      stroke-width: 2;
+    }
+    .tab-badge {
+      position: absolute;
+      top: -2px; right: -4px;
+      min-width: 16px; height: 16px;
+      background: var(--danger);
+      border-radius: 8px;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: var(--font-body);
+      padding: 0 4px;
+    }
+
+    /* ===== ШАПКА ===== */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 52px 20px 10px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+    .header-bar h1 {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--gold);
+      letter-spacing: 0.04em;
+      font-weight: 400;
+    }
+    .icon-btn, .back-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--gold-dim);
+      flex-shrink: 0;
+    }
+    .icon-btn:active, .back-btn:active {
+      background: var(--gold);
+      color: var(--bg4);
+    }
+    .icon-btn svg, .back-btn svg {
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .back-btn svg { width: 16px; height: 16px; stroke-width: 2; }
+    .icon-btn svg { width: 17px; height: 17px; stroke-width: 1.5; }
+
+    /* ===== ГЛАВНАЯ ===== */
+    #home { background: transparent; }
+    .home-table {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 20px 14px;
+      padding: 10px 16px;
+      background: var(--card-bg);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border);
+    }
+    .home-table label {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    .home-table select {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--gold);
+      font-family: var(--font-display);
+      font-size: 16px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .home-table select option { background: var(--bg2); color: var(--text); }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      color: var(--gold-dim);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin: 20px 20px 10px;
+      font-weight: 400;
+    }
+
+    /* Сезонные блюда */
+    .seasonal-scroll {
+      display: flex;
+      gap: 12px;
+      padding: 0 20px 4px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+    }
+    .seasonal-scroll::-webkit-scrollbar { display: none; }
+    .seasonal-card {
+      min-width: 150px; max-width: 150px;
+      scroll-snap-align: start;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .seasonal-card:active { transform: scale(0.96); }
+    .seasonal-card-img {
+      width: 100%; height: 110px;
+      object-fit: cover;
+      display: block;
+    }
+    .seasonal-card-body { padding: 8px 10px; }
+    .seasonal-card-body h4 {
+      font-family: var(--font-display);
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 400;
+      margin-bottom: 2px;
+    }
+    .seasonal-card-body span {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--gold-dim);
+    }
+
+    /* ===== СОБЫТИЯ (НОВЫЙ БЛОК) ===== */
+    .events-scroll {
+      display: flex;
+      gap: 12px;
+      padding: 0 20px 4px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+    }
+    .events-scroll::-webkit-scrollbar { display: none; }
+    .event-card {
+      min-width: 200px;
+      scroll-snap-align: start;
+      border-radius: var(--radius-sm);
+      background: var(--card-bg2);
+      border: 1px solid var(--gold-dim);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .event-time {
+      font-family: var(--font-display);
+      font-size: 12px;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .event-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      color: var(--text);
+      font-weight: 400;
+    }
+    .event-desc {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Кнопки официанта */
+    .waiter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 0 20px 20px;
+    }
+    .waiter-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .waiter-btn:active {
+      border-color: var(--gold-dim);
+      background: rgba(160,138,97,0.08);
+      transform: scale(0.96);
+    }
+    .waiter-btn-icon {
+      font-size: 18px;
+      color: var(--gold);
+      width: 22px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .waiter-btn span {
+      font-family: var(--font-display);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      color: var(--text-mid);
+    }
+
+    /* ===== МЕНЮ — ИСПРАВЛЕННАЯ СТРУКТУРА ===== */
+    #menu { background: transparent; display: flex; flex-direction: column; }
+    .menu-content {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .menu-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 30;
+      transition: opacity 0.3s, transform 0.3s;
+      padding: 50px 16px 0;
+      background: linear-gradient(to bottom, rgba(14,19,17,0.9), transparent);
+    }
+    .menu-top.hidden {
+      opacity: 0;
+      transform: translateY(-20px);
+      pointer-events: none;
+    }
+    .menu-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .menu-top-row h1 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: #fff;
+      font-weight: 400;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+    .menu-view-toggle { display: flex; gap: 6px; }
+    .mvt-btn {
+      padding: 6px 12px;
+      border-radius: 14px;
+      font-family: var(--font-display);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.15);
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+    }
+    .mvt-btn.active {
+      color: var(--gold);
+      border-color: var(--gold-dim);
+    }
+    .menu-cats {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 8px;
+    }
+    .menu-cats::-webkit-scrollbar { display: none; }
+    .cat-pill {
+      padding: 7px 14px;
+      border-radius: 18px;
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.45);
+      background: rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.08);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .cat-pill.active {
+      color: var(--gold);
+      border-color: var(--gold-dim);
+      background: rgba(160,138,97,0.1);
+    }
+    .menu-search {
+      margin: 6px 0 0;
+      position: relative;
+    }
+    .menu-search input {
+      width: 100%;
+      padding: 9px 14px 9px 34px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 13px;
+      outline: none;
+    }
+    .menu-search input::placeholder { color: rgba(255,255,255,0.3); }
+    .menu-search-icon {
+      position: absolute;
+      left: 10px; top: 50%;
+      transform: translateY(-50%);
+      color: rgba(255,255,255,0.3);
+      pointer-events: none;
+    }
+    .menu-search-icon svg { width: 15px; height: 15px; stroke: currentColor; }
+    .menu-filters {
+      display: flex;
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .filter-chip {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-family: var(--font-body);
+      font-size: 10px;
+      color: rgba(255,255,255,0.35);
+      background: rgba(0,0,0,0.3);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      backdrop-filter: blur(10px);
+    }
+    .filter-chip.active {
+      color: var(--gold);
+      border-color: var(--gold-dim);
+    }
+
+    /* TikTok область */
+    .tiktok-area {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+    }
+    .tiktok-slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: stretch;
+      transition: transform 0.3s cubic-bezier(0.25,0.8,0.25,1), opacity 0.2s;
+    }
+    .tiktok-media {
+      position: absolute;
+      inset: 0;
+      background: #0a0a0a;
+    }
+    .tiktok-media video, .tiktok-media img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .tiktok-media .media-gradient {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(transparent 40%, rgba(0,0,0,0.7) 75%, rgba(0,0,0,0.9));
+      pointer-events: none;
+    }
+    .tiktok-actions {
+      position: absolute;
+      right: 12px; bottom: 200px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+    }
+    .tt-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .tt-action:active { transform: scale(0.85); }
+    .tt-action-circle {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.35);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .tt-action-circle svg {
+      width: 22px; height: 22px;
+      stroke: #fff;
+      fill: none;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .tt-action span {
+      font-size: 9px;
+      color: rgba(255,255,255,0.6);
+      font-family: var(--font-body);
+      letter-spacing: 0.02em;
+    }
+    .tt-action.liked .tt-action-circle {
+      border-color: rgba(196,92,92,0.4);
+      background: rgba(196,92,92,0.15);
+    }
+    .tt-action.liked .tt-action-circle svg {
+      stroke: var(--danger);
+      fill: var(--danger);
+    }
+    .tt-action.in-cart .tt-action-circle {
+      border-color: var(--gold-dim);
+      background: rgba(160,138,97,0.15);
+    }
+    .tt-action.in-cart .tt-action-circle svg {
+      stroke: var(--gold);
+    }
+    .tiktok-info {
+      position: absolute;
+      left: 0; right: 70px; bottom: 90px;
+      z-index: 20;
+      padding: 0 16px;
+    }
+    .tt-dish-name {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: #fff;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+      margin-bottom: 4px;
+    }
+    .tt-dish-price {
+      font-family: var(--font-body);
+      font-size: 18px;
+      color: var(--gold-bright);
+      margin-bottom: 6px;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+    }
+    .tt-dish-desc {
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      line-height: 1.45;
+      margin-bottom: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .tt-dish-nutrition {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .tt-nutr-item {
+      font-family: var(--font-body);
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(6px);
+      padding: 3px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .tt-nutr-item b { color: rgba(255,255,255,0.7); font-weight: 500; }
+    .tt-dish-tags {
+      display: flex;
+      gap: 5px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .tt-tag {
+      padding: 2px 7px;
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: 9px;
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.5);
+    }
+    .tt-tag.allergen { border: 1px solid rgba(196,92,92,0.25); color: rgba(196,92,92,0.7); }
+    .tt-dots {
+      position: absolute;
+      right: 12px; top: 50%;
+      transform: translateY(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tt-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      transition: all 0.2s;
+    }
+    .tt-dot.active {
+      background: var(--gold);
+      height: 14px;
+      border-radius: 3px;
+    }
+
+    /* Списочное меню */
+    .list-menu {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      background: var(--bg4);
+      display: none;
+      flex-direction: column;
+    }
+    .list-menu.show { display: flex; }
+    .list-menu-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 140px 16px 90px;
+      scrollbar-width: none;
+    }
+    .list-menu-scroll::-webkit-scrollbar { display: none; }
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .list-item:active { border-color: var(--gold-dim); }
+    .list-item-img {
+      width: 56px; height: 56px;
+      border-radius: 10px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .list-item-info { flex: 1; min-width: 0; }
+    .list-item-info h4 {
+      font-family: var(--font-display);
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 400;
+      margin-bottom: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .list-item-info p {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--text-dim);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .list-item-price {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--gold);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .list-item-add {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--gold-dim);
+      background: rgba(160,138,97,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--gold);
+      font-size: 18px;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      font-family: var(--font-body);
+    }
+    .list-item-add:active { background: var(--gold); color: var(--bg4); }
+
+    /* ===== КОММЕНТАРИИ ===== */
+    #comments { background: transparent; }
+    .comments-list { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+    .comment-card {
+      padding: 14px 16px;
+      background: var(--card-bg);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border);
+    }
+    .comment-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    .comment-author {
+      font-family: var(--font-display);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .comment-stars { color: var(--gold); font-size: 11px; letter-spacing: 2px; }
+    .comment-text {
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--text-mid);
+      line-height: 1.5;
+    }
+    .comment-input-area {
+      padding: 14px 20px;
+      border-top: 1px solid var(--glass-border);
+      flex-shrink: 0;
+    }
+    .comment-input-area textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border);
+      background: var(--card-bg);
+      color: var(--text-dim);
+      font-family: var(--font-body);
+      font-size: 13px;
+      resize: none;
+      height: 54px;
+      outline: none;
+    }
+
+    /* ===== КОРЗИНА ===== */
+    #cart { background: transparent; }
+    .cart-empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-dim);
+    }
+    .cart-empty svg { width: 44px; height: 44px; stroke: var(--gold-dim); }
+    .cart-items { padding: 8px 20px; display: flex; flex-direction: column; gap: 8px; }
+    .cart-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: var(--card-bg);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border);
+    }
+    .cart-item-img { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
+    .cart-item-info { flex: 1; min-width: 0; }
+    .cart-item-info h4 {
+      font-family: var(--font-display);
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 400;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cart-item-info span {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--gold-dim);
+    }
+    .cart-qty {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cart-qty button {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 1px solid var(--glass-border);
+      background: var(--glass);
+      color: var(--text);
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+    }
+    .cart-qty button:active { background: var(--gold); color: var(--bg4); }
+    .cart-qty span {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--text);
+      min-width: 14px;
+      text-align: center;
+    }
+    .cart-comment {
+      margin: 10px 20px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border);
+      background: var(--card-bg);
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--text);
+      width: calc(100% - 40px);
+      resize: none;
+      height: 44px;
+      outline: none;
+    }
+    .rec-section {
+      margin: 8px 20px;
+      padding: 14px;
+      background: rgba(160,138,97,0.04);
+      border: 1px solid rgba(160,138,97,0.08);
+      border-radius: var(--radius-sm);
+    }
+    .rec-title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .rec-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 5px 0;
+      cursor: pointer;
+    }
+    .rec-item:active { opacity: 0.7; }
+    .rec-icon { font-size: 14px; color: var(--gold); width: 18px; text-align: center; }
+    .rec-info { flex: 1; }
+    .rec-info span {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--text-mid);
+    }
+    .rec-info small {
+      display: block;
+      font-family: var(--font-body);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    .rec-add {
+      font-family: var(--font-display);
+      font-size: 9px;
+      color: var(--gold);
+      letter-spacing: 0.06em;
+      border: 1px solid var(--gold-dim);
+      padding: 3px 9px;
+      border-radius: 10px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    .rec-add:active { background: var(--gold); color: var(--bg4); }
+    .cart-total {
+      padding: 10px 20px;
+      border-top: 1px solid var(--glass-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cart-total span {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+    .cart-total strong {
+      font-family: var(--font-display);
+      font-size: 20px;
+      color: var(--gold);
+    }
+    .cart-bottom {
+      display: flex;
+      gap: 10px;
+      padding: 0 20px 8px;
+      flex-shrink: 0;
+    }
+    .btn-gold {
+      flex: 1;
+      padding: 13px;
+      border-radius: var(--radius-sm);
+      background: var(--gold);
+      color: var(--bg4);
+      font-family: var(--font-display);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .btn-gold:active { opacity: 0.8; transform: scale(0.97); }
+    .btn-outline {
+      flex: 1;
+      padding: 13px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      font-family: var(--font-display);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .btn-outline:active { background: var(--gold); color: var(--bg4); }
+
+    /* ===== QR-СКАНЕР ===== */
+    #qr-scanner { background: #000; justify-content: center; align-items: center; text-align: center; }
+    .qr-viewfinder {
+      width: 220px; height: 220px;
+      border: 2px solid var(--gold-dim);
+      border-radius: 20px;
+      position: relative;
+      margin: 0 auto 24px;
+      overflow: hidden;
+    }
+    .qr-corners { position: absolute; inset: -2px; }
+    .qr-corner {
+      position: absolute;
+      width: 30px; height: 30px;
+      border-color: var(--gold);
+      border-style: solid;
+    }
+    .qr-corner.tl { top: 0; left: 0; border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
+    .qr-corner.tr { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
+    .qr-corner.bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
+    .qr-corner.br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
+    .qr-scanline {
+      position: absolute;
+      left: 10px; right: 10px;
+      height: 2px;
+      background: linear-gradient(90deg,transparent,var(--gold),transparent);
+      top: 0;
+      animation: scanline 2.5s ease-in-out infinite;
+    }
+    @keyframes scanline { 0%,100%{ top:10px; opacity:.3; } 50%{ top:calc(100% - 10px); opacity:1; } }
+    .qr-anim-bg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(160,138,97,0.03), transparent 70%);
+      animation: qrPulse 2s ease infinite;
+    }
+    @keyframes qrPulse { 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
+    #qr-scanner h2 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      color: var(--gold);
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+      position: relative;
+      z-index: 2;
+    }
+    #qr-scanner p {
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--text-dim);
+      position: relative;
+      z-index: 2;
+      margin-bottom: 24px;
+    }
+    .pay-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(14,19,17,0.96);
+      z-index: 60;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      text-align: center;
+      padding: 40px;
+    }
+    .pay-overlay.show { display: flex; }
+    .check-circle {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: 2px solid var(--success);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: scaleIn 0.4s ease;
+    }
+    .check-circle svg { width: 36px; height: 36px; stroke: var(--success); fill: none; }
+    @keyframes scaleIn { 0%{ transform:scale(0); opacity:0; } 100%{ transform:scale(1); opacity:1; } }
+    .pay-overlay h2 { font-family: var(--font-display); font-size: 20px; color: var(--gold); font-weight: 400; }
+    .pay-overlay p { font-family: var(--font-body); font-size: 14px; color: var(--text-mid); }
+    .points-earned { font-family: var(--font-display); font-size: 24px; color: var(--gold-bright); }
+
+    /* ===== ПРОФИЛЬ ===== */
+    #profile { background: transparent; }
+    .profile-pts-card {
+      margin: 0 20px 14px;
+      padding: 22px;
+      background: linear-gradient(135deg, rgba(160,138,97,0.08), rgba(160,138,97,0.02));
+      border: 1px solid rgba(160,138,97,0.12);
+      border-radius: var(--radius);
+      text-align: center;
+    }
+    .profile-pts-card .pts-label {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .profile-pts-card .pts-value {
+      font-family: var(--font-display);
+      font-size: 38px;
+      color: var(--gold);
+      margin: 4px 0;
+    }
+    .profile-pts-card .pts-sub {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    .profile-section { padding: 6px 20px; }
+    .profile-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .profile-row:last-child { border: none; }
+    .profile-row-left { display: flex; align-items: center; gap: 10px; }
+    .profile-row-icon { font-size: 14px; color: var(--gold); width: 22px; text-align: center; }
+    .profile-row span { font-family: var(--font-body); font-size: 13px; color: var(--text-mid); }
+    .toggle {
+      width: 38px; height: 20px;
+      border-radius: 10px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      position: relative;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .toggle.on { background: rgba(160,138,97,0.18); border-color: var(--gold-dim); }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      top: 2px; left: 2px;
+      transition: all 0.2s;
+    }
+    .toggle.on::after { left: 20px; background: var(--gold); }
+    .profile-history { padding: 6px 20px; }
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--glass-border);
+      font-family: var(--font-body);
+      font-size: 12px;
+    }
+    .history-item .h-date { color: var(--text-dim); }
+    .history-item .h-amount { color: var(--gold); }
+    .history-item .h-desc { color: var(--text-mid); flex: 1; margin: 0 10px; }
+
+    /* ===== УВЕДОМЛЕНИЯ ===== */
+    #pushes { background: transparent; }
+    .push-list { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
+    .push-card {
+      padding: 12px 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      display: flex;
+      gap: 10px;
+    }
+    .push-icon { font-size: 16px; color: var(--gold); flex-shrink: 0; margin-top: 2px; }
+    .push-text {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--text-mid);
+      line-height: 1.5;
+    }
+    .push-gen-btn {
+      margin: 14px 20px;
+      padding: 13px;
+      border-radius: var(--radius-sm);
+      background: rgba(160,138,97,0.06);
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      font-family: var(--font-display);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .push-gen-btn:active { background: var(--gold); color: var(--bg4); }
+
+    /* ===== ИЗБРАННОЕ ===== */
+    #favorites { background: transparent; }
+    .fav-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 14px 20px;
+    }
+    .fav-card {
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: var(--card-bg);
+      border: 1px solid var(--glass-border);
+      cursor: pointer;
+    }
+    .fav-card:active { transform: scale(0.96); }
+    .fav-card-img { width: 100%; height: 90px; object-fit: cover; }
+    .fav-card-body { padding: 7px 10px; }
+    .fav-card-body h4 {
+      font-family: var(--font-display);
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 400;
+    }
+    .fav-card-body span {
+      font-family: var(--font-body);
+      font-size: 10px;
+      color: var(--gold-dim);
+    }
+
+    /* ===== TOAST ===== */
+    .toast {
+      position: fixed; top: 56px; left: 50%;
+      transform: translateX(-50%) translateY(-80px);
+      padding: 11px 22px;
+      background: rgba(20,26,22,0.94);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--gold);
+      z-index: 9999;
+      opacity: 0;
+      transition: all 0.3s;
+      pointer-events: none;
+      backdrop-filter: blur(20px);
+      white-space: nowrap;
+      max-width: 90vw;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    .spacer { height: 16px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<div class="device" id="device">
+  <div class="toast" id="toast"></div>
+
+  <!-- ===== ИНТРО ===== -->
+  <div class="screen active" id="intro">
+    <div class="bg-plant" id="introBg"></div>
+    <div class="grain-overlay"></div>
+    <div class="intro-content">
+      <div class="intro-logo" id="introLogo"></div>
+      <div class="intro-sub"><span>FEEL IT</span><span class="amp">&amp;</span><span>REMEMBER</span></div>
+      <div class="intro-enter"><button onclick="go('restaurant-select')">Войти</button></div>
+    </div>
+  </div>
+
+  <!-- ===== ВЫБОР РЕСТОРАНА ===== -->
+  <div class="screen" id="restaurant-select">
+    <div class="bg-plant"></div><div class="grain-overlay"></div>
+    <div class="rs-header"><h2>Выберите ресторан</h2></div>
+    <div class="rs-cards">
+      <div class="rs-card" onclick="go('home')">
+        <div class="rs-card-icon">✦</div>
+        <div class="rs-card-info"><h3>Panno</h3><p>Алматы, ул. Панфилова 22 · Итальянская кухня</p></div>
+        <div style="color:var(--gold-dim); font-size:20px;">›</div>
+      </div>
+      <div class="rs-card disabled" onclick="go('coming-soon')">
+        <div class="rs-card-icon" style="opacity:.35;">◇</div>
+        <div class="rs-card-info"><h3 style="color:var(--text-dim);">Скоро</h3><p>Новый ресторан · в разработке</p></div>
+        <div style="color:var(--text-dim); font-size:20px; opacity:.3;">›</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== СКОРО ===== -->
+  <div class="screen" id="coming-soon">
+    <div class="header-bar"><div class="back-btn" onclick="go('restaurant-select')"><svg viewBox="0 0 24 24"><polyline points="14,6 8,12 14,18"/></svg></div><h1></h1><div></div></div>
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px;">
+      <div style="font-size:44px; color:var(--gold-dim); margin-bottom:16px;">◇</div>
+      <h2 style="font-family:var(--font-display); font-size:20px; color:var(--gold); font-weight:400; margin-bottom:8px;">В разработке</h2>
+      <p style="font-family:var(--font-body); font-size:14px; color:var(--text-dim); line-height:1.5;">Мы скоро откроемся.<br>Следите за обновлениями.</p>
+    </div>
+  </div>
+
+  <!-- ===== ГЛАВНАЯ ===== -->
+  <div class="screen" id="home">
+    <div class="header-bar">
+      <h1>Panno</h1>
+      <div style="display:flex; gap:10px;">
+        <div class="icon-btn" onclick="go('pushes')" style="position:relative;">
+          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="tab-badge pushBdg" style="display:none;">0</span>
+        </div>
+        <div class="icon-btn" onclick="go('favorites')">
+          <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="scrollable">
+      <div class="home-table">
+        <label>Стол №</label>
+        <select id="tableNum"></select>
+      </div>
+      <div class="section-title">✦ СЕЗОННОЕ</div>
+      <div class="seasonal-scroll" id="seasonalScroll"></div>
+      <div class="section-title" style="margin-top:20px;">✦ СЕГОДНЯ В PANNO</div>
+      <div class="events-scroll" id="eventsScroll"></div>
+      <div class="section-title" style="margin-top:20px;">✦ УПРАВЛЕНИЕ</div>
+      <div class="waiter-grid">
+        <div class="waiter-btn" onclick="callWaiter('Подойти к столу')"><div class="waiter-btn-icon">✦</div><span>Позвать</span></div>
+        <div class="waiter-btn" onclick="callWaiter('Принести счёт')"><div class="waiter-btn-icon">⬡</div><span>Счёт</span></div>
+        <div class="waiter-btn" onclick="callWaiter('Принести воду')"><div class="waiter-btn-icon">◆</div><span>Вода</span></div>
+        <div class="waiter-btn" onclick="callWaiter('Нужна помощь')"><div class="waiter-btn-icon">✧</div><span>Помощь</span></div>
+      </div>
+      <div class="spacer"></div>
+    </div>
+    <div class="tab-bar" id="homeTab"></div>
+  </div>
+
+  <!-- ===== МЕНЮ (ИСПРАВЛЕНО) ===== -->
+  <div class="screen" id="menu">
+    <div class="menu-content">
+      <div class="menu-top" id="menuTop">
+        <div class="menu-top-row">
+          <h1>Меню</h1>
+          <div class="menu-view-toggle">
+            <div class="mvt-btn active" id="mvtTT" onclick="setMenuView('tiktok')">Лента</div>
+            <div class="mvt-btn" id="mvtList" onclick="setMenuView('list')">Список</div>
+          </div>
+        </div>
+        <div class="menu-cats" id="menuCats"></div>
+        <div class="menu-search">
+          <span class="menu-search-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+          <input type="text" id="menuSearchInput" placeholder="Поиск..." oninput="filterMenu()"/>
+        </div>
+        <div class="menu-filters" id="menuFilters"></div>
+      </div>
+      <div class="tiktok-area" id="tiktokArea">
+        <div class="tiktok-slide" id="tiktokSlide"></div>
+        <div class="tiktok-actions" id="tiktokActions"></div>
+        <div class="tiktok-info" id="tiktokInfo"></div>
+        <div class="tt-dots" id="ttDots"></div>
+      </div>
+      <div class="list-menu" id="listMenu">
+        <div class="list-menu-scroll" id="listMenuScroll"></div>
+      </div>
+    </div>
+    <div class="tab-bar" id="menuTab"></div>
+  </div>
+
+  <!-- ===== КОММЕНТАРИИ ===== -->
+  <div class="screen" id="comments">
+    <div class="header-bar"><div class="back-btn" onclick="go('menu')"><svg viewBox="0 0 24 24"><polyline points="14,6 8,12 14,18"/></svg></div><h1 id="commentsDishName">Отзывы</h1><div></div></div>
+    <div class="scrollable"><div class="comments-list" id="commentsList"></div></div>
+    <div class="comment-input-area"><textarea placeholder="Оставить отзыв (демо)" disabled></textarea></div>
+  </div>
+
+  <!-- ===== КОРЗИНА ===== -->
+  <div class="screen" id="cart">
+    <div class="header-bar"><div class="back-btn" onclick="go('home')"><svg viewBox="0 0 24 24"><polyline points="14,6 8,12 14,18"/></svg></div><h1>Корзина</h1><div></div></div>
+    <div class="scrollable" id="cartContent"></div>
+    <div id="cartFooter" style="flex-shrink:0; display:none;">
+      <div class="cart-total"><span>Итого</span><strong id="cartTotalVal">0 ₸</strong></div>
+      <div class="cart-bottom">
+        <button class="btn-gold" onclick="callWaiter('Подтвердить заказ'); showToast('Официант уже идёт!');">Вызвать официанта</button>
+      </div>
+    </div>
+    <div class="tab-bar" id="cartTab"></div>
+  </div>
+
+  <!-- ===== QR-СКАНЕР ===== -->
+  <div class="screen" id="qr-scanner">
+    <div class="header-bar" style="position:absolute; top:0; left:0; right:0; z-index:20;">
+      <div class="back-btn" onclick="go('home')"><svg viewBox="0 0 24 24"><polyline points="14,6 8,12 14,18"/></svg></div><h1 style="color:#fff;">Сканер QR</h1><div></div>
+    </div>
+    <div style="position:relative; z-index:2; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div class="qr-viewfinder">
+        <div class="qr-anim-bg"></div>
+        <div class="qr-scanline"></div>
+        <div class="qr-corners">
+          <div class="qr-corner tl"></div><div class="qr-corner tr"></div>
+          <div class="qr-corner bl"></div><div class="qr-corner br"></div>
+        </div>
+      </div>
+      <h2>Наведите камеру на QR</h2>
+      <p>QR-код находится на вашем чеке</p>
+      <div class="qr-sim-btn">
+        <button class="btn-outline" style="width:auto; padding:12px 32px;" onclick="simulateScan()">Симулировать сканирование</button>
+      </div>
+    </div>
+    <div class="pay-overlay" id="payOverlay">
+      <div class="check-circle"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <h2>Оплата прошла</h2>
+      <p>Начислено баллов:</p>
+      <div class="points-earned" id="pointsEarned">+0</div>
+      <button class="btn-outline" style="margin-top:20px; width:55%;" onclick="document.getElementById('payOverlay').classList.remove('show'); go('home');">На главную</button>
+    </div>
+  </div>
+
+  <!-- ===== ПРОФИЛЬ ===== -->
+  <div class="screen" id="profile">
+    <div class="header-bar"><h1>Профиль</h1><div style="display:flex; gap:10px;"><div class="icon-btn" onclick="go('pushes')"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div></div></div>
+    <div class="scrollable">
+      <div class="profile-pts-card">
+        <div class="pts-label">Ваши баллы</div>
+        <div class="pts-value" id="profilePoints">0</div>
+        <div class="pts-sub">1 балл = 1 ₸ скидки</div>
+      </div>
+      <button class="btn-outline" style="margin:0 20px 14px; width:calc(100% - 40px);" onclick="usePoints()">Применить баллы к корзине</button>
+      <div class="section-title">История</div>
+      <div class="profile-history" id="profileHistory"><p style="font-family:var(--font-body); font-size:12px; color:var(--text-dim); padding:6px 0;">Пока нет операций</p></div>
+      <div class="section-title" style="margin-top:16px;">Настройки</div>
+      <div class="profile-section">
+        <div class="profile-row"><div class="profile-row-left"><span class="profile-row-icon">✦</span><span>Уведомления</span></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="profile-row"><div class="profile-row-left"><span class="profile-row-icon">◈</span><span>Новые блюда</span></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="profile-row"><div class="profile-row-left"><span class="profile-row-icon">◇</span><span>Рекомендации</span></div><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+      </div>
+      <div class="section-title" style="margin-top:16px;">Контакты</div>
+      <div class="profile-section">
+        <div class="profile-row"><div class="profile-row-left"><span class="profile-row-icon">✧</span><span>+7 727 123 45 67</span></div></div>
+        <div class="profile-row"><div class="profile-row-left"><span class="profile-row-icon">◆</span><span>info@panno.kz</span></div></div>
+        <div class="profile-row"><div class="profile-row-left"><span class="profile-row-icon">⬡</span><span>@panno.almaty</span></div></div>
+      </div>
+      <div class="spacer"></div><div class="spacer"></div>
+    </div>
+    <div class="tab-bar" id="profileTab"></div>
+  </div>
+
+  <!-- ===== УВЕДОМЛЕНИЯ ===== -->
+  <div class="screen" id="pushes">
+    <div class="header-bar"><div class="back-btn" onclick="go('home')"><svg viewBox="0 0 24 24"><polyline points="14,6 8,12 14,18"/></svg></div><h1>Уведомления</h1><div></div></div>
+    <div class="scrollable">
+      <div class="push-list" id="pushList"></div>
+      <div class="push-gen-btn" onclick="generatePush()">✦ Сгенерировать пуш</div>
+      <div class="spacer"></div>
+    </div>
+  </div>
+
+  <!-- ===== ИЗБРАННОЕ ===== -->
+  <div class="screen" id="favorites">
+    <div class="header-bar"><div class="back-btn" onclick="go('home')"><svg viewBox="0 0 24 24"><polyline points="14,6 8,12 14,18"/></svg></div><h1>Избранное</h1><div></div></div>
+    <div class="scrollable"><div class="fav-grid" id="favGrid"></div></div>
+  </div>
+
+</div>
+
+<script>
+  // ========== КОНСТАНТЫ ==========
+  const PLANT_IMG = 'image_186a46.jpg'; // убедитесь, что файл лежит рядом
+  const CATS = ['Все','Супы','Салаты','Горячее','Десерты','Напитки','Вино'];
+  const FILTERS_DEF = [
+    { id: 'spicy', label: 'Острое', icon: '◆' },
+    { id: 'veg', label: 'Вегетарианское', icon: '❖' },
+    { id: 'lactose', label: 'Безлактозное', icon: '◇' }
+  ];
+
+  // Генерация заглушек (если нет изображения)
+  function foodGrad(h, s, t) {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='700'>
+      <defs><linearGradient id='g' x1='0' y1='0' x2='.6' y2='1'>
+        <stop offset='0%' stop-color='hsl(${h},${s}%,18%)'/>
+        <stop offset='100%' stop-color='hsl(${h+25},${Math.max(s-15,10)}%,10%)'/>
+      </linearGradient></defs>
+      <rect width='400' height='700' fill='url(%23g)'/>
+      <text x='200' y='380' text-anchor='middle' font-family='serif' font-size='72' fill='rgba(160,138,97,0.12)'>${t}</text>
+    </svg>`;
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  // ========== БЛЮДА (С ВИДЕО) ==========
+  const DISHES = [
+    {id:1, name:'Тыквенный крем-суп', cat:'Супы', price:4200, desc:'Нежный крем-суп из запечённой тыквы с трюфельным маслом и тыквенными семечками', tags:['вегетарианское'], allergens:['глютен'], kcal:180, protein:4, fat:9, carbs:22, img:foodGrad(30,45,'◈'), video:'2026-02-12 16.39.35.mp4', comments:[{a:'Мария',s:5,t:'Потрясающий вкус, нежная текстура!'},{a:'Алексей',s:4,t:'Ароматный и согревающий'}]},
+    {id:2, name:'Том Ям', cat:'Супы', price:5800, desc:'Тайский острый суп с креветками, грибами шиитаке и лемонграссом', tags:['острое'], allergens:['морепродукты'], kcal:220, protein:18, fat:7, carbs:14, img:foodGrad(12,50,'◆'), video:'2026-02-12 16.39.22.mp4', comments:[{a:'Дана',s:5,t:'Идеальный баланс остроты!'}]},
+    {id:3, name:'Салат Цезарь', cat:'Салаты', price:4800, desc:'Романо, пармезан 24 месяца выдержки, анчоусы, домашние крутоны', tags:[], allergens:['глютен','молоко'], kcal:320, protein:15, fat:22, carbs:16, img:foodGrad(115,28,'✦'), video:'IMG_4035.mp4', comments:[{a:'Ирина',s:5,t:'Лучший Цезарь в городе'},{a:'Тимур',s:4,t:'Свежий и хрустящий'}]},
+    {id:4, name:'Сезонный салат дня', cat:'Салаты', price:3900, desc:'Микс зелени с инжиром, козьим сыром и медовой заправкой', tags:['вегетарианское'], allergens:['молоко'], kcal:240, protein:8, fat:16, carbs:18, img:foodGrad(85,30,'◇'), video:'IMG_4036.mp4', comments:[{a:'Елена',s:5,t:'Необычное сочетание!'}]},
+    {id:5, name:'Стейк Рибай', cat:'Горячее', price:14500, desc:'Мраморная говядина 300г на гриле с овощами и соусом демиглас', tags:[], allergens:[], kcal:580, protein:48, fat:42, carbs:2, img:foodGrad(355,40,'✧'), video:'IMG_4037.mp4', comments:[{a:'Борис',s:5,t:'Тает во рту, идеальная прожарка'},{a:'Андрей',s:5,t:'Мясо высочайшего качества'}]},
+    {id:6, name:'Лосось на гриле', cat:'Горячее', price:9800, desc:'Филе лосося с пюре из цветной капусты и спаржей', tags:['безлактозное'], allergens:['рыба'], kcal:380, protein:34, fat:22, carbs:8, img:foodGrad(18,38,'⬡'), video:'IMG_4038.mp4', comments:[{a:'Светлана',s:4,t:'Свежая и нежная рыба'}]},
+    {id:7, name:'Паста Карбонара', cat:'Горячее', price:6200, desc:'Спагетти с гуанчиале, пекорино романо и чёрным перцем', tags:[], allergens:['глютен','молоко','яйца'], kcal:450, protein:18, fat:24, carbs:42, img:foodGrad(42,28,'❖'), video:'2026-02-12 16.39.35.mp4', comments:[{a:'Катя',s:5,t:'Настоящая итальянская!'}]},
+    {id:8, name:'Ризотто с трюфелем', cat:'Горячее', price:8900, desc:'Кремовое ризотто арборио с чёрным трюфелем и пармезаном', tags:['вегетарианское'], allergens:['молоко'], kcal:420, protein:12, fat:18, carbs:52, img:foodGrad(50,25,'✦'), video:'2026-02-12 16.39.22.mp4', comments:[{a:'Азамат',s:5,t:'Божественный аромат трюфеля'}]},
+    {id:9, name:'Тирамису', cat:'Десерты', price:4200, desc:'Классический итальянский десерт с маскарпоне и эспрессо', tags:['вегетарианское'], allergens:['молоко','глютен','яйца'], kcal:340, protein:6, fat:20, carbs:34, img:foodGrad(22,32,'✦'), video:'2026-02-12 16.39.35.mp4', comments:[{a:'Ольга',s:5,t:'Нежнейший, просто тает'},{a:'Виктория',s:5,t:'Лучший тирамису!'}]},
+    {id:10, name:'Панна Котта', cat:'Десерты', price:3600, desc:'Сливочный десерт с ягодным кули и мятой', tags:['вегетарианское'], allergens:['молоко'], kcal:280, protein:4, fat:18, carbs:26, img:foodGrad(335,28,'◇'), video:'2026-02-12 16.39.22.mp4', comments:[{a:'Наталья',s:4,t:'Нежная текстура'}]},
+    {id:11, name:'Эспрессо', cat:'Напитки', price:1200, desc:'Двойной эспрессо из зёрен специальной обжарки', tags:['вегетарианское','безлактозное'], allergens:[], kcal:5, protein:0, fat:0, carbs:1, img:foodGrad(18,18,'✧'), video:'2026-02-12 16.39.35.mp4', comments:[{a:'Марат',s:5,t:'Отличный крепкий кофе'}]},
+    {id:12, name:'Матча Латте', cat:'Напитки', price:2400, desc:'Японский матча на овсяном молоке с лёгкой пенкой', tags:['вегетарианское','безлактозное'], allergens:[], kcal:120, protein:3, fat:4, carbs:16, img:foodGrad(138,38,'◈'), video:null, comments:[{a:'Аида',s:5,t:'Вкусно и красиво подано!'}]},
+    {id:13, name:'Cabernet Sauvignon', cat:'Вино', price:8500, desc:'Чили, 2021 — нотки чёрной смородины и дуба', tags:[], allergens:['сульфиты'], kcal:85, protein:0, fat:0, carbs:4, img:foodGrad(348,32,'✦'), video:'2026-02-12 16.39.35.mp4', comments:[{a:'Рустам',s:5,t:'Прекрасное вино для мяса'}]},
+    {id:14, name:'Sauvignon Blanc', cat:'Вино', price:7200, desc:'Новая Зеландия, 2022 — цитрус и тропические фрукты', tags:[], allergens:['сульфиты'], kcal:80, protein:0, fat:0, carbs:3, img:foodGrad(55,28,'◆'), video:'2026-02-12 16.39.22.mp4', comments:[{a:'Динара',s:4,t:'Лёгкое и освежающее'}]},
+  ];
+
+  const WINE_PAIRS = {
+    'Стейк Рибай': 'Cabernet Sauvignon',
+    'Лосось на гриле': 'Sauvignon Blanc',
+    'Паста Карбонара': 'Sauvignon Blanc',
+    'Ризотто с трюфелем': 'Sauvignon Blanc',
+    'Салат Цезарь': 'Sauvignon Blanc',
+    'Тирамису': 'Cabernet Sauvignon'
+  };
+  const SIDE_RECS = [
+    { n: 'Трюфельное масло', p: 1200, i: '◆' },
+    { n: 'Хлебная корзина', p: 1800, i: '❖' },
+    { n: 'Соус демиглас', p: 900, i: '◇' },
+    { n: 'Borjomi 0.5л', p: 1400, i: '✧' }
+  ];
+  const EVENTS = [
+    { time: '19:00', title: 'Jazz trio', desc: 'Атмосферный джаз в исполнении трио Soul Notes' },
+    { time: '20:30', title: 'Шеф-ужин', desc: 'Специальное меню от шефа с винной парой' },
+    { time: '12:00–16:00', title: 'Воскресный бранч', desc: 'Скидка 20% на все завтраки' },
+    { time: 'Весь вечер', title: 'Акустика', desc: 'Гитара и вокал — любимые хиты' }
+  ];
+
+  // ========== СОСТОЯНИЕ ==========
+  let S = {
+    cart: [], favs: new Set(), pts: 0, hist: [], pushes: [],
+    cat: 'Все', idx: 0, filtered: [], filters: new Set(), search: '',
+    disc: 0, viewedCats: new Set(), menuView: 'tiktok', topVisible: true
+  };
+
+  // ========== ИНИЦИАЛИЗАЦИЯ ==========
+  (function init() {
+    // Фоновое растение
+    document.querySelectorAll('.bg-plant').forEach(e => { e.style.backgroundImage = `url(${PLANT_IMG})`; });
+    // Логотип с анимацией
+    const logo = document.getElementById('introLogo');
+    'PANNO'.split('').forEach((ch, i) => {
+      const s = document.createElement('span');
+      s.textContent = ch;
+      s.style.animationDelay = (0.2 + i * 0.15) + 's';
+      logo.appendChild(s);
+    });
+    // Номера столов
+    const sel = document.getElementById('tableNum');
+    for (let i = 1; i <= 20; i++) {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = i; sel.appendChild(o);
+    }
+    initSeasonal();
+    initEvents();
+    refreshTabs();
+  })();
+
+  function initSeasonal() {
+    const el = document.getElementById('seasonalScroll');
+    const picks = DISHES.filter((_, i) => [0, 3, 8, 11].includes(i));
+    el.innerHTML = picks.map(d => `
+      <div class="seasonal-card" onclick="go('menu'); setTimeout(()=>jumpToDish(${d.id}),100)">
+        <img class="seasonal-card-img" src="${d.img}"/>
+        <div class="seasonal-card-body"><h4>${d.name}</h4><span>${d.price.toLocaleString()} ₸</span></div>
+      </div>`).join('');
+  }
+
+  function initEvents() {
+    const el = document.getElementById('eventsScroll');
+    el.innerHTML = EVENTS.map(e => `
+      <div class="event-card">
+        <div class="event-time">${e.time}</div>
+        <div class="event-title">${e.title}</div>
+        <div class="event-desc">${e.desc}</div>
+      </div>`).join('');
+  }
+
+  // ========== TAB BAR ==========
+  function tabBar(active) {
+    const cartN = S.cart.reduce((s, x) => s + x.q, 0);
+    return `
+      <div class="tab-item${active==='home'?' active':''}" onclick="go('home')">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Главная
+      </div>
+      <div class="tab-item${active==='menu'?' active':''}" onclick="go('menu')">
+        <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Меню
+      </div>
+      <div class="tab-item tab-qr" onclick="go('qr-scanner')">
+        <div class="tab-qr-circle"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><line x1="21" y1="14" x2="21" y2="21"/><line x1="14" y1="21" x2="21" y2="21"/></svg></div>
+      </div>
+      <div class="tab-item${active==='cart'?' active':''}" onclick="go('cart')" style="position:relative">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${cartN?`<span class="tab-badge">${cartN}</span>`:''}Корзина
+      </div>
+      <div class="tab-item${active==='profile'?' active':''}" onclick="go('profile')">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Профиль
+      </div>`;
+  }
+  function refreshTabs() {
+    ['homeTab','menuTab','cartTab','profileTab'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { const a = id.replace('Tab',''); el.innerHTML = tabBar(a); }
+    });
+  }
+
+  // ========== НАВИГАЦИЯ ==========
+  function go(id) {
+    document.querySelectorAll('.screen.active').forEach(s => s.classList.remove('active'));
+    const next = document.getElementById(id);
+    setTimeout(() => next.classList.add('active'), 30);
+    if (id === 'menu') initMenu();
+    if (id === 'cart') renderCart();
+    if (id === 'profile') renderProfile();
+    if (id === 'pushes') renderPushes();
+    if (id === 'favorites') renderFavorites();
+    refreshTabs();
+  }
+
+  // ========== ВЫЗОВ ОФИЦИАНТА ==========
+  function callWaiter(msg) {
+    showToast(msg + ' — запрос отправлен');
+    setTimeout(() => showToast('Официант уже в пути'), 2200);
+  }
+
+  // ========== МЕНЮ ==========
+  let touchY0 = 0, touchMoveY = 0, isSwiping = false;
+  function initMenu() {
+    S.topVisible = true;
+    document.getElementById('menuTop').classList.remove('hidden');
+    const cEl = document.getElementById('menuCats');
+    cEl.innerHTML = CATS.map(c => `<div class="cat-pill${c===S.cat?' active':''}" onclick="setCat('${c}')">${c}</div>`).join('');
+    const fEl = document.getElementById('menuFilters');
+    fEl.innerHTML = FILTERS_DEF.map(f => `<div class="filter-chip${S.filters.has(f.id)?' active':''}" onclick="togFilter('${f.id}')">${f.icon} ${f.label}</div>`).join('');
+    applyFilters();
+    setMenuView(S.menuView);
+
+    const area = document.getElementById('tiktokArea');
+    area.ontouchstart = (e) => {
+      touchY0 = e.touches[0].screenY;
+      touchMoveY = touchY0;
+      isSwiping = true;
+      document.getElementById('tiktokSlide').style.transition = 'none';
+    };
+    area.ontouchmove = (e) => {
+      if (!isSwiping) return;
+      e.preventDefault();
+      touchMoveY = e.touches[0].screenY;
+      const delta = touchMoveY - touchY0;
+      const slide = document.getElementById('tiktokSlide');
+      slide.style.transform = `translateY(${delta * 0.3}px)`;
+    };
+    area.ontouchend = (e) => {
+      if (!isSwiping) return;
+      isSwiping = false;
+      const delta = touchMoveY - touchY0;
+      const slide = document.getElementById('tiktokSlide');
+      slide.style.transition = 'transform 0.3s, opacity 0.3s';
+      if (delta < -50) {
+        nextDish();
+      } else if (delta > 50) {
+        prevDish();
+      } else {
+        slide.style.transform = 'translateY(0)';
+        setTimeout(() => slide.style.transition = '', 300);
+      }
+      if (Math.abs(delta) > 30 && S.topVisible) {
+        S.topVisible = false;
+        document.getElementById('menuTop').classList.add('hidden');
+      }
+    };
+    area.addEventListener('touchstart', (e) => { if (e.target.closest('.tiktok-area')) e.preventDefault(); }, { passive: false });
+  }
+
+  function nextDish() {
+    if (S.idx < S.filtered.length - 1) {
+      S.idx++;
+      animateSlide('up');
+    } else {
+      document.getElementById('tiktokSlide').style.transform = 'translateY(0)';
+    }
+  }
+  function prevDish() {
+    if (S.idx > 0) {
+      S.idx--;
+      animateSlide('down');
+    } else {
+      document.getElementById('tiktokSlide').style.transform = 'translateY(0)';
+    }
+  }
+  function animateSlide(dir) {
+    const slide = document.getElementById('tiktokSlide');
+    slide.style.transition = 'transform 0.25s, opacity 0.2s';
+    slide.style.transform = `translateY(${dir === 'up' ? '-50px' : '50px'})`;
+    slide.style.opacity = '0.6';
+    setTimeout(() => {
+      renderTT();
+      slide.style.transform = 'translateY(0)';
+      slide.style.opacity = '1';
+      setTimeout(() => slide.style.transition = '', 250);
+    }, 200);
+  }
+
+  function setMenuView(v) {
+    S.menuView = v;
+    document.getElementById('mvtTT').classList.toggle('active', v === 'tiktok');
+    document.getElementById('mvtList').classList.toggle('active', v === 'list');
+    document.getElementById('tiktokArea').style.display = v === 'tiktok' ? 'block' : 'none';
+    document.getElementById('listMenu').classList.toggle('show', v === 'list');
+    if (v === 'tiktok') renderTT(); else renderList();
+  }
+
+  function setCat(c) { S.cat = c; S.idx = 0; S.viewedCats.add(c); applyFilters(); renderTT(); renderList(); }
+  function togFilter(f) { if (S.filters.has(f)) S.filters.delete(f); else S.filters.add(f); S.idx = 0; applyFilters(); renderTT(); renderList(); }
+  function filterMenu() { S.search = document.getElementById('menuSearchInput').value; S.idx = 0; applyFilters(); renderTT(); renderList(); }
+  function applyFilters() {
+    let d = DISHES;
+    if (S.cat !== 'Все') d = d.filter(x => x.cat === S.cat);
+    if (S.filters.has('spicy')) d = d.filter(x => x.tags.includes('острое'));
+    if (S.filters.has('veg')) d = d.filter(x => x.tags.includes('вегетарианское'));
+    if (S.filters.has('lactose')) d = d.filter(x => x.tags.includes('безлактозное'));
+    if (S.search) { const q = S.search.toLowerCase(); d = d.filter(x => x.name.toLowerCase().includes(q) || x.desc.toLowerCase().includes(q)); }
+    S.filtered = d;
+  }
+  function jumpToDish(id) { S.idx = Math.max(0, S.filtered.findIndex(d => d.id === id)); renderTT(); }
+
+  // ========== TikTok RENDER ==========
+  function renderTT() {
+    if (!S.filtered.length) {
+      document.getElementById('tiktokSlide').innerHTML = '';
+      document.getElementById('tiktokActions').innerHTML = '';
+      document.getElementById('tiktokInfo').innerHTML = '<div style="color:rgba(255,255,255,0.4); font-family:var(--font-body); font-size:14px; text-align:center;">Нет блюд</div>';
+      document.getElementById('ttDots').innerHTML = '';
+      return;
+    }
+    const d = S.filtered[S.idx];
+    const liked = S.favs.has(d.id);
+    const inCart = S.cart.some(x => x.d.id === d.id);
+
+    // Видео или картинка
+    if (d.video) {
+      document.getElementById('tiktokSlide').innerHTML = `
+        <div class="tiktok-media">
+          <video src="${d.video}" autoplay loop muted playsinline></video>
+          <div class="media-gradient"></div>
+        </div>`;
+    } else {
+      document.getElementById('tiktokSlide').innerHTML = `
+        <div class="tiktok-media">
+          <img src="${d.img}"/>
+          <div class="media-gradient"></div>
+        </div>`;
+    }
+
+    document.getElementById('tiktokActions').innerHTML = `
+      <div class="tt-action${liked?' liked':''}" onclick="togLike(${d.id})">
+        <div class="tt-action-circle"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+        <span>${liked?'В избранном':'Нравится'}</span>
+      </div>
+      <div class="tt-action" onclick="openComments(${d.id})">
+        <div class="tt-action-circle"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <span>${d.comments.length}</span>
+      </div>
+      <div class="tt-action${inCart?' in-cart':''}" onclick="addToCart(${d.id})">
+        <div class="tt-action-circle"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
+        <span>${inCart?'Добавлено':'В корзину'}</span>
+      </div>`;
+
+    document.getElementById('tiktokInfo').innerHTML = `
+      <div class="tt-dish-name">${d.name}</div>
+      <div class="tt-dish-price">${d.price.toLocaleString()} ₸</div>
+      <div class="tt-dish-desc">${d.desc}</div>
+      <div class="tt-dish-nutrition">
+        <div class="tt-nutr-item"><b>${d.kcal}</b> ккал</div>
+        <div class="tt-nutr-item">Б <b>${d.protein}</b>г</div>
+        <div class="tt-nutr-item">Ж <b>${d.fat}</b>г</div>
+        <div class="tt-nutr-item">У <b>${d.carbs}</b>г</div>
+      </div>
+      <div class="tt-dish-tags">
+        ${d.tags.map(t => `<span class="tt-tag">${t}</span>`).join('')}
+        ${d.allergens.map(a => `<span class="tt-tag allergen">${a}</span>`).join('')}
+      </div>`;
+
+    const maxDots = Math.min(S.filtered.length, 12);
+    document.getElementById('ttDots').innerHTML = S.filtered.slice(0, maxDots).map((_, i) =>
+      `<div class="tt-dot${i===S.idx?' active':''}"></div>`).join('');
+  }
+
+  function togLike(id) {
+    if (S.favs.has(id)) S.favs.delete(id); else S.favs.add(id);
+    renderTT(); showToast(S.favs.has(id) ? 'Добавлено в избранное' : 'Убрано');
+  }
+
+  function openComments(id) {
+    const d = DISHES.find(x => x.id === id);
+    document.getElementById('commentsDishName').textContent = d.name;
+    document.getElementById('commentsList').innerHTML = d.comments.filter(c => c.s >= 4).map(c =>
+      `<div class="comment-card"><div class="comment-header"><span class="comment-author">${c.a}</span><span class="comment-stars">${'✦'.repeat(c.s)}</span></div><div class="comment-text">${c.t}</div></div>`).join('');
+    go('comments');
+  }
+
+  // ========== СПИСОК ==========
+  function renderList() {
+    const el = document.getElementById('listMenuScroll');
+    if (!S.filtered.length) { el.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-dim); font-family:var(--font-body);">Нет блюд</div>'; return; }
+    el.innerHTML = S.filtered.map(d => `
+      <div class="list-item" onclick="S.menuView='tiktok'; S.idx=${S.filtered.indexOf(d)}; setMenuView('tiktok');">
+        <img class="list-item-img" src="${d.img}"/>
+        <div class="list-item-info"><h4>${d.name}</h4><p>${d.kcal} ккал · Б${d.protein} Ж${d.fat} У${d.carbs}</p></div>
+        <div class="list-item-price">${d.price.toLocaleString()} ₸</div>
+        <div class="list-item-add" onclick="event.stopPropagation(); addToCart(${d.id})">+</div>
+      </div>`).join('');
+  }
+
+  // ========== КОРЗИНА ==========
+  function addToCart(id) {
+    const ex = S.cart.find(x => x.d.id === id);
+    if (ex) ex.q++; else S.cart.push({ d: DISHES.find(x => x.id === id), q: 1 });
+    refreshTabs(); renderTT(); showToast('Добавлено в корзину');
+  }
+  function renderCart() {
+    const c = document.getElementById('cartContent'), f = document.getElementById('cartFooter');
+    if (!S.cart.length) {
+      c.innerHTML = `<div class="cart-empty"><svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><p>Корзина пуста</p></div>`;
+      f.style.display = 'none';
+      return;
+    }
+    f.style.display = 'block';
+    let h = '<div class="cart-items">';
+    S.cart.forEach((item,i) => {
+      h += `<div class="cart-item"><img class="cart-item-img" src="${item.d.img}"/><div class="cart-item-info"><h4>${item.d.name}</h4><span>${item.d.price.toLocaleString()} ₸</span></div><div class="cart-qty"><button onclick="chgQty(${i},-1)">−</button><span>${item.q}</span><button onclick="chgQty(${i},1)">+</button></div></div>`;
+    });
+    h += '</div><textarea class="cart-comment" placeholder="Комментарий (без лука, без соуса...)"></textarea>';
+    h += getRecHTML();
+    c.innerHTML = h;
+    const tot = S.cart.reduce((s,x) => s + x.d.price * x.q, 0) - S.disc;
+    document.getElementById('cartTotalVal').textContent = Math.max(0, tot).toLocaleString() + ' ₸';
+  }
+  function chgQty(i,d) {
+    S.cart[i].q += d;
+    if (S.cart[i].q <= 0) S.cart.splice(i,1);
+    refreshTabs(); renderCart();
+  }
+  function getRecHTML() {
+    let h = '';
+    const names = S.cart.map(x => x.d.name);
+    const wr = names.find(n => WINE_PAIRS[n]);
+    if (wr) {
+      const wn = WINE_PAIRS[wr], w = DISHES.find(d => d.name === wn);
+      if (w && !names.includes(wn)) {
+        const sr = SIDE_RECS[Math.floor(Math.random() * SIDE_RECS.length)];
+        h += `<div class="rec-section"><div class="rec-title">✦ Рекомендуем</div>
+          <div class="rec-item" onclick="addToCart(${w.id}); renderCart();"><div class="rec-icon">✦</div><div class="rec-info"><span>${w.name}</span><small>К блюду «${wr}»</small></div><div class="rec-add">+ ${w.price.toLocaleString()} ₸</div></div>
+          <div class="rec-item" onclick="addSide('${sr.n}',${sr.p}); renderCart();"><div class="rec-icon">${sr.i}</div><div class="rec-info"><span>${sr.n}</span><small>Дополнение</small></div><div class="rec-add">+ ${sr.p.toLocaleString()} ₸</div></div></div>`;
+      }
+    }
+    if (!h) {
+      const s1 = SIDE_RECS[0], s2 = SIDE_RECS[3];
+      h += `<div class="rec-section"><div class="rec-title">✦ Дополнения</div>
+        <div class="rec-item" onclick="addSide('${s1.n}',${s1.p}); renderCart();"><div class="rec-icon">${s1.i}</div><div class="rec-info"><span>${s1.n}</span></div><div class="rec-add">+ ${s1.p.toLocaleString()} ₸</div></div>
+        <div class="rec-item" onclick="addSide('${s2.n}',${s2.p}); renderCart();"><div class="rec-icon">${s2.i}</div><div class="rec-info"><span>${s2.n}</span></div><div class="rec-add">+ ${s2.p.toLocaleString()} ₸</div></div></div>`;
+    }
+    return h;
+  }
+  function addSide(n,p) {
+    const ex = S.cart.find(x => x.d.name === n);
+    if (ex) ex.q++; else S.cart.push({ d: { id: 900+Math.random(), name: n, price: p, img: foodGrad(55,18,'◇'), cat: '', desc: '', tags: [], allergens: [], kcal: 0, protein: 0, fat: 0, carbs: 0, comments: [] }, q: 1 });
+    refreshTabs(); showToast('Добавлено');
+  }
+
+  // ========== QR-СКАНЕР ==========
+  function simulateScan() {
+    const tot = S.cart.reduce((s,x) => s + x.d.price * x.q, 0) - S.disc;
+    if (tot <= 0 && !S.cart.length) { showToast('Добавьте блюда в корзину'); return; }
+    const pts = Math.round(Math.max(tot,1) * 0.05);
+    S.pts += pts;
+    S.hist.push({ date: new Date().toLocaleDateString('ru'), desc: 'Оплата', amount: '+' + pts });
+    S.cart = []; S.disc = 0;
+    refreshTabs();
+    document.getElementById('pointsEarned').textContent = '+' + pts + ' баллов';
+    document.getElementById('payOverlay').classList.add('show');
+  }
+
+  // ========== ПРОФИЛЬ ==========
+  function renderProfile() {
+    document.getElementById('profilePoints').textContent = S.pts;
+    const h = document.getElementById('profileHistory');
+    h.innerHTML = S.hist.length ? S.hist.map(x => 
+      `<div class="history-item"><span class="h-date">${x.date}</span><span class="h-desc" style="flex:1; margin:0 8px;">${x.desc}</span><span class="h-amount">${x.amount}</span></div>`).join('') 
+      : '<p style="font-family:var(--font-body); font-size:12px; color:var(--text-dim); padding:6px 0;">Пока нет операций</p>';
+  }
+  function usePoints() {
+    if (!S.pts) { showToast('Нет баллов'); return; }
+    if (!S.cart.length) { showToast('Сначала добавьте блюда'); return; }
+    S.disc = S.pts;
+    S.hist.push({ date: new Date().toLocaleDateString('ru'), desc: 'Списание', amount: '-' + S.pts });
+    S.pts = 0;
+    showToast('Баллы применены');
+    renderProfile();
+  }
+
+  // ========== ИЗБРАННОЕ ==========
+  function renderFavorites() {
+    const g = document.getElementById('favGrid');
+    const fav = DISHES.filter(d => S.favs.has(d.id));
+    g.innerHTML = fav.length ? fav.map(d => 
+      `<div class="fav-card" onclick="go('menu'); setTimeout(()=>jumpToDish(${d.id}),100)">
+        <img class="fav-card-img" src="${d.img}"/>
+        <div class="fav-card-body"><h4>${d.name}</h4><span>${d.price.toLocaleString()} ₸</span></div>
+      </div>`).join('')
+      : '<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-dim); font-family:var(--font-body); font-size:13px;">Нет избранных</div>';
+  }
+
+  // ========== УВЕДОМЛЕНИЯ ==========
+  const PUSH_T = [
+    { c: () => S.cart.some(x => x.d.name === 'Стейк Рибай'), t: 'К вашему стейку подойдёт Cabernet Sauvignon', i: '✦' },
+    { c: () => S.viewedCats.has('Салаты'), t: 'Вы часто выбираете салаты — попробуйте сезонный салат дня', i: '❖' },
+    { c: () => S.cart.length > 0, t: 'Не забудьте подтвердить заказ — позовите официанта', i: '◈' },
+    { c: () => S.favs.size > 1, t: 'Скидка 10% на избранные блюда при следующем визите', i: '✧' },
+    { c: () => true, t: 'Новое сезонное меню уже доступно', i: '◇' },
+    { c: () => S.viewedCats.has('Вино'), t: 'Попробуйте казахстанский Riesling — уже в карте вин', i: '✦' },
+  ];
+  function renderPushes() {
+    const l = document.getElementById('pushList');
+    l.innerHTML = S.pushes.length ? S.pushes.map(p => 
+      `<div class="push-card"><div class="push-icon">${p.i}</div><div class="push-text">${p.t}</div></div>`).join('')
+      : '<div style="text-align:center; padding:20px; color:var(--text-dim); font-family:var(--font-body); font-size:12px;">Нет уведомлений</div>';
+  }
+  function generatePush() {
+    const ok = PUSH_T.filter(t => t.c());
+    const p = ok[Math.floor(Math.random() * ok.length)];
+    if (p && !S.pushes.find(x => x.t === p.t)) {
+      S.pushes.unshift(p);
+      renderPushes();
+      showToast('Новое уведомление');
+      document.querySelectorAll('.pushBdg').forEach(e => { e.style.display = 'flex'; e.textContent = S.pushes.length; });
+    } else showToast('Нет новых');
+  }
+
+  // ========== TOAST ==========
+  function showToast(m) {
+    const t = document.getElementById('toast');
+    t.textContent = m;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+</script>
+</body>
+</html>
