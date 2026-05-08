@@ -25,7 +25,7 @@ class SMSService:
 
         # ЗАГЛУШКА ДЛЯ РАЗРАБОТКИ
         if settings.DEBUG:
-            logger.info(f"\n{'='*30}\nSMS DEV MODE\nPhone: {phone}\nOTP: {otp}\n{'='*30}\n")
+            print(f"\n{'='*30}\nSMS DEV MODE\nPhone: {phone}\nOTP: {otp}\n{'='*30}\n", flush=True)
             return True
         
         # БОЕВОЙ РЕЖИМ (Пример интеграции)

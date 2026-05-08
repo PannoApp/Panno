@@ -33,6 +33,7 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(max_length=15, unique=True, verbose_name="Номер телефона")
     first_name = models.CharField(max_length=150, blank=True, verbose_name="Имя")
+    last_name = models.CharField(max_length=50, blank=True, verbose_name="Фамилия")
     
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

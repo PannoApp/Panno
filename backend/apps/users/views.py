@@ -4,8 +4,13 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 
-from .serializers import RequestSMSSerializer, VerifySMSSerializer
+from .serializers import RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer
 from .services import SMSService
 
 User = get_user_model()
@@ -15,6 +20,8 @@ class RequestSMSView(APIView):
     Эндпоинт для запроса SMS кода.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle] # Указываем класс троттлинга
+    throttle_scope = 'sms_request'          # Указываем ключ из настроек (3/min)
 
     def post(self, request):
         serializer = RequestSMSSerializer(data=request.data)
@@ -36,6 +43,8 @@ class VerifySMSView(APIView):
     Эндпоинт для проверки SMS кода и выдачи JWT токенов.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle] # Указываем класс троттлинга
+    throttle_scope = 'sms_verify'           # Указываем ключ из настроек (5/min)
 
     def post(self, request):
         serializer = VerifySMSSerializer(data=request.data)
@@ -64,3 +73,18 @@ class VerifySMSView(APIView):
             return Response({"error": "Неверный или просроченный код."}, status=status.HTTP_400_BAD_REQUEST)
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    """
+    Эндпоинт для получения и обновления профиля текущего пользователя.
+    """
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated] # Доступ только с валидным JWT токеном
+
+    def get_object(self):
+        # Переопределяем метод получения объекта.
+        # Вместо того чтобы искать юзера по ID из URL, мы просто берем того,
+        # кому принадлежит токен из заголовка запроса.
+        return self.request.user
+    

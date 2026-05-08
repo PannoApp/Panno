@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     
     # Мои приложения
     'users.apps.UsersConfig',
+    'menu.apps.MenuConfig',
 ]
 
 MIDDLEWARE = [
@@ -196,6 +197,15 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny', # По умолчанию открыто, закрывать будем конкретные эндпоинты
     ),
+    # ДОБАВЛЯЕМ ТРОТТЛИНГ
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'sms_request': '3/min',  # 3 запроса в минуту с одного IP
+        'sms_verify': '5/min',   # 5 проверок в минуту с одного IP
+        # 'sms_request_day': '20/day', # Можно комбинировать, если нужно
+    }
 }
 
 # Настройки SimpleJWT
