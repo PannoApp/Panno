@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     # Мои приложения
     'users.apps.UsersConfig',
     'menu.apps.MenuConfig',
+    'bookings.apps.BookingsConfig',
 ]
 
 MIDDLEWARE = [
