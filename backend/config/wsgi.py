@@ -1,8 +1,9 @@
-import os
-
+import os 
 from django.core.wsgi import get_wsgi_application
 
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+# По умолчанию для WSGI сервера ставим продакшен-настройки.
+# Если мы запускаем локальный сервер через manage.py runserver, 
+# он будет использовать dev.py (как мы указали в manage.py).
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.prod')
 
 application = get_wsgi_application()

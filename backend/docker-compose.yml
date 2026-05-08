@@ -1,0 +1,62 @@
+services:
+  # База данных PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    volumes:
+      - pg_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis (для кэша и брокера Celery)
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Основное Django приложение
+  backend:
+    build: .
+    container_name: django_backend
+    volumes:
+      - .:/app/backend # Монтируем код для горячей перезагрузки при разработке
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    # Команда для разработки с автоматической перезагрузкой
+    command: python manage.py runserver 0.0.0.0:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Воркер Celery (использует тот же Dockerfile)
+  worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - .:/app/backend
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pg_data:
