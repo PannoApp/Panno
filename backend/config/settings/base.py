@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_filters',
     
     # Мои приложения
     'users.apps.UsersConfig',
@@ -109,7 +110,7 @@ USE_I18N = True
 USE_TZ = True
 
 # Статика (локально)
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Кэширование через Redis (для сессий и быстрых данных)
@@ -123,11 +124,11 @@ CACHES = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ==========================================
-# Хранилище файлов (Static & Media) - Эпик 1.4
+# Хранилище файлов (Static & Media)
 # ==========================================
 
-# Определяем, используем ли мы S3 (если заполнен бакет в .env)
-USE_S3 = env('AWS_STORAGE_BUCKET_NAME', default=None) is not None
+# Определяем, используем ли мы S3
+USE_S3 = env.bool('USE_S3', default=False)
 
 if USE_S3:
     # Настройки для django-storages (Boto3)
@@ -179,12 +180,8 @@ else:
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
-    MEDIA_URL = 'media/'
+    MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-# Путь для статических файлов (CSS, JS, Images)
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Указываем Django использовать нашу кастомную модель
 AUTH_USER_MODEL = 'users.User'
@@ -205,7 +202,10 @@ REST_FRAMEWORK = {
         'sms_request': '3/min',  # 3 запроса в минуту с одного IP
         'sms_verify': '5/min',   # 5 проверок в минуту с одного IP
         # 'sms_request_day': '20/day', # Можно комбинировать, если нужно
-    }
+    },
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend'
+    ),
 }
 
 # Настройки SimpleJWT
