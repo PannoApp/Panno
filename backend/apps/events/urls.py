@@ -1,5 +1,11 @@
 from django.urls import path
-from .views import UpcomingEventsListView, ArchivedEventsListView, NewsListView
+from .views import (
+    UpcomingEventsListView,
+    ArchivedEventsListView,
+    NewsListView,
+    EventReservationCreateView,
+    UserEventReservationsListView
+)
 
 app_name = 'events'
 
@@ -10,4 +16,7 @@ urlpatterns = [
     path('archived/', ArchivedEventsListView.as_view(), name='event-archived'),
     # Список новостей
     path('news/', NewsListView.as_view(), name='news-list'),
+
+    path('reservations/create/', EventReservationCreateView.as_view(), name='reservation-create'),
+    path('reservations/my/', UserEventReservationsListView.as_view(), name='reservation-list'),
 ]

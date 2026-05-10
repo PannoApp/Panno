@@ -12,8 +12,13 @@ class CategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
 class DishListView(generics.ListAPIView):
-    # Отдаем только активные блюда, сортируем сначала по категории, затем по ID
-    queryset = Dish.objects.filter(is_active=True).order_by('category__order', 'id')
+    queryset = (
+        Dish.objects
+        .filter(is_active=True)
+        .select_related('category')
+        .prefetch_related('tags', 'allergens')
+        .order_by('category__order', 'id')
+    )
     serializer_class = DishSerializer
     permission_classes = [AllowAny]
     pagination_class = VideoFeedPagination

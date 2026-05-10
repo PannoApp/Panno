@@ -14,7 +14,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 class AllergenSerializer(serializers.ModelSerializer):
     class Meta:
-        models = Allergen
+        model = Allergen
         fields = ('id', 'name')
 
 class DishSerializer(serializers.ModelSerializer):

@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 
 class Event(models.Model):
     """
@@ -67,3 +68,42 @@ class News(models.Model):
 
     def __str__(self):
         return self.title
+    
+class EventReservation(models.Model):
+    """
+    Модель записи пользователя на конкретное мероприятие.
+    """
+    event = models.ForeignKey(
+        'Event',
+        on_delete=models.CASCADE,
+        related_name='reservations',
+        verbose_name='Мероприятие'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='events_reservations',
+        verbose_name='Пользователь'
+    )
+
+    # Полезно знать, если пользователь берет с собой +1 или друзей
+    guests_count = models.PositiveIntegerField(
+        default=1,
+        verbose_name='Количество гостей (включая себя)'
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата и время бронирования'
+    )
+
+    class Meta:
+        verbose_name = "Запись на мероприятие"
+        verbose_name_plural = "Записи на мероприятия"
+        # Защита от дубликатов: один пользователь не может записаться на одно событие дважды
+        unique_together = ('event', 'user')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        # Если у юзера нет имени, будет выводиться его email/телефон
+        return f"Запись: {self.user} на {self.event.title}"

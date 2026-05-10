@@ -205,9 +205,9 @@ REST_FRAMEWORK = {
         'sms_verify': '5/min',   # 5 проверок в минуту с одного IP
         # 'sms_request_day': '20/day', # Можно комбинировать, если нужно
     },
-    'DEFAULT_FILTER_BACKENDS': (
-        'django_filters.rest_framework.DjangoFilterBackend'
-    ),
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
 }
 
 # Настройки SimpleJWT
