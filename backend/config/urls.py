@@ -11,7 +11,8 @@ urlpatterns = [
     path('api/events/', include('events.urls')),
     # Подключаем Бронирование (если уже готов urls.py для bookings)
     path('api/bookings/', include('bookings.urls')),
-
+    # Подключаем Основные настройки ресторана
+    path('api/core/', include('core.urls')),
 ]
 
 if settings.DEBUG:
