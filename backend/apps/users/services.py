@@ -1,16 +1,14 @@
-import random
+import secrets
 import logging
 from django.core.cache import cache
 from django.conf import settings
 
-# Настраиваем логгер для вывода в консоль
 logger = logging.getLogger(__name__)
 
 class SMSService:
     @staticmethod
     def generate_otp() -> str:
-        """Генерирует случайный 4-значный код."""
-        return str(random.randint(1000, 9999))
+        return str(secrets.randbelow(9000) + 1000)
     
     @classmethod
     def send_sms(cls, phone:str) -> bool:
