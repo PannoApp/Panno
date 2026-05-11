@@ -37,6 +37,7 @@ backend/
 - [bookings.md](bookings.md) — Бронирование столов
 - [core.md](core.md) — Информация о ресторане
 - [notifications.md](notifications.md) — Push-уведомления (FCM)
+- [testing.md](testing.md) — Unit-тесты: запуск локально и в Docker
 
 ## Быстрый старт
 
@@ -52,6 +53,13 @@ python manage.py migrate
 
 # Создать суперпользователя для админки
 python manage.py createsuperuser
+
+# Запустить тесты (локально, без PostgreSQL и Redis)
+DJANGO_SETTINGS_MODULE=config.settings.test python manage.py test apps
+
+# Запустить тесты в Docker
+docker-compose run --rm --no-deps backend \
+  python manage.py test apps --settings=config.settings.test
 
 # Сгенерировать openapi.yaml
 python manage.py spectacular --file openapi.yaml
