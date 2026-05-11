@@ -1,0 +1,1066 @@
+openapi: 3.0.3
+info:
+  title: Panno Restaurant API
+  version: 1.0.0
+  description: |-
+    REST API для мобильного приложения ресторана Panno.
+
+    ## Авторизация
+    Большинство эндпоинтов требуют JWT Bearer токен. Получить его можно через:
+    1. `POST /api/users/auth/request-sms/` — запросить SMS с кодом
+    2. `POST /api/users/auth/verify-sms/` — подтвердить код и получить токены
+
+    Далее передавайте заголовок: `Authorization: Bearer <access_token>`
+  contact:
+    name: Panno Dev Team
+paths:
+  /api/users/auth/request-sms/:
+    post:
+      operationId: users_auth_request_sms_create
+      description: |-
+        Отправляет на указанный номер телефона 4-значный OTP-код через SMS.
+
+        Код действителен **3 минуты** и хранится в Redis.
+
+        **Лимит:** 3 запроса в минуту с одного IP-адреса.
+      summary: Запрос SMS с кодом подтверждения
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestSMSRequest'
+            examples:
+              Запрос:
+                value:
+                  phone: '+77001234567'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RequestSMSRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RequestSMSRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: SMS успешно отправлен
+        '400':
+          description: Ошибка валидации — неверный формат номера телефона
+        '429':
+          description: Превышен лимит запросов (3/мин с одного IP)
+        '500':
+          description: Ошибка сервера при отправке SMS
+  /api/users/auth/verify-sms/:
+    post:
+      operationId: users_auth_verify_sms_create
+      description: |-
+        Проверяет OTP-код из SMS. При успехе возвращает пару JWT-токенов.
+
+        Если пользователь с таким номером ещё не существует — он создаётся автоматически.
+
+        **Лимит:** 5 попыток в минуту с одного IP-адреса.
+
+        Полученный `access` токен передавайте в заголовке: `Authorization: Bearer <access>`
+      summary: Подтверждение SMS-кода и получение JWT-токенов
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifySMSRequest'
+            examples:
+              Запрос:
+                value:
+                  phone: '+77001234567'
+                  otp: '4823'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerifySMSRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerifySMSRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Авторизация успешна
+        '400':
+          description: Неверный или просроченный код, либо ошибка валидации
+        '429':
+          description: Превышен лимит попыток (5/мин с одного IP)
+  /api/users/profile/:
+    get:
+      operationId: users_profile_retrieve
+      description: 'Возвращает данные авторизованного пользователя: id, номер телефона,
+        имя и фамилию.'
+      summary: Получить профиль текущего пользователя
+      tags:
+      - Auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+        '401':
+          description: Токен не передан или недействителен
+    patch:
+      operationId: users_profile_partial_update
+      description: |-
+        Частичное обновление профиля (PATCH). Можно передавать только изменяемые поля.
+
+        `id` и `phone` — только для чтения, изменить их через этот эндпоинт нельзя.
+      summary: Обновить профиль текущего пользователя
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+            examples:
+              ОбновлениеИмени:
+                value:
+                  first_name: Алихан
+                  last_name: Сейткали
+                summary: Обновление имени
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+        '400':
+          description: Ошибка валидации
+        '401':
+          description: Токен не передан или недействителен
+  /api/menu/categories/:
+    get:
+      operationId: menu_categories_list
+      description: Возвращает все категории блюд, отсортированные по полю `order`.
+      summary: Список категорий меню
+      tags:
+      - Menu
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+          description: ''
+  /api/menu/dishes/:
+    get:
+      operationId: menu_dishes_list
+      description: |-
+        Возвращает активные блюда меню с вложенными данными категории, тегов и аллергенов.
+
+        Поддерживает фильтрацию по категории и тегу, а также пагинацию.
+
+        По умолчанию возвращает **5 блюд** на страницу (формат видеоленты). Максимум — 20.
+      summary: Список блюд
+      parameters:
+      - in: query
+        name: category_id
+        schema:
+          type: integer
+        description: Фильтр по ID категории
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Номер страницы
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Количество блюд на странице (по умолчанию 5, максимум 20)
+      - in: query
+        name: tag_id
+        schema:
+          type: integer
+        description: Фильтр по ID тега
+      tags:
+      - Menu
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDishList'
+          description: ''
+  /api/events/upcoming/:
+    get:
+      operationId: events_upcoming_list
+      description: Возвращает активные мероприятия с датой проведения **в будущем**,
+        отсортированные по ближайшей дате.
+      summary: Список предстоящих мероприятий
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Номер страницы
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Количество элементов на странице (по умолчанию 20, максимум 100)
+      tags:
+      - Events
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventList'
+          description: ''
+  /api/events/archived/:
+    get:
+      operationId: events_archived_list
+      description: Возвращает активные мероприятия с датой проведения **в прошлом**,
+        отсортированные от самого свежего к старому.
+      summary: Архив прошедших мероприятий
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Номер страницы
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Количество элементов на странице (по умолчанию 20, максимум 100)
+      tags:
+      - Events
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventList'
+          description: ''
+  /api/events/news/:
+    get:
+      operationId: events_news_list
+      description: Возвращает новости ресторана, отсортированные от самой свежей к
+        старой.
+      summary: Список новостей
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Номер страницы
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Количество элементов на странице (по умолчанию 20, максимум 100)
+      tags:
+      - Events
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNewsList'
+          description: ''
+  /api/events/reservations/create/:
+    post:
+      operationId: events_reservations_create_create
+      description: |-
+        Создаёт запись текущего авторизованного пользователя на выбранное мероприятие.
+
+        Один пользователь не может записаться на одно мероприятие дважды — повторный запрос вернёт ошибку 400.
+      summary: Записаться на мероприятие
+      tags:
+      - Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventReservationRequest'
+            examples:
+              ЗаписьНаМероприятие:
+                value:
+                  event: 3
+                  guests_count: 2
+                summary: Запись на мероприятие
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventReservationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventReservationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventReservation'
+          description: ''
+        '400':
+          description: Ошибка валидации или повторная запись на то же мероприятие
+        '401':
+          description: Токен не передан или недействителен
+  /api/events/reservations/my/:
+    get:
+      operationId: events_reservations_my_list
+      description: Возвращает все записи на мероприятия текущего авторизованного пользователя
+        с вложенными деталями каждого мероприятия (`event_details`).
+      summary: Мои записи на мероприятия
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Номер страницы
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Количество элементов на странице (по умолчанию 20, максимум 100)
+      tags:
+      - Events
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEventReservationList'
+          description: ''
+        '401':
+          description: Токен не передан или недействителен
+  /api/bookings/:
+    get:
+      operationId: bookings_list
+      description: Возвращает все бронирования текущего авторизованного пользователя,
+        отсортированные по дате и времени визита (ближайшие первыми).
+      summary: Список моих бронирований столов
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Номер страницы
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Количество записей на странице (по умолчанию 20, максимум 100)
+      tags:
+      - Bookings
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTableBookingList'
+          description: ''
+        '401':
+          description: Токен не передан или недействителен
+    post:
+      operationId: bookings_create
+      description: |-
+        Создаёт новое бронирование стола для текущего авторизованного пользователя.
+
+        Статус нового бронирования автоматически устанавливается в `pending` (ожидает подтверждения).
+
+        **Ограничения:** количество гостей от 1 до 50.
+      summary: Создать бронирование стола
+      tags:
+      - Bookings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableBookingRequest'
+            examples:
+              БронированиеНа4Гостей:
+                value:
+                  guest_name: Алихан Сейткали
+                  date: '2026-06-15'
+                  time: '19:30:00'
+                  guests_count: 4
+                  comment: Аллергия на орехи, нужен детский стул
+                summary: Бронирование на 4 гостей
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TableBookingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TableBookingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableBooking'
+          description: ''
+        '400':
+          description: Ошибка валидации входных данных
+        '401':
+          description: Токен не передан или недействителен
+  /api/core/info/:
+    get:
+      operationId: core_info_retrieve
+      description: |-
+        Возвращает статическую публичную информацию о ресторане: адрес, часы работы и ссылки на 3D-тур и карту 2GIS.
+
+        Доступен без авторизации.
+      summary: Информация о ресторане
+      tags:
+      - Core
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantInfo'
+              examples:
+                Пример:
+                  value:
+                    address: г. Алматы, ул. Панфилова, 98
+                    working_hours: 'Пн–Вс: 12:00–00:00'
+                    tour_link: https://tour.example.com/panno
+                    twogis_link: https://2gis.kz/almaty/firm/123456789
+          description: Информация о ресторане
+  /api/notifications/device/register/:
+    post:
+      operationId: notifications_device_register_create
+      description: |-
+        Регистрирует FCM-токен мобильного устройства для отправки push-уведомлений.
+
+        Если токен уже существует в базе — он перепривязывается к текущему пользователю (полезно при смене аккаунта на одном устройстве).
+
+        Вызывать при каждом входе в приложение и при обновлении FCM-токена Firebase.
+      summary: Зарегистрировать или обновить FCM-токен устройства
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserDeviceRequest'
+            examples:
+              РегистрацияУстройства:
+                value:
+                  fcm_token: dGhpcyBpcyBhIHNhbXBsZSBmY20gdG9rZW4...
+                summary: Регистрация устройства
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserDeviceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserDeviceRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          description: Устройство успешно зарегистрировано
+        '200':
+          description: Токен уже существует, перепривязан к текущему пользователю
+        '400':
+          description: Ошибка валидации — токен не передан или пустой
+        '401':
+          description: Токен не передан или недействителен
+components:
+  schemas:
+    Allergen:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Название аллергена
+          maxLength: 100
+      required:
+      - id
+      - name
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Название
+          maxLength: 100
+        order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Порядок отображения
+      required:
+      - id
+      - name
+    Dish:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Название блюда
+          maxLength: 200
+        description:
+          type: string
+          title: Описание
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Цена
+        category:
+          allOf:
+          - $ref: '#/components/schemas/Category'
+          readOnly: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+          readOnly: true
+        allergens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Allergen'
+          readOnly: true
+        image:
+          type: string
+          format: uri
+          title: Фото
+        video:
+          type: string
+          format: uri
+          nullable: true
+          title: Видео (для ленты)
+        is_active:
+          type: boolean
+          title: Активно
+      required:
+      - allergens
+      - category
+      - id
+      - image
+      - name
+      - price
+      - tags
+    Event:
+      type: object
+      description: Сериализатор для модели мероприятий.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          title: Заголовок мероприятия
+          maxLength: 255
+        description:
+          type: string
+          title: Описание
+        date_time:
+          type: string
+          format: date-time
+          title: Дата и время проведения
+        image:
+          type: string
+          format: uri
+          title: Обложка
+        is_active:
+          type: boolean
+          title: Активно
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата создания
+      required:
+      - created_at
+      - date_time
+      - description
+      - id
+      - image
+      - title
+    EventRequest:
+      type: object
+      description: Сериализатор для модели мероприятий.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          title: Заголовок мероприятия
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+          title: Описание
+        date_time:
+          type: string
+          format: date-time
+          title: Дата и время проведения
+        image:
+          type: string
+          format: binary
+          title: Обложка
+        is_active:
+          type: boolean
+          title: Активно
+      required:
+      - date_time
+      - description
+      - image
+      - title
+    EventReservation:
+      type: object
+      description: Сериализатор для создания и просмотра записей на мероприятия.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event:
+          type: integer
+          title: Мероприятие
+        event_details:
+          allOf:
+          - $ref: '#/components/schemas/Event'
+          readOnly: true
+        guests_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Количество гостей (включая себя)
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата и время бронирования
+      required:
+      - created_at
+      - event
+      - event_details
+      - id
+    EventReservationRequest:
+      type: object
+      description: Сериализатор для создания и просмотра записей на мероприятия.
+      properties:
+        event:
+          type: integer
+          title: Мероприятие
+        guests_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Количество гостей (включая себя)
+      required:
+      - event
+    News:
+      type: object
+      description: Сериализатор для модели новостей.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          title: Заголовок новости
+          maxLength: 255
+        content:
+          type: string
+          title: Текст новости
+        image:
+          type: string
+          format: uri
+          nullable: true
+          title: Изображение
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата публикации
+      required:
+      - content
+      - created_at
+      - id
+      - title
+    PaginatedDishList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dish'
+    PaginatedEventList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+    PaginatedEventReservationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventReservation'
+    PaginatedNewsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/News'
+    PaginatedTableBookingList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TableBooking'
+    PatchedUserProfileRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          title: Имя
+          maxLength: 150
+        last_name:
+          type: string
+          title: Фамилия
+          maxLength: 50
+    RequestSMSRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          minLength: 1
+          description: Номер телефона (например, +77001234567)
+          pattern: ^\+[1-9]\d{9,14}$
+          maxLength: 15
+      required:
+      - phone
+    RestaurantInfo:
+      type: object
+      description: Сериализатор для выдачи статической информации о ресторане.
+      properties:
+        address:
+          type: string
+          title: Адрес
+          maxLength: 500
+        working_hours:
+          type: string
+          title: Часы работы
+          maxLength: 255
+        tour_link:
+          type: string
+          format: uri
+          nullable: true
+          title: Ссылка на 3D-тур
+          maxLength: 200
+        twogis_link:
+          type: string
+          format: uri
+          nullable: true
+          title: Ссылка на 2GIS
+          maxLength: 200
+      required:
+      - address
+      - working_hours
+    StatusEnum:
+      enum:
+      - pending
+      - confirmed
+      - canceled
+      - completed
+      type: string
+    TableBooking:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        guest_name:
+          type: string
+          title: Имя гостя
+          maxLength: 255
+        date:
+          type: string
+          format: date
+          title: Дата
+        time:
+          type: string
+          format: time
+          title: Время
+        guests_count:
+          type: integer
+          minimum: 1
+          maximum: 50
+        comment:
+          type: string
+          nullable: true
+          title: Комментарий
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+          title: Статус
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата создания
+      required:
+      - created_at
+      - date
+      - guest_name
+      - guests_count
+      - id
+      - status
+      - time
+    TableBookingRequest:
+      type: object
+      properties:
+        guest_name:
+          type: string
+          minLength: 1
+          title: Имя гостя
+          maxLength: 255
+        date:
+          type: string
+          format: date
+          title: Дата
+        time:
+          type: string
+          format: time
+          title: Время
+        guests_count:
+          type: integer
+          minimum: 1
+          maximum: 50
+        comment:
+          type: string
+          nullable: true
+          title: Комментарий
+      required:
+      - date
+      - guest_name
+      - guests_count
+      - time
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Название тега
+          maxLength: 50
+      required:
+      - id
+      - name
+    UserDeviceRequest:
+      type: object
+      properties:
+        fcm_token:
+          type: string
+          minLength: 1
+          title: FCM Токен
+          maxLength: 4096
+      required:
+      - fcm_token
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        phone:
+          type: string
+          readOnly: true
+          title: Номер телефона
+        first_name:
+          type: string
+          title: Имя
+          maxLength: 150
+        last_name:
+          type: string
+          title: Фамилия
+          maxLength: 50
+      required:
+      - id
+      - phone
+    VerifySMSRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          minLength: 1
+          pattern: ^\+[1-9]\d{9,14}$
+          maxLength: 15
+        otp:
+          type: string
+          minLength: 4
+          description: 4-значный цифровой код из SMS
+          pattern: ^\d{4}$
+          maxLength: 4
+      required:
+      - otp
+      - phone
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+servers:
+- url: http://localhost:8000
+  description: Локальная разработка
+tags:
+- name: Auth
+  description: Авторизация через SMS OTP и управление профилем
+- name: Menu
+  description: Категории и блюда меню ресторана
+- name: Events
+  description: Мероприятия, новости и запись на события
+- name: Bookings
+  description: Бронирование столов
+- name: Core
+  description: Общая информация о ресторане
+- name: Notifications
+  description: Push-уведомления (FCM устройства)

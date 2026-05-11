@@ -34,7 +34,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_filters',
-    
+    'drf_spectacular',
+
     # Мои приложения
     'apps.users.apps.UsersConfig',
     'apps.menu.apps.MenuConfig',
@@ -206,6 +207,41 @@ REST_FRAMEWORK = {
     },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Panno Restaurant API',
+    'DESCRIPTION': (
+        'REST API для мобильного приложения ресторана Panno.\n\n'
+        '## Авторизация\n'
+        'Большинство эндпоинтов требуют JWT Bearer токен. Получить его можно через:\n'
+        '1. `POST /api/users/auth/request-sms/` — запросить SMS с кодом\n'
+        '2. `POST /api/users/auth/verify-sms/` — подтвердить код и получить токены\n\n'
+        'Далее передавайте заголовок: `Authorization: Bearer <access_token>`'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'CONTACT': {'name': 'Panno Dev Team'},
+    'SERVERS': [
+        {'url': 'http://localhost:8000', 'description': 'Локальная разработка'},
+    ],
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SORT_OPERATIONS': False,
+    'ENUM_GENERATE_CHOICE_DESCRIPTION': False,
+    'SWAGGER_UI_SETTINGS': {
+        'persistAuthorization': True,
+        'displayRequestDuration': True,
+        'filter': True,
+    },
+    'TAGS': [
+        {'name': 'Auth', 'description': 'Авторизация через SMS OTP и управление профилем'},
+        {'name': 'Menu', 'description': 'Категории и блюда меню ресторана'},
+        {'name': 'Events', 'description': 'Мероприятия, новости и запись на события'},
+        {'name': 'Bookings', 'description': 'Бронирование столов'},
+        {'name': 'Core', 'description': 'Общая информация о ресторане'},
+        {'name': 'Notifications', 'description': 'Push-уведомления (FCM устройства)'},
     ],
 }
 
