@@ -4,29 +4,31 @@ from django.core.validators import RegexValidator
 
 User = get_user_model()
 
-# Создаем правило: строка должна начинаться с '+' и содержать от 10 до 14 цифр после него.
 phone_regex = RegexValidator(
     regex=r'^\+[1-9]\d{9,14}$',
     message="Номер телефона должен быть в формате: '+77001234567'. Допускается до 15 символов."
+)
+
+otp_regex = RegexValidator(
+    regex=r'^\d{4}$',
+    message="Код должен состоять из 4 цифр."
 )
 
 class RequestSMSSerializer(serializers.Serializer):
     phone = serializers.CharField(
         max_length=15,
         required=True,
-        validators=[phone_regex], # Подключаем валидатор
+        validators=[phone_regex],
         help_text="Номер телефона (например, +77001234567)"
     )
 
 class VerifySMSSerializer(serializers.Serializer):
-    phone = serializers.CharField(
-        max_length=15,
-        validators=[phone_regex]  # Подключаем валидатор
-        )
+    phone = serializers.CharField(max_length=15, validators=[phone_regex])
     otp = serializers.CharField(
-        max_length=4, 
-        min_length=4, 
-        help_text="4-значный код из SMS"
+        max_length=4,
+        min_length=4,
+        validators=[otp_regex],
+        help_text="4-значный цифровой код из SMS"
     )
 
 class UserProfileSerializer(serializers.ModelSerializer):
