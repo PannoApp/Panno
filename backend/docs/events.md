@@ -35,6 +35,8 @@ News (Новость) — независимая сущность
       "description": "Живая джазовая музыка и авторские коктейли",
       "date_time": "2026-06-20T20:00:00+06:00",
       "image": "/media/events/images/jazz.jpg",
+      "format": "open",
+      "price": null,
       "is_active": true,
       "created_at": "2026-05-01T10:00:00+06:00"
     }
@@ -113,6 +115,8 @@ News (Новость) — независимая сущность
     "description": "...",
     "date_time": "2026-06-20T20:00:00+06:00",
     "image": "/media/events/images/jazz.jpg",
+    "format": "open",
+    "price": null,
     "is_active": true,
     "created_at": "2026-05-01T10:00:00+06:00"
   },
@@ -151,6 +155,8 @@ News (Новость) — независимая сущность
 | `description` | text | Описание |
 | `date_time` | datetime | Дата и время проведения |
 | `image` | image | Обложка (обязательная) |
+| `format` | string | Формат: `open` (открытое) или `closed` (закрытое). По умолчанию `open` |
+| `price` | decimal | Цена входа в тенге (необязательное, `null` = вход свободный) |
 | `is_active` | bool | Скрытые мероприятия (`false`) не попадают в API |
 | `created_at` | datetime | Дата создания записи |
 

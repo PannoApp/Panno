@@ -19,12 +19,29 @@ class Event(models.Model):
         upload_to="events/images/", 
         verbose_name="Обложка"
     )
+    FORMAT_CHOICES = [
+        ('open', 'Открытое'),
+        ('closed', 'Закрытое'),
+    ]
+    format = models.CharField(
+        "Формат",
+        max_length=10,
+        choices=FORMAT_CHOICES,
+        default='open',
+    )
+    price = models.DecimalField(
+        "Цена входа",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     is_active = models.BooleanField(
-        default=True, 
+        default=True,
         verbose_name="Активно"
     )
     created_at = models.DateTimeField(
-        auto_now_add=True, 
+        auto_now_add=True,
         verbose_name="Дата создания"
     )
 

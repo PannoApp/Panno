@@ -39,7 +39,19 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 
+    ROLE_CHOICES = [
+        ('admin', 'Администратор'),
+        ('hall_manager', 'Менеджер зала'),
+        ('content_manager', 'Контент-менеджер'),
+    ]
+    role = models.CharField("Роль", max_length=20, choices=ROLE_CHOICES, blank=True)
+
     notifications_enabled = models.BooleanField(default=True)
+
+    # Категорийные настройки уведомлений (сервисные уведомления — бронь — не отключаются)
+    notify_events = models.BooleanField("Уведомления: мероприятия", default=True)
+    notify_promotions = models.BooleanField("Уведомления: акции", default=True)
+    notify_closed_events = models.BooleanField("Уведомления: закрытые события", default=True)
 
     objects = UserManager()
 

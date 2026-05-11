@@ -99,7 +99,11 @@
   "id": 42,
   "phone": "+77001234567",
   "first_name": "Алихан",
-  "last_name": "Сейткали"
+  "last_name": "Сейткали",
+  "notifications_enabled": true,
+  "notify_events": true,
+  "notify_promotions": true,
+  "notify_closed_events": true
 }
 ```
 
@@ -115,7 +119,9 @@
 ```json
 {
   "first_name": "Алихан",
-  "last_name": "Сейткали"
+  "last_name": "Сейткали",
+  "notify_events": false,
+  "notify_promotions": true
 }
 ```
 
@@ -131,8 +137,13 @@
 | `last_name` | string | Фамилия (необязательное) |
 | `is_active` | bool | Активен ли пользователь |
 | `is_staff` | bool | Доступ в Django-админку |
-| `notifications_enabled` | bool | Согласие на push-уведомления (для будущего использования) |
+| `notifications_enabled` | bool | Мастер-флаг согласия на push-уведомления |
+| `notify_events` | bool | Уведомления о мероприятиях (default: true) |
+| `notify_promotions` | bool | Уведомления об акциях (default: true) |
+| `notify_closed_events` | bool | Уведомления о закрытых событиях (default: true) |
 | `date_joined` | datetime | Дата регистрации |
+
+> Сервисные уведомления (подтверждение/изменение брони, напоминание о визите) не управляются флагами — они всегда доставляются.
 
 ## JWT-токены
 
@@ -154,6 +165,24 @@ apps/users/
 ├── services.py     # SMSService: генерация OTP, отправка SMS, верификация
 └── urls.py         # Маршруты /api/users/...
 ```
+
+## SMS-сервис
+
+Файл: `apps/users/services.py` — класс `SMSService`.
+
+| Режим | Поведение |
+|---|---|
+| `DEBUG=True` | Код печатается в консоль сервера, SMS не отправляется |
+| `DEBUG=False` | HTTP POST на `SMS_PROVIDER_URL` с логином/паролем провайдера |
+
+**Переменные окружения для боевого режима:**
+```
+SMS_PROVIDER_URL=https://smsc.ru/sys/send.php
+SMS_LOGIN=your_login
+SMS_PASSWORD=your_password
+```
+
+При ошибке сети или статусе не 200 провайдера — метод возвращает `False` и логирует ошибку. OTP в Redis при этом уже сохранён — повторный запрос перезапишет его.
 
 ## Важные нюансы
 

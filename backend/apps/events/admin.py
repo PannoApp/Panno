@@ -1,14 +1,41 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
-from .models import Event, News
+from .models import Event, News, EventReservation
+
+
+def _is_content_or_admin(user):
+    return user.is_superuser or getattr(user, 'role', '') in ('admin', 'content_manager')
+
+
+def _is_hall_or_admin(user):
+    return user.is_superuser or getattr(user, 'role', '') in ('admin', 'hall_manager')
+
+@admin.register(EventReservation)
+class EventReservationAdmin(admin.ModelAdmin):
+    list_display = ('event', 'user', 'guests_count', 'created_at')
+    list_filter = ('event',)
+    search_fields = ('user__phone', 'event__title')
+    readonly_fields = ('created_at',)
+
+    def has_view_permission(self, request, obj=None):
+        return _is_hall_or_admin(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_hall_or_admin(request.user)
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'
+
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     """
     Настройка админки для мероприятий (Афиши).
     """
-    # Что видим в списке: название, дата проведения, статус и миниатюра
-    list_display = ('title', 'date_time', 'is_active', 'image_preview')
+    list_display = ('title', 'date_time', 'format', 'price', 'is_active', 'image_preview')
     
     # Фильтры: по активности и дате
     list_filter = ('is_active', 'date_time')
@@ -19,8 +46,19 @@ class EventAdmin(admin.ModelAdmin):
     # Возможность быстро включать/выключать мероприятие из списка
     list_editable = ('is_active',)
     
-    # Поля только для чтения (для предпросмотра картинки)
     readonly_fields = ('image_preview_big',)
+
+    def has_view_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
+
+    def has_add_permission(self, request):
+        return _is_content_or_admin(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
 
     def image_preview(self, obj):
         if obj.image:
@@ -50,6 +88,18 @@ class NewsAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
     
     readonly_fields = ('image_preview_big',)
+
+    def has_view_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
+
+    def has_add_permission(self, request):
+        return _is_content_or_admin(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
 
     def image_preview(self, obj):
         if obj.image:

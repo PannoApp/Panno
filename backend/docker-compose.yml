@@ -60,5 +60,21 @@ services:
       redis:
         condition: service_healthy
 
+  # Celery Beat (планировщик периодических задач)
+  beat:
+    build: .
+    container_name: celery_beat
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - .:/app/backend
+      - ./logs:/app/backend/logs
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   pg_data:

@@ -2,24 +2,43 @@ from django.contrib import admin
 from django.utils.safestring import mark_safe
 from .models import Category, Tag, Allergen, Dish
 
+
+def _is_content_or_admin(user):
+    return user.is_superuser or getattr(user, 'role', '') in ('admin', 'content_manager')
+
+
+class ContentManagerMixin:
+    def has_view_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
+
+    def has_add_permission(self, request):
+        return _is_content_or_admin(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
+
+
 @admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
+class CategoryAdmin(ContentManagerMixin, admin.ModelAdmin):
     list_display = ('name', 'order')
     list_editable = ('order',)  # Позволяет менять порядок прямо в списке
     search_fields = ('name',)
 
 @admin.register(Tag)
-class TagAdmin(admin.ModelAdmin):
+class TagAdmin(ContentManagerMixin, admin.ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
 
 @admin.register(Allergen)
-class AllergenAdmin(admin.ModelAdmin):
+class AllergenAdmin(ContentManagerMixin, admin.ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
 
 @admin.register(Dish)
-class DishAdmin(admin.ModelAdmin):
+class DishAdmin(ContentManagerMixin, admin.ModelAdmin):
     # Колонки в общем списке
     list_display = ('name', 'category', 'price', 'is_active', 'image_preview_list')
     # Фильтры в правой панели

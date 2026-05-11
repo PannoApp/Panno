@@ -34,7 +34,9 @@ class VerifySMSSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'phone', 'first_name', 'last_name')
-        # Делаем id и phone только для чтения. 
-        # Смена номера телефона обычно требует отдельной логики с подтверждением по SMS.
+        fields = (
+            'id', 'phone', 'first_name', 'last_name',
+            'notifications_enabled',
+            'notify_events', 'notify_promotions', 'notify_closed_events',
+        )
         read_only_fields = ('id', 'phone')

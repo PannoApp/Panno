@@ -64,7 +64,8 @@ send_push_notification.delay(
     user_id=42,
     title="Бронирование подтверждено",
     body="Ваш столик забронирован. Ждём вас!",
-    data={"booking_id": "7", "status": "confirmed"}  # необязательно
+    data={"booking_id": "7", "status": "confirmed"},  # необязательно
+    category="events"  # необязательно
 )
 ```
 
@@ -74,6 +75,18 @@ send_push_notification.delay(
 | `title` | string | Заголовок уведомления |
 | `body` | string | Текст уведомления |
 | `data` | dict | Дополнительные данные для приложения (необязательно) |
+| `category` | string | Категория уведомления для проверки настроек пользователя (необязательно) |
+
+### Категории уведомлений
+
+| `category` | Флаг на модели User | Описание |
+|---|---|---|
+| `events` | `notify_events` | Мероприятия и афиша |
+| `promotions` | `notify_promotions` | Акции и специальные предложения |
+| `closed_events` | `notify_closed_events` | Закрытые/VIP события |
+| *(не передаётся)* | — | Сервисные уведомления (бронь) — всегда доставляются |
+
+Если `category` указан и пользователь отключил соответствующий флаг, push не отправляется.
 
 **Что делает задача:**
 1. Берёт все FCM-токены пользователя из `UserDevice`
@@ -83,12 +96,14 @@ send_push_notification.delay(
 
 ## Где вызывается задача
 
-| Событие | Триггер | Файл |
-|---|---|---|
-| Статус бронирования → `confirmed` | Django-сигнал `post_save` на `TableBooking` | `apps/bookings/signals.py` |
-| Статус бронирования → `canceled` | Django-сигнал `post_save` на `TableBooking` | `apps/bookings/signals.py` |
-| Статус бронирования → `completed` | Django-сигнал `post_save` на `TableBooking` | `apps/bookings/signals.py` |
-| Создана запись на мероприятие | Django-сигнал `post_save` на `EventReservation` | `apps/events/signals.py` |
+| Событие | Категория | Триггер | Файл |
+|---|---|---|---|
+| Создание брони (статус `pending`) | — (сервисное) | Django-сигнал `post_save` на `TableBooking` | `apps/bookings/signals.py` |
+| Статус бронирования → `confirmed` | — (сервисное) | Django-сигнал `post_save` на `TableBooking` | `apps/bookings/signals.py` |
+| Статус бронирования → `canceled` | — (сервисное) | Django-сигнал `post_save` на `TableBooking` | `apps/bookings/signals.py` |
+| Статус бронирования → `completed` | — (сервисное) | Django-сигнал `post_save` на `TableBooking` | `apps/bookings/signals.py` |
+| Напоминание за 1–2 ч до визита | — (сервисное) | Celery Beat (каждые 15 мин) | `apps/bookings/tasks.py` |
+| Создана запись на мероприятие | `events` | Django-сигнал `post_save` на `EventReservation` | `apps/events/signals.py` |
 
 ## Модель UserDevice
 
@@ -120,14 +135,60 @@ FIREBASE_CREDENTIALS_PATH=/app/backend/firebase-credentials.json
 - **В Docker:** путь `/app/backend/firebase-credentials.json` существует — Firebase работает.
 - **Локально (вне Docker):** путь не существует — Firebase не инициализируется, пуши не уходят. В консоль выводится предупреждение. Это ожидаемое поведение.
 
+## Массовая рассылка
+
+### POST /api/notifications/bulk-push/
+
+Ставит в очередь push-рассылку выбранному сегменту пользователей.
+
+**Авторизация:** Bearer JWT, только `is_staff=True`
+
+**Тело запроса:**
+```json
+{
+  "title": "Специальное предложение",
+  "body": "Скидка 20% на все блюда в пятницу!",
+  "data": {"promo_id": "42"},
+  "category": "promotions",
+  "segment": "all"
+}
+```
+
+| Параметр | Обязательное | Описание |
+|---|---|---|
+| `title` | Да | Заголовок уведомления |
+| `body` | Да | Текст уведомления |
+| `data` | Нет | Дополнительные данные (словарь строк) |
+| `category` | Нет | `events` / `promotions` / `closed_events` — проверяет флаги пользователя |
+| `segment` | Да | Сегмент аудитории (см. ниже) |
+| `last_visit_days` | Для `last_visit_days` | Количество дней |
+| `event_id` | Для `participated_in_event` | ID мероприятия |
+| `registered_after` | Для `registered_after` | Дата `YYYY-MM-DD` |
+
+### Сегменты
+
+| `segment` | Аудитория |
+|---|---|
+| `all` | Все пользователи с зарегистрированными FCM-устройствами |
+| `last_visit_days` | Пользователи, у которых есть бронирование со статусом `completed` за последние N дней |
+| `participated_in_event` | Участники конкретного мероприятия (`event_id`) |
+| `registered_after` | Пользователи, зарегистрированные после указанной даты |
+
+**Ответ 202:**
+```json
+{ "queued": 142, "segment": "all" }
+```
+
+Рассылка выполняется асинхронно через Celery: одна задача `send_bulk_push_notification` → N задач `send_push_notification`.
+
 ## Файлы модуля
 
 ```
 apps/notifications/
 ├── models.py       # UserDevice
-├── serializers.py  # UserDeviceSerializer
-├── views.py        # RegisterDeviceView
-├── tasks.py        # send_push_notification (Celery)
+├── serializers.py  # UserDeviceSerializer, BulkPushSerializer
+├── views.py        # RegisterDeviceView, BulkPushView
+├── tasks.py        # send_push_notification, send_bulk_push_notification (Celery)
 ├── apps.py         # инициализация Firebase в ready()
 └── urls.py         # Маршруты /api/notifications/
 ```

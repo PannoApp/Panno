@@ -46,11 +46,24 @@ class TableBooking(models.Model):
         verbose_name="Количество гостей"
     )
     
+    ZONE_CHOICES = [
+        ('main', 'Главный зал'),
+        ('terrace', 'Терраса'),
+        ('private', 'Приват'),
+    ]
+    zone = models.CharField(
+        "Зона/зал",
+        max_length=50,
+        choices=ZONE_CHOICES,
+        blank=True,
+        null=True,
+    )
+
     # Поле для дополнительных пожеланий клиента
     comment = models.TextField(
-        verbose_name="Комментарий", 
-        blank=True, 
-        null=True
+        verbose_name="Комментарий",
+        blank=True,
+        null=True,
     )
     
     # Текущий статус бронирования (по умолчанию "Ожидает подтверждения")

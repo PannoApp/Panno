@@ -21,12 +21,20 @@
 {
   "address": "г. Алматы, ул. Панфилова, 98",
   "working_hours": "Пн–Вс: 12:00–00:00",
+  "is_open_now": true,
   "tour_link": "https://tour.example.com/panno",
-  "twogis_link": "https://2gis.kz/almaty/firm/123456789"
+  "twogis_link": "https://2gis.kz/almaty/firm/123456789",
+  "phone": "+7 727 123-45-67",
+  "whatsapp": "+77001234567",
+  "telegram": "@panno_restaurant",
+  "instagram": "panno.restaurant",
+  "visit_rules": "Дресс-код: smart casual. Дети до 12 лет...",
+  "privacy_policy": "Настоящая политика...",
+  "terms_of_service": "Пользуясь приложением..."
 }
 ```
 
-Поля `tour_link` и `twogis_link` могут быть `null`, если ссылки не заполнены в админке.
+Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram` могут быть пустой строкой, если не заполнены в админке.
 
 ## Модель RestaurantInfo
 
@@ -34,9 +42,21 @@
 |---|---|---|
 | `id` | int | Всегда равен `1` |
 | `address` | string | Адрес ресторана (до 500 символов) |
-| `working_hours` | string | Часы работы (до 255 символов) |
+| `working_hours` | string | Часы работы в произвольном формате, например `Пн–Вс: 12:00–00:00` |
+| `is_open_now` | bool | Вычисляемое свойство — открыт ли ресторан прямо сейчас (парсит `working_hours`) |
 | `tour_link` | URL | Ссылка на 3D-тур (необязательная) |
 | `twogis_link` | URL | Ссылка на 2GIS (необязательная) |
+| `phone` | string | Телефон для связи |
+| `whatsapp` | string | Контакт в WhatsApp |
+| `telegram` | string | Контакт в Telegram |
+| `instagram` | string | Ссылка/никнейм Instagram |
+| `visit_rules` | text | Правила посещения ресторана |
+| `privacy_policy` | text | Политика обработки персональных данных |
+| `terms_of_service` | text | Пользовательское соглашение |
+
+### is_open_now
+
+Свойство парсит строку `working_hours` регулярным выражением и ищет диапазон вида `HH:MM–HH:MM`. Корректно обрабатывает переход через полночь (например, `20:00–02:00`). Возвращает `None`, если строка не распознана.
 
 ## Файлы модуля
 

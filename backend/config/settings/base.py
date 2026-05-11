@@ -189,6 +189,13 @@ else:
 # Указываем Django использовать нашу кастомную модель
 AUTH_USER_MODEL = 'users.User'
 
+# ==========================================
+# SMS-провайдер
+# ==========================================
+SMS_PROVIDER_URL = env('SMS_PROVIDER_URL', default='')
+SMS_LOGIN = env('SMS_LOGIN', default='')
+SMS_PASSWORD = env('SMS_PASSWORD', default='')
+
 # Настройки Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -277,6 +284,14 @@ CELERY_RESULT_SERIALIZER = 'json'
 
 # Часовой пояс для периодических задач (синхронизируем с Django)
 CELERY_TIMEZONE = TIME_ZONE
+
+# Периодические задачи (Celery Beat)
+CELERY_BEAT_SCHEDULE = {
+    'send-booking-reminders': {
+        'task': 'apps.bookings.tasks.send_booking_reminders',
+        'schedule': 60 * 15,  # каждые 15 минут
+    },
+}
 
 # ==========================================
 # Логирование

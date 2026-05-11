@@ -24,9 +24,19 @@ _STATUS_PUSH = {
 
 @receiver(post_save, sender=TableBooking)
 def notify_on_status_change(sender, instance, created, **kwargs):
-    if created:
-        return
+    from apps.notifications.tasks import send_push_notification
+
     if not instance.user_id:
+        return
+
+    if created:
+        send_push_notification.delay(
+            user_id=instance.user_id,
+            title="Заявка принята",
+            body="Мы свяжемся с вами в ближайшее время.",
+            data={'booking_id': str(instance.pk), 'status': 'pending'},
+        )
+        logger.info("Push queued: booking=%s created", instance.pk)
         return
 
     old_status = getattr(instance, '_original_status', None)
@@ -39,7 +49,6 @@ def notify_on_status_change(sender, instance, created, **kwargs):
 
     title, body = push
 
-    from apps.notifications.tasks import send_push_notification
     send_push_notification.delay(
         user_id=instance.user_id,
         title=title,

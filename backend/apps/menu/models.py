@@ -48,7 +48,9 @@ class Dish(models.Model):
     
     image = models.ImageField("Фото", upload_to="dishes/images/")
     video = models.FileField("Видео (для ленты)", upload_to="dishes/videos/", blank=True, null=True)
-    
+    weight = models.PositiveIntegerField("Вес (г)", null=True, blank=True)
+    story = models.TextField("История блюда", blank=True)
+
     is_active = models.BooleanField("Активно", default=True)
 
     class Meta:

@@ -1,0 +1,32 @@
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('events', '0002_eventreservation'),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name='event',
+            name='format',
+            field=models.CharField(
+                choices=[('open', 'Открытое'), ('closed', 'Закрытое')],
+                default='open',
+                max_length=10,
+                verbose_name='Формат',
+            ),
+        ),
+        migrations.AddField(
+            model_name='event',
+            name='price',
+            field=models.DecimalField(
+                blank=True,
+                decimal_places=2,
+                max_digits=10,
+                null=True,
+                verbose_name='Цена входа',
+            ),
+        ),
+    ]

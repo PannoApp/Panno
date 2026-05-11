@@ -1,5 +1,6 @@
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
+from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
@@ -60,6 +61,13 @@ class CategoryListView(generics.ListAPIView):
             description='Количество блюд на странице (по умолчанию 5, максимум 20)',
             required=False,
         ),
+        OpenApiParameter(
+            name='search',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description='Поиск по названию и описанию блюда (регистронезависимый)',
+            required=False,
+        ),
     ],
     responses={200: DishSerializer(many=True)},
 )
@@ -74,5 +82,6 @@ class DishListView(generics.ListAPIView):
     serializer_class = DishSerializer
     permission_classes = [AllowAny]
     pagination_class = VideoFeedPagination
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = DishFilter
+    search_fields = ['name', 'description']
