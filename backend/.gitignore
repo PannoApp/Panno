@@ -110,3 +110,5 @@ celerybeat.pid
 .DS_Store
 
 CLAUDE.md
+
+firebase-credentials.json

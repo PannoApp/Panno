@@ -31,9 +31,9 @@ def create_manager_group(sender, **kwargs):
 
 class BookingsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'bookings'
+    name = 'apps.bookings'
     verbose_name = 'Бронирования столов'
 
     def ready(self):
-        # Подключаем вызов функции к сигналу post_migrate
         post_migrate.connect(create_manager_group, sender=self)
+        from . import signals  # noqa: F401

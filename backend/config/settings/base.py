@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 import environ
 from datetime import timedelta
@@ -8,8 +7,6 @@ from datetime import timedelta
 # нам нужно подняться на 3 уровня вверх (settings -> config -> корень)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Добавляем путь к папке apps в sys.path, чтобы импортировать приложения напрямую
-sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 # Инициализация django-environ для чтения переменных окружения
 env = environ.Env(
     # Задаем дефолтное значение для DEBUG
@@ -39,11 +36,12 @@ INSTALLED_APPS = [
     'django_filters',
     
     # Мои приложения
-    'users.apps.UsersConfig',
-    'menu.apps.MenuConfig',
-    'bookings.apps.BookingsConfig',
-    'events.apps.EventsConfig',
-    'core.apps.CoreConfig',
+    'apps.users.apps.UsersConfig',
+    'apps.menu.apps.MenuConfig',
+    'apps.bookings.apps.BookingsConfig',
+    'apps.events.apps.EventsConfig',
+    'apps.core.apps.CoreConfig',
+    'apps.notifications.apps.NotificationsConfig',
 ]
 
 MIDDLEWARE = [
@@ -222,3 +220,24 @@ SIMPLE_JWT = {
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
 }
+
+
+# ==========================================
+# Настройки Celery и Redis
+# ==========================================
+
+# URL брокера сообщений (Redis). 
+# В Docker-compose сервис обычно называется 'redis'. 
+# Если запускаешь локально без Docker, используй 'redis://127.0.0.1:6379/0'
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://redis:6379/0')
+
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://redis:6379/0')
+
+# Форматы данных
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Часовой пояс для периодических задач (синхронизируем с Django)
+# Убедись, что переменная TIME_ZONE у тебя определена выше в этом же файле
+CELERY_TIMEZONE = TIME_ZONE

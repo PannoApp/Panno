@@ -3,7 +3,7 @@ from rest_framework.permissions import AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Dish, Category
 from .serializers import DishSerializer, CategorySerializer
-from .pagination import VideoFeedPagination
+from utils.pagination import VideoFeedPagination
 from .filters import DishFilter
 
 class CategoryListView(generics.ListAPIView):

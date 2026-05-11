@@ -57,5 +57,5 @@ class EventReservationSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         event = data['event']
         if EventReservation.objects.filter(user=user, event=event).exists():
-            raise serializers.ValidationError("Вы уже записаны на это меропиятие.")
+            raise serializers.ValidationError("Вы уже записаны на это мероприятие.")
         return data

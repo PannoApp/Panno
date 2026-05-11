@@ -5,14 +5,16 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/users/', include('users.urls')),
-    path('api/menu/', include('menu.urls')),
+    path('api/users/', include('apps.users.urls')),
+    path('api/menu/', include('apps.menu.urls')),
     # Подключаем Афишу и Новости
-    path('api/events/', include('events.urls')),
+    path('api/events/', include('apps.events.urls')),
     # Подключаем Бронирование (если уже готов urls.py для bookings)
-    path('api/bookings/', include('bookings.urls')),
+    path('api/bookings/', include('apps.bookings.urls')),
     # Подключаем Основные настройки ресторана
-    path('api/core/', include('core.urls')),
+    path('api/core/', include('apps.core.urls')),
+    # Подключаем пути уведомлений
+    path('api/notifications/', include('apps.notifications.urls')),
 ]
 
 if settings.DEBUG:

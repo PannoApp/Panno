@@ -1,6 +1,7 @@
 from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.utils import timezone
+from utils.pagination import StandardPagination
 from .models import Event, News, EventReservation
 from .serializers import EventSerializer, NewsSerializer, EventReservationSerializer
 
@@ -8,6 +9,7 @@ from .serializers import EventSerializer, NewsSerializer, EventReservationSerial
 class UpcomingEventsListView(generics.ListAPIView):
     serializer_class = EventSerializer
     permission_classes = [AllowAny]
+    pagination_class = StandardPagination
 
     def get_queryset(self):
         return Event.objects.filter(is_active=True, date_time__gte=timezone.now()).order_by('date_time')
@@ -16,6 +18,7 @@ class UpcomingEventsListView(generics.ListAPIView):
 class ArchivedEventsListView(generics.ListAPIView):
     serializer_class = EventSerializer
     permission_classes = [AllowAny]
+    pagination_class = StandardPagination
 
     def get_queryset(self):
         return Event.objects.filter(is_active=True, date_time__lt=timezone.now()).order_by('-date_time')
@@ -25,6 +28,7 @@ class NewsListView(generics.ListAPIView):
     queryset = News.objects.all()
     serializer_class = NewsSerializer
     permission_classes = [AllowAny]
+    pagination_class = StandardPagination
 
 class EventReservationCreateView(generics.CreateAPIView):
     """
@@ -40,14 +44,10 @@ class EventReservationCreateView(generics.CreateAPIView):
         serializer.save(user=self.request.user)
 
 class UserEventReservationsListView(generics.ListAPIView):
-    """
-    Просмотр истории записей текущего пользователя на мероприятия.
-    Доступно только авторизованным пользователям.
-    """
     serializer_class = EventReservationSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardPagination
 
     def get_queryset(self):
-        # Фильтруем бронирования так, чтобы юзер видел только свои записи
-        return EventReservation.objects.filter(user=self.request.user)
+        return EventReservation.objects.filter(user=self.request.user).select_related('event')
     

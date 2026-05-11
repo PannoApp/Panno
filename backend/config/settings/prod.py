@@ -1,7 +1,12 @@
 from .base import *
+from datetime import timedelta
 
-# В продакшене отладка должна быть строго выключена
 DEBUG = False
+
+SIMPLE_JWT = {
+    **SIMPLE_JWT,
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+}
 
 # Парсим строку из .env (например, "127.0.0.1,example.com") в список
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])

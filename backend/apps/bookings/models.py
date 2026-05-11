@@ -61,10 +61,14 @@ class TableBooking(models.Model):
         verbose_name="Статус"
     )
 
-    # Дата и время автоматического создания записи в БД
     created_at = models.DateTimeField(
-        auto_now_add=True, 
+        auto_now_add=True,
         verbose_name="Дата создания"
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Дата обновления"
     )
 
     class Meta:
@@ -72,6 +76,10 @@ class TableBooking(models.Model):
         verbose_name_plural = "Бронирования столов"
         # Сортировка: сначала отображаем самые ранние брони по дате и времени
         ordering = ['date', 'time']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_status = self.status
 
     def __str__(self):
         return f"Бронь {self.guest_name} на {self.date} {self.time}"

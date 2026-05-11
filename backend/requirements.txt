@@ -44,3 +44,5 @@ Pillow==10.3.0
 
 # filter
 django-filter==24.2
+
+firebase-admin==6.5.0

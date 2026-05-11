@@ -7,6 +7,6 @@ class RestaurantInfoAdmin(admin.ModelAdmin):
         # Запрещаем создавать больше одной записи
         return not RestaurantInfo.objects.exists()
     
-    def has_delete_permission(self, request, onj=None):
+    def has_delete_permission(self, request, obj=None):
         # Запрещаем удалять запись
         return False
