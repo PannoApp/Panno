@@ -96,7 +96,7 @@ Singleton-модель — в базе всегда ровно одна запи
 |------|-----------|
 | Фреймворк | Django 5 + Django REST Framework 3.15 |
 | Auth | SimpleJWT (Bearer-токены) |
-| БД | PostgreSQL 16 |
+| БД | PostgreSQL 16 + PgBouncer |
 | Кэш / Брокер | Redis 7 |
 | Очереди | Celery 5.3 |
 | Push | Firebase Admin SDK (FCM) |
@@ -117,8 +117,8 @@ ALLOWED_HOSTS=
 POSTGRES_DB=
 POSTGRES_USER=
 POSTGRES_PASSWORD=
-POSTGRES_HOST=db
-POSTGRES_PORT=5432
+POSTGRES_HOST=pgbouncer
+POSTGRES_PORT=6432
 
 REDIS_URL=redis://redis:6379/1
 CELERY_BROKER_URL=redis://redis:6379/0

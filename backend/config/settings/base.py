@@ -85,8 +85,14 @@ DATABASES = {
         'NAME': env('POSTGRES_DB'),
         'USER': env('POSTGRES_USER'),
         'PASSWORD': env('POSTGRES_PASSWORD'),
+        # Указываем имя контейнера pgbouncer из твоего docker-compose.yml
         'HOST': env('POSTGRES_HOST'),
+        # Указываем порт, который слушает PgBouncer
         'PORT': env('POSTGRES_PORT'),
+        # КРИТИЧНО для режима POOL_MODE=transaction:
+        # Отключаем серверные курсоры, так как PgBouncer в этом режиме 
+        # не гарантирует сохранение сессии между запросами.
+        'DISABLE_SERVER_SIDE_CURSORS': True,
     }
 }
 

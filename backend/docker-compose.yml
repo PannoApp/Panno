@@ -14,6 +14,29 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      # Указываем, куда стучаться (имя контейнера с БД)
+      - DB_HOST=db
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      # Имя базы данных
+      - DB_NAME=${POSTGRES_DB}
+      
+      # КРИТИЧНО: Режим пулирования
+      - POOL_MODE=transaction
+      # Максимальное количество соединений с самой БД
+      - MAX_CLIENT_CONN=1000
+      - DEFAULT_POOL_SIZE=100
+      # Отключаем SSL для внутренней Docker-сети (если не настроено иначе)
+      - AUTH_TYPE=scram-sha-256 # Или md5, в зависимости от настроек Postgres
+    ports:
+      - "6432:6432" # Стандартный порт PgBouncer
+    depends_on:
+      - db:
+        condition: service_healthy
 
   # Redis (для кэша и брокера Celery)
   redis:
@@ -43,6 +66,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
 
   # Воркер Celery (использует тот же Dockerfile)
   worker:
@@ -59,6 +84,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
 
   # Celery Beat (планировщик периодических задач)
   beat:
@@ -75,6 +102,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
 
 volumes:
   pg_data:
