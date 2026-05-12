@@ -1,8 +1,9 @@
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
+from rest_framework.generics import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
-from .models import RestaurantInfo
-from .serializers import RestaurantInfoSerializer
+from .models import RestaurantInfo, AppVersion
+from .serializers import RestaurantInfoSerializer, AppVersionSerializer
 
 
 @extend_schema(
@@ -42,3 +43,18 @@ class RestaurantInfoView(generics.RetrieveAPIView):
 
     def get_object(self):
         return RestaurantInfo.load()
+
+
+class AppVersionView(generics.RetrieveAPIView):
+    """
+    GET /api/v1/core/app-version/?platform=ios|android
+
+    Возвращает минимальную и последнюю версию приложения для заданной платформы.
+    Доступен без авторизации.
+    """
+    serializer_class   = AppVersionSerializer
+    permission_classes = [AllowAny]
+
+    def get_object(self):
+        platform = self.request.query_params.get('platform', '')
+        return get_object_or_404(AppVersion, platform=platform)

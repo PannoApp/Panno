@@ -26,9 +26,9 @@
 {
   "time": "2026-05-11 14:30:00",
   "level": "INFO",
-  "message": "Request: POST /api/users/auth/request-sms/ - 200",
+  "message": "Request: POST /api/v1/users/auth/request-sms/ - 200",
   "method": "POST",
-  "path": "/api/users/auth/request-sms/",
+  "path": "/api/v1/users/auth/request-sms/",
   "status_code": 200,
   "user_id": "Anonymous",
   "duration": 0.0452
@@ -47,9 +47,9 @@
 {
   "time": "2026-05-11 14:35:12",
   "level": "ERROR",
-  "message": "Unhandled Exception: POST /api/menu/items/",
+  "message": "Unhandled Exception: POST /api/v1/menu/items/",
   "method": "POST",
-  "path": "/api/menu/items/",
+  "path": "/api/v1/menu/items/",
   "status_code": 500,
   "user_id": "15",
   "duration": 0.1205,

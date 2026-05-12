@@ -119,22 +119,22 @@ class RequestSMSViewTest(APITestCase):
 
     @override_settings(DEBUG=True)
     def test_valid_phone_returns_200(self):
-        response = self.client.post('/api/users/auth/request-sms/', {'phone': '+77001234567'})
+        response = self.client.post('/api/v1/users/auth/request-sms/', {'phone': '+77001234567'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['message'], 'SMS код отправлен.')
 
     def test_invalid_phone_returns_400(self):
-        response = self.client.post('/api/users/auth/request-sms/', {'phone': 'notaphone'})
+        response = self.client.post('/api/v1/users/auth/request-sms/', {'phone': 'notaphone'})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('phone', response.data)
 
     def test_missing_phone_returns_400(self):
-        response = self.client.post('/api/users/auth/request-sms/', {})
+        response = self.client.post('/api/v1/users/auth/request-sms/', {})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @patch('apps.users.views.SMSService.send_sms', return_value=False)
     def test_sms_failure_returns_500(self, _):
-        response = self.client.post('/api/users/auth/request-sms/', {'phone': '+77001234567'})
+        response = self.client.post('/api/v1/users/auth/request-sms/', {'phone': '+77001234567'})
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         self.assertIn('error', response.data)
 
@@ -152,7 +152,7 @@ class VerifySMSViewTest(APITestCase):
         cache.set(f'otp_{self.PHONE}', self.OTP, 180)
 
     def test_valid_otp_returns_jwt_tokens(self):
-        response = self.client.post('/api/users/auth/verify-sms/', {
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
             'phone': self.PHONE, 'otp': self.OTP,
         })
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -161,7 +161,7 @@ class VerifySMSViewTest(APITestCase):
 
     def test_valid_otp_creates_new_user(self):
         self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
-        response = self.client.post('/api/users/auth/verify-sms/', {
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
             'phone': self.PHONE, 'otp': self.OTP,
         })
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -171,7 +171,7 @@ class VerifySMSViewTest(APITestCase):
     def test_valid_otp_existing_user_not_duplicated(self):
         User.objects.create_user(phone=self.PHONE)
         cache.set(f'otp_{self.PHONE}', self.OTP, 180)
-        response = self.client.post('/api/users/auth/verify-sms/', {
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
             'phone': self.PHONE, 'otp': self.OTP,
         })
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -179,24 +179,24 @@ class VerifySMSViewTest(APITestCase):
         self.assertEqual(User.objects.filter(phone=self.PHONE).count(), 1)
 
     def test_wrong_otp_returns_400(self):
-        response = self.client.post('/api/users/auth/verify-sms/', {
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
             'phone': self.PHONE, 'otp': '0000',
         })
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
     def test_invalid_otp_format_returns_400(self):
-        response = self.client.post('/api/users/auth/verify-sms/', {
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
             'phone': self.PHONE, 'otp': 'bad!',
         })
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_otp_consumed_after_successful_verify(self):
-        self.client.post('/api/users/auth/verify-sms/', {
+        self.client.post('/api/v1/users/auth/verify-sms/', {
             'phone': self.PHONE, 'otp': self.OTP,
         })
         cache.set(f'otp_{self.PHONE}', self.OTP, 180)
-        response = self.client.post('/api/users/auth/verify-sms/', {
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
             'phone': self.PHONE, 'otp': self.OTP,
         })
         # Second attempt with same OTP should succeed (we re-set OTP above)
@@ -219,18 +219,18 @@ class UserProfileViewTest(APITestCase):
 
     def test_get_own_profile_returns_200(self):
         self._auth()
-        response = self.client.get('/api/users/profile/')
+        response = self.client.get('/api/v1/users/profile/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['phone'], '+77001234567')
         self.assertEqual(response.data['first_name'], 'Алихан')
 
     def test_get_unauthenticated_returns_401(self):
-        response = self.client.get('/api/users/profile/')
+        response = self.client.get('/api/v1/users/profile/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_patch_updates_first_and_last_name(self):
         self._auth()
-        response = self.client.patch('/api/users/profile/', {
+        response = self.client.patch('/api/v1/users/profile/', {
             'first_name': 'Данияр',
             'last_name': 'Сейткали',
         })
@@ -241,22 +241,22 @@ class UserProfileViewTest(APITestCase):
 
     def test_patch_phone_is_read_only(self):
         self._auth()
-        self.client.patch('/api/users/profile/', {'phone': '+70000000000'})
+        self.client.patch('/api/v1/users/profile/', {'phone': '+70000000000'})
         self.user.refresh_from_db()
         self.assertEqual(self.user.phone, '+77001234567')
 
     def test_patch_id_is_read_only(self):
         self._auth()
         original_id = self.user.pk
-        self.client.patch('/api/users/profile/', {'id': 9999})
+        self.client.patch('/api/v1/users/profile/', {'id': 9999})
         self.user.refresh_from_db()
         self.assertEqual(self.user.pk, original_id)
 
     def test_put_not_allowed(self):
         self._auth()
-        response = self.client.put('/api/users/profile/', {'first_name': 'X'})
+        response = self.client.put('/api/v1/users/profile/', {'first_name': 'X'})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_patch_unauthenticated_returns_401(self):
-        response = self.client.patch('/api/users/profile/', {'first_name': 'X'})
+        response = self.client.patch('/api/v1/users/profile/', {'first_name': 'X'})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

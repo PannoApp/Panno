@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import RestaurantInfo
+from .models import RestaurantInfo, AppVersion
 
 
 class RestaurantInfoSerializer(serializers.ModelSerializer):
@@ -27,3 +27,9 @@ class RestaurantInfoSerializer(serializers.ModelSerializer):
 
     def get_is_open_now(self, obj) -> bool:
         return obj.is_open_now
+
+
+class AppVersionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = AppVersion
+        fields = ('platform', 'min_version', 'latest_version', 'store_url', 'updated_at')

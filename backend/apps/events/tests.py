@@ -60,7 +60,7 @@ class UpcomingEventsListViewTest(APITestCase):
     def test_returns_upcoming_active_events(self):
         make_event(title='Будущее', days_offset=2)
         make_past_event(title='Прошлое')
-        response = self.client.get('/api/events/upcoming/')
+        response = self.client.get('/api/v1/events/upcoming/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         titles = [e['title'] for e in response.data['results']]
         self.assertIn('Будущее', titles)
@@ -69,19 +69,19 @@ class UpcomingEventsListViewTest(APITestCase):
     def test_excludes_inactive_events(self):
         make_event(title='Активное', days_offset=1, is_active=True)
         make_event(title='Неактивное', days_offset=2, is_active=False)
-        response = self.client.get('/api/events/upcoming/')
+        response = self.client.get('/api/v1/events/upcoming/')
         titles = [e['title'] for e in response.data['results']]
         self.assertIn('Активное', titles)
         self.assertNotIn('Неактивное', titles)
 
     def test_public_access_no_auth_required(self):
-        response = self.client.get('/api/events/upcoming/')
+        response = self.client.get('/api/v1/events/upcoming/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_sorted_by_nearest_first(self):
         make_event(title='Далёкое', days_offset=10)
         make_event(title='Ближнее', days_offset=2)
-        response = self.client.get('/api/events/upcoming/')
+        response = self.client.get('/api/v1/events/upcoming/')
         titles = [e['title'] for e in response.data['results']]
         self.assertLess(titles.index('Ближнее'), titles.index('Далёкое'))
 
@@ -94,7 +94,7 @@ class ArchivedEventsListViewTest(APITestCase):
     def test_returns_past_events_only(self):
         make_past_event(title='Прошедшее')
         make_event(title='Будущее', days_offset=1)
-        response = self.client.get('/api/events/archived/')
+        response = self.client.get('/api/v1/events/archived/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         titles = [e['title'] for e in response.data['results']]
         self.assertIn('Прошедшее', titles)
@@ -109,12 +109,12 @@ class ArchivedEventsListViewTest(APITestCase):
             image=make_image(),
             is_active=False,
         )
-        response = self.client.get('/api/events/archived/')
+        response = self.client.get('/api/v1/events/archived/')
         titles = [e['title'] for e in response.data['results']]
         self.assertNotIn('НеактивноеПрошлое', titles)
 
     def test_public_access_no_auth_required(self):
-        response = self.client.get('/api/events/archived/')
+        response = self.client.get('/api/v1/events/archived/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
@@ -126,18 +126,18 @@ class NewsListViewTest(APITestCase):
     def test_returns_news_newest_first(self):
         News.objects.create(title='Старая', content='...')
         News.objects.create(title='Свежая', content='...')
-        response = self.client.get('/api/events/news/')
+        response = self.client.get('/api/v1/events/news/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         titles = [n['title'] for n in response.data['results']]
         self.assertIn('Свежая', titles)
         self.assertLess(titles.index('Свежая'), titles.index('Старая'))
 
     def test_public_access_no_auth_required(self):
-        response = self.client.get('/api/events/news/')
+        response = self.client.get('/api/v1/events/news/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_empty_list_returns_200(self):
-        response = self.client.get('/api/events/news/')
+        response = self.client.get('/api/v1/events/news/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
 
@@ -158,7 +158,7 @@ class EventReservationCreateViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_push_notification')
     def test_create_reservation_success(self, _):
         self._auth()
-        response = self.client.post('/api/events/reservations/create/', {
+        response = self.client.post('/api/v1/events/reservations/create/', {
             'event': self.event.pk,
             'guests_count': 2,
         })
@@ -169,20 +169,20 @@ class EventReservationCreateViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_push_notification')
     def test_create_sets_user_from_token(self, _):
         self._auth()
-        self.client.post('/api/events/reservations/create/', {'event': self.event.pk})
+        self.client.post('/api/v1/events/reservations/create/', {'event': self.event.pk})
         reservation = EventReservation.objects.get(event=self.event, user=self.user)
         self.assertEqual(reservation.user, self.user)
 
     @patch('apps.notifications.tasks.send_push_notification')
     def test_duplicate_reservation_returns_400(self, _):
         self._auth()
-        self.client.post('/api/events/reservations/create/', {'event': self.event.pk})
-        response = self.client.post('/api/events/reservations/create/', {'event': self.event.pk})
+        self.client.post('/api/v1/events/reservations/create/', {'event': self.event.pk})
+        response = self.client.post('/api/v1/events/reservations/create/', {'event': self.event.pk})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('non_field_errors', response.data)
 
     def test_unauthenticated_returns_401(self):
-        response = self.client.post('/api/events/reservations/create/', {
+        response = self.client.post('/api/v1/events/reservations/create/', {
             'event': self.event.pk,
         })
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -190,7 +190,7 @@ class EventReservationCreateViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_push_notification')
     def test_invalid_event_id_returns_400(self, _):
         self._auth()
-        response = self.client.post('/api/events/reservations/create/', {'event': 99999})
+        response = self.client.post('/api/v1/events/reservations/create/', {'event': 99999})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
@@ -212,18 +212,18 @@ class UserEventReservationsListViewTest(APITestCase):
         EventReservation.objects.create(event=self.event, user=self.user)
         EventReservation.objects.create(event=self.event, user=self.other)
         self._auth()
-        response = self.client.get('/api/events/reservations/my/')
+        response = self.client.get('/api/v1/events/reservations/my/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
 
     def test_unauthenticated_returns_401(self):
-        response = self.client.get('/api/events/reservations/my/')
+        response = self.client.get('/api/v1/events/reservations/my/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_response_contains_event_details(self):
         EventReservation.objects.create(event=self.event, user=self.user)
         self._auth()
-        response = self.client.get('/api/events/reservations/my/')
+        response = self.client.get('/api/v1/events/reservations/my/')
         result = response.data['results'][0]
         self.assertIn('event_details', result)
         self.assertEqual(result['event_details']['id'], self.event.pk)

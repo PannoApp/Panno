@@ -71,9 +71,9 @@ python manage.py spectacular --file openapi.yaml
 
 | URL | Описание |
 |---|---|
-| `/api/docs/` | Swagger UI — интерактивная документация |
-| `/api/redoc/` | ReDoc — читаемая документация |
-| `/api/schema/` | Сырая OpenAPI 3.0 схема (JSON/YAML) |
+| `/api/v1/docs/` | Swagger UI — интерактивная документация |
+| `/api/v1/redoc/` | ReDoc — читаемая документация |
+| `/api/v1/schema/` | Сырая OpenAPI 3.0 схема (JSON/YAML) |
 
 ## Добавление нового эндпоинта
 

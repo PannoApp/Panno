@@ -29,7 +29,7 @@ class RegisterDeviceViewTest(APITestCase):
 
     def test_register_new_device_returns_201(self):
         self._auth()
-        response = self.client.post('/api/notifications/device/register/', {
+        response = self.client.post('/api/v1/notifications/device/register/', {
             'fcm_token': 'token_abc_123',
         })
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -37,14 +37,14 @@ class RegisterDeviceViewTest(APITestCase):
 
     def test_register_new_device_creates_db_record(self):
         self._auth()
-        self.client.post('/api/notifications/device/register/', {'fcm_token': 'token_xyz'})
+        self.client.post('/api/v1/notifications/device/register/', {'fcm_token': 'token_xyz'})
         self.assertTrue(UserDevice.objects.filter(fcm_token='token_xyz', user=self.user).exists())
 
     def test_register_existing_token_relinks_to_current_user_returns_200(self):
         other = make_user('+77002222222')
         UserDevice.objects.create(user=other, fcm_token='shared_token')
         self._auth()
-        response = self.client.post('/api/notifications/device/register/', {
+        response = self.client.post('/api/v1/notifications/device/register/', {
             'fcm_token': 'shared_token',
         })
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -53,21 +53,21 @@ class RegisterDeviceViewTest(APITestCase):
         self.assertEqual(device.user, self.user)
 
     def test_register_unauthenticated_returns_401(self):
-        response = self.client.post('/api/notifications/device/register/', {
+        response = self.client.post('/api/v1/notifications/device/register/', {
             'fcm_token': 'some_token',
         })
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_register_without_token_returns_400(self):
         self._auth()
-        response = self.client.post('/api/notifications/device/register/', {})
+        response = self.client.post('/api/v1/notifications/device/register/', {})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('fcm_token', response.data)
 
     def test_one_user_can_have_multiple_devices(self):
         self._auth()
-        self.client.post('/api/notifications/device/register/', {'fcm_token': 'token_phone'})
-        self.client.post('/api/notifications/device/register/', {'fcm_token': 'token_tablet'})
+        self.client.post('/api/v1/notifications/device/register/', {'fcm_token': 'token_phone'})
+        self.client.post('/api/v1/notifications/device/register/', {'fcm_token': 'token_tablet'})
         self.assertEqual(UserDevice.objects.filter(user=self.user).count(), 2)
 
 
@@ -301,20 +301,20 @@ class BulkPushViewTest(APITestCase):
 
     def test_non_admin_returns_403(self):
         self._auth(self.regular)
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'T', 'body': 'B', 'segment': 'all',
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_unauthenticated_returns_401(self):
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'T', 'body': 'B', 'segment': 'all',
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_missing_title_returns_400(self):
         self._auth(self.admin)
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'body': 'B', 'segment': 'all',
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -323,7 +323,7 @@ class BulkPushViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_bulk_push_notification')
     def test_segment_all_returns_202(self, mock_task):
         self._auth(self.admin)
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'Привет', 'body': 'Текст', 'segment': 'all',
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
@@ -338,7 +338,7 @@ class BulkPushViewTest(APITestCase):
         UserDevice.objects.create(user=user_b, fcm_token='tok_b1')
 
         self._auth(self.admin)
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'T', 'body': 'B', 'segment': 'all',
         }, format='json')
         self.assertEqual(response.data['queued'], 2)  # 2 distinct users
@@ -346,7 +346,7 @@ class BulkPushViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_bulk_push_notification')
     def test_segment_participated_in_event_without_event_id_returns_400(self, mock_task):
         self._auth(self.admin)
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'T', 'body': 'B', 'segment': 'participated_in_event',
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -355,7 +355,7 @@ class BulkPushViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_bulk_push_notification')
     def test_segment_registered_after_without_date_returns_400(self, mock_task):
         self._auth(self.admin)
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'T', 'body': 'B', 'segment': 'registered_after',
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -364,7 +364,7 @@ class BulkPushViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_bulk_push_notification')
     def test_segment_last_visit_days_returns_202(self, mock_task):
         self._auth(self.admin)
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'T', 'body': 'B',
             'segment': 'last_visit_days', 'last_visit_days': 30,
         }, format='json')
@@ -496,7 +496,7 @@ class PushCampaignTest(APITestCase):
     @patch('apps.notifications.tasks.send_bulk_push_notification')
     def test_bulk_push_creates_campaign(self, mock_task):
         self._auth()
-        response = self.client.post('/api/notifications/bulk-push/', {
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'Акция недели',
             'body': 'Скидка 20%',
             'segment': 'all',
@@ -514,7 +514,7 @@ class PushCampaignTest(APITestCase):
     @patch('apps.notifications.tasks.send_bulk_push_notification')
     def test_campaign_id_passed_to_task(self, mock_task):
         self._auth()
-        self.client.post('/api/notifications/bulk-push/', {
+        self.client.post('/api/v1/notifications/bulk-push/', {
             'title': 'T', 'body': 'B', 'segment': 'all',
         }, format='json')
         from apps.notifications.models import PushCampaign

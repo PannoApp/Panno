@@ -96,9 +96,9 @@ docker-compose run --rm --no-deps backend \
 | `SMSServiceTest` | генерация OTP (4 цифры, диапазон), сохранение в кэш, однократное использование |
 | `RequestSMSSerializerTest` | валидация формата номера телефона |
 | `VerifySMSSerializerTest` | валидация OTP (ровно 4 цифры, только цифры) |
-| `RequestSMSViewTest` | `POST /api/users/auth/request-sms/` — успех, 400, 500 |
-| `VerifySMSViewTest` | `POST /api/users/auth/verify-sms/` — JWT-токены, создание нового пользователя, неверный код |
-| `UserProfileViewTest` | `GET/PATCH /api/users/profile/` — 401 без токена, read-only поля, PUT запрещён |
+| `RequestSMSViewTest` | `POST /api/v1/users/auth/request-sms/` — успех, 400, 500 |
+| `VerifySMSViewTest` | `POST /api/v1/users/auth/verify-sms/` — JWT-токены, создание нового пользователя, неверный код |
+| `UserProfileViewTest` | `GET/PATCH /api/v1/users/profile/` — 401 без токена, read-only поля, PUT запрещён |
 
 ### bookings — 48 тестов
 
@@ -138,7 +138,7 @@ docker-compose run --rm --no-deps backend \
 | Класс | Что проверяет |
 |---|---|
 | `RestaurantInfoModelTest` | `load()` создаёт запись, `save()` принудительно `pk=1`, `delete()` ничего не делает, вторая запись невозможна |
-| `RestaurantInfoViewTest` | `GET /api/core/info/` — публичный доступ, обязательные поля в ответе, nullable поля |
+| `RestaurantInfoViewTest` | `GET /api/v1/core/info/` — публичный доступ, обязательные поля в ответе, nullable поля |
 
 ### notifications — 30 тестов
 

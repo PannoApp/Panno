@@ -5,6 +5,7 @@
 ## 🚀 Базовые правила
 
 - **Base URL (Local):** `http://localhost:8000` (для эмулятора Android: `http://10.0.2.2:8000`)
+- **API Version:** Все эндпоинты используют префикс `/api/v1/`. Пример: `http://localhost:8000/api/v1/users/auth/request-sms/`
 - **Формат данных:** Все запросы и ответы используют `application/json`.
 - **Авторизация:** Большинство эндпоинтов закрыты. Используется JWT-авторизация. Токен передается в заголовке:
   ```http
@@ -27,12 +28,12 @@
 Авторизация работает без паролей, только через SMS (OTP код).
 
 ### 1.1 Запрос SMS-кода
-`POST /api/users/auth/request-sms/` (Без авторизации)
+`POST /api/v1/users/auth/request-sms/` (Без авторизации)
 - **Body:** `{"phone": "+77001234567"}`
 - **Response (200):** SMS отправлена. Код живет 3 минуты. (В режиме разработки код пишется в консоль бэкенда).
 
 ### 1.2 Подтверждение SMS и получение токена
-`POST /api/users/auth/verify-sms/` (Без авторизации)
+`POST /api/v1/users/auth/verify-sms/` (Без авторизации)
 - **Body:** `{"phone": "+77001234567", "otp": "4823"}`
 - **Response (200):** Возвращает токены.
   ```json
@@ -44,7 +45,7 @@
   *(Сохрани токены в `flutter_secure_storage`. Если юзера не было, он будет создан автоматически).*
 
 ### 1.3 Профиль пользователя
-- **Получить профиль:** `GET /api/users/profile/`
+- **Получить профиль:** `GET /api/v1/users/profile/`
   ```json
   {
     "id": 1,
@@ -57,7 +58,7 @@
     "notify_closed_events": true
   }
   ```
-- **Обновить профиль:** `PATCH /api/users/profile/`
+- **Обновить профиль:** `PATCH /api/v1/users/profile/`
   - **Body (любые поля):**
     ```json
     {
@@ -84,11 +85,11 @@
 ## 🍔 2. Меню ресторана
 
 ### 2.1 Категории
-`GET /api/menu/categories/`
+`GET /api/v1/menu/categories/`
 - Возвращает список категорий (отсортированных по порядку). Использовать для верхнего таб-бара.
 
 ### 2.2 Список блюд (Лента)
-`GET /api/menu/dishes/`
+`GET /api/v1/menu/dishes/`
 - По умолчанию отдает **5 блюд** на страницу (удобно для ленты видео/фото). 
 - **Query параметры:**
   - `?category_id=1` — фильтр по категории
@@ -104,7 +105,7 @@
 ## 📅 3. Бронирование столов (Bookings)
 
 ### 3.1 Создать бронь
-`POST /api/bookings/`
+`POST /api/v1/bookings/`
 - **Body:**
   ```json
   {
@@ -124,7 +125,7 @@
 - **Push-напоминания:** За 1–2 часа до визита пользователь получает push-напоминание о брони (сервисное, отключить нельзя).
 
 ### 3.2 Моя история броней
-`GET /api/bookings/`
+`GET /api/v1/bookings/`
 - Возвращает все брони текущего пользователя (с пагинацией), отсортированные по дате визита.
 
 ---
@@ -132,9 +133,9 @@
 ## 🎉 4. Мероприятия (Afisha) и Новости
 
 ### 4.1 Списки (Афиша и Новости)
-- **Предстоящие (Афиша):** `GET /api/events/upcoming/`
-- **Прошедшие (Архив):** `GET /api/events/archived/`
-- **Новости:** `GET /api/events/news/`
+- **Предстоящие (Афиша):** `GET /api/v1/events/upcoming/`
+- **Прошедшие (Архив):** `GET /api/v1/events/archived/`
+- **Новости:** `GET /api/v1/events/news/`
 
 **Поля карточки мероприятия:**
 
@@ -146,12 +147,12 @@
 *Пример:* `{"format": "closed", "price": "3500.00"}` — закрытое событие, билет 3500 ₸.
 
 ### 4.2 Запись на мероприятие
-`POST /api/events/reservations/create/`
+`POST /api/v1/events/reservations/create/`
 - **Body:** `{"event": 3, "guests_count": 2}`
 - **Ограничение:** Нельзя записаться на одно мероприятие дважды (вернет 400 ошибку).
 
 ### 4.3 Мои записи на мероприятия
-`GET /api/events/reservations/my/`
+`GET /api/v1/events/reservations/my/`
 - Возвращает список записей, внутри которых вложен объект `event_details` с полной информацией о самом событии.
 
 ---
@@ -159,7 +160,7 @@
 ## ℹ️ 5. Инфраструктура
 
 ### 5.1 Инфо о ресторане (Контакты, 3D тур)
-`GET /api/core/info/` (Без авторизации)
+`GET /api/v1/core/info/` (Без авторизации)
 - Возвращает всю статическую информацию о ресторане.
   ```json
   {
@@ -197,8 +198,27 @@
 | `tour_link` | URL для WebView 3D-тура |
 | `twogis_link` | URL маршрута в 2ГИС |
 
-### 5.2 Push-уведомления (Регистрация устройства)
-`POST /api/notifications/device/register/`
+### 5.2 Версия приложения (Force Update)
+`GET /api/v1/core/app-version/?platform=ios` или `?platform=android` (Без авторизации)
+- Вызывать при запуске приложения, до отображения главного экрана.
+- **Response (200):**
+  ```json
+  {
+    "platform": "android",
+    "min_version": "1.0.0",
+    "latest_version": "1.3.0",
+    "store_url": "https://play.google.com/store/apps/details?id=kz.panno",
+    "updated_at": "2026-05-12T10:00:00+06:00"
+  }
+  ```
+- **Логика на клиенте:**
+  - Если `current_version < min_version` → показывай диалог принудительного обновления (нельзя закрыть).
+  - Если `min_version ≤ current_version < latest_version` → показывай баннер "Доступно обновление" (можно закрыть).
+  - Если `current_version == latest_version` → всё актуально.
+- **Response (404):** если `platform` не передан или значение неизвестно.
+
+### 5.3 Push-уведомления (Регистрация устройства)
+`POST /api/v1/notifications/device/register/`
 - **Когда вызывать:** При успешном логине и при обновлении токена `FirebaseMessaging.instance.getToken()`.
 - **Body:** `{"fcm_token": "token_string_here..."}`
 

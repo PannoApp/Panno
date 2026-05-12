@@ -13,7 +13,7 @@ Category (Категория)
 
 ## Эндпоинты
 
-### GET /api/menu/categories/
+### GET /api/v1/menu/categories/
 
 Возвращает все категории, отсортированные по полю `order`.
 
@@ -32,7 +32,7 @@ Category (Категория)
 
 ---
 
-### GET /api/menu/dishes/
+### GET /api/v1/menu/dishes/
 
 Возвращает список активных блюд (`is_active=True`).
 
@@ -54,7 +54,7 @@ Category (Категория)
 ```json
 {
   "count": 42,
-  "next": "http://localhost:8000/api/menu/dishes/?page=2",
+  "next": "http://localhost:8000/api/v1/menu/dishes/?page=2",
   "previous": null,
   "results": [
     {
@@ -124,7 +124,7 @@ apps/menu/
 ├── serializers.py  # CategorySerializer, TagSerializer, AllergenSerializer, DishSerializer
 ├── views.py        # CategoryListView, DishListView
 ├── filters.py      # DishFilter (category_id, tag_id)
-└── urls.py         # Маршруты /api/menu/...
+└── urls.py         # Маршруты /api/v1/menu/...
 ```
 
 ## Важные нюансы

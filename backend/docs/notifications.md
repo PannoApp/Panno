@@ -10,7 +10,7 @@
 2. Firebase SDK на телефоне выдаёт FCM-токен (уникальный ID устройства)
         ↓
 3. Приложение отправляет токен на бэкенд
-   POST /api/notifications/device/register/
+   POST /api/v1/notifications/device/register/
         ↓
 4. Бэкенд сохраняет токен в таблицу UserDevice (привязан к пользователю)
         ↓
@@ -21,7 +21,7 @@
 
 ## Эндпоинт
 
-### POST /api/notifications/device/register/
+### POST /api/v1/notifications/device/register/
 
 Регистрирует или обновляет FCM-токен устройства.
 
@@ -137,7 +137,7 @@ FIREBASE_CREDENTIALS_PATH=/app/backend/firebase-credentials.json
 
 ## Массовая рассылка
 
-### POST /api/notifications/bulk-push/
+### POST /api/v1/notifications/bulk-push/
 
 Ставит в очередь push-рассылку выбранному сегменту пользователей.
 
@@ -183,7 +183,7 @@ FIREBASE_CREDENTIALS_PATH=/app/backend/firebase-credentials.json
 
 ## Статистика кампаний (PushCampaign)
 
-Каждый вызов `POST /api/notifications/bulk-push/` создаёт запись `PushCampaign` в базе данных. Статистика доступна в Django-админке: `Notifications → Push-кампании`.
+Каждый вызов `POST /api/v1/notifications/bulk-push/` создаёт запись `PushCampaign` в базе данных. Статистика доступна в Django-админке: `Notifications → Push-кампании`.
 
 | Поле | Описание |
 |---|---|
@@ -232,7 +232,7 @@ apps/notifications/
 ├── views.py        # RegisterDeviceView, BulkPushView
 ├── tasks.py        # send_push_notification, send_bulk_push_notification (Celery)
 ├── apps.py         # инициализация Firebase в ready()
-└── urls.py         # Маршруты /api/notifications/
+└── urls.py         # Маршруты /api/v1/notifications/
 ```
 
 ## Важные нюансы

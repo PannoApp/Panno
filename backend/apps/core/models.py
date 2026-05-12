@@ -68,3 +68,20 @@ class RestaurantInfo(models.Model):
         """Метод для получения синглтона."""
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class AppVersion(models.Model):
+    PLATFORM_CHOICES = [('ios', 'iOS'), ('android', 'Android')]
+
+    platform       = models.CharField("Платформа", max_length=10, choices=PLATFORM_CHOICES, unique=True)
+    min_version    = models.CharField("Минимальная версия (force update)", max_length=20)
+    latest_version = models.CharField("Последняя версия (optional update)", max_length=20)
+    store_url      = models.URLField("Ссылка на магазин", blank=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = "Версия приложения"
+        verbose_name_plural = "Версии приложения"
+
+    def __str__(self):
+        return f"{self.platform}: min={self.min_version}, latest={self.latest_version}"

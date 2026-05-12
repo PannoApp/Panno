@@ -10,7 +10,7 @@
 
 ## Эндпоинт
 
-### GET /api/core/info/
+### GET /api/v1/core/info/
 
 Возвращает публичную информацию о ресторане.
 
@@ -64,14 +64,51 @@
 
 Свойство парсит строку `working_hours` регулярным выражением и ищет диапазон вида `HH:MM–HH:MM`. Корректно обрабатывает переход через полночь (например, `20:00–02:00`). Возвращает `None`, если строка не распознана.
 
+---
+
+## Эндпоинт
+
+### GET /api/v1/core/app-version/
+
+Возвращает минимальную и последнюю версию приложения для конкретной платформы.
+
+**Авторизация:** не нужна
+
+**Query-параметры:** `platform` — `ios` или `android` (обязательный)
+
+**Ответ 200:**
+```json
+{
+  "platform": "ios",
+  "min_version": "1.0.0",
+  "latest_version": "1.3.0",
+  "store_url": "https://apps.apple.com/app/panno/id123",
+  "updated_at": "2026-05-12T10:00:00+06:00"
+}
+```
+
+**Ответ 404** — если `platform` не передан или не найден.
+
+## Модель AppVersion
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `platform` | string | Платформа: `ios` или `android` (уникальное) |
+| `min_version` | string | Минимальная поддерживаемая версия — ниже этой версии приложение должно принудительно обновиться |
+| `latest_version` | string | Последняя доступная версия — ниже этой версии показывается баннер "доступно обновление" |
+| `store_url` | URL | Ссылка на страницу приложения в App Store / Google Play |
+| `updated_at` | datetime | Дата последнего обновления записи (auto) |
+
+---
+
 ## Файлы модуля
 
 ```
 apps/core/
-├── models.py       # RestaurantInfo (Singleton)
-├── serializers.py  # RestaurantInfoSerializer
-├── views.py        # RestaurantInfoView
-└── urls.py         # Маршруты /api/core/
+├── models.py       # RestaurantInfo (Singleton), AppVersion
+├── serializers.py  # RestaurantInfoSerializer, AppVersionSerializer
+├── views.py        # RestaurantInfoView, AppVersionView
+└── urls.py         # Маршруты /api/v1/core/
 ```
 
 ## Важные нюансы

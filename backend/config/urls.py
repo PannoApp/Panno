@@ -9,16 +9,14 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
-    path('api/users/', include('apps.users.urls')),
-    path('api/menu/', include('apps.menu.urls')),
-    # Подключаем Афишу и Новости
-    path('api/events/', include('apps.events.urls')),
-    # Подключаем Бронирование (если уже готов urls.py для bookings)
-    path('api/bookings/', include('apps.bookings.urls')),
-    # Подключаем Основные настройки ресторана
-    path('api/core/', include('apps.core.urls')),
-    # Подключаем пути уведомлений
-    path('api/notifications/', include('apps.notifications.urls')),
+    path('api/v1/', include([
+        path('users/',         include('apps.users.urls')),
+        path('menu/',          include('apps.menu.urls')),
+        path('events/',        include('apps.events.urls')),
+        path('bookings/',      include('apps.bookings.urls')),
+        path('core/',          include('apps.core.urls')),
+        path('notifications/', include('apps.notifications.urls')),
+    ])),
 ]
 
 if settings.DEBUG:

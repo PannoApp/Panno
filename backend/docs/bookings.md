@@ -17,11 +17,11 @@
   status = "completed"  →  push: "Спасибо за визит!"
 ```
 
-Менеджер зала меняет статус через **Staff API** (`PATCH /api/bookings/staff/<pk>/`) или через **Django-админку**.
+Менеджер зала меняет статус через **Staff API** (`PATCH /api/v1/bookings/staff/<pk>/`) или через **Django-админку**.
 
 ## Эндпоинты
 
-### GET /api/bookings/
+### GET /api/v1/bookings/
 
 Список бронирований текущего пользователя. Отсортированы по дате и времени визита (сначала самые ранние).
 
@@ -52,7 +52,7 @@
 
 ---
 
-### POST /api/bookings/
+### POST /api/v1/bookings/
 
 Создаёт новое бронирование от имени текущего пользователя.
 
@@ -105,7 +105,7 @@
 
 ---
 
-### GET /api/bookings/staff/
+### GET /api/v1/bookings/staff/
 
 Список **всех** бронирований (всех пользователей) для персонала.
 
@@ -147,7 +147,7 @@
 
 ---
 
-### PATCH /api/bookings/staff/\<pk\>/
+### PATCH /api/v1/bookings/staff/\<pk\>/
 
 Обновляет статус (или другие поля) конкретного бронирования.
 
@@ -261,15 +261,15 @@ apps/bookings/
 ├── signals.py      # push при создании брони и смене статуса
 ├── tasks.py        # send_booking_reminders (Celery Beat, каждые 15 мин)
 ├── apps.py         # создание группы «Менеджер зала» + подключение signals
-└── urls.py         # Маршруты /api/bookings/
+└── urls.py         # Маршруты /api/v1/bookings/
 ```
 
 ## Сериализаторы
 
 | Класс | Используется | Поле `status` |
 |---|---|---|
-| `TableBookingSerializer` | `GET/POST /api/bookings/` (пользователь) | Только для чтения |
-| `TableBookingStaffSerializer` | `GET/PATCH /api/bookings/staff/` (персонал) | Доступно для записи |
+| `TableBookingSerializer` | `GET/POST /api/v1/bookings/` (пользователь) | Только для чтения |
+| `TableBookingStaffSerializer` | `GET/PATCH /api/v1/bookings/staff/` (персонал) | Доступно для записи |
 
 `TableBookingStaffSerializer` дополнительно включает поля `user_phone` (телефон из профиля владельца брони, read-only), `phone` (телефон, сохранённый в брони) и `updated_at`.
 
@@ -277,10 +277,10 @@ apps/bookings/
 
 | Эндпоинт | Кто имеет доступ |
 |---|---|
-| `GET /api/bookings/` | Любой авторизованный пользователь (свои брони) |
-| `POST /api/bookings/` | Любой авторизованный пользователь |
-| `GET /api/bookings/staff/` | `role=hall_manager` или `role=admin` |
-| `PATCH /api/bookings/staff/<pk>/` | `role=hall_manager` или `role=admin` |
+| `GET /api/v1/bookings/` | Любой авторизованный пользователь (свои брони) |
+| `POST /api/v1/bookings/` | Любой авторизованный пользователь |
+| `GET /api/v1/bookings/staff/` | `role=hall_manager` или `role=admin` |
+| `PATCH /api/v1/bookings/staff/<pk>/` | `role=hall_manager` или `role=admin` |
 
 Проверка роли осуществляется через `utils/permissions.py` → класс `IsHallManager`.
 

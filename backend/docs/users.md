@@ -24,7 +24,7 @@
 
 ## Эндпоинты
 
-### POST /api/users/auth/request-sms/
+### POST /api/v1/users/auth/request-sms/
 
 Запрашивает отправку SMS с кодом.
 
@@ -51,7 +51,7 @@
 
 ---
 
-### POST /api/users/auth/verify-sms/
+### POST /api/v1/users/auth/verify-sms/
 
 Проверяет OTP-код и выдаёт JWT-токены.
 
@@ -87,7 +87,7 @@
 
 ---
 
-### GET /api/users/profile/
+### GET /api/v1/users/profile/
 
 Возвращает профиль текущего пользователя.
 
@@ -109,7 +109,7 @@
 
 ---
 
-### PATCH /api/users/profile/
+### PATCH /api/v1/users/profile/
 
 Частичное обновление профиля. `id` и `phone` — только для чтения, изменить нельзя.
 
@@ -153,7 +153,7 @@
 | `refresh` | 7 дней | 7 дней |
 
 Для обновления access-токена через refresh — используй стандартный эндпоинт Simple JWT:
-`POST /api/token/refresh/` (если подключён в urls.py).
+`POST /api/v1/token/refresh/` (если подключён в urls.py).
 
 ## Файлы модуля
 
@@ -163,7 +163,7 @@ apps/users/
 ├── serializers.py  # RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer
 ├── views.py        # RequestSMSView, VerifySMSView, UserProfileView
 ├── services.py     # SMSService: генерация OTP, отправка SMS, верификация
-└── urls.py         # Маршруты /api/users/...
+└── urls.py         # Маршруты /api/v1/users/...
 ```
 
 ## SMS-сервис

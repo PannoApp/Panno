@@ -14,7 +14,7 @@ News (Новость) — независимая сущность
 
 ## Эндпоинты
 
-### GET /api/events/upcoming/
+### GET /api/v1/events/upcoming/
 
 Предстоящие мероприятия — дата проведения в будущем, отсортированы от ближайшего.
 
@@ -46,7 +46,7 @@ News (Новость) — независимая сущность
 
 ---
 
-### GET /api/events/archived/
+### GET /api/v1/events/archived/
 
 Прошедшие мероприятия — дата проведения в прошлом, отсортированы от самого свежего.
 
@@ -58,7 +58,7 @@ News (Новость) — независимая сущность
 
 ---
 
-### GET /api/events/news/
+### GET /api/v1/events/news/
 
 Новости ресторана, отсортированные от самой свежей.
 
@@ -70,7 +70,7 @@ News (Новость) — независимая сущность
 ```json
 {
   "count": 12,
-  "next": "http://localhost:8000/api/events/news/?page=2",
+  "next": "http://localhost:8000/api/v1/events/news/?page=2",
   "previous": null,
   "results": [
     {
@@ -88,7 +88,7 @@ News (Новость) — независимая сущность
 
 ---
 
-### POST /api/events/reservations/create/
+### POST /api/v1/events/reservations/create/
 
 Записывает текущего пользователя на мероприятие.
 
@@ -134,7 +134,7 @@ News (Новость) — независимая сущность
 
 ---
 
-### GET /api/events/reservations/my/
+### GET /api/v1/events/reservations/my/
 
 Список всех записей текущего пользователя на мероприятия.
 
@@ -210,7 +210,7 @@ apps/events/
 ├── views.py        # 5 view-классов
 ├── signals.py      # push при создании EventReservation
 ├── apps.py         # подключение signals в ready()
-└── urls.py         # Маршруты /api/events/...
+└── urls.py         # Маршруты /api/v1/events/...
 ```
 
 ## Важные нюансы

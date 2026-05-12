@@ -97,13 +97,13 @@ class TableBookingListCreateViewTest(APITestCase):
         make_booking(user=self.user)
         make_booking(user=self.other)
         self._auth()
-        response = self.client.get('/api/bookings/')
+        response = self.client.get('/api/v1/bookings/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['guest_name'], 'Тест Гость')
 
     def test_list_unauthenticated_returns_401(self):
-        response = self.client.get('/api/bookings/')
+        response = self.client.get('/api/v1/bookings/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_create_booking_success(self):
@@ -114,7 +114,7 @@ class TableBookingListCreateViewTest(APITestCase):
             'time': '19:00:00',
             'guests_count': 3,
         }
-        response = self.client.post('/api/bookings/', payload)
+        response = self.client.post('/api/v1/bookings/', payload)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['guest_name'], 'Алихан')
         self.assertEqual(response.data['status'], 'pending')
@@ -127,7 +127,7 @@ class TableBookingListCreateViewTest(APITestCase):
             'time': '20:00:00',
             'guests_count': 2,
         }
-        self.client.post('/api/bookings/', payload)
+        self.client.post('/api/v1/bookings/', payload)
         booking = TableBooking.objects.get(guest_name='Данияр')
         self.assertEqual(booking.user, self.user)
 
@@ -138,7 +138,7 @@ class TableBookingListCreateViewTest(APITestCase):
             'time': '19:00:00',
             'guests_count': 1,
         }
-        response = self.client.post('/api/bookings/', payload)
+        response = self.client.post('/api/v1/bookings/', payload)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_create_booking_invalid_guests_count_returns_400(self):
@@ -149,13 +149,13 @@ class TableBookingListCreateViewTest(APITestCase):
             'time': '19:00:00',
             'guests_count': 100,
         }
-        response = self.client.post('/api/bookings/', payload)
+        response = self.client.post('/api/v1/bookings/', payload)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('guests_count', response.data)
 
     def test_list_empty_when_no_bookings(self):
         self._auth()
-        response = self.client.get('/api/bookings/')
+        response = self.client.get('/api/v1/bookings/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 0)
 
@@ -405,24 +405,24 @@ class StaffBookingListViewTest(APITestCase):
     def test_hall_manager_can_list_all_bookings(self):
         make_booking(user=self.regular)
         self._auth(self.hall_manager)
-        response = self.client.get('/api/bookings/staff/')
+        response = self.client.get('/api/v1/bookings/staff/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
 
     def test_admin_can_list_all_bookings(self):
         make_booking(user=self.regular)
         self._auth(self.admin)
-        response = self.client.get('/api/bookings/staff/')
+        response = self.client.get('/api/v1/bookings/staff/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
 
     def test_regular_user_returns_403(self):
         self._auth(self.regular)
-        response = self.client.get('/api/bookings/staff/')
+        response = self.client.get('/api/v1/bookings/staff/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_unauthenticated_returns_401(self):
-        response = self.client.get('/api/bookings/staff/')
+        response = self.client.get('/api/v1/bookings/staff/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_returns_bookings_for_all_users(self):
@@ -430,13 +430,13 @@ class StaffBookingListViewTest(APITestCase):
         make_booking(user=self.regular)
         make_booking(user=other)
         self._auth(self.hall_manager)
-        response = self.client.get('/api/bookings/staff/')
+        response = self.client.get('/api/v1/bookings/staff/')
         self.assertEqual(response.data['count'], 2)
 
     def test_response_includes_user_phone(self):
         make_booking(user=self.regular)
         self._auth(self.hall_manager)
-        response = self.client.get('/api/bookings/staff/')
+        response = self.client.get('/api/v1/bookings/staff/')
         first = response.data['results'][0]
         self.assertIn('user_phone', first)
         self.assertEqual(first['user_phone'], self.regular.phone)
@@ -444,7 +444,7 @@ class StaffBookingListViewTest(APITestCase):
     def test_response_includes_status_field(self):
         make_booking(user=self.regular, status='confirmed')
         self._auth(self.hall_manager)
-        response = self.client.get('/api/bookings/staff/')
+        response = self.client.get('/api/v1/bookings/staff/')
         self.assertEqual(response.data['results'][0]['status'], 'confirmed')
 
 
@@ -468,7 +468,7 @@ class StaffBookingUpdateViewTest(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
 
     def _url(self, pk=None):
-        return f'/api/bookings/staff/{pk or self.booking.pk}/'
+        return f'/api/v1/bookings/staff/{pk or self.booking.pk}/'
 
     @patch('apps.notifications.tasks.send_push_notification')
     def test_hall_manager_can_change_status(self, _mock):
@@ -497,7 +497,7 @@ class StaffBookingUpdateViewTest(APITestCase):
 
     def test_nonexistent_booking_returns_404(self):
         self._auth(self.hall_manager)
-        response = self.client.patch('/api/bookings/staff/999999/', {'status': 'confirmed'}, format='json')
+        response = self.client.patch('/api/v1/bookings/staff/999999/', {'status': 'confirmed'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_invalid_status_value_returns_400(self):
@@ -593,7 +593,7 @@ class TableBookingPhoneAPITest(APITestCase):
             'time': '19:00:00',
             'guests_count': 2,
         }
-        response = self.client.post('/api/bookings/', payload)
+        response = self.client.post('/api/v1/bookings/', payload)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['phone'], '+77001112233')
         self.assertEqual(TableBooking.objects.get(guest_name='Данияр').phone, '+77001112233')
@@ -602,6 +602,6 @@ class TableBookingPhoneAPITest(APITestCase):
         make_booking(user=self.user, phone='+77001112244')
         refresh = RefreshToken.for_user(self.hall_manager)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
-        response = self.client.get('/api/bookings/staff/')
+        response = self.client.get('/api/v1/bookings/staff/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('phone', response.data['results'][0])

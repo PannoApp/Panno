@@ -42,31 +42,31 @@ class CategoryListViewTest(APITestCase):
         Category.objects.create(name='Напитки', order=3)
         Category.objects.create(name='Салаты', order=2)
         Category.objects.create(name='Горячие', order=1)
-        response = self.client.get('/api/menu/categories/')
+        response = self.client.get('/api/v1/menu/categories/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         orders = [c['order'] for c in response.data]
         self.assertEqual(orders, sorted(orders))
 
     def test_public_access_no_auth_required(self):
-        response = self.client.get('/api/menu/categories/')
+        response = self.client.get('/api/v1/menu/categories/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_returns_all_categories_without_pagination(self):
         for i in range(25):
             Category.objects.create(name=f'Кат {i}', order=i)
-        response = self.client.get('/api/menu/categories/')
+        response = self.client.get('/api/v1/menu/categories/')
         # No pagination — all items in a plain list
         self.assertIsInstance(response.data, list)
         self.assertEqual(len(response.data), 25)
 
     def test_empty_list_returns_200(self):
-        response = self.client.get('/api/menu/categories/')
+        response = self.client.get('/api/v1/menu/categories/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
 
     def test_response_contains_required_fields(self):
         Category.objects.create(name='Десерты', order=5)
-        response = self.client.get('/api/menu/categories/')
+        response = self.client.get('/api/v1/menu/categories/')
         item = response.data[0]
         self.assertIn('id', item)
         self.assertIn('name', item)
@@ -93,7 +93,7 @@ class DishListViewTest(APITestCase):
         self.inactive = make_dish(self.cat1, name='Скрытое блюдо', is_active=False)
 
     def test_returns_only_active_dishes(self):
-        response = self.client.get('/api/menu/dishes/')
+        response = self.client.get('/api/v1/menu/dishes/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = [d['name'] for d in response.data['results']]
         self.assertIn('Стейк', names)
@@ -101,18 +101,18 @@ class DishListViewTest(APITestCase):
         self.assertNotIn('Скрытое блюдо', names)
 
     def test_public_access_no_auth_required(self):
-        response = self.client.get('/api/menu/dishes/')
+        response = self.client.get('/api/v1/menu/dishes/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_filter_by_category_id(self):
-        response = self.client.get(f'/api/menu/dishes/?category_id={self.cat1.pk}')
+        response = self.client.get(f'/api/v1/menu/dishes/?category_id={self.cat1.pk}')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = [d['name'] for d in response.data['results']]
         self.assertIn('Стейк', names)
         self.assertNotIn('Греческий салат', names)
 
     def test_filter_by_tag_id(self):
-        response = self.client.get(f'/api/menu/dishes/?tag_id={self.tag.pk}')
+        response = self.client.get(f'/api/v1/menu/dishes/?tag_id={self.tag.pk}')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = [d['name'] for d in response.data['results']]
         self.assertIn('Стейк', names)
@@ -122,18 +122,18 @@ class DishListViewTest(APITestCase):
         cat = make_category('Большая', order=10)
         for i in range(10):
             make_dish(cat, name=f'Блюдо {i}')
-        response = self.client.get('/api/menu/dishes/')
+        response = self.client.get('/api/v1/menu/dishes/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertLessEqual(len(response.data['results']), 5)
 
     def test_response_contains_nested_category(self):
-        response = self.client.get(f'/api/menu/dishes/?category_id={self.cat1.pk}')
+        response = self.client.get(f'/api/v1/menu/dishes/?category_id={self.cat1.pk}')
         dish = response.data['results'][0]
         self.assertIn('category', dish)
         self.assertEqual(dish['category']['id'], self.cat1.pk)
 
     def test_response_contains_tags_and_allergens(self):
-        response = self.client.get(f'/api/menu/dishes/?category_id={self.cat2.pk}')
+        response = self.client.get(f'/api/v1/menu/dishes/?category_id={self.cat2.pk}')
         dish = response.data['results'][0]
         self.assertIn('tags', dish)
         self.assertIn('allergens', dish)
@@ -144,7 +144,7 @@ class DishListViewTest(APITestCase):
         cat = make_category('Огромная', order=20)
         for i in range(6):
             make_dish(cat, name=f'Доп {i}')
-        response = self.client.get(f'/api/menu/dishes/?category_id={cat.pk}')
+        response = self.client.get(f'/api/v1/menu/dishes/?category_id={cat.pk}')
         self.assertIsNotNone(response.data.get('next'))
 
 
