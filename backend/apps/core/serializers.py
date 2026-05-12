@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import RestaurantInfo, AppVersion
+from .models import RestaurantInfo, AppVersion, InteriorPhoto
 
 
 class RestaurantInfoSerializer(serializers.ModelSerializer):
@@ -10,9 +10,14 @@ class RestaurantInfoSerializer(serializers.ModelSerializer):
         fields = (
             'address',
             'working_hours',
+            # Временное изменение режима — пустая строка если нет активного уведомления
+            'working_hours_note',
             'is_open_now',
             'tour_link',
+            # Ссылки для кнопки «Построить маршрут» — передавай все, клиент покажет доступные
             'twogis_link',
+            'google_maps_link',
+            'yandex_maps_link',
             'phone',
             'whatsapp',
             'telegram',
@@ -23,6 +28,10 @@ class RestaurantInfoSerializer(serializers.ModelSerializer):
             'visit_rules',
             'privacy_policy',
             'terms_of_service',
+            'feedback_url',
+            # Флаг депозита: если True — Flutter показывает предупреждение в форме бронирования
+            'booking_deposit_required',
+            'booking_deposit_note',
         )
 
     def get_is_open_now(self, obj) -> bool:
@@ -33,3 +42,12 @@ class AppVersionSerializer(serializers.ModelSerializer):
     class Meta:
         model  = AppVersion
         fields = ('platform', 'min_version', 'latest_version', 'store_url', 'updated_at')
+
+
+class InteriorPhotoSerializer(serializers.ModelSerializer):
+    # zone_display — человекочитаемое название зоны (например "Терраса" вместо "terrace")
+    zone_display = serializers.CharField(source='get_zone_display', read_only=True)
+
+    class Meta:
+        model  = InteriorPhoto
+        fields = ('id', 'zone', 'zone_display', 'image', 'caption', 'order')

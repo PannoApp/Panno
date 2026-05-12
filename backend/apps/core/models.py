@@ -8,9 +8,44 @@ class RestaurantInfo(models.Model):
     Информация о ресторане (Singleton-модель).
     """
     address = models.CharField(max_length=500, verbose_name="Адрес")
-    working_hours = models.CharField(max_length=255, verbose_name="Часы работы")
+    working_hours = models.CharField(
+        max_length=500,
+        verbose_name="Часы работы",
+        help_text="Напр.: «Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00»",
+    )
+    # Временное уведомление об изменении режима — показывается поверх основных часов.
+    # Примеры: «Закрыто 1 января», «В новогоднюю ночь работаем до 04:00».
+    # Оставьте пустым, чтобы не показывать дополнительное сообщение.
+    working_hours_note = models.CharField(
+        "Временное изменение режима",
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Разовое уведомление, которое Flutter покажет гостям (напр.: «Закрыто 1 января»).",
+    )
     tour_link = models.URLField(blank=True, null=True, verbose_name="Ссылка на 3D-тур")
-    twogis_link = models.URLField(blank=True, null=True, verbose_name="Ссылка на 2GIS")
+
+    # Ссылки для кнопки «Построить маршрут» — приложение показывает те, что заполнены
+    twogis_link       = models.URLField(blank=True, null=True, verbose_name="Ссылка на 2GIS")
+    google_maps_link  = models.URLField(blank=True, null=True, verbose_name="Ссылка на Google Maps")
+    yandex_maps_link  = models.URLField(blank=True, null=True, verbose_name="Ссылка на Яндекс.Карты")
+
+    # URL для обратной связи (форма, email-ссылка mailto:, WhatsApp и т.п.)
+    feedback_url = models.URLField("Обратная связь (URL)", blank=True, null=True)
+
+    # Если ресторан требует депозит при бронировании — Flutter показывает предупреждение
+    # и предлагает гостю позвонить менеджеру. Оплата через приложение не принимается.
+    booking_deposit_required = models.BooleanField(
+        "Требуется депозит при бронировании",
+        default=False,
+    )
+    booking_deposit_note = models.CharField(
+        "Текст предупреждения о депозите",
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Напр.: «При бронировании приват-зала необходим депозит. Позвоните менеджеру.»",
+    )
 
     phone = models.CharField("Телефон", max_length=20, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=100, blank=True)
@@ -68,6 +103,36 @@ class RestaurantInfo(models.Model):
         """Метод для получения синглтона."""
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class InteriorPhoto(models.Model):
+    """
+    Фотография интерьера ресторана для галереи во вкладке «Интерьер».
+    Фотографии группируются по зонам (главный зал, бар, терраса и т.д.).
+    """
+
+    ZONE_CHOICES = [
+        ('main_hall', 'Главный зал'),
+        ('bar',       'Бар'),
+        ('private',   'Приватная комната'),
+        ('terrace',   'Терраса'),
+        ('other',     'Другое'),
+    ]
+
+    zone    = models.CharField("Зона", max_length=20, choices=ZONE_CHOICES, default='main_hall')
+    image   = models.ImageField("Фото", upload_to='interior/')
+    caption = models.CharField("Подпись (необязательно)", max_length=255, blank=True)
+
+    # Порядок отображения внутри зоны — меньше = раньше
+    order   = models.PositiveIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name        = "Фото интерьера"
+        verbose_name_plural = "Фото интерьера"
+        ordering            = ['zone', 'order']
+
+    def __str__(self):
+        return f"{self.get_zone_display()} — {self.image.name}"
 
 
 class AppVersion(models.Model):

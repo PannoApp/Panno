@@ -20,7 +20,8 @@
 ```json
 {
   "address": "г. Алматы, ул. Панфилова, 98",
-  "working_hours": "Пн–Вс: 12:00–00:00",
+  "working_hours": "Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00",
+  "working_hours_note": "Закрыто 1 января",
   "is_open_now": true,
   "tour_link": "https://tour.example.com/panno",
   "twogis_link": "https://2gis.kz/almaty/firm/123456789",
@@ -45,7 +46,8 @@
 |---|---|---|
 | `id` | int | Всегда равен `1` |
 | `address` | string | Адрес ресторана (до 500 символов) |
-| `working_hours` | string | Часы работы в произвольном формате, например `Пн–Вс: 12:00–00:00` |
+| `working_hours` | string | Основное расписание (до 500 символов), например `Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00` |
+| `working_hours_note` | string | Временное изменение режима (пустая строка если нет активного уведомления). Пример: `Закрыто 1 января`. Flutter показывает поверх основного расписания. |
 | `is_open_now` | bool | Вычисляемое свойство — открыт ли ресторан прямо сейчас (парсит `working_hours`) |
 | `tour_link` | URL | Ссылка на 3D-тур (необязательная) |
 | `twogis_link` | URL | Ссылка на 2GIS (необязательная) |
@@ -101,13 +103,24 @@
 
 ---
 
+## Django Admin — контроль ролей
+
+| Секция | admin | content_manager | hall_manager |
+|---|---|---|---|
+| `RestaurantInfo` (контакты, часы, контент главной, юридика) | ✅ view/change | ✅ view/change | ❌ |
+| `AppVersion` (версии приложения) | ✅ full | ❌ | ❌ |
+| `InteriorPhoto` (фото интерьера) | ✅ full | ✅ full | ❌ |
+
+**Важно:** при назначении роли (`role != ''`) в `UserAdmin` поле `is_staff` автоматически устанавливается в `True` — иначе сотрудник не может войти в Django Admin. При снятии роли `is_staff` сбрасывается в `False` (кроме суперпользователей).
+
 ## Файлы модуля
 
 ```
 apps/core/
-├── models.py       # RestaurantInfo (Singleton), AppVersion
-├── serializers.py  # RestaurantInfoSerializer, AppVersionSerializer
-├── views.py        # RestaurantInfoView, AppVersionView
+├── models.py       # RestaurantInfo (Singleton), InteriorPhoto, AppVersion
+├── serializers.py  # RestaurantInfoSerializer, AppVersionSerializer, InteriorPhotoSerializer
+├── views.py        # RestaurantInfoView, AppVersionView, InteriorPhotoListView
+├── admin.py        # RestaurantInfoAdmin, InteriorPhotoAdmin, AppVersionAdmin (роли)
 └── urls.py         # Маршруты /api/v1/core/
 ```
 

@@ -36,6 +36,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'id', 'phone', 'first_name', 'last_name',
+            # Город — Flutter передаёт при наличии разрешения на геолокацию
+            'city',
             'notifications_enabled',
             'notify_events', 'notify_promotions', 'notify_closed_events',
         )

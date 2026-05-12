@@ -35,11 +35,17 @@ def send_push_notification(user_id, title, body, data=None, category=None, campa
     from django.contrib.auth import get_user_model
     User = get_user_model()
 
-    # Проверка категорийных настроек
+    # Проверка настроек для маркетинговых категорий.
+    # Сервисные пуши (category=None) — обязательные, настройки не применяются.
     if category and category in _CATEGORY_FLAG:
         flag = _CATEGORY_FLAG[category]
         try:
-            user = User.objects.only(flag).get(pk=user_id)
+            user = User.objects.only('notifications_enabled', flag).get(pk=user_id)
+            # Глобальный выключатель — отключает все маркетинговые уведомления сразу
+            if not user.notifications_enabled:
+                logger.info("Push skipped: user=%s notifications_enabled=False", user_id)
+                return
+            # Категорийный выключатель — пользователь отключил конкретную категорию
             if not getattr(user, flag):
                 logger.info("Push skipped: user=%s disabled category=%s", user_id, category)
                 return
@@ -88,27 +94,31 @@ def send_push_notification(user_id, title, body, data=None, category=None, campa
         return
 
     # 2. Формируем сообщение
+    # FCM требует, чтобы все значения data были строками
+    str_data = {k: str(v) for k, v in (data or {}).items()}
+
     message = messaging.MulticastMessage(
         notification=messaging.Notification(
             title=title,
             body=body,
         ),
-        data=data or {},
+        data=str_data,
         tokens=tokens,
     )
 
     # 3. Отправляем
-    response = messaging.send_multicast(message)
-    
+    # send_multicast использовал устаревший batch-эндпоинт fcm.googleapis.com/batch
+    # (Google отключил его — отсюда 404). send_each_for_multicast отправляет
+    # каждое сообщение через HTTP v1 API индивидуально.
+    response = messaging.send_each_for_multicast(message)
+
     # 4. Обработка результатов (чистка невалидных токенов)
     if response.failure_count > 0:
-        responses = response.responses
-        for idx, resp in enumerate(responses):
+        for idx, resp in enumerate(response.responses):
             if not resp.success:
-                # Если токен невалидный — удаляем его, чтобы не слать в пустоту
                 token_to_remove = tokens[idx]
                 UserDevice.objects.filter(fcm_token=token_to_remove).delete()
-                logger.warning(f"Удален невалидный токен: {token_to_remove}")
+                logger.warning("Удален невалидный FCM-токен: %s | error: %s", token_to_remove, resp.exception)
 
     logger.info(f"Отправлено пушей: {response.success_count}, Ошибок: {response.failure_count}")
 

@@ -41,10 +41,11 @@ class CategoryListView(generics.ListAPIView):
             examples=[],
         ),
         OpenApiParameter(
-            name='tag_id',
-            type=OpenApiTypes.INT,
+            name='tag_ids',
+            type=OpenApiTypes.STR,
             location=OpenApiParameter.QUERY,
-            description='Фильтр по ID тега',
+            # Принимает список ID через запятую: ?tag_ids=1,2,3
+            description='Фильтр по нескольким тегам (ID через запятую). Пример: ?tag_ids=1,2,3',
             required=False,
         ),
         OpenApiParameter(
@@ -77,6 +78,9 @@ class DishListView(generics.ListAPIView):
         .filter(is_active=True)
         .select_related('category')
         .prefetch_related('tags', 'allergens')
+        # distinct() обязателен: при фильтрации по tag_ids блюдо с несколькими
+        # совпавшими тегами без distinct вернётся в результатах несколько раз
+        .distinct()
         .order_by('category__order', 'id')
     )
     serializer_class = DishSerializer

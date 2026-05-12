@@ -191,6 +191,15 @@ class BookingSignalTest(TestCase):
         self.assertIn('booking_id', kwargs['data'])
 
     @patch('apps.notifications.tasks.send_push_notification')
+    def test_confirmed_push_body_contains_date_and_time(self, mock_task):
+        """Push при подтверждении должен содержать дату и время визита (по ТЗ)."""
+        self._change_status('confirmed')
+        _, kwargs = mock_task.delay.call_args
+        # Дата в формате DD.MM.YYYY, время в формате HH:MM
+        self.assertIn('15.06.2026', kwargs['body'])
+        self.assertIn('19:00', kwargs['body'])
+
+    @patch('apps.notifications.tasks.send_push_notification')
     def test_push_sent_on_canceled(self, mock_task):
         self._change_status('canceled')
         mock_task.delay.assert_called_once()

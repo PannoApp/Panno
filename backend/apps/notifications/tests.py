@@ -102,7 +102,7 @@ class SendPushNotificationTaskTest(TestCase):
     def test_skips_if_no_devices(self, mock_messaging):
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=self.user.pk, title='T', body='B')
-        mock_messaging.send_multicast.assert_not_called()
+        mock_messaging.send_each_for_multicast.assert_not_called()
 
     @patch('apps.notifications.tasks.messaging')
     def test_sends_to_all_devices(self, mock_messaging):
@@ -112,12 +112,12 @@ class SendPushNotificationTaskTest(TestCase):
         mock_response = MagicMock()
         mock_response.failure_count = 0
         mock_response.success_count = 2
-        mock_messaging.send_multicast.return_value = mock_response
+        mock_messaging.send_each_for_multicast.return_value = mock_response
 
         from apps.notifications.tasks import send_push_notification
         result = send_push_notification(user_id=self.user.pk, title='Заголовок', body='Текст')
 
-        mock_messaging.send_multicast.assert_called_once()
+        mock_messaging.send_each_for_multicast.assert_called_once()
         # Inspect constructor call args, not mock instance attributes
         _, kwargs = mock_messaging.MulticastMessage.call_args
         self.assertIn('tok1', kwargs['tokens'])
@@ -139,7 +139,7 @@ class SendPushNotificationTaskTest(TestCase):
         mock_response.failure_count = 1
         mock_response.success_count = 1
         mock_response.responses = [ok_resp, failed_resp]
-        mock_messaging.send_multicast.return_value = mock_response
+        mock_messaging.send_each_for_multicast.return_value = mock_response
 
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=self.user.pk, title='T', body='B')
@@ -156,7 +156,7 @@ class SendPushNotificationTaskTest(TestCase):
         mock_response = MagicMock()
         mock_response.failure_count = 0
         mock_response.success_count = 1
-        mock_messaging.send_multicast.return_value = mock_response
+        mock_messaging.send_each_for_multicast.return_value = mock_response
 
         extra = {'booking_id': '7', 'status': 'confirmed'}
 
@@ -173,7 +173,7 @@ class SendPushNotificationTaskTest(TestCase):
         mock_response = MagicMock()
         mock_response.failure_count = 0
         mock_response.success_count = 1
-        mock_messaging.send_multicast.return_value = mock_response
+        mock_messaging.send_each_for_multicast.return_value = mock_response
 
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=self.user.pk, title='T', body='B')
@@ -197,7 +197,7 @@ class SendPushNotificationCategoryTest(TestCase):
         self.user.save()
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=self.user.pk, title='T', body='B', category='events')
-        mock_messaging.send_multicast.assert_not_called()
+        mock_messaging.send_each_for_multicast.assert_not_called()
 
     @patch('apps.notifications.tasks.messaging')
     def test_skips_when_notify_promotions_disabled(self, mock_messaging):
@@ -205,7 +205,7 @@ class SendPushNotificationCategoryTest(TestCase):
         self.user.save()
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=self.user.pk, title='T', body='B', category='promotions')
-        mock_messaging.send_multicast.assert_not_called()
+        mock_messaging.send_each_for_multicast.assert_not_called()
 
     @patch('apps.notifications.tasks.messaging')
     def test_skips_when_notify_closed_events_disabled(self, mock_messaging):
@@ -213,17 +213,17 @@ class SendPushNotificationCategoryTest(TestCase):
         self.user.save()
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=self.user.pk, title='T', body='B', category='closed_events')
-        mock_messaging.send_multicast.assert_not_called()
+        mock_messaging.send_each_for_multicast.assert_not_called()
 
     @patch('apps.notifications.tasks.messaging')
     def test_sends_when_category_is_none(self, mock_messaging):
         mock_response = MagicMock()
         mock_response.failure_count = 0
         mock_response.success_count = 1
-        mock_messaging.send_multicast.return_value = mock_response
+        mock_messaging.send_each_for_multicast.return_value = mock_response
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=self.user.pk, title='T', body='B', category=None)
-        mock_messaging.send_multicast.assert_called_once()
+        mock_messaging.send_each_for_multicast.assert_called_once()
 
     @patch('apps.notifications.tasks.messaging')
     def test_sends_when_category_unknown(self, mock_messaging):
@@ -231,16 +231,16 @@ class SendPushNotificationCategoryTest(TestCase):
         mock_response = MagicMock()
         mock_response.failure_count = 0
         mock_response.success_count = 1
-        mock_messaging.send_multicast.return_value = mock_response
+        mock_messaging.send_each_for_multicast.return_value = mock_response
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=self.user.pk, title='T', body='B', category='unknown_cat')
-        mock_messaging.send_multicast.assert_called_once()
+        mock_messaging.send_each_for_multicast.assert_called_once()
 
     @patch('apps.notifications.tasks.messaging')
     def test_returns_early_when_user_does_not_exist(self, mock_messaging):
         from apps.notifications.tasks import send_push_notification
         send_push_notification(user_id=999999, title='T', body='B', category='events')
-        mock_messaging.send_multicast.assert_not_called()
+        mock_messaging.send_each_for_multicast.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -386,12 +386,12 @@ class PushWeeklyLimitTest(TestCase):
     @patch('apps.notifications.tasks.messaging')
     def test_push_within_limit_is_sent(self, mock_msg, mock_cache):
         mock_cache.get.return_value = 0
-        mock_msg.send_multicast.return_value = MagicMock(
+        mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
         from apps.notifications.tasks import send_push_notification
         send_push_notification(self.user.pk, 'T', 'B', category='events')
-        mock_msg.send_multicast.assert_called_once()
+        mock_msg.send_each_for_multicast.assert_called_once()
         mock_cache.set.assert_called_once()
 
     @patch('apps.notifications.tasks.cache')
@@ -400,19 +400,19 @@ class PushWeeklyLimitTest(TestCase):
         mock_cache.get.return_value = 3  # already at limit
         from apps.notifications.tasks import send_push_notification
         send_push_notification(self.user.pk, 'T', 'B', category='events')
-        mock_msg.send_multicast.assert_not_called()
+        mock_msg.send_each_for_multicast.assert_not_called()
 
     @patch('apps.notifications.tasks.cache')
     @patch('apps.notifications.tasks.messaging')
     def test_service_push_ignores_limit(self, mock_msg, mock_cache):
         mock_cache.get.return_value = 99  # way over limit
-        mock_msg.send_multicast.return_value = MagicMock(
+        mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
         from apps.notifications.tasks import send_push_notification
         # category=None → service push, no limit check
         send_push_notification(self.user.pk, 'T', 'B', category=None)
-        mock_msg.send_multicast.assert_called_once()
+        mock_msg.send_each_for_multicast.assert_called_once()
         mock_cache.get.assert_not_called()
 
 
@@ -439,12 +439,12 @@ class PushTimeWindowTest(TestCase):
         mock_tz.localtime.return_value = self._make_local_dt(10)
         mock_tz.now.return_value = self._make_local_dt(10)
         mock_cache.get.return_value = 0
-        mock_msg.send_multicast.return_value = MagicMock(
+        mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
         from apps.notifications.tasks import send_push_notification
         send_push_notification(self.user.pk, 'T', 'B', category='events')
-        mock_msg.send_multicast.assert_called_once()
+        mock_msg.send_each_for_multicast.assert_called_once()
 
     @patch('apps.notifications.tasks.cache')
     @patch('apps.notifications.tasks.messaging')
@@ -456,7 +456,7 @@ class PushTimeWindowTest(TestCase):
         from apps.notifications.tasks import send_push_notification
         with patch.object(send_push_notification, 'apply_async') as mock_apply:
             send_push_notification(self.user.pk, 'T', 'B', category='events')
-            mock_msg.send_multicast.assert_not_called()
+            mock_msg.send_each_for_multicast.assert_not_called()
             mock_apply.assert_called_once()
             eta = mock_apply.call_args[1]['eta']
             self.assertEqual(eta.hour, 9)
@@ -467,13 +467,13 @@ class PushTimeWindowTest(TestCase):
     def test_service_push_ignores_time_window(self, mock_tz, mock_msg, mock_cache):
         mock_tz.localtime.return_value = self._make_local_dt(2)
         mock_tz.now.return_value = self._make_local_dt(2)
-        mock_msg.send_multicast.return_value = MagicMock(
+        mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
         from apps.notifications.tasks import send_push_notification
         # category=None → service push, skips time window check
         send_push_notification(self.user.pk, 'T', 'B', category=None)
-        mock_msg.send_multicast.assert_called_once()
+        mock_msg.send_each_for_multicast.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -528,7 +528,7 @@ class PushCampaignTest(APITestCase):
         camp = PushCampaign.objects.create(
             title='T', body='B', segment='all', total_users=1,
         )
-        mock_msg.send_multicast.return_value = MagicMock(
+        mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
         from apps.notifications.tasks import send_push_notification
@@ -538,3 +538,107 @@ class PushCampaignTest(APITestCase):
         camp.refresh_from_db()
         self.assertEqual(camp.delivered_count, 1)
         self.assertEqual(camp.failed_count, 0)
+
+
+# ---------------------------------------------------------------------------
+# notifications_enabled: глобальный выключатель (ТЗ блок 6)
+# ---------------------------------------------------------------------------
+
+class NotificationsEnabledFlagTest(TestCase):
+    """
+    notifications_enabled=False блокирует маркетинговые пуши, но не сервисные.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(phone='+77030000001')
+        UserDevice.objects.create(user=self.user, fcm_token='tok-enabled-test')
+
+    @patch('apps.notifications.tasks.messaging')
+    def test_marketing_push_skipped_when_notifications_disabled(self, mock_msg):
+        """Маркетинговый пуш не уходит, если пользователь глобально отключил уведомления."""
+        self.user.notifications_enabled = False
+        self.user.save()
+        from apps.notifications.tasks import send_push_notification
+        send_push_notification(self.user.pk, 'T', 'B', category='promotions')
+        mock_msg.send_each_for_multicast.assert_not_called()
+
+    @patch('apps.notifications.tasks.messaging')
+    def test_service_push_sent_regardless_of_notifications_enabled(self, mock_msg):
+        """Сервисный пуш (category=None) уходит даже при notifications_enabled=False."""
+        self.user.notifications_enabled = False
+        self.user.save()
+        mock_msg.send_each_for_multicast.return_value = MagicMock(
+            success_count=1, failure_count=0, responses=[]
+        )
+        from apps.notifications.tasks import send_push_notification
+        send_push_notification(self.user.pk, 'T', 'B', category=None)
+        mock_msg.send_each_for_multicast.assert_called_once()
+
+    @patch('apps.notifications.tasks.messaging')
+    def test_marketing_push_sent_when_notifications_enabled(self, mock_msg):
+        """Маркетинговый пуш уходит при notifications_enabled=True (по умолчанию)."""
+        mock_msg.send_each_for_multicast.return_value = MagicMock(
+            success_count=1, failure_count=0, responses=[]
+        )
+        from apps.notifications.tasks import send_push_notification
+        send_push_notification(self.user.pk, 'T', 'B', category='events')
+        mock_msg.send_each_for_multicast.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Сегмент by_city (ТЗ блок 6 — геолокация)
+# ---------------------------------------------------------------------------
+
+class BulkPushByCitySegmentTest(APITestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_user(phone='+77031000001', role='content_manager', is_staff=True)
+        self.almaty_user = User.objects.create_user(phone='+77031000002', city='Алматы')
+        self.astana_user = User.objects.create_user(phone='+77031000003', city='Астана')
+        self.no_city_user = User.objects.create_user(phone='+77031000004')
+
+    def _auth(self):
+        refresh = RefreshToken.for_user(self.admin)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_by_city_segment_filters_by_city(self, mock_task):
+        """Сегмент by_city возвращает только пользователей с совпадающим городом."""
+        self._auth()
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
+            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Алматы',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        # Только almaty_user попадает в выборку
+        self.assertEqual(response.data['queued'], 1)
+
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_by_city_segment_exact_match_only(self, mock_task):
+        """Пользователи другого города не попадают в выборку."""
+        self._auth()
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
+            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Астана',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data['queued'], 1)  # только astana_user
+
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_by_city_without_city_param_returns_400(self, mock_task):
+        """Без параметра city возвращается 400."""
+        self._auth()
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
+            'title': 'T', 'body': 'B', 'segment': 'by_city',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('city', response.data)
+
+    def test_city_field_saved_via_profile_patch(self):
+        """Поле city сохраняется через PATCH /api/v1/users/profile/."""
+        from rest_framework_simplejwt.tokens import RefreshToken as RT
+        refresh = RT.for_user(self.almaty_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+        response = self.client.patch('/api/v1/users/profile/', {'city': 'Шымкент'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.almaty_user.refresh_from_db()
+        self.assertEqual(self.almaty_user.city, 'Шымкент')

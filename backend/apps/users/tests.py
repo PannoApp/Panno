@@ -260,3 +260,77 @@ class UserProfileViewTest(APITestCase):
     def test_patch_unauthenticated_returns_401(self):
         response = self.client.patch('/api/v1/users/profile/', {'first_name': 'X'})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+# ---------------------------------------------------------------------------
+# Блок 8: auto-set is_staff при назначении роли через UserAdmin
+# ---------------------------------------------------------------------------
+
+class UserAdminIsStaffAutoSetTest(TestCase):
+    """
+    UserAdmin.save_model() должен автоматически устанавливать is_staff=True
+    при назначении роли, и is_staff=False при снятии роли.
+    Без этого сотрудник не смог бы войти в Django Admin.
+    """
+
+    def setUp(self):
+        self.superuser = User.objects.create_user(phone='+70000000001')
+        self.superuser.is_superuser = True
+        self.superuser.is_staff = True
+        self.superuser.save()
+
+    def _save_via_admin(self, user, role):
+        """Симулирует сохранение через UserAdmin (вызывает save_model)."""
+        from apps.users.admin import UserAdmin
+        from django.contrib.admin import site
+        from django.test import RequestFactory
+        rf = RequestFactory()
+        req = rf.post('/')
+        req.user = self.superuser
+
+        admin_instance = UserAdmin(User, site)
+        user.role = role
+        # form и change — не используются в нашей логике, передаём заглушки
+        admin_instance.save_model(req, user, form=None, change=True)
+
+    def test_role_assigned_sets_is_staff_true(self):
+        """Назначение роли hall_manager → is_staff автоматически True."""
+        user = User.objects.create_user(phone='+71112223344')
+        self.assertFalse(user.is_staff)
+        self._save_via_admin(user, 'hall_manager')
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+    def test_content_manager_role_sets_is_staff(self):
+        user = User.objects.create_user(phone='+71112223345')
+        self._save_via_admin(user, 'content_manager')
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+    def test_admin_role_sets_is_staff(self):
+        user = User.objects.create_user(phone='+71112223346')
+        self._save_via_admin(user, 'admin')
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+    def test_role_cleared_unsets_is_staff(self):
+        """Снятие роли → is_staff=False (пользователь теряет доступ к Admin)."""
+        user = User.objects.create_user(phone='+71112223347')
+        user.is_staff = True
+        user.save()
+        self._save_via_admin(user, '')
+        user.refresh_from_db()
+        self.assertFalse(user.is_staff)
+
+    def test_superuser_is_staff_not_touched_when_role_cleared(self):
+        """
+        Снятие роли у суперпользователя не должно убирать is_staff —
+        суперпользователь всегда должен иметь доступ к Admin.
+        """
+        su = User.objects.create_user(phone='+71112223348')
+        su.is_superuser = True
+        su.is_staff = True
+        su.save()
+        self._save_via_admin(su, '')
+        su.refresh_from_db()
+        self.assertTrue(su.is_staff)

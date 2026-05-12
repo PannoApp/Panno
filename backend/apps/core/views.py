@@ -2,8 +2,8 @@ from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from rest_framework.generics import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
-from .models import RestaurantInfo, AppVersion
-from .serializers import RestaurantInfoSerializer, AppVersionSerializer
+from .models import RestaurantInfo, AppVersion, InteriorPhoto
+from .serializers import RestaurantInfoSerializer, AppVersionSerializer, InteriorPhotoSerializer
 
 
 @extend_schema(
@@ -58,3 +58,25 @@ class AppVersionView(generics.RetrieveAPIView):
     def get_object(self):
         platform = self.request.query_params.get('platform', '')
         return get_object_or_404(AppVersion, platform=platform)
+
+
+@extend_schema(
+    tags=['Core'],
+    summary='Галерея фотографий интерьера',
+    description=(
+        'Возвращает фотографии интерьера ресторана, сгруппированные по зонам.\n\n'
+        'Доступен без авторизации.\n\n'
+        '**Зоны:** `main_hall` — Главный зал, `bar` — Бар, '
+        '`private` — Приватная комната, `terrace` — Терраса, `other` — Другое.'
+    ),
+    responses={200: InteriorPhotoSerializer(many=True)},
+)
+class InteriorPhotoListView(generics.ListAPIView):
+    """
+    Список фотографий интерьера для вкладки «Интерьер/3D-тур».
+    Без авторизации, без пагинации — фотографий обычно немного (10–30 штук).
+    """
+    # Сортировка: сначала по зоне (алфавит), внутри зоны — по полю order
+    queryset           = InteriorPhoto.objects.all().order_by('zone', 'order')
+    serializer_class   = InteriorPhotoSerializer
+    permission_classes = [AllowAny]

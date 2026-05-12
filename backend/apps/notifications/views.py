@@ -148,6 +148,14 @@ class BulkPushView(views.APIView):
             user_ids = list(
                 User.objects.filter(date_joined__date__gte=date).values_list('id', flat=True)
             )
+        elif segment == 'by_city':
+            # Геолокационный сегмент: пользователи, у которых поле city совпадает с переданным
+            city = data.get('city', '').strip()
+            if not city:
+                return Response({'city': ['Обязательно для сегмента by_city.']}, status=400)
+            user_ids = list(
+                User.objects.filter(city__iexact=city).values_list('id', flat=True)
+            )
         else:
             user_ids = []
 

@@ -48,6 +48,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     notifications_enabled = models.BooleanField(default=True)
 
+    # Город пользователя — заполняется из геолокации на стороне приложения (если разрешена).
+    # Используется для сегментирования push-рассылок по городу/региону.
+    city = models.CharField("Город", max_length=100, blank=True, default='')
+
     # Категорийные настройки уведомлений (сервисные уведомления — бронь — не отключаются)
     notify_events = models.BooleanField("Уведомления: мероприятия", default=True)
     notify_promotions = models.BooleanField("Уведомления: акции", default=True)

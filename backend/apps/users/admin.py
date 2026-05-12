@@ -23,8 +23,22 @@ class AdminOnlyMixin:
 
 @admin.register(User)
 class UserAdmin(AdminOnlyMixin, admin.ModelAdmin):
-    list_display = ('phone', 'first_name', 'last_name', 'role', 'is_staff', 'is_active', 'date_joined')
-    list_filter = ('role', 'is_staff', 'is_active')
-    search_fields = ('phone', 'first_name', 'last_name')
+    list_display    = ('phone', 'first_name', 'last_name', 'role', 'is_staff', 'is_active', 'date_joined')
+    list_filter     = ('role', 'is_staff', 'is_active')
+    search_fields   = ('phone', 'first_name', 'last_name')
     readonly_fields = ('date_joined',)
-    exclude = ('groups', 'user_permissions')
+    exclude         = ('groups', 'user_permissions')
+
+    def save_model(self, request, obj, form, change):
+        """
+        Автоматически синхронизирует is_staff с ролью пользователя:
+        - Если у пользователя задана любая роль — is_staff=True (может войти в Django Admin).
+        - Если роль снята — is_staff=False (обычный пользователь приложения).
+        is_superuser никогда не трогаем здесь — он управляется отдельно.
+        """
+        if obj.role:
+            obj.is_staff = True
+        elif not obj.is_superuser:
+            # Снять is_staff можно только если пользователь не суперпользователь
+            obj.is_staff = False
+        super().save_model(request, obj, form, change)

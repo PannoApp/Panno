@@ -111,8 +111,9 @@ class DishListViewTest(APITestCase):
         self.assertIn('Стейк', names)
         self.assertNotIn('Греческий салат', names)
 
-    def test_filter_by_tag_id(self):
-        response = self.client.get(f'/api/v1/menu/dishes/?tag_id={self.tag.pk}')
+    def test_filter_by_tag_ids(self):
+        # Параметр переименован с tag_id → tag_ids (поддерживает несколько через запятую)
+        response = self.client.get(f'/api/v1/menu/dishes/?tag_ids={self.tag.pk}')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         names = [d['name'] for d in response.data['results']]
         self.assertIn('Стейк', names)

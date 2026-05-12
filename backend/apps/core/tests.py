@@ -5,7 +5,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import RestaurantInfo, AppVersion
+from .models import RestaurantInfo, AppVersion, InteriorPhoto
 
 
 # ---------------------------------------------------------------------------
@@ -246,3 +246,342 @@ class AppVersionViewTest(APITestCase):
         response = self.client.get('/api/v1/core/app-version/?platform=ios')
         self.assertIn('store_url', response.data)
         self.assertIn('updated_at', response.data)
+
+
+# ---------------------------------------------------------------------------
+# RestaurantInfo — новые поля карт и обратной связи (ТЗ 4.5)
+# ---------------------------------------------------------------------------
+
+class RestaurantInfoMapLinksTest(APITestCase):
+    def setUp(self):
+        self.info = RestaurantInfo.load()
+
+    def test_response_contains_all_map_links(self):
+        """Все три ссылки на карты должны быть в ответе (могут быть null)."""
+        response = self.client.get('/api/v1/core/info/')
+        self.assertIn('twogis_link', response.data)
+        self.assertIn('google_maps_link', response.data)
+        self.assertIn('yandex_maps_link', response.data)
+
+    def test_response_contains_feedback_url(self):
+        """Ссылка на обратную связь должна быть в ответе."""
+        response = self.client.get('/api/v1/core/info/')
+        self.assertIn('feedback_url', response.data)
+
+    def test_map_links_reflect_saved_values(self):
+        """Сохранённые ссылки на карты возвращаются корректно."""
+        self.info.google_maps_link = 'https://maps.google.com/?q=panno'
+        self.info.yandex_maps_link = 'https://yandex.kz/maps/?text=panno'
+        self.info.save()
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['google_maps_link'], 'https://maps.google.com/?q=panno')
+        self.assertEqual(response.data['yandex_maps_link'], 'https://yandex.kz/maps/?text=panno')
+
+    def test_map_links_nullable(self):
+        """Незаполненные ссылки возвращаются как null."""
+        response = self.client.get('/api/v1/core/info/')
+        self.assertIsNone(response.data['google_maps_link'])
+        self.assertIsNone(response.data['yandex_maps_link'])
+        self.assertIsNone(response.data['feedback_url'])
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/core/info/ — Поля депозита при бронировании (ТЗ 5)
+# ---------------------------------------------------------------------------
+
+class RestaurantInfoDepositTest(APITestCase):
+    def setUp(self):
+        self.info = RestaurantInfo.load()
+
+    def test_response_contains_deposit_fields(self):
+        """Поля депозита должны присутствовать в ответе."""
+        response = self.client.get('/api/v1/core/info/')
+        self.assertIn('booking_deposit_required', response.data)
+        self.assertIn('booking_deposit_note', response.data)
+
+    def test_deposit_required_defaults_to_false(self):
+        """По умолчанию депозит не требуется."""
+        response = self.client.get('/api/v1/core/info/')
+        self.assertFalse(response.data['booking_deposit_required'])
+
+    def test_deposit_note_defaults_to_empty(self):
+        """По умолчанию текст предупреждения пустой."""
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['booking_deposit_note'], '')
+
+    def test_deposit_fields_reflect_saved_values(self):
+        """Сохранённые значения полей депозита корректно возвращаются."""
+        self.info.booking_deposit_required = True
+        self.info.booking_deposit_note = 'Позвоните менеджеру для уточнения условий.'
+        self.info.save()
+        response = self.client.get('/api/v1/core/info/')
+        self.assertTrue(response.data['booking_deposit_required'])
+        self.assertEqual(
+            response.data['booking_deposit_note'],
+            'Позвоните менеджеру для уточнения условий.',
+        )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/core/interior/ — Галерея интерьера (ТЗ 4.3)
+# ---------------------------------------------------------------------------
+
+class InteriorPhotoListViewTest(APITestCase):
+    def setUp(self):
+        # Создаём фото в разных зонах для тестирования группировки и порядка
+        InteriorPhoto.objects.create(zone='main_hall', order=1, caption='Главный зал, вид 1')
+        InteriorPhoto.objects.create(zone='terrace',   order=1, caption='Терраса')
+        InteriorPhoto.objects.create(zone='main_hall', order=2, caption='Главный зал, вид 2')
+
+    def test_returns_200_without_auth(self):
+        """Галерея доступна без авторизации."""
+        response = self.client.get('/api/v1/core/interior/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_returns_all_photos(self):
+        """Возвращаются все созданные фотографии."""
+        response = self.client.get('/api/v1/core/interior/')
+        self.assertEqual(len(response.data), 3)
+
+    def test_response_contains_required_fields(self):
+        """Ответ содержит поля id, zone, zone_display, image, caption, order."""
+        response = self.client.get('/api/v1/core/interior/')
+        photo = response.data[0]
+        for field in ('id', 'zone', 'zone_display', 'image', 'caption', 'order'):
+            self.assertIn(field, photo)
+
+    def test_zone_display_is_human_readable(self):
+        """zone_display содержит читаемое название зоны, а не код."""
+        response = self.client.get('/api/v1/core/interior/')
+        # Все zone_display для main_hall должны быть 'Главный зал'
+        main_hall_photos = [p for p in response.data if p['zone'] == 'main_hall']
+        self.assertTrue(all(p['zone_display'] == 'Главный зал' for p in main_hall_photos))
+
+    def test_sorted_by_zone_then_order(self):
+        """Фотографии отсортированы: сначала по зоне, внутри зоны — по order."""
+        response = self.client.get('/api/v1/core/interior/')
+        zones = [p['zone'] for p in response.data]
+        orders_in_main_hall = [p['order'] for p in response.data if p['zone'] == 'main_hall']
+        # Зона main_hall идёт раньше terrace (алфавитный порядок m < t)
+        self.assertEqual(zones[0], 'main_hall')
+        # Внутри зоны order должен быть возрастающим
+        self.assertEqual(orders_in_main_hall, sorted(orders_in_main_hall))
+
+    def test_empty_gallery_returns_empty_list(self):
+        """Если фотографий нет, возвращается пустой список."""
+        InteriorPhoto.objects.all().delete()
+        response = self.client.get('/api/v1/core/interior/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+
+# ---------------------------------------------------------------------------
+# Тест фильтрации блюд по нескольким тегам (ТЗ 4.2)
+# ---------------------------------------------------------------------------
+
+class DishMultiTagFilterTest(APITestCase):
+    """
+    Проверяем, что ?tag_ids=1,2 возвращает блюда с любым из указанных тегов,
+    а не только с одним.
+    """
+    def setUp(self):
+        from apps.menu.models import Category, Tag, Dish
+        category = Category.objects.create(name='Основные', order=1)
+        self.tag_vegan = Tag.objects.create(name='Вегетарианское')
+        self.tag_spicy = Tag.objects.create(name='Острое')
+        self.tag_gluten_free = Tag.objects.create(name='Без глютена')
+
+        # Блюдо 1: только веганское
+        self.dish_vegan = Dish.objects.create(
+            name='Овощной плов', price='2500', category=category,
+        )
+        self.dish_vegan.tags.add(self.tag_vegan)
+
+        # Блюдо 2: острое
+        self.dish_spicy = Dish.objects.create(
+            name='Острая баранина', price='3500', category=category,
+        )
+        self.dish_spicy.tags.add(self.tag_spicy)
+
+        # Блюдо 3: без тегов из нашего списка
+        self.dish_plain = Dish.objects.create(
+            name='Хлеб', price='500', category=category,
+        )
+        self.dish_plain.tags.add(self.tag_gluten_free)
+
+    def test_single_tag_filter(self):
+        """?tag_ids=<id> возвращает только блюда с этим тегом."""
+        response = self.client.get(f'/api/v1/menu/dishes/?tag_ids={self.tag_vegan.id}')
+        self.assertEqual(response.status_code, 200)
+        names = [d['name'] for d in response.data['results']]
+        self.assertIn('Овощной плов', names)
+        self.assertNotIn('Острая баранина', names)
+
+    def test_multi_tag_filter_returns_union(self):
+        """?tag_ids=1,2 возвращает блюда с тегом 1 ИЛИ тегом 2."""
+        response = self.client.get(
+            f'/api/v1/menu/dishes/?tag_ids={self.tag_vegan.id},{self.tag_spicy.id}'
+        )
+        self.assertEqual(response.status_code, 200)
+        names = [d['name'] for d in response.data['results']]
+        self.assertIn('Овощной плов', names)
+        self.assertIn('Острая баранина', names)
+        self.assertNotIn('Хлеб', names)
+
+    def test_no_duplicates_when_dish_has_multiple_matching_tags(self):
+        """Блюдо с несколькими совпавшими тегами не дублируется в результатах."""
+        from apps.menu.models import Dish, Category
+        category = Category.objects.first()
+        dish_both = Dish.objects.create(name='Острый веганский суп', price='1800', category=category)
+        dish_both.tags.add(self.tag_vegan, self.tag_spicy)
+
+        response = self.client.get(
+            f'/api/v1/menu/dishes/?tag_ids={self.tag_vegan.id},{self.tag_spicy.id}'
+        )
+        names = [d['name'] for d in response.data['results']]
+        # Блюдо с двумя тегами должно появиться ровно один раз
+        self.assertEqual(names.count('Острый веганский суп'), 1)
+
+
+# ---------------------------------------------------------------------------
+# Блок 8: working_hours_note — временное изменение режима работы
+# ---------------------------------------------------------------------------
+
+class WorkingHoursNoteTest(APITestCase):
+    """
+    working_hours_note передаётся через GET /api/v1/core/info/.
+    Flutter показывает его поверх основного расписания, если не пустое.
+    """
+
+    def setUp(self):
+        self.info = RestaurantInfo.load()
+        self.info.working_hours = 'Пн–Вс: 12:00–00:00'
+        self.info.working_hours_note = ''
+        self.info.save()
+
+    def test_working_hours_note_present_in_response(self):
+        """Поле working_hours_note всегда присутствует в ответе API."""
+        response = self.client.get('/api/v1/core/info/')
+        self.assertIn('working_hours_note', response.data)
+
+    def test_working_hours_note_empty_by_default(self):
+        """По умолчанию поле пустое — нет временных уведомлений."""
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['working_hours_note'], '')
+
+    def test_working_hours_note_reflects_saved_value(self):
+        """Если менеджер задал уведомление — оно возвращается приложению."""
+        self.info.working_hours_note = 'Закрыто 1 января'
+        self.info.save()
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['working_hours_note'], 'Закрыто 1 января')
+
+    def test_working_hours_note_independent_of_working_hours(self):
+        """Основные часы работы и временное уведомление — независимые поля."""
+        self.info.working_hours = 'Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00'
+        self.info.working_hours_note = 'В праздники до 02:00'
+        self.info.save()
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['working_hours'], 'Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00')
+        self.assertEqual(response.data['working_hours_note'], 'В праздники до 02:00')
+
+
+# ---------------------------------------------------------------------------
+# Блок 8: Контроль доступа к RestaurantInfoAdmin по ролям
+# ---------------------------------------------------------------------------
+
+class RestaurantInfoAdminAccessTest(TestCase):
+    """
+    RestaurantInfoAdmin доступен только content_manager и admin.
+    hall_manager и обычный is_staff не должны видеть его.
+    """
+
+    def _make_user(self, role):
+        from django.contrib.auth import get_user_model
+        U = get_user_model()
+        u = U.objects.create_user(phone=f'+7700000{abs(hash(role)) % 10000:04d}')
+        u.role = role
+        u.is_staff = True
+        u.save()
+        return u
+
+    def setUp(self):
+        from .admin import RestaurantInfoAdmin
+        from django.contrib.admin import site
+        self.admin_class = RestaurantInfoAdmin(RestaurantInfo, site)
+        self.info = RestaurantInfo.load()
+
+    def _request(self, user):
+        """Фиктивный request-объект с заданным пользователем."""
+        from django.test import RequestFactory
+        rf = RequestFactory()
+        req = rf.get('/')
+        req.user = user
+        return req
+
+    def test_content_manager_can_view(self):
+        user = self._make_user('content_manager')
+        self.assertTrue(self.admin_class.has_view_permission(self._request(user)))
+
+    def test_content_manager_can_change(self):
+        user = self._make_user('content_manager')
+        self.assertTrue(self.admin_class.has_change_permission(self._request(user)))
+
+    def test_hall_manager_cannot_view(self):
+        """Менеджер зала не должен иметь доступа к настройкам ресторана."""
+        user = self._make_user('hall_manager')
+        self.assertFalse(self.admin_class.has_view_permission(self._request(user)))
+
+    def test_admin_role_can_view(self):
+        user = self._make_user('admin')
+        self.assertTrue(self.admin_class.has_view_permission(self._request(user)))
+
+    def test_delete_always_forbidden(self):
+        """Синглтон нельзя удалить ни одной ролью."""
+        user = self._make_user('admin')
+        self.assertFalse(self.admin_class.has_delete_permission(self._request(user)))
+
+
+# ---------------------------------------------------------------------------
+# Блок 8: Контроль доступа к AppVersionAdmin по ролям
+# ---------------------------------------------------------------------------
+
+class AppVersionAdminAccessTest(TestCase):
+    """
+    AppVersionAdmin доступен только admin (и superuser).
+    content_manager и hall_manager не должны иметь доступа.
+    """
+
+    def _make_user(self, role):
+        from django.contrib.auth import get_user_model
+        U = get_user_model()
+        u = U.objects.create_user(phone=f'+7800000{abs(hash(role)) % 10000:04d}')
+        u.role = role
+        u.is_staff = True
+        u.save()
+        return u
+
+    def setUp(self):
+        from .admin import AppVersionAdmin
+        from django.contrib.admin import site
+        self.admin_class = AppVersionAdmin(AppVersion, site)
+
+    def _request(self, user):
+        from django.test import RequestFactory
+        rf = RequestFactory()
+        req = rf.get('/')
+        req.user = user
+        return req
+
+    def test_admin_role_can_view(self):
+        user = self._make_user('admin')
+        self.assertTrue(self.admin_class.has_view_permission(self._request(user)))
+
+    def test_content_manager_cannot_view(self):
+        """Контент-менеджер не управляет версиями приложения."""
+        user = self._make_user('content_manager')
+        self.assertFalse(self.admin_class.has_view_permission(self._request(user)))
+
+    def test_hall_manager_cannot_change(self):
+        user = self._make_user('hall_manager')
+        self.assertFalse(self.admin_class.has_change_permission(self._request(user)))

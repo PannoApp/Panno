@@ -86,7 +86,11 @@ send_push_notification.delay(
 | `closed_events` | `notify_closed_events` | Закрытые/VIP события |
 | *(не передаётся)* | — | Сервисные уведомления (бронь) — всегда доставляются |
 
-Если `category` указан и пользователь отключил соответствующий флаг, push не отправляется.
+Пуш не отправляется если `category` задан и:
+- `user.notifications_enabled = False` — пользователь глобально отключил все уведомления, **или**
+- соответствующий флаг категории (`notify_events` / `notify_promotions` / `notify_closed_events`) = `False`
+
+Сервисные пуши (`category=None`) — обязательные. Не блокируются ни одним из флагов.
 
 **Что делает задача:**
 1. Берёт все FCM-токены пользователя из `UserDevice`
@@ -164,6 +168,7 @@ FIREBASE_CREDENTIALS_PATH=/app/backend/firebase-credentials.json
 | `last_visit_days` | Для `last_visit_days` | Количество дней |
 | `event_id` | Для `participated_in_event` | ID мероприятия |
 | `registered_after` | Для `registered_after` | Дата `YYYY-MM-DD` |
+| `city` | Для `by_city` | Название города (точное совпадение, например `"Алматы"`) |
 
 ### Сегменты
 
@@ -173,6 +178,7 @@ FIREBASE_CREDENTIALS_PATH=/app/backend/firebase-credentials.json
 | `last_visit_days` | Пользователи, у которых есть бронирование со статусом `completed` за последние N дней |
 | `participated_in_event` | Участники конкретного мероприятия (`event_id`) |
 | `registered_after` | Пользователи, зарегистрированные после указанной даты |
+| `by_city` | Пользователи с конкретным городом (`city`) — по геолокации, сохранённой в профиле |
 
 **Ответ 202:**
 ```json
