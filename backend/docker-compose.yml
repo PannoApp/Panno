@@ -35,7 +35,7 @@ services:
     ports:
       - "6432:6432" # Стандартный порт PgBouncer
     depends_on:
-      - db:
+      db:
         condition: service_healthy
 
   # Redis (для кэша и брокера Celery)

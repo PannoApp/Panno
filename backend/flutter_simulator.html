@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panno Flutter App Simulator</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg: #F3F4F6;
+            --surface: #FFFFFF;
+            --text: #111827;
+            --text-light: #6B7280;
+            --border: #E5E7EB;
+            --success: #10B981;
+            --error: #EF4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .sidebar-title {
+            padding: 0 20px 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: var(--bg);
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .content-header {
+            background: var(--surface);
+            padding: 15px 30px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .token-status {
+            font-size: 0.9rem;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background: #FEE2E2;
+            color: var(--error);
+        }
+
+        .token-status.has-token {
+            background: #D1FAE5;
+            color: var(--success);
+        }
+
+        .scrollable-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            display: flex;
+            gap: 20px;
+        }
+
+        .form-panel,
+        .response-panel {
+            background: var(--surface);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        .section {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .section h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            color: var(--primary);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="time"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        .response-box {
+            background: #1E1E1E;
+            color: #D4D4D4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            min-height: 200px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            background: var(--border);
+            color: var(--text-light);
+        }
+
+        .status-badge.success {
+            background: var(--success);
+            color: white;
+        }
+
+        .status-badge.error {
+            background: var(--error);
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-title">📱 Simulator</div>
+        <div class="nav-item active" onclick="switchTab('auth')">🔐 Auth & Profile</div>
+        <div class="nav-item" onclick="switchTab('menu')">🍔 Menu</div>
+        <div class="nav-item" onclick="switchTab('bookings')">📅 Bookings</div>
+        <div class="nav-item" onclick="switchTab('events')">🎉 Events</div>
+        <div class="nav-item" onclick="switchTab('core')">ℹ️ Core & Config</div>
+    </div>
+
+    <div class="main-content">
+        <div class="content-header">
+            <h2 id="current-tab-title" style="margin: 0;">Auth & Profile</h2>
+            <div id="token-status" class="token-status">No Token</div>
+        </div>
+
+        <div class="scrollable-content">
+            <div class="form-panel">
+
+                <!-- Auth Tab -->
+                <div id="tab-auth" class="tab-content active">
+                    <div class="section">
+                        <h3>1. Request SMS</h3>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="text" id="req-phone" placeholder="+77001234567" value="+77001234567">
+                        </div>
+                        <button onclick="requestSms()">Send SMS</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>2. Verify SMS</h3>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="text" id="ver-phone" placeholder="+77001234567" value="+77001234567">
+                        </div>
+                        <div class="form-group">
+                            <label>OTP Code</label>
+                            <input type="text" id="ver-otp" placeholder="1234">
+                        </div>
+                        <button onclick="verifySms()">Verify & Login</button>
+                        <button onclick="logout()" style="background: var(--error); margin-left: 10px;">Logout</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>3. Profile</h3>
+                        <button onclick="getProfile()" style="margin-bottom: 10px;">Get Profile</button>
+                        <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+                        <div class="form-group">
+                            <label>First Name</label>
+                            <input type="text" id="prof-fname">
+                        </div>
+                        <div class="form-group">
+                            <label>Last Name</label>
+                            <input type="text" id="prof-lname">
+                        </div>
+                        <button onclick="updateProfile()">Update Profile</button>
+                    </div>
+                </div>
+
+                <!-- Menu Tab -->
+                <div id="tab-menu" class="tab-content">
+                    <div class="section">
+                        <h3>Menu Categories</h3>
+                        <button onclick="apiCall('GET', '/api/v1/menu/categories/')">Get Categories</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>Dishes List</h3>
+                        <div class="form-group">
+                            <label>Category ID (optional)</label>
+                            <input type="number" id="dish-cat">
+                        </div>
+                        <div class="form-group">
+                            <label>Search (optional)</label>
+                            <input type="text" id="dish-search">
+                        </div>
+                        <button onclick="getDishes()">Get Dishes</button>
+                    </div>
+                </div>
+
+                <!-- Bookings Tab -->
+                <div id="tab-bookings" class="tab-content">
+                    <div class="section">
+                        <h3>My Bookings</h3>
+                        <button onclick="apiCall('GET', '/api/v1/bookings/')">Get My Bookings</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>Create Booking</h3>
+                        <div class="form-group">
+                            <label>Guest Name</label>
+                            <input type="text" id="book-name" value="Test User">
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" id="book-date">
+                        </div>
+                        <div class="form-group">
+                            <label>Time</label>
+                            <input type="time" id="book-time" value="19:30">
+                        </div>
+                        <div class="form-group">
+                            <label>Guests Count</label>
+                            <input type="number" id="book-guests" value="2">
+                        </div>
+                        <div class="form-group">
+                            <label>Zone</label>
+                            <select id="book-zone">
+                                <option value="">No preference</option>
+                                <option value="main">Main Hall</option>
+                                <option value="terrace">Terrace</option>
+                                <option value="private">Private</option>
+                            </select>
+                        </div>
+                        <button onclick="createBooking()">Create Booking</button>
+                    </div>
+                </div>
+
+                <!-- Events Tab -->
+                <div id="tab-events" class="tab-content">
+                    <div class="section">
+                        <h3>Events & News Lists</h3>
+                        <button onclick="apiCall('GET', '/api/v1/events/upcoming/')">Upcoming Events</button>
+                        <button onclick="apiCall('GET', '/api/v1/events/archived/')">Archived Events</button>
+                        <button onclick="apiCall('GET', '/api/v1/events/news/')">News</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>My Reservations</h3>
+                        <button onclick="apiCall('GET', '/api/v1/events/reservations/my/')">Get My Reservations</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>Reserve Event</h3>
+                        <div class="form-group">
+                            <label>Event ID</label>
+                            <input type="number" id="res-event-id" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Guests Count</label>
+                            <input type="number" id="res-guests" value="1">
+                        </div>
+                        <button onclick="reserveEvent()">Create Reservation</button>
+                    </div>
+                </div>
+
+                <!-- Core Tab -->
+                <div id="tab-core" class="tab-content">
+                    <div class="section">
+                        <h3>Core Info</h3>
+                        <button onclick="apiCall('GET', '/api/v1/core/info/')">Get Restaurant Info</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>App Version Check</h3>
+                        <div class="form-group">
+                            <label>Platform</label>
+                            <select id="ver-platform">
+                                <option value="ios">iOS</option>
+                                <option value="android">Android</option>
+                            </select>
+                        </div>
+                        <button onclick="checkVersion()">Check Version</button>
+                    </div>
+
+                    <div class="section">
+                        <h3>Register FCM Device</h3>
+                        <div class="form-group">
+                            <label>FCM Token</label>
+                            <input type="text" id="fcm-token" value="dummy_fcm_token_123">
+                        </div>
+                        <button onclick="registerDevice()">Register Device</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="response-panel">
+                <h3>Response</h3>
+                <div id="response-status" class="status-badge">Waiting...</div>
+                <div id="response-url"
+                    style="font-size: 0.8rem; color: var(--text-light); margin-bottom: 10px; word-break: break-all;">
+                </div>
+                <div id="response-body" class="response-box">JSON output will appear here</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://0.0.0.0:8000';
+        let accessToken = localStorage.getItem('access_token') || null;
+
+        // Init date field
+        document.getElementById('book-date').valueAsDate = new Date();
+        updateTokenStatus();
+
+        // Utilities
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+
+            event.currentTarget.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+            document.getElementById('current-tab-title').innerText = event.currentTarget.innerText;
+        }
+
+        function updateTokenStatus() {
+            const el = document.getElementById('token-status');
+            if (accessToken) {
+                el.innerText = 'Token Active';
+                el.className = 'token-status has-token';
+            } else {
+                el.innerText = 'No Token';
+                el.className = 'token-status';
+            }
+        }
+
+        function logout() {
+            accessToken = null;
+            localStorage.removeItem('access_token');
+            updateTokenStatus();
+            alert("Logged out");
+        }
+
+        async function doFetch(method, endpoint, body = null, headers = {}) {
+            const url = BASE_URL + endpoint;
+
+            document.getElementById('response-url').innerText = `${method} ${url}`;
+            document.getElementById('response-status').innerText = 'Loading...';
+            document.getElementById('response-status').className = 'status-badge';
+            document.getElementById('response-body').innerText = '...';
+
+            const defaultHeaders = {
+                'Content-Type': 'application/json'
+            };
+
+            if (accessToken) {
+                defaultHeaders['Authorization'] = 'Bearer ' + accessToken;
+            }
+
+            const config = {
+                method: method,
+                headers: { ...defaultHeaders, ...headers }
+            };
+
+            if (body) {
+                config.body = JSON.stringify(body);
+            }
+
+            try {
+                const res = await fetch(url, config);
+                const status = res.status;
+                let data;
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    data = await res.text();
+                }
+
+                document.getElementById('response-status').innerText = `${status} ${res.statusText}`;
+                if (status >= 200 && status < 300) {
+                    document.getElementById('response-status').className = 'status-badge success';
+                } else {
+                    document.getElementById('response-status').className = 'status-badge error';
+                }
+
+                document.getElementById('response-body').innerText = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+
+                return { status, data };
+            } catch (err) {
+                document.getElementById('response-status').innerText = 'Fetch Error';
+                document.getElementById('response-status').className = 'status-badge error';
+                document.getElementById('response-body').innerText = err.toString();
+                return { status: 500, data: null };
+            }
+        }
+
+        function apiCall(method, endpoint) {
+            doFetch(method, endpoint);
+        }
+
+        // Auth
+        async function requestSms() {
+            const phone = document.getElementById('req-phone').value;
+            await doFetch('POST', '/api/v1/users/auth/request-sms/', { phone });
+        }
+
+        async function verifySms() {
+            const phone = document.getElementById('ver-phone').value;
+            const otp = document.getElementById('ver-otp').value;
+            const res = await doFetch('POST', '/api/v1/users/auth/verify-sms/', { phone, otp });
+
+            if (res.status === 200 && res.data.access) {
+                accessToken = res.data.access;
+                localStorage.setItem('access_token', accessToken);
+                updateTokenStatus();
+            }
+        }
+
+        async function getProfile() {
+            const res = await doFetch('GET', '/api/v1/users/profile/');
+            if (res.status === 200) {
+                document.getElementById('prof-fname').value = res.data.first_name || '';
+                document.getElementById('prof-lname').value = res.data.last_name || '';
+            }
+        }
+
+        async function updateProfile() {
+            const first_name = document.getElementById('prof-fname').value;
+            const last_name = document.getElementById('prof-lname').value;
+            await doFetch('PATCH', '/api/v1/users/profile/', { first_name, last_name });
+        }
+
+        // Menu
+        function getDishes() {
+            let url = '/api/v1/menu/dishes/?';
+            const cat = document.getElementById('dish-cat').value;
+            const search = document.getElementById('dish-search').value;
+
+            if (cat) url += `category_id=${cat}&`;
+            if (search) url += `search=${search}`;
+
+            doFetch('GET', url);
+        }
+
+        // Bookings
+        async function createBooking() {
+            const payload = {
+                guest_name: document.getElementById('book-name').value,
+                date: document.getElementById('book-date').value,
+                time: document.getElementById('book-time').value,
+                guests_count: parseInt(document.getElementById('book-guests').value)
+            };
+
+            const zone = document.getElementById('book-zone').value;
+            if (zone) payload.zone = zone;
+
+            // Important: Idempotency-Key
+            const uuid = generateUUID();
+            await doFetch('POST', '/api/v1/bookings/', payload, { 'Idempotency-Key': uuid });
+        }
+
+        // Events
+        async function reserveEvent() {
+            const payload = {
+                event: parseInt(document.getElementById('res-event-id').value),
+                guests_count: parseInt(document.getElementById('res-guests').value)
+            };
+
+            // Important: Idempotency-Key
+            const uuid = generateUUID();
+            await doFetch('POST', '/api/v1/events/reservations/create/', payload, { 'Idempotency-Key': uuid });
+        }
+
+        // Core
+        function checkVersion() {
+            const platform = document.getElementById('ver-platform').value;
+            doFetch('GET', `/api/v1/core/app-version/?platform=${platform}`);
+        }
+
+        function registerDevice() {
+            const token = document.getElementById('fcm-token').value;
+            doFetch('POST', '/api/v1/notifications/device/register/', { fcm_token: token });
+        }
+    </script>
+</body>
+
+</html>
