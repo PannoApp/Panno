@@ -17,6 +17,10 @@ class RestaurantInfo(models.Model):
     telegram = models.CharField("Telegram", max_length=100, blank=True)
     instagram = models.CharField("Instagram", max_length=100, blank=True)
 
+    concept_description = models.TextField("Описание концепции", blank=True, default='')
+    hero_image = models.ImageField("Заглавное изображение", upload_to='core/', blank=True, null=True)
+    hero_video_url = models.URLField("URL заглавного видео", max_length=500, blank=True, default='')
+
     visit_rules = models.TextField("Правила посещения", blank=True)
     privacy_policy = models.TextField("Политика обработки ПД", blank=True)
     terms_of_service = models.TextField("Пользовательское соглашение", blank=True)

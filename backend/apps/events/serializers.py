@@ -61,3 +61,18 @@ class EventReservationSerializer(serializers.ModelSerializer):
         if EventReservation.objects.filter(user=user, event=event).exists():
             raise serializers.ValidationError("Вы уже записаны на это мероприятие.")
         return data
+
+
+class EventReservationStaffSerializer(EventReservationSerializer):
+    """Сериализатор для менеджера зала: добавляет имя и телефон гостя из профиля."""
+    guest_name  = serializers.SerializerMethodField()
+    guest_phone = serializers.CharField(source='user.phone', read_only=True, default=None)
+
+    class Meta(EventReservationSerializer.Meta):
+        fields = EventReservationSerializer.Meta.fields + ('guest_name', 'guest_phone')
+
+    def get_guest_name(self, obj):
+        if not obj.user:
+            return None
+        full = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return full or obj.user.phone

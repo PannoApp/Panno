@@ -182,6 +182,17 @@ News (Новость) — независимая сущность
 
 Пара `(event, user)` уникальна — один пользователь не может записаться дважды на одно мероприятие (защита на уровне БД и сериализатора).
 
+### Поля только для персонала (EventReservationStaffSerializer)
+
+Для менеджера зала доступен `EventReservationStaffSerializer`, который добавляет:
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `guest_name` | string | Имя гостя (first_name + last_name из профиля; или телефон если имя не заполнено) |
+| `guest_phone` | string | Телефон гостя из профиля (`user.phone`) |
+
+Эти поля также отображаются в Django-админке (`EventReservation → list_display`).
+
 ## Push-уведомления
 
 При создании `EventReservation` автоматически уходит push через Celery:
@@ -195,7 +206,7 @@ News (Новость) — независимая сущность
 ```
 apps/events/
 ├── models.py       # Event, News, EventReservation
-├── serializers.py  # EventSerializer, NewsSerializer, EventReservationSerializer
+├── serializers.py  # EventSerializer, NewsSerializer, EventReservationSerializer, EventReservationStaffSerializer
 ├── views.py        # 5 view-классов
 ├── signals.py      # push при создании EventReservation
 ├── apps.py         # подключение signals в ready()

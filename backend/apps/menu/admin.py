@@ -1,10 +1,11 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
+from utils.permissions import _has_role
 from .models import Category, Tag, Allergen, Dish
 
 
 def _is_content_or_admin(user):
-    return user.is_superuser or getattr(user, 'role', '') in ('admin', 'content_manager')
+    return _has_role(user, 'admin', 'content_manager')
 
 
 class ContentManagerMixin:

@@ -27,10 +27,17 @@ class TableBooking(models.Model):
 
     # Имя гостя (может отличаться от имени в профиле пользователя)
     guest_name = models.CharField(
-        max_length=255, 
+        max_length=255,
         verbose_name="Имя гостя"
     )
-    
+
+    phone = models.CharField(
+        "Телефон гостя",
+        max_length=20,
+        blank=True,
+        default='',
+    )
+
     # Дата планируемого визита
     date = models.DateField(
         verbose_name="Дата"

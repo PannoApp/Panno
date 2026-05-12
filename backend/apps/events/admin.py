@@ -1,21 +1,33 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
+from utils.permissions import _has_role
 from .models import Event, News, EventReservation
 
 
 def _is_content_or_admin(user):
-    return user.is_superuser or getattr(user, 'role', '') in ('admin', 'content_manager')
+    return _has_role(user, 'admin', 'content_manager')
 
 
 def _is_hall_or_admin(user):
-    return user.is_superuser or getattr(user, 'role', '') in ('admin', 'hall_manager')
+    return _has_role(user, 'admin', 'hall_manager')
 
 @admin.register(EventReservation)
 class EventReservationAdmin(admin.ModelAdmin):
-    list_display = ('event', 'user', 'guests_count', 'created_at')
+    list_display = ('event', 'guest_name', 'guest_phone', 'guests_count', 'created_at')
     list_filter = ('event',)
-    search_fields = ('user__phone', 'event__title')
+    search_fields = ('user__phone', 'user__first_name', 'user__last_name', 'event__title')
     readonly_fields = ('created_at',)
+
+    @admin.display(description='Имя гостя')
+    def guest_name(self, obj):
+        if not obj.user:
+            return '—'
+        full = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return full or obj.user.phone
+
+    @admin.display(description='Телефон')
+    def guest_phone(self, obj):
+        return obj.user.phone if obj.user else '—'
 
     def has_view_permission(self, request, obj=None):
         return _is_hall_or_admin(request.user)

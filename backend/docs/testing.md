@@ -2,7 +2,7 @@
 
 ## Обзор
 
-В проекте 119 unit-тестов для всех 6 модулей.
+В проекте 162 unit-теста для всех 6 модулей.
 
 Тесты покрывают:
 - Сервисный слой (OTP-логика)
@@ -100,13 +100,17 @@ docker-compose run --rm --no-deps backend \
 | `VerifySMSViewTest` | `POST /api/users/auth/verify-sms/` — JWT-токены, создание нового пользователя, неверный код |
 | `UserProfileViewTest` | `GET/PATCH /api/users/profile/` — 401 без токена, read-only поля, PUT запрещён |
 
-### bookings — 20 тестов
+### bookings — 48 тестов
 
 | Класс | Что проверяет |
 |---|---|
 | `TableBookingSerializerTest` | guests_count (0 и 51 — невалидны, 50 — валидно), обязательные поля, read-only статус |
 | `TableBookingListCreateViewTest` | пользователь видит только свои брони, создание брони, 401 без токена |
 | `BookingSignalTest` | push при `confirmed`/`canceled`/`completed`, нет push при создании, нет push без пользователя, нет push если статус не изменился |
+| `SendBookingRemindersTaskTest` | нет броней в окне → 0, push для `confirmed` брони в окне, пропуск `pending` и без пользователя, другая дата → пропуск |
+| `TableBookingStaffSerializerTest` | `status` доступен для записи, `user_phone` из связанного User, `user_phone=None` без пользователя, `user` read-only, невалидный статус → ошибка |
+| `StaffBookingListViewTest` | `hall_manager` и `admin` получают 200, обычный пользователь → 403, неавторизованный → 401, возвращает брони всех пользователей, `user_phone` и `status` в ответе |
+| `StaffBookingUpdateViewTest` | `hall_manager` и `admin` меняют статус → 200, 403/401/404/400/405, смена статуса запускает push, `user_phone` в ответе, поле `user` нельзя изменить |
 
 ### events — 25 тестов
 
@@ -136,13 +140,16 @@ docker-compose run --rm --no-deps backend \
 | `RestaurantInfoModelTest` | `load()` создаёт запись, `save()` принудительно `pk=1`, `delete()` ничего не делает, вторая запись невозможна |
 | `RestaurantInfoViewTest` | `GET /api/core/info/` — публичный доступ, обязательные поля в ответе, nullable поля |
 
-### notifications — 15 тестов
+### notifications — 30 тестов
 
 | Класс | Что проверяет |
 |---|---|
 | `RegisterDeviceViewTest` | регистрация нового → 201, перепривязка существующего токена → 200, 401 без токена, один пользователь — несколько устройств |
 | `UserDeviceModelTest` | `__str__`, уникальность `fcm_token` |
-| `SendPushNotificationTaskTest` | нет устройств → Firebase не вызывается, отправка на все устройства, удаление невалидных токенов, передача `data` |
+| `SendPushNotificationTaskTest` | нет устройств → Firebase не вызывается, отправка на все устройства, удаление невалидных токенов, передача `data`, `data={}` по умолчанию |
+| `SendPushNotificationCategoryTest` | пропуск при выключенных `notify_events`/`notify_promotions`/`notify_closed_events`, отправка при `category=None` и неизвестной категории, несуществующий пользователь → пропуск |
+| `SendBulkPushNotificationTaskTest` | одна задача на пользователя, пустой список → 0, передача `category` и `data` в подзадачи |
+| `BulkPushViewTest` | обычный пользователь → 403, 401 без токена, отсутствие `title` → 400, `segment=all` → 202, корректный подсчёт уникальных пользователей, `participated_in_event` без `event_id` → 400, `registered_after` без даты → 400, `last_visit_days` → 202 |
 
 ---
 

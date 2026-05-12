@@ -28,13 +28,16 @@
   "whatsapp": "+77001234567",
   "telegram": "@panno_restaurant",
   "instagram": "panno.restaurant",
+  "concept_description": "Modern Nomad — кухня кочевников. Вкусы Центральной Азии в современной интерпретации.",
+  "hero_image": "https://cdn.example.com/media/core/hero.jpg",
+  "hero_video_url": "https://cdn.example.com/media/core/hero.mp4",
   "visit_rules": "Дресс-код: smart casual. Дети до 12 лет...",
   "privacy_policy": "Настоящая политика...",
   "terms_of_service": "Пользуясь приложением..."
 }
 ```
 
-Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram` могут быть пустой строкой, если не заполнены в админке.
+Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram`, `hero_video_url`, `concept_description` могут быть пустой строкой, если не заполнены в админке. `hero_image` возвращает `null`, если изображение не загружено.
 
 ## Модель RestaurantInfo
 
@@ -50,6 +53,9 @@
 | `whatsapp` | string | Контакт в WhatsApp |
 | `telegram` | string | Контакт в Telegram |
 | `instagram` | string | Ссылка/никнейм Instagram |
+| `concept_description` | text | Краткое описание концепции ресторана (главный экран приложения) |
+| `hero_image` | image | Заглавное изображение главного экрана (файл, URL или `null`) |
+| `hero_video_url` | URL | Ссылка на заглавное видео (YouTube, CDN и т.п.; пустая строка если не задана) |
 | `visit_rules` | text | Правила посещения ресторана |
 | `privacy_policy` | text | Политика обработки персональных данных |
 | `terms_of_service` | text | Пользовательское соглашение |

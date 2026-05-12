@@ -1,6 +1,12 @@
 import logging
+from datetime import timedelta
+
 from celery import shared_task
+from django.conf import settings
+from django.core.cache import cache
+from django.utils import timezone
 from firebase_admin import messaging
+
 from .models import UserDevice
 
 logger = logging.getLogger(__name__)
@@ -13,13 +19,18 @@ _CATEGORY_FLAG = {
 
 
 @shared_task(name='apps.notifications.tasks.send_push_notification')
-def send_push_notification(user_id, title, body, data=None, category=None):
+def send_push_notification(user_id, title, body, data=None, category=None, campaign_id=None):
     """
     Фоновая задача для отправки пуша конкретному пользователю на все его устройства.
 
     category — опциональная категория уведомления ('events', 'promotions', 'closed_events').
     Если указана и пользователь отключил эту категорию, push не отправляется.
     Сервисные уведомления (бронь, напоминания) category не передают — всегда доставляются.
+
+    Для маркетинговых пушей (category != None) дополнительно применяются:
+    - Лимит частоты: не более PUSH_WEEKLY_LIMIT раз в неделю на пользователя.
+    - Временное окно: отправка только в часы PUSH_ALLOWED_HOUR_START–PUSH_ALLOWED_HOUR_END.
+      Если текущее время вне окна — задача откладывается через apply_async(eta=...).
     """
     from django.contrib.auth import get_user_model
     User = get_user_model()
@@ -34,6 +45,39 @@ def send_push_notification(user_id, title, body, data=None, category=None):
                 return
         except User.DoesNotExist:
             return
+
+    # Ограничения только для маркетинговых пушей (category != None)
+    if category:
+        # --- Временное окно ---
+        now_local = timezone.localtime(timezone.now())
+        hour = now_local.hour
+        start = settings.PUSH_ALLOWED_HOUR_START
+        end   = settings.PUSH_ALLOWED_HOUR_END
+        if not (start <= hour < end):
+            next_run = now_local.replace(hour=start, minute=0, second=0, microsecond=0)
+            if next_run <= now_local:
+                next_run += timedelta(days=1)
+            send_push_notification.apply_async(
+                args=[user_id, title, body, data, category, campaign_id],
+                eta=next_run,
+            )
+            logger.info(
+                "Push deferred: user=%s category=%s eta=%s",
+                user_id, category, next_run.isoformat(),
+            )
+            return
+
+        # --- Недельный лимит ---
+        week_num = timezone.now().isocalendar()[1]
+        week_key = f"push_weekly:{user_id}:{week_num}"
+        count = cache.get(week_key, 0)
+        if count >= settings.PUSH_WEEKLY_LIMIT:
+            logger.info(
+                "Push skipped: weekly limit reached user=%s week=%s count=%s",
+                user_id, week_num, count,
+            )
+            return
+        cache.set(week_key, count + 1, timeout=7 * 24 * 3600)
 
     # 1. Собираем все токены пользователя
     devices = UserDevice.objects.filter(user_id=user_id)
@@ -67,14 +111,24 @@ def send_push_notification(user_id, title, body, data=None, category=None):
                 logger.warning(f"Удален невалидный токен: {token_to_remove}")
 
     logger.info(f"Отправлено пушей: {response.success_count}, Ошибок: {response.failure_count}")
+
+    if campaign_id:
+        from django.db.models import F
+        from .models import PushCampaign
+        PushCampaign.objects.filter(pk=campaign_id).update(
+            delivered_count=F('delivered_count') + response.success_count,
+            failed_count=F('failed_count') + response.failure_count,
+        )
+
     return response.success_count
 
 
 @shared_task(name='apps.notifications.tasks.send_bulk_push_notification')
-def send_bulk_push_notification(user_ids, title, body, data=None, category=None):
+def send_bulk_push_notification(user_ids, title, body, data=None, category=None, campaign_id=None):
     """
     Рассылает push конкретному списку пользователей.
     Вызывает send_push_notification.delay для каждого — Celery сам параллелит.
+    Если передан campaign_id — статистика доставки накапливается в PushCampaign.
     """
     queued = 0
     for user_id in user_ids:
@@ -84,7 +138,8 @@ def send_bulk_push_notification(user_ids, title, body, data=None, category=None)
             body=body,
             data=data or {},
             category=category,
+            campaign_id=campaign_id,
         )
         queued += 1
-    logger.info("Bulk push queued: %d tasks, category=%s", queued, category)
+    logger.info("Bulk push queued: %d tasks, category=%s, campaign_id=%s", queued, category, campaign_id)
     return queued

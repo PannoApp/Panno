@@ -1,3 +1,6 @@
+from datetime import time as dt_time
+from unittest.mock import MagicMock, patch
+
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -6,7 +9,7 @@ from .models import RestaurantInfo
 
 
 # ---------------------------------------------------------------------------
-# RestaurantInfo model (singleton)
+# Модель ресторана (синглтон)
 # ---------------------------------------------------------------------------
 
 class RestaurantInfoModelTest(TestCase):
@@ -89,3 +92,107 @@ class RestaurantInfoViewTest(APITestCase):
         # tour_link and twogis_link are null when not set
         self.assertIsNone(response.data['tour_link'])
         self.assertIsNone(response.data['twogis_link'])
+
+
+# ---------------------------------------------------------------------------
+# RestaurantInfo.is_open_now property
+# ---------------------------------------------------------------------------
+
+class RestaurantInfoIsOpenNowTest(TestCase):
+    def _make_info(self, working_hours):
+        info = RestaurantInfo.load()
+        info.working_hours = working_hours
+        info.save()
+        return info
+
+    def _mock_local_time(self, hour, minute):
+        mock_dt = MagicMock()
+        mock_dt.time.return_value = dt_time(hour, minute)
+        return mock_dt
+
+    def test_returns_none_when_working_hours_empty(self):
+        info = self._make_info('')
+        self.assertIsNone(info.is_open_now)
+
+    def test_returns_none_when_format_unrecognized(self):
+        info = self._make_info('всегда открыто')
+        self.assertIsNone(info.is_open_now)
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_returns_true_within_normal_hours(self, mock_now, mock_localtime):
+        mock_localtime.return_value = self._mock_local_time(15, 0)
+        info = self._make_info('Пн–Вс: 12:00–22:00')
+        self.assertTrue(info.is_open_now)
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_returns_false_before_opening(self, mock_now, mock_localtime):
+        mock_localtime.return_value = self._mock_local_time(10, 0)
+        info = self._make_info('Пн–Вс: 12:00–22:00')
+        self.assertFalse(info.is_open_now)
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_returns_false_after_closing(self, mock_now, mock_localtime):
+        mock_localtime.return_value = self._mock_local_time(23, 0)
+        info = self._make_info('Пн–Вс: 12:00–22:00')
+        self.assertFalse(info.is_open_now)
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_midnight_crossing_returns_true_after_open(self, mock_now, mock_localtime):
+        mock_localtime.return_value = self._mock_local_time(23, 0)
+        info = self._make_info('Пн–Вс: 20:00–02:00')
+        self.assertTrue(info.is_open_now)
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_midnight_crossing_returns_true_before_close(self, mock_now, mock_localtime):
+        mock_localtime.return_value = self._mock_local_time(1, 30)
+        info = self._make_info('Пн–Вс: 20:00–02:00')
+        self.assertTrue(info.is_open_now)
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_midnight_crossing_returns_false_outside_hours(self, mock_now, mock_localtime):
+        mock_localtime.return_value = self._mock_local_time(10, 0)
+        info = self._make_info('Пн–Вс: 20:00–02:00')
+        self.assertFalse(info.is_open_now)
+
+
+# ---------------------------------------------------------------------------
+# RestaurantInfo hero media + concept fields
+# ---------------------------------------------------------------------------
+
+class RestaurantInfoHeroFieldsTest(APITestCase):
+    def setUp(self):
+        self.info = RestaurantInfo.load()
+
+    def test_concept_description_defaults_to_empty_string(self):
+        response = self.client.get('/api/core/info/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('concept_description', response.data)
+        self.assertEqual(response.data['concept_description'], '')
+
+    def test_hero_image_defaults_to_null(self):
+        response = self.client.get('/api/core/info/')
+        self.assertIn('hero_image', response.data)
+        self.assertIsNone(response.data['hero_image'])
+
+    def test_hero_video_url_defaults_to_empty_string(self):
+        response = self.client.get('/api/core/info/')
+        self.assertIn('hero_video_url', response.data)
+        self.assertEqual(response.data['hero_video_url'], '')
+
+    def test_concept_description_reflects_saved_value(self):
+        self.info.concept_description = 'Modern Nomad — кухня кочевников'
+        self.info.save()
+        response = self.client.get('/api/core/info/')
+        self.assertEqual(response.data['concept_description'], 'Modern Nomad — кухня кочевников')
+
+    def test_hero_video_url_reflects_saved_value(self):
+        self.info.hero_video_url = 'https://cdn.example.com/hero.mp4'
+        self.info.save()
+        response = self.client.get('/api/core/info/')
+        self.assertEqual(response.data['hero_video_url'], 'https://cdn.example.com/hero.mp4')

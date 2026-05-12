@@ -2,9 +2,10 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework import status, views
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
+from utils.permissions import IsContentManager
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
-from .models import UserDevice
+from .models import UserDevice, PushCampaign
 from .serializers import UserDeviceSerializer, BulkPushSerializer
 
 
@@ -104,7 +105,7 @@ class RegisterDeviceView(views.APIView):
     },
 )
 class BulkPushView(views.APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsContentManager]
 
     def post(self, request, *args, **kwargs):
         serializer = BulkPushSerializer(data=request.data)
@@ -150,6 +151,14 @@ class BulkPushView(views.APIView):
         else:
             user_ids = []
 
+        campaign = PushCampaign.objects.create(
+            title=data['title'],
+            body=data['body'],
+            category=data.get('category') or '',
+            segment=segment,
+            total_users=len(user_ids),
+        )
+
         from .tasks import send_bulk_push_notification
         send_bulk_push_notification.delay(
             user_ids=user_ids,
@@ -157,6 +166,7 @@ class BulkPushView(views.APIView):
             body=data['body'],
             data=data.get('data', {}),
             category=data.get('category'),
+            campaign_id=campaign.pk,
         )
 
         return Response(

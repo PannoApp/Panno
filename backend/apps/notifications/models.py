@@ -32,3 +32,23 @@ class UserDevice(models.Model):
 
     def __str__(self):
         return f"Устройство пользователя ID {self.user.id}"
+
+
+class PushCampaign(models.Model):
+    created_at      = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    title           = models.CharField(max_length=255, verbose_name="Заголовок")
+    body            = models.TextField(verbose_name="Текст")
+    category        = models.CharField(max_length=50, blank=True, verbose_name="Категория")
+    segment         = models.CharField(max_length=50, blank=True, verbose_name="Сегмент")
+    total_users     = models.PositiveIntegerField(default=0, verbose_name="Всего получателей")
+    delivered_count = models.PositiveIntegerField(default=0, verbose_name="Доставлено")
+    failed_count    = models.PositiveIntegerField(default=0, verbose_name="Ошибок")
+
+    class Meta:
+        app_label = 'notifications'
+        verbose_name = "Push-кампания"
+        verbose_name_plural = "Push-кампании"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.created_at:%Y-%m-%d}] {self.title} ({self.segment})"

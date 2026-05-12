@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import UserDevice
+from .models import UserDevice, PushCampaign
 
 
 def _is_content_or_admin(user):
@@ -29,3 +29,26 @@ class UserDeviceAdmin(admin.ModelAdmin):
     def fcm_token_short(self, obj):
         return obj.fcm_token[:40] + '...' if len(obj.fcm_token) > 40 else obj.fcm_token
     fcm_token_short.short_description = 'FCM Токен'
+
+
+@admin.register(PushCampaign)
+class PushCampaignAdmin(admin.ModelAdmin):
+    list_display = (
+        'created_at', 'title', 'category', 'segment',
+        'total_users', 'delivered_count', 'failed_count',
+    )
+    list_filter = ('category', 'segment', 'created_at')
+    search_fields = ('title',)
+    readonly_fields = (
+        'created_at', 'title', 'body', 'category', 'segment',
+        'total_users', 'delivered_count', 'failed_count',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser

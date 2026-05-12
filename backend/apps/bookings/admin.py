@@ -1,9 +1,10 @@
 from django.contrib import admin
+from utils.permissions import _has_role
 from .models import TableBooking
 
 
 def _is_hall_manager(user):
-    return getattr(user, 'role', '') in ('admin', 'hall_manager') or user.is_superuser
+    return _has_role(user, 'admin', 'hall_manager')
 
 
 @admin.register(TableBooking)

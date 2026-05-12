@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -34,6 +34,7 @@ class SMSServiceTest(TestCase):
         self.assertGreaterEqual(otp, 1000)
         self.assertLessEqual(otp, 9999)
 
+    @override_settings(DEBUG=True)
     def test_send_sms_stores_otp_in_cache(self):
         result = SMSService.send_sms('+77001234567')
         self.assertTrue(result)
@@ -116,6 +117,7 @@ class RequestSMSViewTest(APITestCase):
     def setUp(self):
         cache.clear()
 
+    @override_settings(DEBUG=True)
     def test_valid_phone_returns_200(self):
         response = self.client.post('/api/users/auth/request-sms/', {'phone': '+77001234567'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)

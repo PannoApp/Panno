@@ -9,7 +9,7 @@ from rest_framework.test import APITestCase, APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Event, News, EventReservation
-from .serializers import EventReservationSerializer
+from .serializers import EventReservationSerializer, EventReservationStaffSerializer
 
 User = get_user_model()
 
@@ -285,3 +285,35 @@ class EventReservationSignalTest(TestCase):
         reservation.guests_count = 5
         reservation.save()
         mock_task.delay.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# EventReservationStaffSerializer
+# ---------------------------------------------------------------------------
+
+class EventReservationStaffSerializerTest(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            phone='+77030000001', first_name='Алихан', last_name='Сейткали'
+        )
+        self.event = make_event()
+
+    def test_staff_serializer_includes_guest_name(self):
+        reservation = EventReservation.objects.create(event=self.event, user=self.user)
+        s = EventReservationStaffSerializer(reservation)
+        self.assertIn('guest_name', s.data)
+        self.assertEqual(s.data['guest_name'], 'Алихан Сейткали')
+
+    def test_staff_serializer_includes_guest_phone(self):
+        reservation = EventReservation.objects.create(event=self.event, user=self.user)
+        s = EventReservationStaffSerializer(reservation)
+        self.assertIn('guest_phone', s.data)
+        self.assertEqual(s.data['guest_phone'], '+77030000001')
+
+    def test_guest_name_falls_back_to_phone_if_no_name(self):
+        User = get_user_model()
+        user_no_name = User.objects.create_user(phone='+77030000002')
+        reservation = EventReservation.objects.create(event=self.event, user=user_no_name)
+        s = EventReservationStaffSerializer(reservation)
+        self.assertEqual(s.data['guest_name'], '+77030000002')

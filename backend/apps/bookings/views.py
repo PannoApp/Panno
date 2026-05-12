@@ -3,8 +3,9 @@ from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
 from utils.pagination import StandardPagination
+from utils.permissions import IsHallManager
 from .models import TableBooking
-from .serializers import TableBookingSerializer
+from .serializers import TableBookingSerializer, TableBookingStaffSerializer
 
 
 _error_401 = OpenApiResponse(description='Токен не передан или недействителен')
@@ -98,3 +99,67 @@ class TableBookingListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+@extend_schema(tags=['Bookings — Staff'])
+class StaffBookingListView(generics.ListAPIView):
+    """Список всех броней для менеджера зала и администратора."""
+    serializer_class = TableBookingStaffSerializer
+    permission_classes = [IsHallManager]
+    pagination_class = StandardPagination
+
+    @extend_schema(
+        summary='Все бронирования (для персонала)',
+        description=(
+            'Возвращает все бронирования всех пользователей.\n\n'
+            'Доступно только для `role=hall_manager` или `role=admin`.'
+        ),
+        parameters=_pagination_params,
+        responses={
+            200: TableBookingStaffSerializer(many=True),
+            401: _error_401,
+            403: OpenApiResponse(description='Недостаточно прав'),
+        },
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return TableBooking.objects.select_related('user').order_by('-date', '-time')
+
+
+@extend_schema(tags=['Bookings — Staff'])
+class StaffBookingUpdateView(generics.UpdateAPIView):
+    """Смена статуса бронирования для менеджера зала и администратора."""
+    serializer_class = TableBookingStaffSerializer
+    permission_classes = [IsHallManager]
+    http_method_names = ['patch', 'head', 'options']
+
+    @extend_schema(
+        summary='Обновить статус бронирования (для персонала)',
+        description=(
+            'Позволяет менеджеру зала изменить статус или детали бронирования.\n\n'
+            'Доступно только для `role=hall_manager` или `role=admin`.\n\n'
+            '**Доступные статусы:** `pending`, `confirmed`, `canceled`, `completed`.'
+        ),
+        request=TableBookingStaffSerializer,
+        responses={
+            200: TableBookingStaffSerializer,
+            400: OpenApiResponse(description='Ошибка валидации'),
+            401: _error_401,
+            403: OpenApiResponse(description='Недостаточно прав'),
+            404: OpenApiResponse(description='Бронирование не найдено'),
+        },
+        examples=[
+            OpenApiExample(
+                'Подтвердить бронь',
+                value={'status': 'confirmed'},
+                request_only=True,
+            )
+        ],
+    )
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return TableBooking.objects.select_related('user')
