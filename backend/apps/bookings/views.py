@@ -2,6 +2,7 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
+from utils.idempotency import IdempotencyMixin
 from utils.pagination import StandardPagination
 from utils.permissions import IsHallManager
 from .models import TableBooking
@@ -29,7 +30,7 @@ _pagination_params = [
 
 
 @extend_schema(tags=['Bookings'])
-class TableBookingListCreateView(generics.ListCreateAPIView):
+class TableBookingListCreateView(IdempotencyMixin, generics.ListCreateAPIView):
     serializer_class = TableBookingSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardPagination

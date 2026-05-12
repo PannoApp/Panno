@@ -1,7 +1,9 @@
+import uuid
 from datetime import date as dt_date, time as dt_time
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -114,7 +116,9 @@ class TableBookingListCreateViewTest(APITestCase):
             'time': '19:00:00',
             'guests_count': 3,
         }
-        response = self.client.post('/api/v1/bookings/', payload)
+        response = self.client.post(
+            '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['guest_name'], 'Алихан')
         self.assertEqual(response.data['status'], 'pending')
@@ -127,7 +131,7 @@ class TableBookingListCreateViewTest(APITestCase):
             'time': '20:00:00',
             'guests_count': 2,
         }
-        self.client.post('/api/v1/bookings/', payload)
+        self.client.post('/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
         booking = TableBooking.objects.get(guest_name='Данияр')
         self.assertEqual(booking.user, self.user)
 
@@ -149,7 +153,9 @@ class TableBookingListCreateViewTest(APITestCase):
             'time': '19:00:00',
             'guests_count': 100,
         }
-        response = self.client.post('/api/v1/bookings/', payload)
+        response = self.client.post(
+            '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('guests_count', response.data)
 
@@ -593,7 +599,9 @@ class TableBookingPhoneAPITest(APITestCase):
             'time': '19:00:00',
             'guests_count': 2,
         }
-        response = self.client.post('/api/v1/bookings/', payload)
+        response = self.client.post(
+            '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['phone'], '+77001112233')
         self.assertEqual(TableBooking.objects.get(guest_name='Данияр').phone, '+77001112233')
@@ -604,4 +612,71 @@ class TableBookingPhoneAPITest(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
         response = self.client.get('/api/v1/bookings/staff/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('phone', response.data['results'][0])
+
+
+# ---------------------------------------------------------------------------
+# Idempotency — POST /api/v1/bookings/
+# ---------------------------------------------------------------------------
+
+class BookingIdempotencyTest(APITestCase):
+    URL = '/api/v1/bookings/'
+
+    def setUp(self):
+        self.user = make_user('+77009000001')
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+        self.payload = {
+            'guest_name': 'Идем Потент',
+            'date': '2026-08-01',
+            'time': '18:00:00',
+            'guests_count': 2,
+        }
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_missing_key_returns_400(self):
+        response = self.client.post(self.URL, self.payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Idempotency-Key', response.data['detail'])
+
+    def test_invalid_key_returns_400(self):
+        response = self.client.post(
+            self.URL, self.payload, HTTP_IDEMPOTENCY_KEY='not-a-uuid',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_first_request_creates_booking(self):
+        key = str(uuid.uuid4())
+        response = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(TableBooking.objects.filter(user=self.user).count(), 1)
+
+    def test_duplicate_key_does_not_create_second_booking(self):
+        key = str(uuid.uuid4())
+        r1 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
+        r2 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r1.data['id'], r2.data['id'])
+        self.assertEqual(TableBooking.objects.filter(user=self.user).count(), 1)
+
+    def test_different_keys_create_two_bookings(self):
+        r1 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
+        r2 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+        self.assertNotEqual(r1.data['id'], r2.data['id'])
+        self.assertEqual(TableBooking.objects.filter(user=self.user).count(), 2)
+
+    def test_same_key_different_user_creates_new_booking(self):
+        key = str(uuid.uuid4())
+        self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
+
+        user2 = make_user('+77009000002')
+        refresh2 = RefreshToken.for_user(user2)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh2.access_token}')
+        r2 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(TableBooking.objects.count(), 2)

@@ -1,6 +1,8 @@
+import uuid
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -158,10 +160,11 @@ class EventReservationCreateViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_push_notification')
     def test_create_reservation_success(self, _):
         self._auth()
-        response = self.client.post('/api/v1/events/reservations/create/', {
-            'event': self.event.pk,
-            'guests_count': 2,
-        })
+        response = self.client.post(
+            '/api/v1/events/reservations/create/',
+            {'event': self.event.pk, 'guests_count': 2},
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['event'], self.event.pk)
         self.assertEqual(response.data['guests_count'], 2)
@@ -169,15 +172,28 @@ class EventReservationCreateViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_push_notification')
     def test_create_sets_user_from_token(self, _):
         self._auth()
-        self.client.post('/api/v1/events/reservations/create/', {'event': self.event.pk})
+        self.client.post(
+            '/api/v1/events/reservations/create/',
+            {'event': self.event.pk},
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
         reservation = EventReservation.objects.get(event=self.event, user=self.user)
         self.assertEqual(reservation.user, self.user)
 
     @patch('apps.notifications.tasks.send_push_notification')
     def test_duplicate_reservation_returns_400(self, _):
         self._auth()
-        self.client.post('/api/v1/events/reservations/create/', {'event': self.event.pk})
-        response = self.client.post('/api/v1/events/reservations/create/', {'event': self.event.pk})
+        # Two different idempotency keys so the second request reaches DB validation
+        self.client.post(
+            '/api/v1/events/reservations/create/',
+            {'event': self.event.pk},
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
+        response = self.client.post(
+            '/api/v1/events/reservations/create/',
+            {'event': self.event.pk},
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('non_field_errors', response.data)
 
@@ -190,7 +206,11 @@ class EventReservationCreateViewTest(APITestCase):
     @patch('apps.notifications.tasks.send_push_notification')
     def test_invalid_event_id_returns_400(self, _):
         self._auth()
-        response = self.client.post('/api/v1/events/reservations/create/', {'event': 99999})
+        response = self.client.post(
+            '/api/v1/events/reservations/create/',
+            {'event': 99999},
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
@@ -317,3 +337,61 @@ class EventReservationStaffSerializerTest(TestCase):
         reservation = EventReservation.objects.create(event=self.event, user=user_no_name)
         s = EventReservationStaffSerializer(reservation)
         self.assertEqual(s.data['guest_name'], '+77030000002')
+
+
+# ---------------------------------------------------------------------------
+# Idempotency — POST /api/v1/events/reservations/create/
+# ---------------------------------------------------------------------------
+
+class EventReservationIdempotencyTest(APITestCase):
+    URL = '/api/v1/events/reservations/create/'
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            phone='+77040000001',
+            first_name='Идем',
+            last_name='Потент',
+        )
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+        self.event = make_event()
+        self.payload = {'event': self.event.pk, 'guests_count': 1}
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_missing_key_returns_400(self):
+        response = self.client.post(self.URL, self.payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Idempotency-Key', response.data['detail'])
+
+    def test_invalid_key_returns_400(self):
+        response = self.client.post(
+            self.URL, self.payload, HTTP_IDEMPOTENCY_KEY='bad-key',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_first_request_creates_reservation(self):
+        key = str(uuid.uuid4())
+        response = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(EventReservation.objects.filter(user=self.user).count(), 1)
+
+    def test_duplicate_key_does_not_create_second_reservation(self):
+        key = str(uuid.uuid4())
+        r1 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
+        r2 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r1.data['id'], r2.data['id'])
+        self.assertEqual(EventReservation.objects.filter(user=self.user).count(), 1)
+
+    def test_validation_error_is_cached_and_returned_on_retry(self):
+        key = str(uuid.uuid4())
+        bad_payload = {'event': 99999, 'guests_count': 1}
+        r1 = self.client.post(self.URL, bad_payload, HTTP_IDEMPOTENCY_KEY=key)
+        r2 = self.client.post(self.URL, bad_payload, HTTP_IDEMPOTENCY_KEY=key)
+        self.assertEqual(r1.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST)

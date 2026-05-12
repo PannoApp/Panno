@@ -3,6 +3,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
+from utils.idempotency import IdempotencyMixin
 from utils.pagination import StandardPagination
 from .models import Event, News, EventReservation
 from .serializers import EventSerializer, NewsSerializer, EventReservationSerializer
@@ -114,7 +115,7 @@ class NewsListView(generics.ListAPIView):
         )
     ],
 )
-class EventReservationCreateView(generics.CreateAPIView):
+class EventReservationCreateView(IdempotencyMixin, generics.CreateAPIView):
     serializer_class = EventReservationSerializer
     permission_classes = [IsAuthenticated]
 
