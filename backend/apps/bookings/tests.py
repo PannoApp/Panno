@@ -725,3 +725,103 @@ class BookingReminderRetryConfigTest(TestCase):
         mock_objects.filter.side_effect = Exception("DB connection lost")
         with self.assertRaises(Exception):
             send_booking_reminders()
+
+
+# ---------------------------------------------------------------------------
+# Дедупликация напоминаний через Redis-ключ reminder_sent:{booking_id}
+# ---------------------------------------------------------------------------
+
+class BookingReminderDeduplicationTest(TestCase):
+    """
+    Проверяет, что повторный запуск send_booking_reminders в том же
+    временном окне не отправляет второе напоминание одной и той же брони.
+    Механизм: cache.add('reminder_sent:{pk}', True, 10800).
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def _mock_timezone(self, mock_tz, hour=14, minute=0, today=None):
+        fixed_date = today or dt_date(2026, 5, 12)
+        mock_dt = MagicMock()
+        mock_dt.date.return_value = fixed_date
+        mock_dt.time.return_value = dt_time(hour, minute)
+        mock_dt.__add__ = lambda self, delta: MagicMock(
+            time=lambda: dt_time(
+                (hour * 60 + minute + int(delta.total_seconds() // 60)) // 60 % 24,
+                (hour * 60 + minute + int(delta.total_seconds() // 60)) % 60,
+            ),
+            date=lambda: fixed_date,
+        )
+        mock_tz.now.return_value = MagicMock()
+        mock_tz.localtime.return_value = mock_dt
+        return fixed_date
+
+    @patch('apps.bookings.tasks.timezone')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_second_run_does_not_send_duplicate_push(self, mock_push, mock_tz):
+        """Второй запуск задачи в том же окне не должен отправлять повторный пуш."""
+        fixed_date = self._mock_timezone(mock_tz, hour=14, minute=0)
+        user = make_user('+77020000001')
+        TableBooking.objects.create(
+            user=user, guest_name='Дедупликация', date=fixed_date,
+            time='15:30:00', guests_count=2, status='confirmed',
+        )
+        mock_push.delay.reset_mock()
+
+        from apps.bookings.tasks import send_booking_reminders
+        # Первый запуск — пуш уходит, ключ устанавливается
+        result1 = send_booking_reminders()
+        # Второй запуск — ключ уже есть, пуш не отправляется
+        result2 = send_booking_reminders()
+
+        self.assertEqual(result1, 1)
+        self.assertEqual(result2, 0)
+        self.assertEqual(mock_push.delay.call_count, 1)
+
+    @patch('apps.bookings.tasks.timezone')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_cache_key_is_set_after_first_run(self, mock_push, mock_tz):
+        """После первого запуска Redis-ключ reminder_sent:{pk} должен быть установлен."""
+        fixed_date = self._mock_timezone(mock_tz, hour=14, minute=0)
+        user = make_user('+77020000002')
+        booking = TableBooking.objects.create(
+            user=user, guest_name='Ключ', date=fixed_date,
+            time='15:30:00', guests_count=2, status='confirmed',
+        )
+        mock_push.delay.reset_mock()
+
+        from apps.bookings.tasks import send_booking_reminders
+        send_booking_reminders()
+
+        self.assertIsNotNone(cache.get(f'reminder_sent:{booking.pk}'))
+
+    @patch('apps.bookings.tasks.timezone')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_different_bookings_each_get_one_push(self, mock_push, mock_tz):
+        """Две разные брони в окне должны получить по одному пушу каждая."""
+        fixed_date = self._mock_timezone(mock_tz, hour=14, minute=0)
+        user1 = make_user('+77020000003')
+        user2 = make_user('+77020000004')
+        TableBooking.objects.create(
+            user=user1, guest_name='Гость 1', date=fixed_date,
+            time='15:10:00', guests_count=2, status='confirmed',
+        )
+        TableBooking.objects.create(
+            user=user2, guest_name='Гость 2', date=fixed_date,
+            time='15:50:00', guests_count=3, status='confirmed',
+        )
+        mock_push.delay.reset_mock()
+
+        from apps.bookings.tasks import send_booking_reminders
+        # Первый запуск — оба пуша уходят
+        result1 = send_booking_reminders()
+        # Второй запуск — оба ключа уже есть
+        result2 = send_booking_reminders()
+
+        self.assertEqual(result1, 2)
+        self.assertEqual(result2, 0)
+        self.assertEqual(mock_push.delay.call_count, 2)

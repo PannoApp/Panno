@@ -1,5 +1,6 @@
 import logging
 from celery import shared_task
+from django.core.cache import cache
 from django.utils import timezone
 from datetime import timedelta
 
@@ -42,6 +43,12 @@ def send_booking_reminders():
 
     count = 0
     for booking in bookings:
+        # cache.add() атомарен: устанавливает ключ только если его нет.
+        # Возвращает False — бронь уже обработана в предыдущем запуске Beat.
+        cache_key = f'reminder_sent:{booking.pk}'
+        if not cache.add(cache_key, True, timeout=10800):  # TTL = 3 часа
+            continue
+
         send_push_notification.delay(
             user_id=booking.user_id,
             title="Напоминание о визите",
