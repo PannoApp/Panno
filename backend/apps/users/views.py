@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
+
+from .throttles import PhoneSMSThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
@@ -29,7 +31,8 @@ _sms_request_400 = OpenApiResponse(
 @extend_schema(tags=['Auth'])
 class RequestSMSView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    # Два уровня защиты: по IP (ScopedRateThrottle) + по номеру телефона (PhoneSMSThrottle)
+    throttle_classes = [ScopedRateThrottle, PhoneSMSThrottle]
     throttle_scope = 'sms_request'
 
     @extend_schema(
@@ -37,7 +40,8 @@ class RequestSMSView(APIView):
         description=(
             'Отправляет на указанный номер телефона 4-значный OTP-код через SMS.\n\n'
             'Код действителен **3 минуты** и хранится в Redis.\n\n'
-            '**Лимит:** 3 запроса в минуту с одного IP-адреса.'
+            '**Лимит:** 3 запроса в минуту с одного IP-адреса '
+            'и 5 запросов за 10 минут на один номер телефона.'
         ),
         request=RequestSMSSerializer,
         responses={
@@ -48,7 +52,9 @@ class RequestSMSView(APIView):
                 ],
             ),
             400: _sms_request_400,
-            429: OpenApiResponse(description='Превышен лимит запросов (3/мин с одного IP)'),
+            429: OpenApiResponse(
+                description='Превышен лимит запросов (3/мин с одного IP или 5/10мин на номер)'
+            ),
             500: OpenApiResponse(
                 description='Ошибка сервера при отправке SMS',
                 examples=[

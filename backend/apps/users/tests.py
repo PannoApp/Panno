@@ -9,6 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import RequestSMSSerializer, VerifySMSSerializer
 from .services import SMSService
+from .throttles import PhoneSMSThrottle
 
 User = get_user_model()
 
@@ -343,6 +344,109 @@ class UserProfileViewTest(APITestCase):
     def test_patch_unauthenticated_returns_401(self):
         response = self.client.patch('/api/v1/users/profile/', {'first_name': 'X'})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+# ---------------------------------------------------------------------------
+# PhoneSMSThrottle
+# ---------------------------------------------------------------------------
+
+class PhoneSMSThrottleTest(TestCase):
+    """Тесты для кастомного троттлинга по номеру телефона."""
+
+    def setUp(self):
+        cache.clear()
+
+    def test_parse_rate_returns_5_requests_600_seconds(self):
+        throttle = PhoneSMSThrottle()
+        num, duration = throttle.parse_rate('any_string')
+        self.assertEqual(num, 5)
+        self.assertEqual(duration, 600)
+
+    def test_parse_rate_with_none_returns_none_pair(self):
+        throttle = PhoneSMSThrottle()
+        num, duration = throttle.parse_rate(None)
+        self.assertIsNone(num)
+        self.assertIsNone(duration)
+
+    def _make_mock_request(self, phone=None):
+        """Возвращает mock-объект с атрибутом data, имитирующий DRF Request."""
+        req = MagicMock()
+        req.data = {'phone': phone} if phone else {}
+        return req
+
+    def test_get_cache_key_contains_phone(self):
+        """Ключ Redis должен содержать номер телефона."""
+        throttle = PhoneSMSThrottle()
+        key = throttle.get_cache_key(self._make_mock_request('+77001234567'), view=None)
+        self.assertIsNotNone(key)
+        self.assertIn('+77001234567', key)
+
+    def test_get_cache_key_without_phone_returns_none(self):
+        """Если телефона нет в теле — не блокируем (сработает валидация сериализатора)."""
+        throttle = PhoneSMSThrottle()
+        key = throttle.get_cache_key(self._make_mock_request(), view=None)
+        self.assertIsNone(key)
+
+    def test_different_phones_have_different_keys(self):
+        """Два разных номера не должны разделять один счётчик."""
+        throttle = PhoneSMSThrottle()
+        key1 = throttle.get_cache_key(self._make_mock_request('+77001111111'), view=None)
+        key2 = throttle.get_cache_key(self._make_mock_request('+77002222222'), view=None)
+        self.assertNotEqual(key1, key2)
+
+
+class RequestSMSPhoneThrottleIntegrationTest(APITestCase):
+    """
+    Интеграционный тест: проверяем, что 429 возвращается после превышения
+    лимита по номеру телефона (5 запросов за 10 минут).
+
+    ScopedRateThrottle (IP-уровень) мокается, чтобы не мешать — в тестах
+    все запросы идут с одного IP, и IP-лимит (3/мин) срабатывал бы раньше
+    телефонного (5/10 мин), скрывая поведение, которое мы тестируем.
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    @override_settings(DEBUG=True)
+    @patch('rest_framework.throttling.ScopedRateThrottle.allow_request', return_value=True)
+    def test_phone_throttle_blocks_after_limit(self, _mock_ip_throttle):
+        """После 5 успешных запросов с одного номера — должен вернуться 429."""
+        phone = '+77009999999'
+        url = '/api/v1/users/auth/request-sms/'
+
+        # Первые 5 запросов должны проходить
+        for i in range(5):
+            response = self.client.post(url, {'phone': phone})
+            self.assertEqual(
+                response.status_code, status.HTTP_200_OK,
+                msg=f'Запрос {i + 1} должен проходить, получен {response.status_code}',
+            )
+
+        # 6-й запрос с того же номера — должен быть заблокирован телефонным троттлом
+        response = self.client.post(url, {'phone': phone})
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    @override_settings(DEBUG=True)
+    @patch('rest_framework.throttling.ScopedRateThrottle.allow_request', return_value=True)
+    def test_different_phones_are_throttled_independently(self, _mock_ip_throttle):
+        """Лимит считается отдельно для каждого номера телефона."""
+        url = '/api/v1/users/auth/request-sms/'
+
+        phone_a = '+77001110001'
+        phone_b = '+77001110002'
+
+        # Исчерпываем лимит для phone_a
+        for _ in range(5):
+            self.client.post(url, {'phone': phone_a})
+
+        # phone_a заблокирован
+        response_a = self.client.post(url, {'phone': phone_a})
+        self.assertEqual(response_a.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+        # phone_b должен проходить свободно — у него свой независимый счётчик
+        response_b = self.client.post(url, {'phone': phone_b})
+        self.assertEqual(response_b.status_code, status.HTTP_200_OK)
 
 
 # ---------------------------------------------------------------------------
