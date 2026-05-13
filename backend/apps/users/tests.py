@@ -452,7 +452,64 @@ class RequestSMSPhoneThrottleIntegrationTest(APITestCase):
 
 
 # ---------------------------------------------------------------------------
-# Блок 8: auto-set is_staff при назначении роли через UserAdmin
+# Блок 8: auto-set is_staff при назначении роли через User.save()
+# ---------------------------------------------------------------------------
+
+class UserRoleIsStaffSyncTest(TestCase):
+    """
+    User.save() автоматически синхронизирует is_staff с полем role.
+    Логика живёт в модели — работает при любом способе сохранения:
+    вручную, через Admin, через management-команды, импорты и т.д.
+    """
+
+    def test_role_assigned_directly_sets_is_staff(self):
+        """Назначение роли напрямую через .save() → is_staff=True."""
+        user = User.objects.create_user(phone='+70001110001')
+        self.assertFalse(user.is_staff)
+        user.role = 'hall_manager'
+        user.save()
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+    def test_all_roles_set_is_staff(self):
+        """Каждая из допустимых ролей должна давать is_staff=True."""
+        for i, (role, _) in enumerate(User.ROLE_CHOICES):
+            user = User.objects.create_user(phone=f'+7000111000{i}')
+            user.role = role
+            user.save()
+            user.refresh_from_db()
+            self.assertTrue(user.is_staff, msg=f'role={role} должна давать is_staff=True')
+
+    def test_clearing_role_removes_is_staff(self):
+        """Снятие роли у обычного пользователя → is_staff=False."""
+        user = User.objects.create_user(phone='+70001110010')
+        user.role = 'content_manager'
+        user.save()
+        user.role = ''
+        user.save()
+        user.refresh_from_db()
+        self.assertFalse(user.is_staff)
+
+    def test_superuser_is_staff_preserved_when_role_cleared(self):
+        """Суперпользователь: снятие роли не убирает is_staff."""
+        user = User.objects.create_user(phone='+70001110011')
+        user.is_superuser = True
+        user.is_staff = True
+        user.save()
+        user.role = ''
+        user.save()
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+    def test_create_user_without_role_is_not_staff(self):
+        """Новый пользователь без роли не должен быть is_staff=True."""
+        user = User.objects.create_user(phone='+70001110012')
+        self.assertFalse(user.is_staff)
+        self.assertEqual(user.role, '')
+
+
+# ---------------------------------------------------------------------------
+# Блок 9: auto-set is_staff при назначении роли через UserAdmin
 # ---------------------------------------------------------------------------
 
 class UserAdminIsStaffAutoSetTest(TestCase):

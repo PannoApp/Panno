@@ -30,15 +30,7 @@ class UserAdmin(AdminOnlyMixin, admin.ModelAdmin):
     exclude         = ('groups', 'user_permissions')
 
     def save_model(self, request, obj, form, change):
-        """
-        Автоматически синхронизирует is_staff с ролью пользователя:
-        - Если у пользователя задана любая роль — is_staff=True (может войти в Django Admin).
-        - Если роль снята — is_staff=False (обычный пользователь приложения).
-        is_superuser никогда не трогаем здесь — он управляется отдельно.
-        """
-        if obj.role:
-            obj.is_staff = True
-        elif not obj.is_superuser:
-            # Снять is_staff можно только если пользователь не суперпользователь
-            obj.is_staff = False
+        # Синхронизация is_staff выполняется автоматически в User.save().
+        # Явный вызов здесь избыточен, но оставлен для читаемости —
+        # редактор Admin видит намерение прямо в этом методе.
         super().save_model(request, obj, form, change)

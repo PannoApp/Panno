@@ -70,5 +70,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
 
+    def save(self, *args, **kwargs):
+        # Синхронизируем is_staff с полем role при любом сохранении:
+        # любая непустая роль → is_staff=True (доступ в Admin + staff API).
+        # Снятие роли у обычного пользователя → is_staff=False.
+        # Суперпользователь не затрагивается — его is_staff управляется отдельно.
+        if self.role:
+            self.is_staff = True
+        elif not self.is_superuser:
+            self.is_staff = False
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.phone
