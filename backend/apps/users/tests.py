@@ -577,6 +577,65 @@ class TokenRefreshViewTest(APITestCase):
 
 
 # ---------------------------------------------------------------------------
+# POST /api/v1/users/auth/logout/
+# ---------------------------------------------------------------------------
+
+class LogoutViewTest(APITestCase):
+    """
+    Тесты logout-эндпоинта: refresh-токен должен попадать в blacklist после
+    вызова logout, а повторная попытка обновить access — завершаться с 401.
+    """
+
+    URL = '/api/v1/users/auth/logout/'
+    REFRESH_URL = '/api/v1/users/auth/token/refresh/'
+
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77001234567')
+        self.refresh = RefreshToken.for_user(self.user)
+        # Аутентифицируем клиента через access-токен
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.refresh.access_token}')
+
+    def test_logout_returns_204(self):
+        """Валидный refresh-токен → 204 No Content."""
+        response = self.client.post(self.URL, {'refresh': str(self.refresh)})
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_logout_blacklists_refresh_token(self):
+        """После logout refresh-токен нельзя использовать для обновления access."""
+        refresh_str = str(self.refresh)
+        self.client.post(self.URL, {'refresh': refresh_str})
+
+        # Попытка обновить access с уже отозванным токеном должна вернуть 401
+        response = self.client.post(self.REFRESH_URL, {'refresh': refresh_str})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_with_already_blacklisted_token_returns_400(self):
+        """Повторный logout с тем же токеном → 400 Bad Request."""
+        refresh_str = str(self.refresh)
+        self.client.post(self.URL, {'refresh': refresh_str})
+        response = self.client.post(self.URL, {'refresh': refresh_str})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+
+    def test_logout_with_invalid_token_returns_400(self):
+        """Поддельный/невалидный токен → 400 Bad Request."""
+        response = self.client.post(self.URL, {'refresh': 'not.a.valid.token'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+
+    def test_logout_without_auth_header_returns_401(self):
+        """Без Authorization-заголовка (access-токена) → 401 Unauthorized."""
+        self.client.credentials()
+        response = self.client.post(self.URL, {'refresh': str(self.refresh)})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_missing_refresh_field_returns_400(self):
+        """Пустое тело запроса → 400 Bad Request."""
+        response = self.client.post(self.URL, {})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+# ---------------------------------------------------------------------------
 # JWT-настройки: проверяем TTL токенов для разных окружений
 # ---------------------------------------------------------------------------
 

@@ -31,6 +31,12 @@ class VerifySMSSerializer(serializers.Serializer):
         help_text="4-значный цифровой код из SMS"
     )
 
+class LogoutSerializer(serializers.Serializer):
+    refresh = serializers.CharField(
+        help_text="Refresh-токен, который нужно отозвать"
+    )
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

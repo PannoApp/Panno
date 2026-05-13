@@ -37,6 +37,9 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
 
+    # Blacklist для JWT: хранит отозванные refresh-токены в БД
+    'rest_framework_simplejwt.token_blacklist',
+
     # Мои приложения
     'apps.users.apps.UsersConfig',
     'apps.menu.apps.MenuConfig',
@@ -272,8 +275,9 @@ SPECTACULAR_SETTINGS = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # Продовое значение: короткий TTL снижает риск утечки токена
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': False,
+    # При каждом refresh выдаётся новый refresh-токен, старый попадает в blacklist
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',

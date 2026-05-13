@@ -6,10 +6,11 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from .throttles import PhoneSMSThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 
-from .serializers import RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer
+from .serializers import RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer, LogoutSerializer
 from .services import SMSService
 
 User = get_user_model()
@@ -161,6 +162,60 @@ class VerifySMSView(APIView):
             'access': str(refresh.access_token),
             'refresh': str(refresh),
         })
+
+
+@extend_schema(tags=['Auth'])
+class LogoutView(APIView):
+    """
+    Logout: принимает refresh-токен и помещает его в blacklist.
+    После этого токен нельзя использовать для получения нового access-токена.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Выход из системы (отзыв refresh-токена)',
+        description=(
+            'Добавляет refresh-токен в blacklist, делая его недействительным.\n\n'
+            'После logout клиент должен удалить оба токена (`access` и `refresh`) '
+            'из локального хранилища и перенаправить пользователя на экран входа.\n\n'
+            '**Важно:** access-токен продолжает работать до истечения своего TTL (30 мин в проде). '
+            'Blacklist инвалидирует только возможность получить новый access через refresh.'
+        ),
+        request=LogoutSerializer,
+        responses={
+            204: OpenApiResponse(description='Успешный logout, тело пустое'),
+            400: OpenApiResponse(
+                description='Токен невалиден или уже отозван',
+                examples=[
+                    OpenApiExample('Ошибка', value={'error': 'Токен недействителен или уже отозван.'})
+                ],
+            ),
+            401: _error_401,
+        },
+        examples=[
+            OpenApiExample(
+                'Запрос',
+                value={'refresh': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>'},
+                request_only=True,
+            )
+        ],
+    )
+    def post(self, request):
+        serializer = LogoutSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Парсим токен и добавляем в blacklist (запись в БД через token_blacklist)
+            token = RefreshToken(serializer.validated_data['refresh'])
+            token.blacklist()
+        except TokenError:
+            return Response(
+                {'error': 'Токен недействителен или уже отозван.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema(tags=['Auth'])

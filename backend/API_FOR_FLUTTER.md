@@ -79,7 +79,38 @@ if (error.response?.statusCode == 401) {
 }
 ```
 
-### 1.4 Профиль пользователя
+### 1.4 Выход из системы (Logout)
+`POST /api/v1/users/auth/logout/` (Требует авторизации)
+- **Body:** `{"refresh": "<твой_refresh_token>"}`
+- **Response (204):** тело пустое — logout выполнен. Удали оба токена из `flutter_secure_storage`.
+- **Response (400):** токен уже отозван или невалиден.
+- **Response (401):** не передан access-токен в заголовке.
+
+> **Важно:** после logout refresh-токен помещается в blacklist на сервере — его больше нельзя использовать. access-токен продолжает жить до конца своего TTL (30 мин в проде), но после удаления из хранилища клиент всё равно потеряет доступ.
+
+**Схема реализации logout в Flutter:**
+```dart
+Future<void> logout() async {
+  final refreshToken = await storage.read(key: 'refresh');
+  final accessToken = await storage.read(key: 'access');
+
+  try {
+    await dio.post(
+      '/api/v1/users/auth/logout/',
+      data: {'refresh': refreshToken},
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
+  } catch (_) {
+    // Даже если запрос упал — всё равно чистим локальное хранилище
+  }
+
+  await storage.delete(key: 'access');
+  await storage.delete(key: 'refresh');
+  // Перенаправить на экран входа
+}
+```
+
+### 1.5 Профиль пользователя
 - **Получить профиль:** `GET /api/v1/users/profile/`
   ```json
   {

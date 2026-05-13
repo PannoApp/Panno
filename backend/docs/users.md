@@ -149,6 +149,30 @@
 
 ---
 
+### POST /api/v1/users/auth/logout/
+
+Отзывает refresh-токен, помещая его в blacklist. После этого токен нельзя использовать для обновления access.
+
+**Авторизация:** Bearer JWT (access токен)
+
+**Тело запроса:**
+```json
+{ "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+```
+
+**Ответ 204:** тело пустое — logout выполнен.
+
+**Ответ 400** — токен невалиден или уже отозван:
+```json
+{ "error": "Токен недействителен или уже отозван." }
+```
+
+**Ответ 401** — не передан или недействителен access-токен в заголовке.
+
+> **Важно:** access-токен продолжает работать до истечения своего TTL (30 мин в проде). Blacklist инвалидирует только возможность получить новый access через refresh. Клиент должен удалить оба токена из `flutter_secure_storage` после logout.
+
+---
+
 ### POST /api/v1/users/auth/token/refresh/
 
 Обновляет access-токен по действующему refresh-токену. Позволяет не проходить SMS-флоу заново при истечении access-токена.
@@ -188,8 +212,8 @@
 ```
 apps/users/
 ├── models.py       # Кастомная модель User (AbstractBaseUser)
-├── serializers.py  # RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer
-├── views.py        # RequestSMSView, VerifySMSView, UserProfileView
+├── serializers.py  # RequestSMSSerializer, VerifySMSSerializer, LogoutSerializer, UserProfileSerializer
+├── views.py        # RequestSMSView, VerifySMSView, LogoutView, UserProfileView
 ├── services.py     # SMSService: генерация OTP, сохранение в Redis, верификация
 ├── tasks.py        # send_sms_task — Celery-таска для HTTP-запроса к SMS-провайдеру
 ├── throttles.py    # PhoneSMSThrottle — троттлинг по номеру телефона (5 запросов / 10 мин)
@@ -249,9 +273,23 @@ SMS_PASSWORD=your_password
 - **Спама с одного IP** — первый уровень (IP-счётчик)
 - **Распределённых атак** — разные IP атакуют один номер, первый уровень не срабатывает, но второй блокирует по номеру
 
+## JWT Blacklist
+
+Приложение `rest_framework_simplejwt.token_blacklist` подключено в `INSTALLED_APPS` и хранит отозванные токены в таблице `token_blacklist_blacklistedtoken`.
+
+**Ротация refresh-токенов** (`ROTATE_REFRESH_TOKENS = True`, `BLACKLIST_AFTER_ROTATION = True`):
+- При каждом вызове `POST /api/v1/users/auth/token/refresh/` выдаётся новый refresh-токен, а старый автоматически попадает в blacklist.
+- Это предотвращает повторное использование перехваченного refresh-токена.
+
+**Явный logout** (`POST /api/v1/users/auth/logout/`):
+- Клиент передаёт refresh-токен; сервер записывает его в blacklist.
+- Последующие попытки обновить access через этот refresh вернут 401.
+- access-токен остаётся рабочим до конца своего TTL (30 мин в проде) — это нормальное поведение для stateless JWT.
+
 ## Важные нюансы
 
 - OTP хранится в Redis под ключом `otp_<номер_телефона>`. После успешной проверки удаляется.
 - В `DEBUG=True` SMS не отправляется — код печатается в консоль сервера. Это намеренно.
 - Смена номера телефона через PATCH недоступна — это поле `read_only`. Смена номера требует отдельного OTP-флоу.
 - `create_superuser` для Django-админки принимает пароль, обычные пользователи входят без пароля.
+- После logout клиент обязан удалить оба токена из `flutter_secure_storage` и перенаправить на экран входа.
