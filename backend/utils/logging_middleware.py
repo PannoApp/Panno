@@ -44,7 +44,11 @@ class RequestLoggingMiddleware:
         request.start_time = start_time  # Сохраняем для process_exception
         
         response = self.get_response(request)
-        
+
+        # Логируем ПОСЛЕ get_response: к этому моменту DRF уже выполнил JWT-аутентификацию
+        # и установил request.user на уровне Django-запроса (через Request.user setter).
+        # Вызов get_user_id ДО get_response всегда возвращал бы 'Anonymous' для JWT-запросов,
+        # поскольку AuthenticationMiddleware использует сессии, а не JWT.
         duration = time.time() - start_time
         self.log_request(request, response, duration)
         

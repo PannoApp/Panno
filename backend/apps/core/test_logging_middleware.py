@@ -139,3 +139,49 @@ class RequestLoggingMiddlewareTests(SimpleTestCase):
         request = self.factory.get('/api/test/')
         body_str = self.middleware.get_masked_body(request)
         self.assertEqual(body_str, "")
+
+    @patch('utils.logging_middleware.logger.info')
+    def test_user_id_logged_for_authenticated_user(self, mock_logger_info):
+        """
+        После get_response DRF устанавливает request.user через JWT-аутентификацию.
+        Проверяем, что user_id в логе содержит реальный ID, а не 'Anonymous'.
+        """
+        request = self.factory.get('/api/test/')
+        mock_user = Mock()
+        mock_user.is_authenticated = True
+        mock_user.id = 42
+        request.user = mock_user
+
+        self.middleware(request)
+
+        args, kwargs = mock_logger_info.call_args
+        self.assertEqual(kwargs['extra']['user_id'], '42')
+
+    @patch('utils.logging_middleware.logger.info')
+    def test_user_id_logged_as_anonymous_for_unauthenticated_user(self, mock_logger_info):
+        """Неаутентифицированные запросы должны логировать user_id = 'Anonymous'."""
+        request = self.factory.get('/api/test/')
+        mock_user = Mock()
+        mock_user.is_authenticated = False
+        request.user = mock_user
+
+        self.middleware(request)
+
+        args, kwargs = mock_logger_info.call_args
+        self.assertEqual(kwargs['extra']['user_id'], 'Anonymous')
+
+    @patch('utils.logging_middleware.logger.error')
+    def test_process_exception_user_id_for_authenticated_user(self, mock_logger_error):
+        """process_exception должен корректно логировать user_id аутентифицированного пользователя."""
+        request = self.factory.get('/api/test/')
+        request.start_time = 1234567890.0
+        mock_user = Mock()
+        mock_user.is_authenticated = True
+        mock_user.id = 99
+        request.user = mock_user
+
+        with patch('time.time', return_value=1234567891.0):
+            self.middleware.process_exception(request, ValueError("Ошибка"))
+
+        args, kwargs = mock_logger_error.call_args
+        self.assertEqual(kwargs['extra']['user_id'], '99')

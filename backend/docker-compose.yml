@@ -34,6 +34,13 @@ services:
       - AUTH_TYPE=scram-sha-256 # Или md5, в зависимости от настроек Postgres
     ports:
       - "6432:6432" # Стандартный порт PgBouncer
+    healthcheck:
+      # pg_isready через порт PgBouncer — подтверждает, что он принимает соединения
+      test: [ "CMD-SHELL", "pg_isready -h localhost -p 6432" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     depends_on:
       db:
         condition: service_healthy
@@ -67,7 +74,7 @@ services:
       redis:
         condition: service_healthy
       pgbouncer:
-        condition: service_started
+        condition: service_healthy
 
   # Воркер Celery (использует тот же Dockerfile)
   worker:
@@ -85,7 +92,7 @@ services:
       redis:
         condition: service_healthy
       pgbouncer:
-        condition: service_started
+        condition: service_healthy
 
   # Celery Beat (планировщик периодических задач)
   beat:
@@ -103,7 +110,7 @@ services:
       redis:
         condition: service_healthy
       pgbouncer:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   pg_data:

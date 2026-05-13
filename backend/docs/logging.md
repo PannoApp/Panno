@@ -65,10 +65,25 @@ ERROR | Необработанное исключение в MyView | traceback:
   "method": "POST",
   "path": "/api/v1/users/auth/request-sms/",
   "status_code": 200,
-  "user_id": "Anonymous",
+  "user_id": "15",
   "duration": 0.0452
 }
 ```
+
+#### Поле `user_id` и JWT-аутентификация
+
+`user_id` всегда логируется **после** завершения обработки запроса (`self.get_response(request)`). Это принципиально для корректной работы с JWT:
+
+* `AuthenticationMiddleware` (позиция 6 в `MIDDLEWARE`) устанавливает `request.user` через сессии → для JWT-запросов это `AnonymousUser`.
+* DRF выполняет `JWTAuthentication` внутри `APIView.dispatch()` и устанавливает `request.user = jwt_user` на уровне Django-запроса через `Request.user` setter (`self._request.user = value`).
+* После `get_response` `request.user` уже содержит аутентифицированного пользователя → `get_user_id()` возвращает реальный `str(user.id)`.
+
+Значения поля:
+| Ситуация | `user_id` |
+|---|---|
+| Аутентифицированный JWT-запрос | `"15"` (числовой ID) |
+| Неаутентифицированный запрос | `"Anonymous"` |
+| Неверный / просроченный токен | `"Anonymous"` |
 
 ### `ERROR` (Серверные ошибки и исключения)
 Для HTTP-статусов `>= 500` или при падении (когда срабатывает `process_exception`) пишется подробный лог. Дополнительно захватываются:
