@@ -251,6 +251,9 @@ class SendBulkPushNotificationTaskTest(TestCase):
     def setUp(self):
         self.user1 = make_user('+77006666661')
         self.user2 = make_user('+77006666662')
+        # Регистрируем устройства: без них фильтрация по UserDevice исключит пользователей
+        UserDevice.objects.create(user=self.user1, fcm_token='tok_bulk_user1')
+        UserDevice.objects.create(user=self.user2, fcm_token='tok_bulk_user2')
 
     @patch('apps.notifications.tasks.send_push_notification')
     def test_queues_one_task_per_user(self, mock_task):
@@ -284,6 +287,34 @@ class SendBulkPushNotificationTaskTest(TestCase):
         self.assertEqual(kwargs['title'], 'Акция')
         self.assertEqual(kwargs['data'], extra_data)
         self.assertEqual(kwargs['category'], 'promotions')
+
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_filters_out_users_without_devices(self, mock_task):
+        """Пользователи без зарегистрированных устройств не получают Celery-задачу."""
+        user_no_device = make_user('+77006666663')
+        from apps.notifications.tasks import send_bulk_push_notification
+        result = send_bulk_push_notification(
+            user_ids=[self.user1.pk, user_no_device.pk],
+            title='T', body='B',
+        )
+        # Только user1 имеет устройство — только одна задача
+        self.assertEqual(mock_task.delay.call_count, 1)
+        self.assertEqual(result, 1)
+        called_user_id = mock_task.delay.call_args[1]['user_id']
+        self.assertEqual(called_user_id, self.user1.pk)
+
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_all_users_without_devices_queues_nothing(self, mock_task):
+        """Если все переданные пользователи без устройств — задачи не создаются."""
+        user_a = make_user('+77006666664')
+        user_b = make_user('+77006666665')
+        from apps.notifications.tasks import send_bulk_push_notification
+        result = send_bulk_push_notification(
+            user_ids=[user_a.pk, user_b.pk],
+            title='T', body='B',
+        )
+        mock_task.delay.assert_not_called()
+        self.assertEqual(result, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -370,6 +401,48 @@ class BulkPushViewTest(APITestCase):
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(response.data['segment'], 'last_visit_days')
+
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_registered_after_excludes_users_without_devices(self, mock_task):
+        """
+        Сегмент registered_after: пользователи без FCM-устройств не учитываются в queued.
+        """
+        from django.utils import timezone as tz
+        from datetime import date
+        user_with_device = make_user('+77009000001')
+        UserDevice.objects.create(user=user_with_device, fcm_token='tok_reg_filter')
+        make_user('+77009000002')  # пользователь без устройства
+
+        self._auth(self.admin)
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
+            'title': 'T', 'body': 'B',
+            'segment': 'registered_after',
+            'registered_after': '2000-01-01',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        # В выборке только пользователи с устройствами (admin создан в setUp без устройства)
+        _, kwargs = mock_task.delay.call_args
+        queued_ids = kwargs['user_ids']
+        self.assertIn(user_with_device.pk, queued_ids)
+
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_by_city_excludes_users_without_devices(self, mock_task):
+        """
+        Сегмент by_city: пользователи без FCM-устройств не учитываются в queued.
+        """
+        from django.contrib.auth import get_user_model
+        U = get_user_model()
+        user_with_dev = U.objects.create_user(phone='+77009001001', city='Алматы')
+        UserDevice.objects.create(user=user_with_dev, fcm_token='tok_city_filter')
+        U.objects.create_user(phone='+77009001002', city='Алматы')  # без устройства
+
+        self._auth(self.admin)
+        response = self.client.post('/api/v1/notifications/bulk-push/', {
+            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Алматы',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        # queued должен содержать только пользователя с устройством
+        self.assertEqual(response.data['queued'], 1)
 
 
 # ---------------------------------------------------------------------------
@@ -597,6 +670,10 @@ class BulkPushByCitySegmentTest(APITestCase):
         self.almaty_user = User.objects.create_user(phone='+77031000002', city='Алматы')
         self.astana_user = User.objects.create_user(phone='+77031000003', city='Астана')
         self.no_city_user = User.objects.create_user(phone='+77031000004')
+        # После добавления фильтрации по UserDevice пользователи без устройств
+        # не попадают в рассылку — регистрируем устройства для тестовых пользователей
+        UserDevice.objects.create(user=self.almaty_user, fcm_token='tok_almaty')
+        UserDevice.objects.create(user=self.astana_user, fcm_token='tok_astana')
 
     def _auth(self):
         refresh = RefreshToken.for_user(self.admin)

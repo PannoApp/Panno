@@ -160,8 +160,17 @@ def send_bulk_push_notification(user_ids, title, body, data=None, category=None,
     Вызывает send_push_notification.delay для каждого — Celery сам параллелит.
     Если передан campaign_id — статистика доставки накапливается в PushCampaign.
     """
+    # Фильтруем: оставляем только пользователей с хотя бы одним зарегистрированным FCM-устройством.
+    # Без этого на каждого пользователя без устройств создаётся лишняя Celery-задача,
+    # которая делает SELECT в БД и сразу завершается с "нет токенов".
+    active_user_ids = list(
+        UserDevice.objects.filter(user_id__in=user_ids)
+        .values_list('user_id', flat=True)
+        .distinct()
+    )
+
     queued = 0
-    for user_id in user_ids:
+    for user_id in active_user_ids:
         send_push_notification.delay(
             user_id=user_id,
             title=title,
@@ -171,5 +180,9 @@ def send_bulk_push_notification(user_ids, title, body, data=None, category=None,
             campaign_id=campaign_id,
         )
         queued += 1
-    logger.info("Bulk push queued: %d tasks, category=%s, campaign_id=%s", queued, category, campaign_id)
+
+    logger.info(
+        "Bulk push queued: %d tasks (filtered from %d), category=%s, campaign_id=%s",
+        queued, len(user_ids), category, campaign_id,
+    )
     return queued

@@ -203,6 +203,10 @@ FIREBASE_CREDENTIALS_PATH=/app/backend/firebase-credentials.json
 
 Рассылка выполняется асинхронно через Celery: одна задача `send_bulk_push_notification` → N задач `send_push_notification`.
 
+> **Фильтрация по устройствам:** перед постановкой подзадач в очередь список пользователей фильтруется по таблице `UserDevice`. Пользователи без зарегистрированных FCM-токенов исключаются на двух уровнях:
+> 1. **View** (`BulkPushView`) — при построении выборки сегментов `last_visit_days`, `participated_in_event`, `registered_after`, `by_city` применяется `UserDevice.objects.filter(user_id__in=...)`. Поле `queued` в ответе и `total_users` в `PushCampaign` отражают только реальных получателей.
+> 2. **Task** (`send_bulk_push_notification`) — дополнительная фильтрация перед созданием подзадач как защитный слой (если таска вызвана напрямую, минуя view).
+
 ## Статистика кампаний (PushCampaign)
 
 Каждый вызов `POST /api/v1/notifications/bulk-push/` создаёт запись `PushCampaign` в базе данных. Статистика доступна в Django-админке: `Notifications → Push-кампании`.

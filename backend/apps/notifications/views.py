@@ -126,35 +126,60 @@ class BulkPushView(views.APIView):
             days = data.get('last_visit_days', 30)
             since = timezone.now() - timedelta(days=days)
             from apps.bookings.models import TableBooking
-            user_ids = list(
+            raw_ids = list(
                 TableBooking.objects.filter(
                     status='completed',
                     updated_at__gte=since,
                     user__isnull=False,
                 ).values_list('user_id', flat=True).distinct()
             )
+            # Оставляем только тех, у кого есть хотя бы одно FCM-устройство,
+            # чтобы не создавать лишние Celery-задачи вхолостую.
+            user_ids = list(
+                UserDevice.objects.filter(user_id__in=raw_ids)
+                .values_list('user_id', flat=True)
+                .distinct()
+            )
         elif segment == 'participated_in_event':
             event_id = data.get('event_id')
             if not event_id:
                 return Response({'event_id': ['Обязательно для сегмента participated_in_event.']}, status=400)
             from apps.events.models import EventReservation
-            user_ids = list(
+            raw_ids = list(
                 EventReservation.objects.filter(event_id=event_id).values_list('user_id', flat=True).distinct()
+            )
+            # Оставляем только тех, у кого есть хотя бы одно FCM-устройство.
+            user_ids = list(
+                UserDevice.objects.filter(user_id__in=raw_ids)
+                .values_list('user_id', flat=True)
+                .distinct()
             )
         elif segment == 'registered_after':
             date = data.get('registered_after')
             if not date:
                 return Response({'registered_after': ['Обязательно для сегмента registered_after.']}, status=400)
-            user_ids = list(
+            raw_ids = list(
                 User.objects.filter(date_joined__date__gte=date).values_list('id', flat=True)
+            )
+            # Оставляем только тех, у кого есть хотя бы одно FCM-устройство.
+            user_ids = list(
+                UserDevice.objects.filter(user_id__in=raw_ids)
+                .values_list('user_id', flat=True)
+                .distinct()
             )
         elif segment == 'by_city':
             # Геолокационный сегмент: пользователи, у которых поле city совпадает с переданным
             city = data.get('city', '').strip()
             if not city:
                 return Response({'city': ['Обязательно для сегмента by_city.']}, status=400)
-            user_ids = list(
+            raw_ids = list(
                 User.objects.filter(city__iexact=city).values_list('id', flat=True)
+            )
+            # Оставляем только тех, у кого есть хотя бы одно FCM-устройство.
+            user_ids = list(
+                UserDevice.objects.filter(user_id__in=raw_ids)
+                .values_list('user_id', flat=True)
+                .distinct()
             )
         else:
             user_ids = []
