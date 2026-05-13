@@ -1,6 +1,7 @@
 from datetime import time as dt_time
 from unittest.mock import MagicMock, patch
 
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -728,3 +729,81 @@ class HealthCheckRedisDownTest(APITestCase):
         self.assertEqual(response.data['redis'], 'error')
         # БД при этом должна быть ok
         self.assertEqual(response.data['db'], 'ok')
+
+
+# =============================================================================
+# Кэширование: RestaurantInfo
+# =============================================================================
+
+class RestaurantInfoCacheTest(APITestCase):
+    """Проверяем, что RestaurantInfo кэшируется и инвалидируется через сигнал."""
+
+    def setUp(self):
+        cache.clear()
+        self.info = RestaurantInfo.load()
+        self.info.address = 'Исходный адрес'
+        self.info.save()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_cache_miss_populates_cache(self):
+        """Первый запрос записывает данные в кэш."""
+        self.assertIsNone(cache.get('restaurant_info'))
+        self.client.get('/api/v1/core/info/')
+        self.assertIsNotNone(cache.get('restaurant_info'))
+
+    def test_second_request_uses_cache(self):
+        """Второй запрос возвращает данные из кэша без обращения к RestaurantInfo.load."""
+        with patch.object(RestaurantInfo, 'load', wraps=RestaurantInfo.load) as mock_load:
+            self.client.get('/api/v1/core/info/')  # промах — вызывает load
+            self.client.get('/api/v1/core/info/')  # попадание — load не вызывается
+            self.assertEqual(mock_load.call_count, 1)
+
+    def test_post_save_invalidates_cache(self):
+        """Сохранение синглтона сбрасывает кэш — следующий запрос читает свежие данные."""
+        self.client.get('/api/v1/core/info/')           # наполнить кэш
+        self.info.address = 'Новый адрес'
+        self.info.save()                                # инвалидация через сигнал
+        self.assertIsNone(cache.get('restaurant_info'))
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['address'], 'Новый адрес')
+
+
+# =============================================================================
+# Кэширование: InteriorPhoto
+# =============================================================================
+
+class InteriorPhotoCacheTest(APITestCase):
+    """Проверяем кэш галереи интерьера."""
+
+    def setUp(self):
+        cache.clear()
+        InteriorPhoto.objects.create(zone='main_hall', order=1, caption='Вид 1')
+        InteriorPhoto.objects.create(zone='bar', order=1, caption='Бар')
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_cache_miss_populates_cache(self):
+        """Первый запрос записывает список фотографий в кэш."""
+        self.assertIsNone(cache.get('interior_photos'))
+        self.client.get('/api/v1/core/interior/')
+        self.assertIsNotNone(cache.get('interior_photos'))
+
+    def test_post_save_invalidates_cache(self):
+        """Добавление новой фотографии инвалидирует кэш."""
+        self.client.get('/api/v1/core/interior/')
+        self.assertIsNotNone(cache.get('interior_photos'))
+        InteriorPhoto.objects.create(zone='terrace', order=1, caption='Терраса')
+        self.assertIsNone(cache.get('interior_photos'))
+        response = self.client.get('/api/v1/core/interior/')
+        self.assertEqual(len(response.data), 3)
+
+    def test_post_delete_invalidates_cache(self):
+        """Удаление фотографии инвалидирует кэш."""
+        self.client.get('/api/v1/core/interior/')
+        InteriorPhoto.objects.first().delete()
+        self.assertIsNone(cache.get('interior_photos'))
+        response = self.client.get('/api/v1/core/interior/')
+        self.assertEqual(len(response.data), 1)

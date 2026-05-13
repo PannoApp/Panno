@@ -1,6 +1,8 @@
+from django.core.cache import cache
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from rest_framework.filters import SearchFilter
+from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
@@ -8,6 +10,10 @@ from .models import Dish, Category
 from .serializers import DishSerializer, CategorySerializer
 from utils.pagination import VideoFeedPagination
 from .filters import DishFilter
+
+# TTL кэша категорий (меняются редко) и страниц блюд (меняются чаще)
+_CACHE_CATEGORIES = 3600
+_CACHE_DISHES     = 300
 
 
 @extend_schema(
@@ -17,9 +23,17 @@ from .filters import DishFilter
     responses={200: CategorySerializer(many=True)},
 )
 class CategoryListView(generics.ListAPIView):
-    queryset = Category.objects.all().order_by('order')
     serializer_class = CategorySerializer
     permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        # Категории меняются редко — кэшируем на 1 час.
+        # Инвалидация через post_save/post_delete-сигнал в apps/menu/signals.py.
+        categories = cache.get('menu_categories')
+        if categories is None:
+            categories = list(Category.objects.all().order_by('order'))
+            cache.set('menu_categories', categories, timeout=_CACHE_CATEGORIES)
+        return categories
 
 
 @extend_schema(
@@ -89,3 +103,16 @@ class DishListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_class = DishFilter
     search_fields = ['name', 'description']
+
+    def list(self, request, *args, **kwargs):
+        # Версионный кэш: при изменении любого блюда/категории/тега
+        # signals.py инкрементирует 'menu_dishes_cache_version', что
+        # автоматически делает все старые ключи недостижимыми.
+        version   = cache.get_or_set('menu_dishes_cache_version', 1, timeout=None)
+        cache_key = f'menu_dishes:{version}:{request.query_params.urlencode()}'
+        cached    = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, timeout=_CACHE_DISHES)
+        return response

@@ -179,6 +179,17 @@ apps/core/
 └── management/commands/seed_initial_data.py  # Начальное заполнение БД
 ```
 
+## Кэширование
+
+Все публичные эндпоинты модуля кэшируют результаты в Redis, чтобы не делать SELECT при каждом запросе.
+
+| Эндпоинт | Ключ кэша | TTL | Инвалидация |
+|---|---|---|---|
+| `GET /api/v1/core/info/` | `restaurant_info` | 3600 сек | `post_save` / `post_delete` на `RestaurantInfo` |
+| `GET /api/v1/core/interior/` | `interior_photos` | 3600 сек | `post_save` / `post_delete` на `InteriorPhoto` |
+
+Сигналы инвалидации подключены в `apps/core/signals.py`, зарегистрированы через `CoreConfig.ready()`.
+
 ## Важные нюансы
 
 - Метод `RestaurantInfo.load()` возвращает единственную запись или создаёт её с пустыми полями, если она ещё не существует. Используй его вместо `get(pk=1)`.

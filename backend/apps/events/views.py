@@ -1,5 +1,7 @@
+from django.core.cache import cache
 from rest_framework import generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
@@ -7,6 +9,12 @@ from utils.idempotency import IdempotencyMixin
 from utils.pagination import StandardPagination
 from .models import Event, News, EventReservation
 from .serializers import EventSerializer, NewsSerializer, EventReservationSerializer
+
+# Предстоящие/прошедшие события зависят от текущего времени — короткий TTL,
+# чтобы список обновлялся автоматически когда событие «наступает».
+_CACHE_EVENTS = 60
+# Новости и архив меняются реже — можно кэшировать дольше.
+_CACHE_NEWS   = 300
 
 
 _pagination_params = [
@@ -47,6 +55,18 @@ class UpcomingEventsListView(generics.ListAPIView):
     def get_queryset(self):
         return Event.objects.filter(is_active=True, date_time__gte=timezone.now()).order_by('date_time')
 
+    def list(self, request, *args, **kwargs):
+        # TTL=60 сек — список автоматически обновится когда событие «наступит».
+        # При сохранении Event signals.py инкрементирует версию для мгновенной инвалидации.
+        version   = cache.get_or_set('events_upcoming_cache_version', 1, timeout=None)
+        cache_key = f'events_upcoming:{version}:{request.query_params.urlencode()}'
+        cached    = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, timeout=_CACHE_EVENTS)
+        return response
+
 
 @extend_schema(
     tags=['Events'],
@@ -66,6 +86,17 @@ class ArchivedEventsListView(generics.ListAPIView):
     def get_queryset(self):
         return Event.objects.filter(is_active=True, date_time__lt=timezone.now()).order_by('-date_time')
 
+    def list(self, request, *args, **kwargs):
+        # Архив тоже зависит от текущего времени — аналогичный TTL=60 сек.
+        version   = cache.get_or_set('events_archived_cache_version', 1, timeout=None)
+        cache_key = f'events_archived:{version}:{request.query_params.urlencode()}'
+        cached    = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, timeout=_CACHE_EVENTS)
+        return response
+
 
 @extend_schema(
     tags=['Events'],
@@ -79,6 +110,17 @@ class NewsListView(generics.ListAPIView):
     serializer_class = NewsSerializer
     permission_classes = [AllowAny]
     pagination_class = StandardPagination
+
+    def list(self, request, *args, **kwargs):
+        # Новости — статичный контент, кэшируем на 5 минут.
+        version   = cache.get_or_set('events_news_cache_version', 1, timeout=None)
+        cache_key = f'events_news:{version}:{request.query_params.urlencode()}'
+        cached    = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, timeout=_CACHE_NEWS)
+        return response
 
 
 @extend_schema(

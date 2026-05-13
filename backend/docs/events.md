@@ -234,3 +234,17 @@ apps/events/
 POST /api/v1/events/reservations/create/
 Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
 ```
+
+## Кэширование публичных эндпоинтов
+
+Публичные эндпоинты событий и новостей кэшируют ответы в Redis.
+
+| Эндпоинт | Ключ кэша | TTL | Инвалидация |
+|---|---|---|---|
+| `GET /api/v1/events/upcoming/` | `events_upcoming:{version}:{query_string}` | 60 сек | `post_save` / `post_delete` на `Event` |
+| `GET /api/v1/events/archived/` | `events_archived:{version}:{query_string}` | 60 сек | `post_save` / `post_delete` на `Event` |
+| `GET /api/v1/events/news/` | `events_news:{version}:{query_string}` | 300 сек | `post_save` / `post_delete` на `News` |
+
+**Короткий TTL для событий** — список предстоящих и прошедших событий зависит от `timezone.now()`. TTL=60 секунд гарантирует, что событие «переедет» из upcoming в archived не позже чем через минуту после его наступления. Когда менеджер изменяет событие вручную — сигнал инкрементирует версию, инвалидация мгновенная.
+
+Сигналы инвалидации добавлены в `apps/events/signals.py`.

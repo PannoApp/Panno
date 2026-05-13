@@ -30,6 +30,8 @@ services:
       # Максимальное количество соединений с самой БД
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=100
+      # Порт, на котором слушает PgBouncer внутри контейнера
+      - LISTEN_PORT=6432
       # Отключаем SSL для внутренней Docker-сети (если не настроено иначе)
       - AUTH_TYPE=scram-sha-256 # Или md5, в зависимости от настроек Postgres
     ports:

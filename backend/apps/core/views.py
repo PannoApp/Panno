@@ -1,9 +1,13 @@
+from django.core.cache import cache
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from rest_framework.generics import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from .models import RestaurantInfo, AppVersion, InteriorPhoto
 from .serializers import RestaurantInfoSerializer, AppVersionSerializer, InteriorPhotoSerializer
+
+# TTL для статичных данных, которые меняются редко (раз в неделю и реже)
+_CACHE_1H = 3600
 
 
 @extend_schema(
@@ -42,7 +46,9 @@ class RestaurantInfoView(generics.RetrieveAPIView):
     permission_classes = [AllowAny]
 
     def get_object(self):
-        return RestaurantInfo.load()
+        # Синглтон меняется крайне редко — кэшируем на 1 час.
+        # Инвалидация через post_save-сигнал в apps/core/signals.py.
+        return cache.get_or_set('restaurant_info', RestaurantInfo.load, timeout=_CACHE_1H)
 
 
 class AppVersionView(generics.RetrieveAPIView):
@@ -76,7 +82,15 @@ class InteriorPhotoListView(generics.ListAPIView):
     Список фотографий интерьера для вкладки «Интерьер/3D-тур».
     Без авторизации, без пагинации — фотографий обычно немного (10–30 штук).
     """
-    # Сортировка: сначала по зоне (алфавит), внутри зоны — по полю order
-    queryset           = InteriorPhoto.objects.all().order_by('zone', 'order')
     serializer_class   = InteriorPhotoSerializer
     permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        # Галерея меняется редко — кэшируем на 1 час.
+        # Инвалидация через post_save/post_delete-сигнал в apps/core/signals.py.
+        photos = cache.get('interior_photos')
+        if photos is None:
+            # Сортировка: сначала по зоне (алфавит), внутри зоны — по полю order
+            photos = list(InteriorPhoto.objects.all().order_by('zone', 'order'))
+            cache.set('interior_photos', photos, timeout=_CACHE_1H)
+        return photos

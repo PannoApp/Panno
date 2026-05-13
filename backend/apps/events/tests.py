@@ -395,3 +395,88 @@ class EventReservationIdempotencyTest(APITestCase):
         r2 = self.client.post(self.URL, bad_payload, HTTP_IDEMPOTENCY_KEY=key)
         self.assertEqual(r1.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+# =============================================================================
+# Кэширование: UpcomingEventsListView / ArchivedEventsListView / NewsListView
+# =============================================================================
+
+class EventsCacheTest(APITestCase):
+    """Версионный кэш предстоящих и прошедших событий."""
+
+    def setUp(self):
+        cache.clear()
+        make_event(title='Предстоящее 1', days_offset=1)
+        make_event(title='Предстоящее 2', days_offset=2)
+        make_past_event(title='Прошедшее 1')
+
+    def tearDown(self):
+        cache.clear()
+
+    def _version(self, prefix):
+        return cache.get(f'events_{prefix}_cache_version', 1)
+
+    def test_upcoming_cache_hit_on_second_request(self):
+        """Второй запрос к /upcoming/ попадает в кэш."""
+        r1 = self.client.get('/api/v1/events/upcoming/')
+        v  = self._version('upcoming')
+        self.assertIsNotNone(cache.get(f'events_upcoming:{v}:'))
+        r2 = self.client.get('/api/v1/events/upcoming/')
+        self.assertEqual(r1.data, r2.data)
+
+    def test_post_save_event_bumps_upcoming_version(self):
+        """Сохранение Event инкрементирует версию кэша предстоящих событий."""
+        self.client.get('/api/v1/events/upcoming/')
+        v_before = self._version('upcoming')
+        make_event(title='Новое', days_offset=5)
+        self.assertGreater(self._version('upcoming'), v_before)
+
+    def test_post_save_event_bumps_archived_version(self):
+        """Сохранение Event инкрементирует версию кэша прошедших событий."""
+        self.client.get('/api/v1/events/archived/')
+        v_before = self._version('archived')
+        make_past_event(title='Ещё одно прошлое')
+        self.assertGreater(self._version('archived'), v_before)
+
+    def test_after_invalidation_new_event_appears(self):
+        """После инвалидации новое событие появляется в ответе."""
+        self.client.get('/api/v1/events/upcoming/')
+        make_event(title='Срочное мероприятие', days_offset=3)
+        response = self.client.get('/api/v1/events/upcoming/')
+        titles = [e['title'] for e in response.data['results']]
+        self.assertIn('Срочное мероприятие', titles)
+
+
+class NewsCacheTest(APITestCase):
+    """Версионный кэш новостей."""
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_news_cache_hit_on_second_request(self):
+        """Второй запрос к /news/ попадает в кэш."""
+        News.objects.create(title='Новость 1', content='Текст')
+        r1 = self.client.get('/api/v1/events/news/')
+        v  = cache.get('events_news_cache_version', 1)
+        self.assertIsNotNone(cache.get(f'events_news:{v}:'))
+        r2 = self.client.get('/api/v1/events/news/')
+        self.assertEqual(r1.data, r2.data)
+
+    def test_post_save_news_bumps_version(self):
+        """Создание новости инкрементирует версию кэша новостей."""
+        self.client.get('/api/v1/events/news/')
+        v_before = cache.get('events_news_cache_version', 1)
+        News.objects.create(title='Свежая новость', content='...')
+        self.assertGreater(cache.get('events_news_cache_version', 1), v_before)
+
+    def test_after_invalidation_new_news_appears(self):
+        """После инвалидации новая новость видна в ответе."""
+        News.objects.create(title='Старая', content='...')
+        self.client.get('/api/v1/events/news/')
+        News.objects.create(title='Только что добавили', content='...')
+        response = self.client.get('/api/v1/events/news/')
+        titles = [n['title'] for n in response.data['results']]
+        self.assertIn('Только что добавили', titles)

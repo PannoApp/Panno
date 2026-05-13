@@ -127,6 +127,19 @@ apps/menu/
 └── urls.py         # Маршруты /api/v1/menu/...
 ```
 
+## Кэширование
+
+Публичные эндпоинты меню кэшируют результаты в Redis.
+
+| Эндпоинт | Стратегия | TTL | Инвалидация |
+|---|---|---|---|
+| `GET /api/v1/menu/categories/` | Единый ключ `menu_categories` | 3600 сек | `post_save` / `post_delete` на `Category` |
+| `GET /api/v1/menu/dishes/` | Версионный ключ `menu_dishes:{version}:{query_string}` | 300 сек | Инкремент `menu_dishes_cache_version` при изменении `Dish`, `Category`, `Tag`, `Allergen` |
+
+**Версионный кэш блюд** — при любом изменении `Dish`/`Category`/`Tag`/`Allergen` сигнал увеличивает счётчик `menu_dishes_cache_version` в Redis. Все старые ключи перестают использоваться и истекают по TTL самостоятельно. Разные наборы query-параметров (`?category_id=`, `?tag_ids=`, `?search=`) кэшируются отдельно.
+
+Сигналы подключены в `apps/menu/signals.py`, зарегистрированы через `MenuConfig.ready()`.
+
 ## Важные нюансы
 
 - Блюда с `is_active=False` не возвращаются API — скрывать блюдо нужно через Django-админку, не удалять.

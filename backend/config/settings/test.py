@@ -19,7 +19,6 @@ PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
 DEFAULT_FILE_STORAGE = 'django.core.files.storage.InMemoryStorage'
 
-# Use in-memory Celery broker so .delay() calls don't need a running Redis
+# Используем in-memory брокер, чтобы .delay() не требовал запущенного Redis
 CELERY_BROKER_URL = 'memory://'
-CELERY_RESULT_BACKEND = 'cache+memory://'
 CELERY_TASK_ALWAYS_EAGER = False
