@@ -585,3 +585,146 @@ class AppVersionAdminAccessTest(TestCase):
     def test_hall_manager_cannot_change(self):
         user = self._make_user('hall_manager')
         self.assertFalse(self.admin_class.has_change_permission(self._request(user)))
+
+
+# =============================================================================
+# seed_initial_data — management command
+# =============================================================================
+
+class SeedInitialDataCommandTest(TestCase):
+    """Команда создаёт все нужные записи на пустой базе."""
+
+    def test_creates_restaurant_info(self):
+        """После выполнения команды RestaurantInfo существует и адрес заполнен."""
+        from django.core.management import call_command
+
+        # Убеждаемся, что синглтон ещё не создан
+        RestaurantInfo.objects.all().delete()
+
+        call_command("seed_initial_data", verbosity=0)
+
+        info = RestaurantInfo.load()
+        self.assertTrue(info.address)
+        self.assertTrue(info.working_hours)
+
+    def test_creates_app_versions_for_both_platforms(self):
+        """После выполнения команды существуют записи для ios и android."""
+        from django.core.management import call_command
+
+        AppVersion.objects.all().delete()
+
+        call_command("seed_initial_data", verbosity=0)
+
+        self.assertTrue(AppVersion.objects.filter(platform="ios").exists())
+        self.assertTrue(AppVersion.objects.filter(platform="android").exists())
+
+    def test_initial_versions_are_1_0_0(self):
+        """Версия по умолчанию — 1.0.0."""
+        from django.core.management import call_command
+
+        AppVersion.objects.all().delete()
+        call_command("seed_initial_data", verbosity=0)
+
+        ios = AppVersion.objects.get(platform="ios")
+        self.assertEqual(ios.min_version, "1.0.0")
+        self.assertEqual(ios.latest_version, "1.0.0")
+
+
+class SeedInitialDataIdempotentTest(TestCase):
+    """Повторный запуск без --force не создаёт дублей и не затирает данные."""
+
+    def setUp(self):
+        from django.core.management import call_command
+        call_command("seed_initial_data", verbosity=0)
+
+    def test_no_duplicate_app_versions(self):
+        """После двух запусков кряду количество AppVersion остаётся равным 2."""
+        from django.core.management import call_command
+        call_command("seed_initial_data", verbosity=0)
+        self.assertEqual(AppVersion.objects.count(), 2)
+
+    def test_existing_address_not_overwritten(self):
+        """Без --force команда не затирает данные, изменённые администратором."""
+        from django.core.management import call_command
+
+        info = RestaurantInfo.load()
+        info.address = "Кастомный адрес"
+        info.save()
+
+        call_command("seed_initial_data", verbosity=0)
+
+        info.refresh_from_db()
+        self.assertEqual(info.address, "Кастомный адрес")
+
+
+class SeedInitialDataForceTest(TestCase):
+    """Флаг --force перезаписывает существующие записи."""
+
+    def setUp(self):
+        from django.core.management import call_command
+        call_command("seed_initial_data", verbosity=0)
+
+    def test_force_resets_app_version(self):
+        """--force сбрасывает версии к 1.0.0 даже если они были изменены."""
+        from django.core.management import call_command
+
+        ios = AppVersion.objects.get(platform="ios")
+        ios.min_version = "2.5.0"
+        ios.latest_version = "3.0.0"
+        ios.save()
+
+        call_command("seed_initial_data", "--force", verbosity=0)
+
+        ios.refresh_from_db()
+        self.assertEqual(ios.min_version, "1.0.0")
+        self.assertEqual(ios.latest_version, "1.0.0")
+
+    def test_force_still_no_duplicates(self):
+        """--force не создаёт новых записей AppVersion."""
+        from django.core.management import call_command
+        call_command("seed_initial_data", "--force", verbosity=0)
+        self.assertEqual(AppVersion.objects.count(), 2)
+
+
+# =============================================================================
+# GET /api/v1/health/ — проверка работоспособности сервисов
+# =============================================================================
+
+class HealthCheckOkTest(APITestCase):
+    """Все сервисы доступны — эндпоинт возвращает 200 и status=ok."""
+
+    def test_returns_200_when_all_ok(self):
+        response = self.client.get('/api/v1/core/health/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'ok')
+        self.assertEqual(response.data['db'], 'ok')
+
+    def test_no_auth_required(self):
+        """Эндпоинт доступен без авторизации — нужен для мониторинга."""
+        response = self.client.get('/api/v1/core/health/')
+        # Не должен вернуть 401 или 403
+        self.assertNotEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_response_contains_required_keys(self):
+        """Ответ содержит ключи status, db, redis."""
+        response = self.client.get('/api/v1/core/health/')
+        for key in ('status', 'db', 'redis'):
+            self.assertIn(key, response.data)
+
+
+class HealthCheckRedisDownTest(APITestCase):
+    """При недоступном Redis возвращается 503 и status=degraded."""
+
+    @patch('apps.core.health.cache')
+    def test_returns_503_when_redis_down(self, mock_cache):
+        # Симулируем сбой Redis
+        mock_cache.set.side_effect = Exception("Connection refused")
+
+        response = self.client.get('/api/v1/core/health/')
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertEqual(response.data['status'], 'degraded')
+        self.assertEqual(response.data['redis'], 'error')
+        # БД при этом должна быть ok
+        self.assertEqual(response.data['db'], 'ok')

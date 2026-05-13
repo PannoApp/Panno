@@ -642,3 +642,50 @@ class BulkPushByCitySegmentTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.almaty_user.refresh_from_db()
         self.assertEqual(self.almaty_user.city, 'Шымкент')
+
+
+# =============================================================================
+# Firebase startup validation — NotificationsConfig.ready()
+# =============================================================================
+
+class FirebaseStartupValidationTest(TestCase):
+    """При отсутствующем файле credentials логируется WARNING, приложение не падает."""
+
+    def test_missing_file_logs_warning(self):
+        """Если файл не существует — в лог попадает WARNING с указанием пути."""
+        import firebase_admin
+        from apps.notifications.apps import NotificationsConfig
+
+        config = NotificationsConfig('apps.notifications', __import__('apps.notifications', fromlist=['notifications']))
+
+        with self.settings(FIREBASE_CREDENTIALS_PATH='/nonexistent/path/creds.json'):
+            # Сбрасываем firebase_admin, чтобы ready() не пропустил инициализацию
+            saved_apps = firebase_admin._apps.copy()
+            firebase_admin._apps.clear()
+
+            try:
+                with self.assertLogs('apps.notifications.apps', level='WARNING') as cm:
+                    config.ready()
+                # Убеждаемся что сообщение содержит путь к файлу
+                self.assertTrue(any('/nonexistent/path/creds.json' in line for line in cm.output))
+            finally:
+                # Восстанавливаем состояние firebase_admin
+                firebase_admin._apps.update(saved_apps)
+
+    def test_missing_file_does_not_raise(self):
+        """Отсутствие файла credentials не бросает исключение — сервер стартует."""
+        import firebase_admin
+        from apps.notifications.apps import NotificationsConfig
+
+        config = NotificationsConfig('apps.notifications', __import__('apps.notifications', fromlist=['notifications']))
+
+        with self.settings(FIREBASE_CREDENTIALS_PATH='/nonexistent/path/creds.json'):
+            saved_apps = firebase_admin._apps.copy()
+            firebase_admin._apps.clear()
+
+            try:
+                # Не должно бросить никакого исключения
+                with self.assertLogs('apps.notifications.apps', level='WARNING'):
+                    config.ready()
+            finally:
+                firebase_admin._apps.update(saved_apps)

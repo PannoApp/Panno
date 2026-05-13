@@ -113,6 +113,59 @@
 
 **Важно:** при назначении роли (`role != ''`) в `UserAdmin` поле `is_staff` автоматически устанавливается в `True` — иначе сотрудник не может войти в Django Admin. При снятии роли `is_staff` сбрасывается в `False` (кроме суперпользователей).
 
+## Эндпоинт
+
+### GET /api/v1/core/health/
+
+Проверяет работоспособность PostgreSQL и Redis. **Для DevOps и мониторинга, Flutter не использует.**
+
+**Авторизация:** не нужна
+
+**Ответ 200** — все сервисы работают:
+```json
+{
+  "status": "ok",
+  "db": "ok",
+  "redis": "ok"
+}
+```
+
+**Ответ 503** — хотя бы один сервис недоступен:
+```json
+{
+  "status": "degraded",
+  "db": "ok",
+  "redis": "error"
+}
+```
+
+---
+
+## Начальное заполнение данных
+
+### Management command: `seed_initial_data`
+
+Создаёт начальные данные после первого `migrate` на новом окружении.
+
+```bash
+# Создать если ещё нет (безопасно запускать повторно)
+python manage.py seed_initial_data
+
+# Перезаписать существующие данные данными-заглушками
+python manage.py seed_initial_data --force
+```
+
+**Что создаёт:**
+- `RestaurantInfo` — адрес, часы работы, телефон (заглушки, заменить в Admin)
+- `AppVersion(ios)` — `min_version=1.0.0`, `latest_version=1.0.0`
+- `AppVersion(android)` — `min_version=1.0.0`, `latest_version=1.0.0`
+
+**Поведение без `--force`:** если запись уже существует и заполнена — пропускается. Идемпотентен.
+
+**После выполнения:** обязательно зайди в Django Admin и замени заглушки реальными данными.
+
+---
+
 ## Файлы модуля
 
 ```
@@ -121,7 +174,9 @@ apps/core/
 ├── serializers.py  # RestaurantInfoSerializer, AppVersionSerializer, InteriorPhotoSerializer
 ├── views.py        # RestaurantInfoView, AppVersionView, InteriorPhotoListView
 ├── admin.py        # RestaurantInfoAdmin, InteriorPhotoAdmin, AppVersionAdmin (роли)
-└── urls.py         # Маршруты /api/v1/core/
+├── urls.py         # Маршруты /api/v1/core/
+├── health.py       # HealthCheckView (GET /api/v1/core/health/)
+└── management/commands/seed_initial_data.py  # Начальное заполнение БД
 ```
 
 ## Важные нюансы
