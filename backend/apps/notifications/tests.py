@@ -660,6 +660,11 @@ class CeleryRetryConfigTest(TestCase):
         self.assertEqual(send_push_notification.default_retry_delay, 60)
         self.assertTrue(send_push_notification.acks_late)
 
+    def test_send_push_notification_reject_on_worker_lost(self):
+        """reject_on_worker_lost=True — при гибели воркера задача возвращается в очередь."""
+        from apps.notifications.tasks import send_push_notification
+        self.assertTrue(send_push_notification.reject_on_worker_lost)
+
     def test_send_push_notification_autoretry_for_exception(self):
         """autoretry_for=(Exception,) — задача перезапускается при любом исключении."""
         from apps.notifications.tasks import send_push_notification
@@ -670,6 +675,11 @@ class CeleryRetryConfigTest(TestCase):
         self.assertEqual(send_bulk_push_notification.max_retries, 3)
         self.assertEqual(send_bulk_push_notification.default_retry_delay, 60)
         self.assertTrue(send_bulk_push_notification.acks_late)
+
+    def test_send_bulk_push_notification_reject_on_worker_lost(self):
+        """reject_on_worker_lost=True — при гибели воркера задача возвращается в очередь."""
+        from apps.notifications.tasks import send_bulk_push_notification
+        self.assertTrue(send_bulk_push_notification.reject_on_worker_lost)
 
     def test_send_bulk_push_notification_autoretry_for_exception(self):
         from apps.notifications.tasks import send_bulk_push_notification

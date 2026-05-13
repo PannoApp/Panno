@@ -11,10 +11,13 @@ logger = logging.getLogger(__name__)
     # При сбое БД или Redis повторяем до 3 раз с паузой 60 с.
     # Периодические задачи вызываются Celery Beat, retry безопасен —
     # следующий плановый запуск также проверит то же временное окно.
+    # reject_on_worker_lost=True: если воркер убит (SIGKILL) в середине выполнения —
+    # задача nack'ается брокером и возвращается в очередь, а не теряется.
     autoretry_for=(Exception,),
     max_retries=3,
     default_retry_delay=60,
     acks_late=True,
+    reject_on_worker_lost=True,
 )
 def send_booking_reminders():
     """

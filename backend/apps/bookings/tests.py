@@ -707,6 +707,11 @@ class BookingReminderRetryConfigTest(TestCase):
         self.assertEqual(send_booking_reminders.default_retry_delay, 60)
         self.assertTrue(send_booking_reminders.acks_late)
 
+    def test_reject_on_worker_lost(self):
+        """reject_on_worker_lost=True — при гибели воркера задача возвращается в очередь."""
+        from apps.bookings.tasks import send_booking_reminders
+        self.assertTrue(send_booking_reminders.reject_on_worker_lost)
+
     def test_autoretry_for_exception(self):
         """autoretry_for=(Exception,) — задача перезапускается при любом исключении."""
         from apps.bookings.tasks import send_booking_reminders
