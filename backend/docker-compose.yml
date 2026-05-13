@@ -114,5 +114,18 @@ services:
       pgbouncer:
         condition: service_healthy
 
+  # Flower — веб-интерфейс мониторинга Celery
+  flower:
+    build: .
+    container_name: celery_flower
+    command: celery -A config flower --port=5555
+    ports:
+      - "5555:5555"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - worker
+
 volumes:
   pg_data:
