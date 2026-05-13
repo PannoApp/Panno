@@ -43,9 +43,9 @@ DJANGO_SETTINGS_MODULE=config.settings.dev python manage.py runserver
 
 **Celery worker + beat:**
 ```bash
-docker compose exec worker celery -A config worker --loglevel=info
-# Beat (not in docker-compose yet — run separately):
-celery -A config beat --loglevel=info
+docker compose logs -f worker   # Tail worker logs
+docker compose logs -f beat     # Tail beat logs
+docker compose logs -f flower   # Flower UI at http://localhost:5555
 ```
 
 **Run tests:**
@@ -95,9 +95,9 @@ docker compose exec backend python manage.py test apps.bookings.tests.TableBooki
 ### Config & Infrastructure
 
 - **Settings:** split into `base.py` / `dev.py` / `prod.py` / `test.py` under `config/settings/`
-- **Celery:** `config/celery.py` — app name `piligrim`, autodiscovers `tasks.py` in all apps. `beat_schedule` not yet configured.
+- **Celery:** `config/celery.py` — app name `piligrim`, autodiscovers `tasks.py` in all apps.
 - **Storage:** `USE_S3=True` env switches from `FileSystemStorage` to `django-storages` S3 backend
-- **Docker Compose services:** `db` (PostgreSQL 16), `redis` (Redis 7), `backend` (Django/gunicorn), `worker` (Celery)
+- **Docker Compose services:** `db` (PostgreSQL 16), `pgbouncer` (connection pooler), `redis` (Redis 7), `backend` (Django), `worker` (Celery worker), `beat` (Celery Beat — periodic tasks), `flower` (Celery monitoring UI, port 5555)
 
 ### Documentation
 
