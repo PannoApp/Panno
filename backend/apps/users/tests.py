@@ -1,3 +1,5 @@
+from datetime import timedelta
+from importlib import import_module, reload
 from unittest.mock import patch, MagicMock
 
 from django.contrib.auth import get_user_model
@@ -572,3 +574,67 @@ class TokenRefreshViewTest(APITestCase):
         self.client.credentials()
         response = self.client.post(self.URL, {'refresh': str(self.refresh)})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# JWT-настройки: проверяем TTL токенов для разных окружений
+# ---------------------------------------------------------------------------
+
+class JWTSettingsBaseTest(TestCase):
+    """
+    Проверяем, что base.py содержит безопасный TTL access-токена для прода.
+    Тест защищает от случайного возврата к небезопасному значению.
+    """
+
+    def test_access_token_lifetime_is_30_minutes_in_base(self):
+        """base.py: ACCESS_TOKEN_LIFETIME должен быть <= 30 минут."""
+        base_settings = import_module('config.settings.base')
+        lifetime = base_settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME']
+        self.assertLessEqual(
+            lifetime,
+            timedelta(minutes=30),
+            msg=(
+                f'ACCESS_TOKEN_LIFETIME в base.py равен {lifetime}. '
+                'Для безопасности в проде значение должно быть не более 30 минут.'
+            ),
+        )
+
+    def test_refresh_token_lifetime_is_7_days_in_base(self):
+        """base.py: REFRESH_TOKEN_LIFETIME должен оставаться 7 дней."""
+        base_settings = import_module('config.settings.base')
+        lifetime = base_settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME']
+        self.assertEqual(lifetime, timedelta(days=7))
+
+
+class JWTSettingsDevTest(TestCase):
+    """
+    Проверяем, что dev.py переопределяет ACCESS_TOKEN_LIFETIME на 1 день
+    для удобства разработки.
+    """
+
+    def test_access_token_lifetime_is_1_day_in_dev(self):
+        """dev.py: ACCESS_TOKEN_LIFETIME должен быть 1 день."""
+        dev_settings = import_module('config.settings.dev')
+        lifetime = dev_settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME']
+        self.assertEqual(
+            lifetime,
+            timedelta(days=1),
+            msg=(
+                f'ACCESS_TOKEN_LIFETIME в dev.py равен {lifetime}. '
+                'Для удобства разработки ожидается 1 день.'
+            ),
+        )
+
+    def test_dev_access_lifetime_exceeds_base(self):
+        """dev.py должен задавать больший TTL, чем base.py (разработка удобнее прода)."""
+        base_settings = import_module('config.settings.base')
+        dev_settings = import_module('config.settings.dev')
+        self.assertGreater(
+            dev_settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'],
+            base_settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'],
+        )
+
+    def test_dev_inherits_refresh_lifetime_from_base(self):
+        """dev.py не переопределяет REFRESH_TOKEN_LIFETIME — должен унаследовать 7 дней."""
+        dev_settings = import_module('config.settings.dev')
+        self.assertEqual(dev_settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'], timedelta(days=7))

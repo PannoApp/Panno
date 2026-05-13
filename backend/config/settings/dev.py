@@ -1,7 +1,14 @@
 from .base import *
+from datetime import timedelta
 
 
 # Переопределяем и добавляем настройки, специфичные только для локальной разработки
+
+# Увеличиваем TTL access-токена для удобства разработки (в base.py стоит 30 минут для прода)
+SIMPLE_JWT = {
+    **SIMPLE_JWT,
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+}
 
 # Включаем вывод email-сообщений в консоль (чтобы не настраивать реальный SMTP локально)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

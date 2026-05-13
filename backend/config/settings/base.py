@@ -270,7 +270,7 @@ SPECTACULAR_SETTINGS = {
 
 # Настройки SimpleJWT
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), # Для разработки ставим 1 день. В проде изменим на 15-30 минут
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # Продовое значение: короткий TTL снижает риск утечки токена
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
