@@ -112,3 +112,5 @@ celerybeat.pid
 CLAUDE.md
 
 firebase-credentials.json
+
+docs/technical_debt.md

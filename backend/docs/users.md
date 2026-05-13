@@ -162,7 +162,8 @@ apps/users/
 ├── models.py       # Кастомная модель User (AbstractBaseUser)
 ├── serializers.py  # RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer
 ├── views.py        # RequestSMSView, VerifySMSView, UserProfileView
-├── services.py     # SMSService: генерация OTP, отправка SMS, верификация
+├── services.py     # SMSService: генерация OTP, сохранение в Redis, верификация
+├── tasks.py        # send_sms_task — Celery-таска для HTTP-запроса к SMS-провайдеру
 └── urls.py         # Маршруты /api/v1/users/...
 ```
 
@@ -170,10 +171,30 @@ apps/users/
 
 Файл: `apps/users/services.py` — класс `SMSService`.
 
+**Схема работы в боевом режиме (`DEBUG=False`):**
+
+```
+RequestSMSView.post()
+    │
+    ├─ SMSService.send_sms(phone)          ← синхронно, не блокирует worker
+    │       │
+    │       ├─ generate_otp()              ← генерация 4-значного кода
+    │       ├─ cache.set(otp, ttl=180)     ← сохранение в Redis
+    │       └─ send_sms_task.delay(phone, otp)  ← постановка в очередь Celery
+    │
+    └─ return 200 OK                       ← ответ клиенту без ожидания SMS
+
+Celery worker (фоново):
+    send_sms_task(phone, otp)
+        └─ requests.post(SMS_PROVIDER_URL, timeout=10)
+               ├─ 200 OK → успех
+               └─ ошибка → retry (до 3 раз, пауза 30 сек)
+```
+
 | Режим | Поведение |
 |---|---|
-| `DEBUG=True` | Код печатается в консоль сервера, SMS не отправляется |
-| `DEBUG=False` | HTTP POST на `SMS_PROVIDER_URL` с логином/паролем провайдера |
+| `DEBUG=True` | Код печатается в консоль сервера, Celery не вызывается, SMS не отправляется |
+| `DEBUG=False` | OTP сохраняется в Redis, HTTP-запрос к провайдеру — в Celery-таске асинхронно |
 
 **Переменные окружения для боевого режима:**
 ```
@@ -182,7 +203,7 @@ SMS_LOGIN=your_login
 SMS_PASSWORD=your_password
 ```
 
-При ошибке сети или статусе не 200 провайдера — метод возвращает `False` и логирует ошибку. OTP в Redis при этом уже сохранён — повторный запрос перезапишет его.
+При ошибке сети или статусе не 200 провайдера — Celery-таска повторяет попытку до 3 раз с паузой 30 секунд. OTP в Redis сохранён до вызова таски — клиент получает 200 немедленно.
 
 ## Важные нюансы
 

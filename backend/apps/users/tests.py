@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -40,6 +40,45 @@ class SMSServiceTest(TestCase):
         self.assertTrue(result)
         self.assertIsNotNone(cache.get('otp_+77001234567'))
 
+    @override_settings(DEBUG=True)
+    def test_send_sms_debug_does_not_call_celery(self):
+        with patch('apps.users.tasks.send_sms_task.delay') as mock_delay:
+            SMSService.send_sms('+77001234567')
+            mock_delay.assert_not_called()
+
+    @override_settings(DEBUG=False, SMS_PROVIDER_URL='http://fake', SMS_LOGIN='l', SMS_PASSWORD='p')
+    def test_send_sms_production_dispatches_celery_task(self):
+        with patch('apps.users.tasks.send_sms_task.delay') as mock_delay:
+            result = SMSService.send_sms('+77001234567')
+            self.assertTrue(result)
+            mock_delay.assert_called_once()
+            call_args = mock_delay.call_args[0]
+            self.assertEqual(call_args[0], '+77001234567')
+            # OTP passed to task must match what was saved in Redis
+            saved_otp = cache.get('otp_+77001234567')
+            self.assertIsNotNone(saved_otp)
+            self.assertEqual(call_args[1], saved_otp)
+
+    @override_settings(DEBUG=False, SMS_PROVIDER_URL='http://fake', SMS_LOGIN='l', SMS_PASSWORD='p')
+    def test_send_sms_production_saves_otp_before_dispatch(self):
+        """OTP должен быть в Redis до того, как Celery-таска встанет в очередь."""
+        saved_otps = []
+
+        def capture_delay(phone, otp):
+            saved_otps.append(cache.get(f'otp_{phone}'))
+
+        with patch('apps.users.tasks.send_sms_task.delay', side_effect=capture_delay):
+            SMSService.send_sms('+77001234567')
+
+        self.assertEqual(len(saved_otps), 1)
+        self.assertIsNotNone(saved_otps[0])
+
+    @override_settings(DEBUG=False, SMS_PROVIDER_URL='http://fake', SMS_LOGIN='l', SMS_PASSWORD='p')
+    def test_send_sms_production_returns_true_immediately(self):
+        with patch('apps.users.tasks.send_sms_task.delay'):
+            result = SMSService.send_sms('+77001234567')
+        self.assertTrue(result)
+
     def test_verify_otp_correct_returns_true_and_deletes_key(self):
         cache.set('otp_+77001234567', '1234', 180)
         self.assertTrue(SMSService.verify_otp('+77001234567', '1234'))
@@ -57,6 +96,50 @@ class SMSServiceTest(TestCase):
         cache.set('otp_+77001234567', '1234', 180)
         SMSService.verify_otp('+77001234567', '1234')
         self.assertFalse(SMSService.verify_otp('+77001234567', '1234'))
+
+
+# ---------------------------------------------------------------------------
+# send_sms_task (Celery)
+# ---------------------------------------------------------------------------
+
+class SendSmsTaskTest(TestCase):
+    """Тесты для Celery-таски apps.users.tasks.send_sms_task."""
+
+    def _run_task_eagerly(self, phone, otp):
+        """Запускает таску синхронно (CELERY_TASK_ALWAYS_EAGER)."""
+        from .tasks import send_sms_task
+        return send_sms_task.apply(args=[phone, otp])
+
+    @override_settings(SMS_PROVIDER_URL='http://fake', SMS_LOGIN='l', SMS_PASSWORD='p')
+    def test_task_calls_sms_provider(self):
+        import requests as req_module
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        with patch.object(req_module, 'post', return_value=mock_resp) as mock_post:
+            self._run_task_eagerly('+77001234567', '1234')
+            mock_post.assert_called_once()
+            _, kwargs = mock_post.call_args
+            self.assertIn('1234', kwargs['data']['mes'])
+            self.assertEqual(kwargs['data']['phones'], '+77001234567')
+
+    @override_settings(SMS_PROVIDER_URL='http://fake', SMS_LOGIN='l', SMS_PASSWORD='p')
+    def test_task_retries_on_provider_error_status(self):
+        import requests as req_module
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        mock_resp.text = 'Internal Server Error'
+        with patch.object(req_module, 'post', return_value=mock_resp):
+            from .tasks import send_sms_task
+            result = send_sms_task.apply(args=['+77001234567', '1234'])
+            self.assertTrue(result.failed())
+
+    @override_settings(SMS_PROVIDER_URL='http://fake', SMS_LOGIN='l', SMS_PASSWORD='p')
+    def test_task_retries_on_network_exception(self):
+        import requests as req_module
+        with patch.object(req_module, 'post', side_effect=req_module.RequestException('timeout')):
+            from .tasks import send_sms_task
+            result = send_sms_task.apply(args=['+77001234567', '1234'])
+            self.assertTrue(result.failed())
 
 
 # ---------------------------------------------------------------------------
