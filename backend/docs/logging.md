@@ -6,7 +6,42 @@
 
 ## 1. Архитектура логирования
 
-Система состоит из двух основных компонентов, расположенных в `utils/logging_middleware.py`:
+Система состоит из трёх компонентов:
+
+1. **`RequestLoggingMiddleware`** (`utils/logging_middleware.py`) — перехватывает запросы/ответы и пишет JSON-лог.
+2. **`JsonFormatter`** (`utils/logging_middleware.py`) — форматирует записи лога как JSON.
+3. **`custom_exception_handler`** (`utils/exception_handler.py`) — кастомный обработчик исключений DRF (см. ниже).
+
+---
+
+## 1a. Кастомный обработчик исключений DRF (`utils/exception_handler.py`)
+
+Зарегистрирован в `REST_FRAMEWORK['EXCEPTION_HANDLER']` в `config/settings/base.py`.
+
+**Проблема без него:** если внутри DRF-view возникает обычное Python-исключение (`KeyError`, `AttributeError` и т.п.), стандартный DRF-хендлер возвращает `None`. Django тогда отдаёт HTML-страницу (`DEBUG=True`) или пустое тело без JSON (`DEBUG=False`). Flutter падает при попытке распарсить такой ответ.
+
+**Поведение с ним:**
+
+| Тип исключения | Что происходит | HTTP-статус |
+|---|---|---|
+| Наследник `APIException` (ValidationError, PermissionDenied и т.д.) | DRF обрабатывает штатно | 400 / 401 / 403 / … |
+| Любое другое Python-исключение | Хендлер перехватывает, логирует `ERROR` + traceback, возвращает JSON | 500 |
+
+**Формат JSON-ответа при 500:**
+```json
+{"detail": "Внутренняя ошибка сервера."}
+```
+
+**Лог при необработанном исключении:**
+```
+ERROR | Необработанное исключение в MyView | traceback: ...
+```
+
+---
+
+## 2. Формат логов и Уровни (RequestLoggingMiddleware)
+
+Все логи пишутся в формате JSON. Система делит логи на два уровня в зависимости от исхода запроса:
 
 1. **`RequestLoggingMiddleware`** — перехватывает входящие запросы и исходящие ответы. Замеряет время выполнения и собирает метаданные (метод, путь, ID пользователя, статус ответа).
 2. **`JsonFormatter`** — преобразует собранные данные в структурированные JSON-строки, что идеально подходит для сбора логов через ELK Stack (Elasticsearch, Logstash, Kibana), Datadog, Grafana Loki или другие системы мониторинга.
@@ -110,7 +145,13 @@ tail -f logs/app.log | jq
 Логика маскировки и форматирования покрыта автоматическими тестами в `apps/core/test_logging_middleware.py`.
 Тесты используют легковесный `SimpleTestCase`, не требующий подключения к БД.
 
+Кастомный обработчик исключений покрыт тестами в `apps/core/test_exception_handler.py` (7 тестов):
+- DRF-исключение обрабатывается штатно (400, JSON)
+- Python-исключение → 500, `Content-Type: application/json`, тело `{"detail": "..."}`
+- Исключение логируется как ERROR с именем view
+
 Запуск тестов логирования:
 ```bash
-python manage.py test apps.core.test_logging_middleware
+docker compose exec backend python manage.py test apps.core.test_logging_middleware --settings=config.settings.test
+docker compose exec backend python manage.py test apps.core.test_exception_handler --settings=config.settings.test
 ```

@@ -223,6 +223,7 @@ REST_FRAMEWORK = {
         'django_filters.rest_framework.DjangoFilterBackend',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'utils.exception_handler.custom_exception_handler',
 }
 
 SPECTACULAR_SETTINGS = {
