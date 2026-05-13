@@ -108,21 +108,9 @@ DATABASES = {
     }
 }
 
-# Валидаторы паролей по умолчанию
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
+# AUTH_PASSWORD_VALIDATORS намеренно не задан: все пользователи аутентифицируются
+# через SMS OTP и имеют unusable_password — валидаторы паролей к ним никогда
+# не применяются и создавали бы ложное впечатление о наличии пароля.
 
 # Локализация
 LANGUAGE_CODE = 'ru-ru'

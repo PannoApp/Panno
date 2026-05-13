@@ -697,3 +697,39 @@ class JWTSettingsDevTest(TestCase):
         """dev.py не переопределяет REFRESH_TOKEN_LIFETIME — должен унаследовать 7 дней."""
         dev_settings = import_module('config.settings.dev')
         self.assertEqual(dev_settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'], timedelta(days=7))
+
+
+# ---------------------------------------------------------------------------
+# AUTH_PASSWORD_VALIDATORS: убеждаемся, что мёртвый код отсутствует
+# ---------------------------------------------------------------------------
+
+class PasswordValidatorsAbsentTest(TestCase):
+    """
+    Гарантирует, что AUTH_PASSWORD_VALIDATORS не возвращён в base.py случайно.
+
+    Все пользователи системы аутентифицируются через SMS OTP и имеют
+    unusable_password (set_unusable_password() в UserManager.create_user).
+    Валидаторы паролей никогда не применяются — их присутствие в конфиге
+    вводило бы в заблуждение читателей настроек.
+    """
+
+    def test_auth_password_validators_not_set_in_base(self):
+        """base.py не должен содержать AUTH_PASSWORD_VALIDATORS."""
+        base_settings = import_module('config.settings.base')
+        validators = getattr(base_settings, 'AUTH_PASSWORD_VALIDATORS', None)
+        self.assertIsNone(
+            validators,
+            msg=(
+                'AUTH_PASSWORD_VALIDATORS обнаружен в base.py. '
+                'Пользователи используют SMS OTP и имеют unusable_password — '
+                'валидаторы паролей к ним не применяются и должны быть удалены.'
+            ),
+        )
+
+    def test_users_have_unusable_password(self):
+        """Пользователь, созданный через create_user, должен иметь unusable_password."""
+        user = User.objects.create_user(phone='+77001111111')
+        self.assertFalse(
+            user.has_usable_password(),
+            msg='create_user должен вызывать set_unusable_password() — пароли не используются.',
+        )
