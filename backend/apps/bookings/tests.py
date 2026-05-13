@@ -689,3 +689,34 @@ class BookingIdempotencyTest(APITestCase):
         r2 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
         self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
         self.assertEqual(TableBooking.objects.count(), 2)
+
+
+# ---------------------------------------------------------------------------
+# Retry-конфигурация Celery-таски send_booking_reminders
+# ---------------------------------------------------------------------------
+
+class BookingReminderRetryConfigTest(TestCase):
+    """
+    Проверяет, что send_booking_reminders настроена на автоматический retry.
+    При сбое БД или Redis задача не теряется, а повторяется до max_retries раз.
+    """
+
+    def test_has_retry_config(self):
+        from apps.bookings.tasks import send_booking_reminders
+        self.assertEqual(send_booking_reminders.max_retries, 3)
+        self.assertEqual(send_booking_reminders.default_retry_delay, 60)
+        self.assertTrue(send_booking_reminders.acks_late)
+
+    def test_autoretry_for_exception(self):
+        """autoretry_for=(Exception,) — задача перезапускается при любом исключении."""
+        from apps.bookings.tasks import send_booking_reminders
+        self.assertIn(Exception, send_booking_reminders.autoretry_for)
+
+    @patch('apps.bookings.models.TableBooking.objects')
+    def test_db_exception_propagates_for_autoretry(self, mock_objects):
+        """При сбое БД задача пробрасывает исключение — Celery запустит retry."""
+        from apps.bookings.tasks import send_booking_reminders
+        # TableBooking импортируется внутри функции, поэтому патчим на уровне модели
+        mock_objects.filter.side_effect = Exception("DB connection lost")
+        with self.assertRaises(Exception):
+            send_booking_reminders()

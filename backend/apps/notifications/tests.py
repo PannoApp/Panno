@@ -644,6 +644,52 @@ class BulkPushByCitySegmentTest(APITestCase):
         self.assertEqual(self.almaty_user.city, 'Шымкент')
 
 
+# ---------------------------------------------------------------------------
+# Retry-конфигурация Celery-тасок
+# ---------------------------------------------------------------------------
+
+class CeleryRetryConfigTest(TestCase):
+    """
+    Проверяет, что все Celery-таски notifications настроены на retry.
+    При сбое Firebase задача не теряется, а повторяется до max_retries раз.
+    """
+
+    def test_send_push_notification_has_retry_config(self):
+        from apps.notifications.tasks import send_push_notification
+        self.assertEqual(send_push_notification.max_retries, 3)
+        self.assertEqual(send_push_notification.default_retry_delay, 60)
+        self.assertTrue(send_push_notification.acks_late)
+
+    def test_send_push_notification_autoretry_for_exception(self):
+        """autoretry_for=(Exception,) — задача перезапускается при любом исключении."""
+        from apps.notifications.tasks import send_push_notification
+        self.assertIn(Exception, send_push_notification.autoretry_for)
+
+    def test_send_bulk_push_notification_has_retry_config(self):
+        from apps.notifications.tasks import send_bulk_push_notification
+        self.assertEqual(send_bulk_push_notification.max_retries, 3)
+        self.assertEqual(send_bulk_push_notification.default_retry_delay, 60)
+        self.assertTrue(send_bulk_push_notification.acks_late)
+
+    def test_send_bulk_push_notification_autoretry_for_exception(self):
+        from apps.notifications.tasks import send_bulk_push_notification
+        self.assertIn(Exception, send_bulk_push_notification.autoretry_for)
+
+    @patch('apps.notifications.tasks.messaging')
+    def test_firebase_exception_propagates_for_autoretry(self, mock_messaging):
+        """
+        При исключении от Firebase задача пробрасывает его наружу —
+        Celery перехватывает его через autoretry_for и ставит задачу на retry.
+        """
+        from apps.notifications.tasks import send_push_notification
+        user = make_user('+77040000001')
+        UserDevice.objects.create(user=user, fcm_token='tok-retry')
+        mock_messaging.send_each_for_multicast.side_effect = ConnectionError("Firebase недоступен")
+        # При прямом вызове задачи (без Celery-воркера) исключение пробрасывается как есть
+        with self.assertRaises(ConnectionError):
+            send_push_notification(user_id=user.pk, title='T', body='B')
+
+
 # =============================================================================
 # Firebase startup validation — NotificationsConfig.ready()
 # =============================================================================

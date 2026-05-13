@@ -18,7 +18,16 @@ _CATEGORY_FLAG = {
 }
 
 
-@shared_task(name='apps.notifications.tasks.send_push_notification')
+@shared_task(
+    name='apps.notifications.tasks.send_push_notification',
+    # При временном сбое Firebase повторяем до 3 раз с паузой 60 с между попытками.
+    # acks_late=True гарантирует, что сообщение не удаляется из очереди до успешного завершения —
+    # если worker упал в процессе, задача вернётся в очередь, а не потеряется.
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=60,
+    acks_late=True,
+)
 def send_push_notification(user_id, title, body, data=None, category=None, campaign_id=None):
     """
     Фоновая задача для отправки пуша конкретному пользователю на все его устройства.
@@ -133,7 +142,14 @@ def send_push_notification(user_id, title, body, data=None, category=None, campa
     return response.success_count
 
 
-@shared_task(name='apps.notifications.tasks.send_bulk_push_notification')
+@shared_task(
+    name='apps.notifications.tasks.send_bulk_push_notification',
+    # Retry при сбое БД или неожиданной ошибке во время постановки подзадач в очередь.
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=60,
+    acks_late=True,
+)
 def send_bulk_push_notification(user_ids, title, body, data=None, category=None, campaign_id=None):
     """
     Рассылает push конкретному списку пользователей.

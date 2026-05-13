@@ -6,7 +6,16 @@ from datetime import timedelta
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name='apps.bookings.tasks.send_booking_reminders')
+@shared_task(
+    name='apps.bookings.tasks.send_booking_reminders',
+    # При сбое БД или Redis повторяем до 3 раз с паузой 60 с.
+    # Периодические задачи вызываются Celery Beat, retry безопасен —
+    # следующий плановый запуск также проверит то же временное окно.
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=60,
+    acks_late=True,
+)
 def send_booking_reminders():
     """
     Запускается каждые 15 минут через Celery Beat.
