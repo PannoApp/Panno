@@ -49,7 +49,37 @@
   - `user_id` — ID пользователя (пригодится для аналитики).
   - Сохрани `access` и `refresh` в `flutter_secure_storage`. Если юзера не было, он создаётся автоматически.
 
-### 1.3 Профиль пользователя
+### 1.3 Обновление access-токена
+`POST /api/v1/users/auth/token/refresh/` (Без авторизации)
+- **Когда вызывать:** При получении `401 Unauthorized` на любом защищённом запросе.
+- **Body:** `{"refresh": "<твой_refresh_token>"}`
+- **Response (200):**
+  ```json
+  { "access": "eyJhbG..." }
+  ```
+  Сохрани новый `access` в `flutter_secure_storage` и повтори исходный запрос.
+- **Response (401):** refresh-токен тоже истёк (после 7 дней неактивности) — перенаправь пользователя на экран входа через SMS.
+
+**Рекомендуемая схема в Dio (interceptor):**
+```dart
+// В onError interceptor: если 401 — пробуем обновить access
+if (error.response?.statusCode == 401) {
+  final refreshToken = await storage.read(key: 'refresh');
+  final resp = await dio.post('/api/v1/users/auth/token/refresh/',
+      data: {'refresh': refreshToken});
+  if (resp.statusCode == 200) {
+    final newAccess = resp.data['access'];
+    await storage.write(key: 'access', value: newAccess);
+    // Повторяем исходный запрос с новым токеном
+    error.requestOptions.headers['Authorization'] = 'Bearer $newAccess';
+    return dio.fetch(error.requestOptions);
+  }
+  // Если 401 на refresh — разлогиниваем
+  await _logout();
+}
+```
+
+### 1.4 Профиль пользователя
 - **Получить профиль:** `GET /api/v1/users/profile/`
   ```json
   {
@@ -325,8 +355,8 @@ final response = await dio.post(
 
 ## 🛑 7. Обработка ошибок в приложении (Важно)
 
-1. **401 Unauthorized**: Твой Access токен протух.
-   - *Действие:* Нужно сделать логаут юзера или (если реализован refresh) обновить токен.
+1. **401 Unauthorized**: Access-токен истёк.
+   - *Действие:* Вызови `POST /api/v1/users/auth/token/refresh/` с сохранённым refresh-токеном. Если refresh тоже вернул 401 — разлогинь пользователя и отправь на экран SMS-входа. Подробная схема — в разделе 1.3.
 2. **400 Bad Request**: Ошибка валидации формы.
    - В ответе будет JSON вида: `{"phone": ["Неверный формат номера."]}`. Это нужно парсить и показывать под полями ввода.
 3. **500 Server Error**: Бэкенд упал. 

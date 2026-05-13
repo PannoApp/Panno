@@ -147,6 +147,33 @@
 
 > Сервисные уведомления (подтверждение/изменение брони, напоминание о визите) не управляются флагами — они всегда доставляются.
 
+---
+
+### POST /api/v1/users/auth/token/refresh/
+
+Обновляет access-токен по действующему refresh-токену. Позволяет не проходить SMS-флоу заново при истечении access-токена.
+
+**Авторизация:** не нужна
+
+**Тело запроса:**
+```json
+{ "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+```
+
+**Ответ 200:**
+```json
+{ "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+```
+
+**Ответ 401** — если refresh-токен недействителен или просрочен:
+```json
+{ "detail": "Token is invalid or expired", "code": "token_not_valid" }
+```
+
+**Ответ 400** — если поле `refresh` не передано.
+
+---
+
 ## JWT-токены
 
 | Токен | Время жизни (dev) | Время жизни (prod) |
@@ -154,8 +181,7 @@
 | `access` | 1 день | 30 минут |
 | `refresh` | 7 дней | 7 дней |
 
-Для обновления access-токена через refresh — используй стандартный эндпоинт Simple JWT:
-`POST /api/v1/token/refresh/` (если подключён в urls.py).
+Для обновления access-токена используй: `POST /api/v1/users/auth/token/refresh/`.
 
 ## Файлы модуля
 

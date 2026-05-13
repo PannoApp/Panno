@@ -521,3 +521,54 @@ class UserAdminIsStaffAutoSetTest(TestCase):
         self._save_via_admin(su, '')
         su.refresh_from_db()
         self.assertTrue(su.is_staff)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/users/auth/token/refresh/
+# ---------------------------------------------------------------------------
+
+class TokenRefreshViewTest(APITestCase):
+    """
+    Тесты эндпоинта обновления access-токена через refresh-токен.
+    Позволяет Flutter-клиенту избежать повторного SMS-флоу при истечении
+    access-токена.
+    """
+
+    URL = '/api/v1/users/auth/token/refresh/'
+
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77001234567')
+        self.refresh = RefreshToken.for_user(self.user)
+
+    def test_valid_refresh_returns_new_access_token(self):
+        """Валидный refresh-токен → новый access-токен в ответе."""
+        response = self.client.post(self.URL, {'refresh': str(self.refresh)})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+
+    def test_new_access_token_is_different_from_old(self):
+        """Каждый вызов должен выдавать уникальный access-токен."""
+        old_access = str(self.refresh.access_token)
+        response = self.client.post(self.URL, {'refresh': str(self.refresh)})
+        self.assertNotEqual(response.data['access'], old_access)
+
+    def test_invalid_refresh_token_returns_401(self):
+        """Поддельный токен → 401 Unauthorized."""
+        response = self.client.post(self.URL, {'refresh': 'invalid.token.here'})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_missing_refresh_field_returns_400(self):
+        """Пустое тело запроса → 400 Bad Request."""
+        response = self.client.post(self.URL, {})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_endpoint_does_not_require_authorization_header(self):
+        """
+        Эндпоинт публичный — не нужен Authorization-заголовок.
+        Если бы требовал — это был бы порочный круг: обновлять токен
+        уже не смог бы клиент с просроченным access.
+        """
+        # Убеждаемся, что credentials пусты
+        self.client.credentials()
+        response = self.client.post(self.URL, {'refresh': str(self.refresh)})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
