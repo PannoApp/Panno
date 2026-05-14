@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -604,3 +604,191 @@ class BookingReminderDeduplicationTest(TestCase):
         self.assertEqual(result1, 2)
         self.assertEqual(result2, 0)
         self.assertEqual(mock_push.delay.call_count, 2)
+
+
+# ---------------------------------------------------------------------------
+# Celery task: send_telegram_notification
+# ---------------------------------------------------------------------------
+
+_TG_SETTINGS = dict(TELEGRAM_BOT_TOKEN='test_bot_token', TELEGRAM_CHAT_ID='-1001234567890')
+
+
+class TelegramNotificationTaskTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77005000001')
+        self.booking = make_booking(
+            user=self.user,
+            phone='+77001234567',
+            zone='main',
+            comment='У окна',
+        )
+
+    def _call(self, booking_pk=None):
+        from apps.bookings.tasks import send_telegram_notification
+        send_telegram_notification(booking_pk or self.booking.pk)
+
+    def _mock_post(self):
+        m = MagicMock()
+        m.raise_for_status.return_value = None
+        return m
+
+    # --- основное поведение ---
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_sends_message_on_valid_booking(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        self._call()
+        mock_post.assert_called_once()
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_message_contains_booking_id_and_guest_name(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        self._call()
+        text = mock_post.call_args[1]['json']['text']
+        self.assertIn(str(self.booking.pk), text)
+        self.assertIn(self.booking.guest_name, text)
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_message_contains_phone_from_booking(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        self._call()
+        text = mock_post.call_args[1]['json']['text']
+        self.assertIn('+77001234567', text)
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_message_contains_date_time_and_zone(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        self._call()
+        text = mock_post.call_args[1]['json']['text']
+        self.assertIn('15.06.2026', text)
+        self.assertIn('19:00', text)
+        self.assertIn('Главный зал', text)
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_message_contains_comment(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        self._call()
+        text = mock_post.call_args[1]['json']['text']
+        self.assertIn('У окна', text)
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_uses_user_phone_when_booking_phone_is_empty(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        booking = make_booking(user=self.user, phone='')
+        from apps.bookings.tasks import send_telegram_notification
+        send_telegram_notification(booking.pk)
+        text = mock_post.call_args[1]['json']['text']
+        self.assertIn(self.user.phone, text)
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_anonymous_booking_without_phone_shows_dash(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        anon = TableBooking.objects.create(
+            user=None, guest_name='Аноним',
+            date='2026-07-01', time='18:00:00',
+            guests_count=1, phone='',
+        )
+        from apps.bookings.tasks import send_telegram_notification
+        send_telegram_notification(anon.pk)
+        text = mock_post.call_args[1]['json']['text']
+        self.assertIn('—', text)
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_sends_to_correct_chat_id(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        self._call()
+        payload = mock_post.call_args[1]['json']
+        self.assertEqual(payload['chat_id'], '-1001234567890')
+
+    # --- пропуск при незаполненных настройках ---
+
+    @override_settings(TELEGRAM_BOT_TOKEN='', TELEGRAM_CHAT_ID='-1001234567890')
+    @patch('apps.bookings.tasks.requests.post')
+    def test_skips_when_no_token(self, mock_post):
+        self._call()
+        mock_post.assert_not_called()
+
+    @override_settings(TELEGRAM_BOT_TOKEN='test_bot_token', TELEGRAM_CHAT_ID='')
+    @patch('apps.bookings.tasks.requests.post')
+    def test_skips_when_no_chat_id(self, mock_post):
+        self._call()
+        mock_post.assert_not_called()
+
+    # --- устойчивость ---
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_does_not_raise_on_missing_booking(self, mock_post):
+        from apps.bookings.tasks import send_telegram_notification
+        send_telegram_notification(99999)
+        mock_post.assert_not_called()
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_propagates_http_error_for_celery_retry(self, mock_post):
+        from requests import HTTPError
+        mock_post.return_value = MagicMock(raise_for_status=MagicMock(side_effect=HTTPError('500')))
+        from apps.bookings.tasks import send_telegram_notification
+        with self.assertRaises(HTTPError):
+            send_telegram_notification(self.booking.pk)
+
+    # --- конфигурация retry ---
+
+    def test_retry_config(self):
+        from apps.bookings.tasks import send_telegram_notification
+        self.assertEqual(send_telegram_notification.max_retries, 3)
+        self.assertEqual(send_telegram_notification.default_retry_delay, 30)
+        self.assertTrue(send_telegram_notification.acks_late)
+        self.assertTrue(send_telegram_notification.reject_on_worker_lost)
+        self.assertIn(Exception, send_telegram_notification.autoretry_for)
+
+
+# ---------------------------------------------------------------------------
+# Signal: Telegram вызывается при создании брони
+# ---------------------------------------------------------------------------
+
+class BookingSignalTelegramTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77006000001')
+
+    @patch('apps.bookings.tasks.send_telegram_notification')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_telegram_queued_on_create_with_user(self, mock_push, mock_tg):
+        booking = make_booking(user=self.user)
+        mock_tg.delay.assert_called_once_with(booking.pk)
+
+    @patch('apps.bookings.tasks.send_telegram_notification')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_telegram_queued_on_create_without_user(self, mock_push, mock_tg):
+        booking = TableBooking.objects.create(
+            user=None, guest_name='Гость без аккаунта',
+            date='2026-07-01', time='18:00:00', guests_count=1,
+        )
+        mock_tg.delay.assert_called_once_with(booking.pk)
+
+    @patch('apps.bookings.tasks.send_telegram_notification')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_push_not_sent_on_create_without_user(self, mock_push, mock_tg):
+        TableBooking.objects.create(
+            user=None, guest_name='Гость без аккаунта',
+            date='2026-07-01', time='18:00:00', guests_count=1,
+        )
+        mock_push.delay.assert_not_called()
+
+    @patch('apps.bookings.tasks.send_telegram_notification')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_telegram_not_queued_on_status_change(self, mock_push, mock_tg):
+        booking = make_booking(user=self.user)
+        mock_tg.delay.reset_mock()
+        booking = TableBooking.objects.get(pk=booking.pk)
+        booking.status = 'confirmed'
+        booking.save()
+        mock_tg.delay.assert_not_called()

@@ -32,20 +32,22 @@ class TableBookingAdmin(ModelAdmin):
 
     # Колонки, которые будут видны в общем списке
     list_display = (
-        'guest_name', 
-        'date', 
-        'time', 
-        'guests_count', 
-        'status', 
-        'user', 
-        'created_at'
+        'guest_name',
+        'phone',
+        'date',
+        'time',
+        'guests_count',
+        'zone',
+        'status',
+        'user',
+        'created_at',
     )
     
     # Фильтры в правой панели (по статусу и дате визита)
-    list_filter = ('status', 'date', 'created_at')
+    list_filter = ('status', 'zone', 'date', 'created_at')
     
     # Поля для поиска (по имени гостя, комментарию и данным связанного пользователя)
-    search_fields = ('guest_name', 'comment', 'user__phone', 'user__first_name')
+    search_fields = ('guest_name', 'phone', 'comment', 'user__phone', 'user__first_name')
     
     # Позволяет быстро менять статус прямо в списке, не заходя в карточку
     list_editable = ('status',)
@@ -56,10 +58,10 @@ class TableBookingAdmin(ModelAdmin):
     # Группировка полей в форме редактирования для удобства менеджера
     fieldsets = (
         ('Основная информация', {
-            'fields': ('user', 'guest_name', 'guests_count', 'comment')
+            'fields': ('user', 'guest_name', 'phone', 'guests_count', 'comment')
         }),
         ('Детали визита', {
-            'fields': ('date', 'time', 'status')
+            'fields': ('date', 'time', 'zone', 'status')
         }),
         ('Системные данные', {
             'fields': ('created_at',),

@@ -23,17 +23,20 @@ _STATUS_PUSH = {
 def notify_on_status_change(sender, instance, created, **kwargs):
     from apps.notifications.tasks import send_push_notification
 
-    if not instance.user_id:
+    if created:
+        if instance.user_id:
+            send_push_notification.delay(
+                user_id=instance.user_id,
+                title="Заявка принята",
+                body="Мы свяжемся с вами в ближайшее время.",
+                data={'booking_id': str(instance.pk), 'status': 'pending'},
+            )
+        from apps.bookings.tasks import send_telegram_notification
+        send_telegram_notification.delay(instance.pk)
+        logger.info("Push+Telegram queued: booking=%s created", instance.pk)
         return
 
-    if created:
-        send_push_notification.delay(
-            user_id=instance.user_id,
-            title="Заявка принята",
-            body="Мы свяжемся с вами в ближайшее время.",
-            data={'booking_id': str(instance.pk), 'status': 'pending'},
-        )
-        logger.info("Push queued: booking=%s created", instance.pk)
+    if not instance.user_id:
         return
 
     old_status = getattr(instance, '_original_status', None)

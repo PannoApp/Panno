@@ -208,6 +208,12 @@ SMS_PASSWORD = env('SMS_PASSWORD', default='')
 # ==========================================
 FIREBASE_CREDENTIALS_PATH = env('FIREBASE_CREDENTIALS_PATH', default='')
 
+# ==========================================
+# Telegram Bot
+# ==========================================
+TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
+TELEGRAM_CHAT_ID = env('TELEGRAM_CHAT_ID', default='')
+
 
 # Настройки Django REST Framework
 REST_FRAMEWORK = {

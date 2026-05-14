@@ -1,10 +1,68 @@
+import html
 import logging
+import requests
 from celery import shared_task
+from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
+
+_ZONE_LABELS = {
+    'main': 'Главный зал',
+    'terrace': 'Терраса',
+    'private': 'Приват',
+}
+
+
+@shared_task(
+    name='apps.bookings.tasks.send_telegram_notification',
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=30,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
+def send_telegram_notification(booking_id):
+    token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
+    chat_id = getattr(settings, 'TELEGRAM_CHAT_ID', '')
+    if not token or not chat_id:
+        return
+
+    from .models import TableBooking
+    try:
+        b = TableBooking.objects.select_related('user').get(pk=booking_id)
+    except TableBooking.DoesNotExist:
+        return
+
+    date_str = b.date.strftime('%d.%m.%Y')
+    time_str = b.time.strftime('%H:%M')
+    zone_str = _ZONE_LABELS.get(b.zone, b.zone or '—')
+    phone = html.escape(b.phone or (b.user.phone if b.user_id else '—'))
+
+    lines = [
+        f"🍽 <b>Новое бронирование #{b.pk}</b>",
+        "",
+        f"👤 {html.escape(b.guest_name)}",
+        f"📞 {phone}",
+        f"📅 {date_str} в {time_str}",
+        f"👥 {b.guests_count} гост.",
+        f"🏠 {zone_str}",
+    ]
+    if b.comment:
+        lines.append(f"💬 {html.escape(b.comment)}")
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    resp = requests.post(url, json={
+        'chat_id': chat_id,
+        'text': '\n'.join(lines),
+        'parse_mode': 'HTML',
+    }, timeout=10)
+    if not resp.ok:
+        logger.error("Telegram API error: status=%s body=%s", resp.status_code, resp.text)
+    resp.raise_for_status()
+    logger.info("Telegram notification sent: booking=%s", booking_id)
 
 
 @shared_task(
