@@ -30,7 +30,13 @@
   "telegram": "@panno_restaurant",
   "instagram": "panno.restaurant",
   "concept_description": "Modern Nomad — кухня кочевников. Вкусы Центральной Азии в современной интерпретации.",
-  "hero_image": "https://cdn.example.com/media/core/hero.jpg",
+  "hero_slides": [
+    {
+      "id": 1,
+      "image": "https://cdn.example.com/media/core/hero/slide1.jpg",
+      "order": 0
+    }
+  ],
   "hero_video_url": "https://cdn.example.com/media/core/hero.mp4",
   "visit_rules": "Дресс-код: smart casual. Дети до 12 лет...",
   "privacy_policy": "Настоящая политика...",
@@ -38,7 +44,7 @@
 }
 ```
 
-Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram`, `hero_video_url`, `concept_description` могут быть пустой строкой, если не заполнены в админке. `hero_image` возвращает `null`, если изображение не загружено.
+Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram`, `hero_video_url`, `concept_description` могут быть пустой строкой, если не заполнены в админке. `hero_slides` возвращает пустой список `[]`, если изображения не загружены.
 
 ## Модель RestaurantInfo
 
@@ -56,7 +62,7 @@
 | `telegram` | string | Контакт в Telegram |
 | `instagram` | string | Ссылка/никнейм Instagram |
 | `concept_description` | text | Краткое описание концепции ресторана (главный экран приложения) |
-| `hero_image` | image | Заглавное изображение главного экрана (файл, URL или `null`) |
+| `hero_slides` | array | Список изображений-слайдов для главного экрана |
 | `hero_video_url` | URL | Ссылка на заглавное видео (YouTube, CDN и т.п.; пустая строка если не задана) |
 | `visit_rules` | text | Правила посещения ресторана |
 | `privacy_policy` | text | Политика обработки персональных данных |

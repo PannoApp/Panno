@@ -1,7 +1,8 @@
+from django.contrib.admin import ModelAdmin, TabularInline
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from utils.permissions import _has_role
-from .models import RestaurantInfo, AppVersion, InteriorPhoto
+from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide
 
 
 def _is_content_or_admin(user):
@@ -14,8 +15,21 @@ def _is_admin_only(user):
     return _has_role(user, 'admin')
 
 
+class HeroSlideInline(TabularInline):
+    model = HeroSlide
+    extra = 1
+    fields = ('image', 'order', 'image_preview')
+    readonly_fields = ('image_preview',)
+
+    def image_preview(self, obj):
+        if obj and obj.image:
+            return mark_safe(f'<img src="{obj.image.url}" height="60" style="border-radius:4px;" />')
+        return "—"
+    image_preview.short_description = "Превью"
+
+
 @admin.register(RestaurantInfo)
-class RestaurantInfoAdmin(admin.ModelAdmin):
+class RestaurantInfoAdmin(ModelAdmin):
     """
     Синглтон-настройки ресторана.
     Добавлять/удалять нельзя — только редактировать.
@@ -39,7 +53,7 @@ class RestaurantInfoAdmin(admin.ModelAdmin):
             'fields': ('twogis_link', 'google_maps_link', 'yandex_maps_link', 'tour_link'),
         }),
         ('Контент главной', {
-            'fields': ('concept_description', 'hero_image', 'hero_video_url'),
+            'fields': ('concept_description', 'hero_video_url'),
         }),
         ('Бронирование', {
             'fields': ('booking_deposit_required', 'booking_deposit_note'),
@@ -50,25 +64,7 @@ class RestaurantInfoAdmin(admin.ModelAdmin):
         }),
     )
 
-    # Превью изображения героя прямо в форме
-    readonly_fields = ('hero_image_preview',)
-
-    def get_fieldsets(self, request, obj=None):
-        """Добавляем превью героя в соответствующую секцию."""
-        fieldsets = list(super().get_fieldsets(request, obj))
-        for i, (name, opts) in enumerate(fieldsets):
-            if name == 'Контент главной':
-                fields = list(opts['fields'])
-                if 'hero_image_preview' not in fields:
-                    fields.insert(fields.index('hero_image') + 1, 'hero_image_preview')
-                fieldsets[i] = (name, {**opts, 'fields': tuple(fields)})
-        return fieldsets
-
-    def hero_image_preview(self, obj):
-        if obj and obj.hero_image:
-            return mark_safe(f'<img src="{obj.hero_image.url}" width="400" style="border-radius:8px;" />')
-        return "Изображение не загружено"
-    hero_image_preview.short_description = "Предпросмотр заглавного изображения"
+    inlines = [HeroSlideInline]
 
     # Доступ по ролям
     def has_module_permission(self, request):
@@ -90,7 +86,7 @@ class RestaurantInfoAdmin(admin.ModelAdmin):
 
 
 @admin.register(InteriorPhoto)
-class InteriorPhotoAdmin(admin.ModelAdmin):
+class InteriorPhotoAdmin(ModelAdmin):
     """Фото интерьера — управляет контент-менеджер."""
 
     list_display   = ('zone', 'caption', 'order', 'image_preview')
@@ -134,7 +130,7 @@ class InteriorPhotoAdmin(admin.ModelAdmin):
 
 
 @admin.register(AppVersion)
-class AppVersionAdmin(admin.ModelAdmin):
+class AppVersionAdmin(ModelAdmin):
     """
     Версии приложения — только для роли admin.
     Управляет обязательным/рекомендуемым обновлением в Flutter.

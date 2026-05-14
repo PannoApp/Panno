@@ -1,3 +1,4 @@
+from django.contrib.admin import ModelAdmin
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from utils.permissions import _has_role
@@ -26,23 +27,23 @@ class ContentManagerMixin:
 
 
 @admin.register(Category)
-class CategoryAdmin(ContentManagerMixin, admin.ModelAdmin):
+class CategoryAdmin(ContentManagerMixin, ModelAdmin):
     list_display = ('name', 'order')
     list_editable = ('order',)  # Позволяет менять порядок прямо в списке
     search_fields = ('name',)
 
 @admin.register(Tag)
-class TagAdmin(ContentManagerMixin, admin.ModelAdmin):
+class TagAdmin(ContentManagerMixin, ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
 
 @admin.register(Allergen)
-class AllergenAdmin(ContentManagerMixin, admin.ModelAdmin):
+class AllergenAdmin(ContentManagerMixin, ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
 
 @admin.register(Dish)
-class DishAdmin(ContentManagerMixin, admin.ModelAdmin):
+class DishAdmin(ContentManagerMixin, ModelAdmin):
     # Колонки в общем списке
     list_display = ('name', 'category', 'price', 'is_active', 'image_preview_list')
     # Фильтры в правой панели

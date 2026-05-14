@@ -53,7 +53,6 @@ class RestaurantInfo(models.Model):
     instagram = models.CharField("Instagram", max_length=100, blank=True)
 
     concept_description = models.TextField("Описание концепции", blank=True, default='')
-    hero_image = models.ImageField("Заглавное изображение", upload_to='core/', blank=True, null=True)
     hero_video_url = models.URLField("URL заглавного видео", max_length=500, blank=True, default='')
 
     visit_rules = models.TextField("Правила посещения", blank=True)
@@ -150,3 +149,25 @@ class AppVersion(models.Model):
 
     def __str__(self):
         return f"{self.platform}: min={self.min_version}, latest={self.latest_version}"
+
+
+class HeroSlide(models.Model):
+    """
+    Слайды для заглавного экрана (карусель).
+    """
+    restaurant_info = models.ForeignKey(
+        RestaurantInfo,
+        on_delete=models.CASCADE,
+        related_name='hero_slides',
+        verbose_name="Ресторан"
+    )
+    image = models.ImageField("Изображение", upload_to='core/hero/')
+    order = models.PositiveIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "Слайд главного экрана"
+        verbose_name_plural = "Слайды главного экрана"
+        ordering = ['order']
+
+    def __str__(self):
+        return f"Слайд {self.order}"

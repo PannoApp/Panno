@@ -1,3 +1,4 @@
+from django.contrib.admin import ModelAdmin
 from django.contrib import admin
 from utils.permissions import _has_role
 from .models import TableBooking
@@ -8,7 +9,7 @@ def _is_hall_manager(user):
 
 
 @admin.register(TableBooking)
-class TableBookingAdmin(admin.ModelAdmin):
+class TableBookingAdmin(ModelAdmin):
 
     def has_module_permission(self, request):
         return _is_hall_manager(request.user)

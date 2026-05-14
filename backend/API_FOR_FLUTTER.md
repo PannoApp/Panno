@@ -261,7 +261,18 @@ if (info.bookingDepositRequired) {
     "telegram": "@panno_almaty",
     "instagram": "@panno_almaty",
     "concept_description": "Modern Nomad — кухня кочевников...",
-    "hero_image": "https://cdn.example.com/media/core/hero.jpg",
+    "hero_slides": [
+      {
+        "id": 1,
+        "image": "https://cdn.example.com/media/core/hero/slide1.jpg",
+        "order": 0
+      },
+      {
+        "id": 2,
+        "image": "https://cdn.example.com/media/core/hero/slide2.jpg",
+        "order": 1
+      }
+    ],
     "hero_video_url": "https://cdn.example.com/media/core/hero.mp4",
     "tour_link": "https://...",
     "twogis_link": "https://2gis.kz/...",
@@ -280,7 +291,7 @@ if (info.bookingDepositRequired) {
 | `working_hours_note` | Временное изменение режима — пустая строка если нет уведомления. Показывай поверх `working_hours` если не пустое (напр. «Закрыто 1 января»). |
 | `is_open_now` | `true` / `false` — вычисляется по `working_hours` в реальном времени (часовой пояс Asia/Almaty) |
 | `concept_description` | Краткое описание концепции ресторана (для главного экрана). Пустая строка если не заполнено. |
-| `hero_image` | URL заглавного изображения главного экрана (`null` если не загружено) |
+| `hero_slides` | Массив изображений-слайдов для главного экрана (может быть пустым списком `[]`). Каждый объект содержит `id`, `image` (URL) и `order`. |
 | `hero_video_url` | URL заглавного видео (YouTube, CDN). Пустая строка если не задано. |
 | `phone` | Телефон ресторана |
 | `whatsapp` | WhatsApp-контакт (ссылка или номер) |

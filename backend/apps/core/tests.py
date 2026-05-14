@@ -176,10 +176,10 @@ class RestaurantInfoHeroFieldsTest(APITestCase):
         self.assertIn('concept_description', response.data)
         self.assertEqual(response.data['concept_description'], '')
 
-    def test_hero_image_defaults_to_null(self):
+    def test_hero_slides_defaults_to_empty_list(self):
         response = self.client.get('/api/v1/core/info/')
-        self.assertIn('hero_image', response.data)
-        self.assertIsNone(response.data['hero_image'])
+        self.assertIn('hero_slides', response.data)
+        self.assertEqual(response.data['hero_slides'], [])
 
     def test_hero_video_url_defaults_to_empty_string(self):
         response = self.client.get('/api/v1/core/info/')

@@ -1,3 +1,4 @@
+from django.contrib.admin import ModelAdmin
 from django.contrib import admin
 from .models import UserDevice, PushCampaign
 
@@ -7,7 +8,7 @@ def _is_content_or_admin(user):
 
 
 @admin.register(UserDevice)
-class UserDeviceAdmin(admin.ModelAdmin):
+class UserDeviceAdmin(ModelAdmin):
 
     def has_module_permission(self, request):
         return _is_content_or_admin(request.user)
@@ -54,7 +55,7 @@ class PushCampaignForm(forms.ModelForm):
 
 
 @admin.register(PushCampaign)
-class PushCampaignAdmin(admin.ModelAdmin):
+class PushCampaignAdmin(ModelAdmin):
     form = PushCampaignForm
     list_display = (
         'created_at', 'title', 'category', 'segment',

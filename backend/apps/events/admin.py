@@ -1,3 +1,4 @@
+from django.contrib.admin import ModelAdmin
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from utils.permissions import _has_role
@@ -12,7 +13,7 @@ def _is_hall_or_admin(user):
     return _has_role(user, 'admin', 'hall_manager')
 
 @admin.register(EventReservation)
-class EventReservationAdmin(admin.ModelAdmin):
+class EventReservationAdmin(ModelAdmin):
     list_display = ('event', 'guest_name', 'guest_phone', 'guests_count', 'created_at')
     list_filter = ('event',)
     search_fields = ('user__phone', 'user__first_name', 'user__last_name', 'event__title')
@@ -46,7 +47,7 @@ class EventReservationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Event)
-class EventAdmin(admin.ModelAdmin):
+class EventAdmin(ModelAdmin):
     """
     Настройка админки для мероприятий (Афиши).
     """
@@ -92,7 +93,7 @@ class EventAdmin(admin.ModelAdmin):
 
 
 @admin.register(News)
-class NewsAdmin(admin.ModelAdmin):
+class NewsAdmin(ModelAdmin):
     """
     Настройка админки для новостей.
     """

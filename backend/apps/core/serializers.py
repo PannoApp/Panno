@@ -1,9 +1,16 @@
 from rest_framework import serializers
-from .models import RestaurantInfo, AppVersion, InteriorPhoto
+from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide
+
+
+class HeroSlideSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HeroSlide
+        fields = ('id', 'image', 'order')
 
 
 class RestaurantInfoSerializer(serializers.ModelSerializer):
     is_open_now = serializers.SerializerMethodField()
+    hero_slides = HeroSlideSerializer(many=True, read_only=True)
 
     class Meta:
         model = RestaurantInfo
@@ -23,7 +30,7 @@ class RestaurantInfoSerializer(serializers.ModelSerializer):
             'telegram',
             'instagram',
             'concept_description',
-            'hero_image',
+            'hero_slides',
             'hero_video_url',
             'visit_rules',
             'privacy_policy',

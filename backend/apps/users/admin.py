@@ -1,3 +1,4 @@
+from django.contrib.admin import ModelAdmin
 from django.contrib import admin
 from utils.permissions import _has_role
 from .models import User
@@ -22,7 +23,7 @@ class AdminOnlyMixin:
 
 
 @admin.register(User)
-class UserAdmin(AdminOnlyMixin, admin.ModelAdmin):
+class UserAdmin(AdminOnlyMixin, ModelAdmin):
     list_display    = ('phone', 'first_name', 'last_name', 'role', 'is_staff', 'is_active', 'date_joined')
     list_filter     = ('role', 'is_staff', 'is_active')
     search_fields   = ('phone', 'first_name', 'last_name')
