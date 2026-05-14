@@ -29,6 +29,9 @@ class EventReservationAdmin(admin.ModelAdmin):
     def guest_phone(self, obj):
         return obj.user.phone if obj.user else '—'
 
+    def has_module_permission(self, request):
+        return _is_hall_or_admin(request.user)
+
     def has_view_permission(self, request, obj=None):
         return _is_hall_or_admin(request.user)
 
@@ -59,6 +62,9 @@ class EventAdmin(admin.ModelAdmin):
     list_editable = ('is_active',)
     
     readonly_fields = ('image_preview_big',)
+
+    def has_module_permission(self, request):
+        return _is_content_or_admin(request.user)
 
     def has_view_permission(self, request, obj=None):
         return _is_content_or_admin(request.user)
@@ -100,6 +106,9 @@ class NewsAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
     
     readonly_fields = ('image_preview_big',)
+
+    def has_module_permission(self, request):
+        return _is_content_or_admin(request.user)
 
     def has_view_permission(self, request, obj=None):
         return _is_content_or_admin(request.user)

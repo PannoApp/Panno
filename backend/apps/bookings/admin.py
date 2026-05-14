@@ -10,6 +10,9 @@ def _is_hall_manager(user):
 @admin.register(TableBooking)
 class TableBookingAdmin(admin.ModelAdmin):
 
+    def has_module_permission(self, request):
+        return _is_hall_manager(request.user)
+
     def has_view_permission(self, request, obj=None):
         return _is_hall_manager(request.user)
 

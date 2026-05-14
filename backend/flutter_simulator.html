@@ -451,7 +451,6 @@
 
   <div class="nav-section">Interaction</div>
   <div class="nav-item" onclick="switchTab('bookings', this)">📅 Bookings (User)</div>
-  <div class="nav-item" onclick="switchTab('bookings-staff', this)">👔 Bookings (Staff)</div>
   <div class="nav-item" onclick="switchTab('events', this)">🎉 Events &amp; News</div>
 
   <div class="nav-section">System</div>
@@ -641,40 +640,6 @@
             <input type="text" id="book-idem-key" readonly style="font-family:monospace;font-size:0.75rem;background:#F9FAFB;color:var(--text-light);">
           </div>
           <button onclick="createBooking()">POST /bookings/</button>
-        </div>
-      </div>
-
-      <!-- BOOKINGS (STAFF) TAB -->
-      <div id="tab-bookings-staff" class="tab-content">
-        <div class="section">
-          <h3>All Bookings (staff)</h3>
-          <div class="form-group">
-            <label>page</label>
-            <input type="number" id="staff-book-page" value="1">
-          </div>
-          <button onclick="getStaffBookings()">GET /bookings/staff/</button>
-        </div>
-
-        <div class="section">
-          <h3>Update Booking Status</h3>
-          <div class="form-group">
-            <label>Booking ID</label>
-            <input type="number" id="staff-book-id" value="1">
-          </div>
-          <div class="form-group">
-            <label>New Status</label>
-            <select id="staff-book-status">
-              <option value="pending">pending</option>
-              <option value="confirmed">confirmed</option>
-              <option value="canceled">canceled</option>
-              <option value="completed">completed</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Guest Name (optional)</label>
-            <input type="text" id="staff-guest-name" placeholder="Leave blank to keep">
-          </div>
-          <button onclick="updateStaffBooking()">PATCH /bookings/staff/{id}/</button>
         </div>
       </div>
 
@@ -1117,21 +1082,6 @@
   }
 
   // createBooking определена ниже в секции Push Simulation (с симуляцией push)
-
-  // ─── Bookings (staff) ──────────────────────────────────────────────────
-  function getStaffBookings() {
-    const page = document.getElementById('staff-book-page').value;
-    doFetch('GET', `/api/v1/bookings/staff/?page=${page}`);
-  }
-
-  async function updateStaffBooking() {
-    const id     = document.getElementById('staff-book-id').value;
-    const status = document.getElementById('staff-book-status').value;
-    const name   = document.getElementById('staff-guest-name').value;
-    const payload = { status };
-    if (name) payload.guest_name = name;
-    await doFetch('PATCH', `/api/v1/bookings/staff/${id}/`, payload);
-  }
 
   // ─── Events ───────────────────────────────────────────────────────────
   function getEvents(type) {

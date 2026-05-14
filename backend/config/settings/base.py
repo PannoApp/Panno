@@ -202,6 +202,12 @@ SMS_PROVIDER_URL = env('SMS_PROVIDER_URL', default='')
 SMS_LOGIN = env('SMS_LOGIN', default='')
 SMS_PASSWORD = env('SMS_PASSWORD', default='')
 
+# ==========================================
+# Firebase (FCM)
+# ==========================================
+FIREBASE_CREDENTIALS_PATH = env('FIREBASE_CREDENTIALS_PATH', default='')
+
+
 # Настройки Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

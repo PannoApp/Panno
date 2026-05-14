@@ -9,6 +9,9 @@ def _is_content_or_admin(user):
 
 
 class ContentManagerMixin:
+    def has_module_permission(self, request):
+        return _is_content_or_admin(request.user)
+
     def has_view_permission(self, request, obj=None):
         return _is_content_or_admin(request.user)
 

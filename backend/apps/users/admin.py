@@ -5,7 +5,7 @@ from .models import User
 
 class AdminOnlyMixin:
     """Доступ только пользователям с role='admin' или is_superuser."""
-    def has_module_perms(self, request, app_label):
+    def has_module_permission(self, request):
         return _has_role(request.user, 'admin')
 
     def has_view_permission(self, request, obj=None):

@@ -71,6 +71,9 @@ class RestaurantInfoAdmin(admin.ModelAdmin):
     hero_image_preview.short_description = "Предпросмотр заглавного изображения"
 
     # Доступ по ролям
+    def has_module_permission(self, request):
+        return _is_content_or_admin(request.user)
+
     def has_view_permission(self, request, obj=None):
         return _is_content_or_admin(request.user)
 
@@ -114,6 +117,9 @@ class InteriorPhotoAdmin(admin.ModelAdmin):
         return 'Фото не загружено'
     image_preview_detail.short_description = 'Предпросмотр'
 
+    def has_module_permission(self, request):
+        return _is_content_or_admin(request.user)
+
     def has_view_permission(self, request, obj=None):
         return _is_content_or_admin(request.user)
 
@@ -138,6 +144,9 @@ class AppVersionAdmin(admin.ModelAdmin):
     readonly_fields = ('updated_at',)
 
     # Доступ — только администратор (изменение версий влияет на поведение всех клиентов)
+    def has_module_permission(self, request):
+        return _is_admin_only(request.user)
+
     def has_view_permission(self, request, obj=None):
         return _is_admin_only(request.user)
 
