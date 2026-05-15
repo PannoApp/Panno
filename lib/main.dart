@@ -2,7 +2,6 @@
 // Тема: piligrim_design_spec.md — тёмная тема, цвета Қара жер / Мөлдір су / Сары дала
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'core/ambient_preset.dart';
 import 'core/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
@@ -33,38 +32,16 @@ void main() {
   });
 }
 
-class PiligrimApp extends StatefulWidget {
+class PiligrimApp extends StatelessWidget {
   const PiligrimApp({super.key});
 
   @override
-  State<PiligrimApp> createState() => _PiligrimAppState();
-}
-
-class _PiligrimAppState extends State<PiligrimApp> {
-  final AmbientPresetController _ambientCtrl = AmbientPresetController();
-
-  @override
-  void initState() {
-    super.initState();
-    _ambientCtrl.load();
-  }
-
-  @override
-  void dispose() {
-    _ambientCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AmbientPresetScope(
-      controller: _ambientCtrl,
-      child: MaterialApp(
-        title: 'PILIGRIM',
-        debugShowCheckedModeBanner: false,
-        theme: piligrimTheme,
-        home: const SplashScreen(),
-      ),
+    return MaterialApp(
+      title: 'PILIGRIM',
+      debugShowCheckedModeBanner: false,
+      theme: piligrimTheme,
+      home: const SplashScreen(),
     );
   }
 }

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../core/ambient_preset.dart';
 import '../core/theme.dart';
 import '../core/profile_data.dart';
 import '../core/home_data.dart';
@@ -87,15 +86,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onToggle: (id, val) =>
                           setState(() => _notifState[id] = val),
                     ),
-                    const SizedBox(height: 28),
-
-                    // Атмосфера приложения
-                    const PiligrimSectionHeader(
-                      label: 'АТМОСФЕРА ПРИЛОЖЕНИЯ',
-                      icon: 'assets/images/spiral.svg',
-                    ),
-                    const SizedBox(height: 12),
-                    const _AmbientPresetCard(),
                     const SizedBox(height: 28),
 
                     // Контакты
@@ -549,167 +539,6 @@ class _NotificationsCard extends StatelessWidget {
             ],
           );
         }).toList(),
-      ),
-    );
-  }
-}
-
-// Карточка выбора атмосферы (темы) интерфейса: Calm, Ember, Mystic
-class _AmbientPresetCard extends StatelessWidget {
-  const _AmbientPresetCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final current = AmbientPresetScope.of(context);
-    final ctrl = AmbientPresetScope.controllerOf(context);
-
-    return _BrandCard(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Выберите атмосферу интерфейса',
-              style: PiligrimTextStyles.caption.copyWith(
-                color: PiligrimColors.sky.withValues(alpha: 0.45),
-                fontSize: 11,
-                letterSpacing: 0.7,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...AppAmbientPreset.values.map((preset) {
-              final active = preset == current;
-              final accent = switch (preset) {
-                AppAmbientPreset.calm => PiligrimColors.water,
-                AppAmbientPreset.ember => PiligrimColors.steppe,
-                AppAmbientPreset.mystic => PiligrimColors.sky,
-              };
-              final previewTop = switch (preset) {
-                AppAmbientPreset.calm => PiligrimColors.water.withValues(alpha: 0.6),
-                AppAmbientPreset.ember => PiligrimColors.ember.withValues(alpha: 0.75),
-                AppAmbientPreset.mystic => PiligrimColors.water.withValues(alpha: 0.35),
-              };
-              final previewBottom = switch (preset) {
-                AppAmbientPreset.calm => PiligrimColors.sky.withValues(alpha: 0.3),
-                AppAmbientPreset.ember => PiligrimColors.steppe.withValues(alpha: 0.35),
-                AppAmbientPreset.mystic => PiligrimColors.earthDeep.withValues(alpha: 0.9),
-              };
-
-              final title = switch (preset) {
-                AppAmbientPreset.calm => 'CALM · ВОДА',
-                AppAmbientPreset.ember => 'EMBER · ОГОНЬ',
-                AppAmbientPreset.mystic => 'MYSTIC · ГЛУБИНА',
-              };
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: PiligrimTap(
-                  borderRadius: BorderRadius.circular(11),
-                  onTap: () => ctrl.setPreset(preset),
-                  child: AnimatedContainer(
-                    duration: 230.ms,
-                    curve: Curves.easeOut,
-                    padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(11),
-                      color: active
-                          ? accent.withValues(alpha: 0.14)
-                          : PiligrimColors.earth,
-                      border: Border.all(
-                        color: active
-                            ? accent.withValues(alpha: 0.8)
-                            : PiligrimColors.divider,
-                        width: active ? 1.2 : 1,
-                      ),
-                      boxShadow: active
-                          ? [
-                              BoxShadow(
-                                color: accent.withValues(alpha: 0.2),
-                                blurRadius: 14,
-                                spreadRadius: -3,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 54,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [previewTop, previewBottom],
-                            ),
-                            border: Border.all(
-                              color: accent.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Center(
-                            child: SvgPicture.asset(
-                              'assets/images/spiral.svg',
-                              width: 14,
-                              height: 14,
-                              colorFilter: ColorFilter.mode(
-                                accent.withValues(alpha: active ? 0.95 : 0.55),
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: PiligrimTextStyles.body.copyWith(
-                                  fontSize: 12.8,
-                                  color: active
-                                      ? accent
-                                      : PiligrimColors.sky.withValues(alpha: 0.6),
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                preset.subtitle,
-                                style: PiligrimTextStyles.caption.copyWith(
-                                  fontSize: 10.2,
-                                  color: active
-                                      ? accent.withValues(alpha: 0.78)
-                                      : PiligrimColors.sky.withValues(alpha: 0.36),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        AnimatedOpacity(
-                          duration: 220.ms,
-                          opacity: active ? 1 : 0.35,
-                          child: SvgPicture.asset(
-                            'assets/images/star_totem (1).svg',
-                            width: 12,
-                            height: 12,
-                            colorFilter: ColorFilter.mode(
-                              active ? accent : PiligrimColors.sky.withValues(alpha: 0.28),
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
       ),
     );
   }
