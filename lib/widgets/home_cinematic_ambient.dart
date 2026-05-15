@@ -1,5 +1,4 @@
-// Кинематографичный слой только для главного экрана:
-// медленные пылинки + тёплое «дыхание» света (без blur / glass).
+// Premium cinematic atmosphere для home — пыль, grain, тёплое дыхание света.
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
@@ -28,7 +27,7 @@ class _HomeCinematicAmbientState extends State<HomeCinematicAmbient>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 42),
+      duration: const Duration(seconds: 90),
     )..repeat();
   }
 
@@ -71,19 +70,33 @@ class _HomeAmbientPainter extends CustomPainter {
   final double parallaxX;
   final double parallaxY;
 
-  static List<_DustGrain>? _grains;
+  static const _tau = math.pi * 2;
+  static List<_Mote>? _motes;
+  static List<_Grain>? _grain;
 
-  static List<_DustGrain> _makeGrains(int n) {
-    final r = math.Random(0x50494C49);
+  static List<_Mote> _makeMotes(int n) {
+    final r = math.Random(0xD0574C);
     return List.generate(
       n,
-      (_) => _DustGrain(
+      (_) => _Mote(
         x: r.nextDouble(),
         y: r.nextDouble(),
-        radius: r.nextDouble() * 0.55 + 0.25,
-        speed: r.nextDouble() * 0.35 + 0.12,
+        size: r.nextDouble() * 0.35 + 0.15,
+        drift: r.nextDouble() * 0.08 + 0.02,
         phase: r.nextDouble(),
-        wobble: r.nextDouble() * 0.9 + 0.2,
+        warmth: r.nextDouble(),
+      ),
+    );
+  }
+
+  static List<_Grain> _makeGrain(int n) {
+    final r = math.Random(0x475241);
+    return List.generate(
+      n,
+      (i) => _Grain(
+        x: r.nextDouble(),
+        y: r.nextDouble(),
+        phase: (i * 0.137) % 1.0,
       ),
     );
   }
@@ -94,58 +107,95 @@ class _HomeAmbientPainter extends CustomPainter {
     final h = size.height;
     final rect = Offset.zero & size;
 
-    _grains ??= _makeGrains(52);
+    _motes ??= _makeMotes(14);
+    _grain ??= _makeGrain(96);
 
-    // Тёплое «дыхание» — низ и центр, очень мягко
-    final breath = 0.42 + 0.58 * math.sin(t * math.pi * 2 * 1.85);
-    final warmAlpha = 0.04 + breath * 0.055;
+    // Медленное amber-дыхание — свечи, тишина.
+    final breath = 0.5 + 0.5 * math.sin(t * _tau * 0.55);
+    final amber = 0.022 + breath * 0.028;
     canvas.drawRect(
       rect,
       Paint()
         ..shader = RadialGradient(
-          center: Alignment(0.08 * parallaxX, 0.92 + 0.04 * parallaxY),
-          radius: 1.05,
+          center: Alignment(0.12 + parallaxX * 0.03, 0.88 + parallaxY * 0.02),
+          radius: 1.15,
           colors: [
-            PiligrimColors.steppe.withValues(alpha: warmAlpha),
-            PiligrimColors.ember.withValues(alpha: warmAlpha * 0.45),
+            PiligrimColors.nomadCream.withValues(alpha: amber * 0.55),
+            PiligrimColors.steppe.withValues(alpha: amber * 0.35),
             PiligrimColors.clear,
           ],
-          stops: const [0.0, 0.38, 1.0],
+          stops: const [0.0, 0.42, 1.0],
         ).createShader(rect),
     );
 
-    // Второй слой — чуть холоднее, верх (луна бренда), едва заметно
-    final coolBreath = 0.5 + 0.5 * math.sin(t * math.pi * 2 * 1.2 + 1.1);
+    // Мягкий луч света сверху-сбоку (пыль в воздухе).
+    final shaft = 0.5 + 0.5 * math.sin(t * _tau * 0.35 + 0.8);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment(-0.6 + parallaxX * 0.05, -1.0),
+          end: Alignment(0.5, 0.4),
+          colors: [
+            PiligrimColors.sky.withValues(alpha: 0.012 + shaft * 0.016),
+            PiligrimColors.clear,
+            PiligrimColors.clear,
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(rect),
+    );
+
+    // Едва заметный холодный контраст бренда — сверху.
+    final cool = 0.5 + 0.5 * math.sin(t * _tau * 0.4 + 2.0);
     canvas.drawRect(
       rect,
       Paint()
         ..shader = RadialGradient(
-          center: Alignment(-0.55 + parallaxX * 0.04, -0.75),
-          radius: 0.95,
+          center: Alignment(-0.5 + parallaxX * 0.02, -0.82),
+          radius: 0.9,
           colors: [
-            PiligrimColors.water.withValues(alpha: 0.018 + coolBreath * 0.022),
+            PiligrimColors.water.withValues(alpha: 0.008 + cool * 0.012),
             PiligrimColors.clear,
           ],
-          stops: const [0.0, 1.0],
         ).createShader(rect),
     );
 
-    // Пылинки — медленный дрейф
-    for (final g in _grains!) {
-      final drift = (t * g.speed + g.phase) % 1.0;
-      final nx = g.x +
-          math.sin((t + g.phase) * math.pi * 2 * g.wobble) * 0.018 +
-          parallaxX * 0.006;
-      final ny = (g.y - drift * 0.42 + 0.15) % 1.08 - 0.04;
-      final px = (nx * w).clamp(0.0, w);
-      final py = (ny * h).clamp(0.0, h);
-      final twinkle =
-          0.35 + 0.65 * math.sin((t * 6.2 + g.phase * 11) * math.pi * 2);
-      final a = (0.045 + twinkle * 0.07) * (0.55 + g.radius * 0.35);
+    // Film grain — статичная сетка, очень тихий дрейф.
+    final grainShift = math.sin(t * _tau * 0.25) * 0.4;
+    for (final g in _grain!) {
+      final flicker =
+          0.5 + 0.5 * math.sin(t * _tau * 0.6 + g.phase * _tau);
+      final a = (0.012 + flicker * 0.018).clamp(0.008, 0.032);
+      final gx = ((g.x * w) + grainShift) % w;
+      final gy = ((g.y * h) + grainShift * 0.6) % h;
       canvas.drawCircle(
-        Offset(px, py),
-        g.radius,
-        Paint()..color = PiligrimColors.sky.withValues(alpha: a.clamp(0.02, 0.14)),
+        Offset(gx, gy),
+        0.45,
+        Paint()..color = PiligrimColors.sky.withValues(alpha: a),
+      );
+    }
+
+    // Редкие моты пыли — горизонтальный дрейф, без «падающих искр».
+    for (final m in _motes!) {
+      final slow = (t * m.drift + m.phase) % 1.0;
+      final nx = (m.x + slow * 0.06 +
+              math.sin(t * _tau * 0.18 + m.phase) * 0.012 +
+              parallaxX * 0.004) %
+          1.0;
+      final ny = (m.y +
+              math.cos(t * _tau * 0.14 + m.phase * 2) * 0.008 +
+              parallaxY * 0.003) %
+          1.0;
+      final glint =
+          0.4 + 0.6 * math.sin(t * _tau * 0.45 + m.phase * _tau);
+      final a = (0.018 + glint * 0.022).clamp(0.012, 0.045);
+      final tone = m.warmth > 0.55
+          ? PiligrimColors.nomadCream
+          : PiligrimColors.sky;
+      canvas.drawCircle(
+        Offset(nx * w, ny * h),
+        m.size,
+        Paint()..color = tone.withValues(alpha: a),
       );
     }
   }
@@ -157,14 +207,19 @@ class _HomeAmbientPainter extends CustomPainter {
       old.parallaxY != parallaxY;
 }
 
-class _DustGrain {
-  const _DustGrain({
+class _Mote {
+  const _Mote({
     required this.x,
     required this.y,
-    required this.radius,
-    required this.speed,
+    required this.size,
+    required this.drift,
     required this.phase,
-    required this.wobble,
+    required this.warmth,
   });
-  final double x, y, radius, speed, phase, wobble;
+  final double x, y, size, drift, phase, warmth;
+}
+
+class _Grain {
+  const _Grain({required this.x, required this.y, required this.phase});
+  final double x, y, phase;
 }
