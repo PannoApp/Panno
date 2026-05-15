@@ -59,7 +59,7 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
         children: [
           SvgPicture.asset(
             'assets/images/piligrim.svg',
-            height: 32,
+            height: 28,
             colorFilter: const ColorFilter.mode(
               PiligrimColors.sky,
               BlendMode.srcIn,
@@ -68,7 +68,7 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
               .animate()
               .fadeIn(duration: 1100.ms, curve: Curves.easeOut),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 28),
 
           SizedBox(
             height: 76,

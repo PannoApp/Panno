@@ -27,7 +27,7 @@ class _HomeCinematicAmbientState extends State<HomeCinematicAmbient>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 90),
+      duration: const Duration(seconds: 120),
     )..repeat();
   }
 
@@ -78,11 +78,11 @@ class _HomeAmbientPainter extends CustomPainter {
     final r = math.Random(0xD0574C);
     return List.generate(
       n,
-      (_) => _Mote(
+      (i) => _Mote(
         x: r.nextDouble(),
         y: r.nextDouble(),
-        size: r.nextDouble() * 0.35 + 0.15,
-        drift: r.nextDouble() * 0.08 + 0.02,
+        size: r.nextDouble() * 0.28 + 0.12,
+        drift: i < 5 ? r.nextDouble() * 0.015 + 0.004 : 0,
         phase: r.nextDouble(),
         warmth: r.nextDouble(),
       ),
@@ -107,37 +107,35 @@ class _HomeAmbientPainter extends CustomPainter {
     final h = size.height;
     final rect = Offset.zero & size;
 
-    _motes ??= _makeMotes(14);
-    _grain ??= _makeGrain(96);
+    _motes ??= _makeMotes(8);
+    _grain ??= _makeGrain(58);
 
-    // Медленное amber-дыхание — свечи, тишина.
-    final breath = 0.5 + 0.5 * math.sin(t * _tau * 0.55);
-    final amber = 0.022 + breath * 0.028;
+    final breath = 0.5 + 0.5 * math.sin(t * _tau * 0.38);
+    final amber = 0.016 + breath * 0.020;
     canvas.drawRect(
       rect,
       Paint()
         ..shader = RadialGradient(
-          center: Alignment(0.12 + parallaxX * 0.03, 0.88 + parallaxY * 0.02),
+          center: Alignment(0.12 + parallaxX * 0.02, 0.88 + parallaxY * 0.015),
           radius: 1.15,
           colors: [
-            PiligrimColors.nomadCream.withValues(alpha: amber * 0.55),
-            PiligrimColors.steppe.withValues(alpha: amber * 0.35),
+            PiligrimColors.nomadCream.withValues(alpha: amber * 0.45),
+            PiligrimColors.steppe.withValues(alpha: amber * 0.28),
             PiligrimColors.clear,
           ],
           stops: const [0.0, 0.42, 1.0],
         ).createShader(rect),
     );
 
-    // Мягкий луч света сверху-сбоку (пыль в воздухе).
-    final shaft = 0.5 + 0.5 * math.sin(t * _tau * 0.35 + 0.8);
+    final shaft = 0.5 + 0.5 * math.sin(t * _tau * 0.22 + 0.8);
     canvas.drawRect(
       rect,
       Paint()
         ..shader = LinearGradient(
-          begin: Alignment(-0.6 + parallaxX * 0.05, -1.0),
-          end: Alignment(0.5, 0.4),
+          begin: Alignment(-0.6 + parallaxX * 0.04, -1.0),
+          end: const Alignment(0.5, 0.4),
           colors: [
-            PiligrimColors.sky.withValues(alpha: 0.012 + shaft * 0.016),
+            PiligrimColors.sky.withValues(alpha: 0.008 + shaft * 0.010),
             PiligrimColors.clear,
             PiligrimColors.clear,
           ],
@@ -145,50 +143,48 @@ class _HomeAmbientPainter extends CustomPainter {
         ).createShader(rect),
     );
 
-    // Едва заметный холодный контраст бренда — сверху.
-    final cool = 0.5 + 0.5 * math.sin(t * _tau * 0.4 + 2.0);
+    final cool = 0.5 + 0.5 * math.sin(t * _tau * 0.28 + 2.0);
     canvas.drawRect(
       rect,
       Paint()
         ..shader = RadialGradient(
-          center: Alignment(-0.5 + parallaxX * 0.02, -0.82),
+          center: Alignment(-0.5 + parallaxX * 0.015, -0.82),
           radius: 0.9,
           colors: [
-            PiligrimColors.water.withValues(alpha: 0.008 + cool * 0.012),
+            PiligrimColors.water.withValues(alpha: 0.006 + cool * 0.008),
             PiligrimColors.clear,
           ],
         ).createShader(rect),
     );
 
-    // Film grain — статичная сетка, очень тихий дрейф.
-    final grainShift = math.sin(t * _tau * 0.25) * 0.4;
+    final grainShift = math.sin(t * _tau * 0.14) * 0.25;
     for (final g in _grain!) {
       final flicker =
-          0.5 + 0.5 * math.sin(t * _tau * 0.6 + g.phase * _tau);
-      final a = (0.012 + flicker * 0.018).clamp(0.008, 0.032);
+          0.5 + 0.5 * math.sin(t * _tau * 0.35 + g.phase * _tau);
+      final a = (0.008 + flicker * 0.010).clamp(0.006, 0.020);
       final gx = ((g.x * w) + grainShift) % w;
-      final gy = ((g.y * h) + grainShift * 0.6) % h;
+      final gy = ((g.y * h) + grainShift * 0.5) % h;
       canvas.drawCircle(
         Offset(gx, gy),
-        0.45,
+        0.4,
         Paint()..color = PiligrimColors.sky.withValues(alpha: a),
       );
     }
 
-    // Редкие моты пыли — горизонтальный дрейф, без «падающих искр».
     for (final m in _motes!) {
-      final slow = (t * m.drift + m.phase) % 1.0;
-      final nx = (m.x + slow * 0.06 +
-              math.sin(t * _tau * 0.18 + m.phase) * 0.012 +
-              parallaxX * 0.004) %
+      final slow = m.drift > 0 ? (t * m.drift + m.phase) % 1.0 : 0.0;
+      final nx = (m.x +
+              slow * 0.025 +
+              math.sin(t * _tau * 0.10 + m.phase) * 0.006 +
+              parallaxX * 0.003) %
           1.0;
       final ny = (m.y +
-              math.cos(t * _tau * 0.14 + m.phase * 2) * 0.008 +
-              parallaxY * 0.003) %
+              math.cos(t * _tau * 0.08 + m.phase * 2) * 0.004 +
+              parallaxY * 0.002) %
           1.0;
       final glint =
-          0.4 + 0.6 * math.sin(t * _tau * 0.45 + m.phase * _tau);
-      final a = (0.018 + glint * 0.022).clamp(0.012, 0.045);
+          0.45 + 0.55 * math.sin(t * _tau * 0.28 + m.phase * _tau);
+      final a = (0.010 + glint * 0.014).clamp(0.008, 0.028);
       final tone = m.warmth > 0.55
           ? PiligrimColors.nomadCream
           : PiligrimColors.sky;

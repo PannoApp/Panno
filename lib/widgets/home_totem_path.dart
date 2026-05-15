@@ -85,20 +85,30 @@ class _HomeTotemPathRowState extends State<HomeTotemPathRow> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     color: selected
-                        ? PiligrimColors.sky.withValues(alpha: 0.048)
+                        ? PiligrimColors.sky.withValues(alpha: 0.03)
                         : PiligrimColors.clear,
                     border: Border.all(
-                      width: selected ? 1.2 : 1,
+                      width: selected ? 0.65 : 0.5,
                       color: selected
-                          ? cat.accentColor.withValues(alpha: 0.42)
-                          : PiligrimColors.sky.withValues(alpha: 0.1),
+                          ? cat.accentColor.withValues(alpha: 0.22)
+                          : PiligrimColors.sky.withValues(alpha: 0.055),
                     ),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: cat.accentColor.withValues(alpha: 0.10),
+                              blurRadius: 18,
+                              spreadRadius: -6,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       AnimatedScale(
-                        scale: selected ? 1.1 : 1.0,
+                        scale: selected ? 1.05 : 1.0,
                         duration: const Duration(milliseconds: 320),
                         curve: Curves.easeOutCubic,
                         child: SvgPicture.asset(

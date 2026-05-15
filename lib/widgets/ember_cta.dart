@@ -56,13 +56,13 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final paddedRow = Padding(
-      padding: EdgeInsets.symmetric(horizontal: widget.small ? 16 : 20),
+      padding: EdgeInsets.symmetric(horizontal: widget.small ? 14 : 18),
       child: Row(
         children: [
           SvgPicture.asset(
             widget.iconAsset,
-            width: widget.small ? 18 : 22,
-            height: widget.small ? 18 : 22,
+            width: widget.small ? 17 : 20,
+            height: widget.small ? 17 : 20,
             colorFilter: const ColorFilter.mode(
               PiligrimColors.sky,
               BlendMode.srcIn,
@@ -73,9 +73,9 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
             widget.label,
             style: PiligrimTextStyles.button.copyWith(
               color: PiligrimColors.sky,
-              fontSize: widget.small ? 13 : 14,
-              letterSpacing: 0.5,
-              fontWeight: FontWeight.w700,
+              fontSize: widget.small ? 12.5 : 13.5,
+              letterSpacing: 0.45,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const Spacer(),
@@ -91,7 +91,7 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
     );
 
     final tapChild = PiligrimTap(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       onTap: widget.onTap,
       scaleDown: 0.965,
       releaseDuration: const Duration(milliseconds: 320),
@@ -104,13 +104,13 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
               0.05 * math.sin(t * math.pi * 7.2) +
               0.02 * math.sin(t * math.pi * 13.1);
 
-          final glowRadius = (10 + flicker * 4).clamp(10.0, 16.0);
-          final glowOpacity = (0.18 + flicker * 0.06).clamp(0.12, 0.28);
+          final glowRadius = (6 + flicker * 3).clamp(6.0, 11.0);
+          final glowOpacity = (0.10 + flicker * 0.04).clamp(0.07, 0.16);
 
           return Container(
-            height: widget.small ? 48 : 56,
+            height: widget.small ? 44 : 50,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -121,9 +121,9 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: PiligrimColors.shadow.withValues(alpha: 0.4),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
+                  color: PiligrimColors.shadow.withValues(alpha: 0.28),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
                 BoxShadow(
                   color: PiligrimColors.ember.withValues(alpha: glowOpacity),
@@ -146,7 +146,7 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
         animation: idle,
         builder: (_, child) {
           final breathe =
-              1.0 + 0.006 * math.sin(idle.value * math.pi * 2);
+              1.0 + 0.003 * math.sin(idle.value * math.pi * 2);
           return Transform.scale(
             scale: breathe,
             alignment: Alignment.center,
