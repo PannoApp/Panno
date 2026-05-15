@@ -63,3 +63,10 @@ app.*.map.json
 
 # Design mockups / archives
 /макет/
+
+# Backend (Django)
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+backend/db.sqlite3
+backend/.env

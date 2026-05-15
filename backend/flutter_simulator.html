@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panno API Simulator</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --bg: #F3F4F6;
+      --surface: #FFFFFF;
+      --text: #111827;
+      --text-light: #6B7280;
+      --border: #E5E7EB;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --error: #EF4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ---- Sidebar ---- */
+    .sidebar {
+      width: 220px;
+      min-width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .sidebar-title {
+      padding: 16px 18px;
+      font-weight: 700;
+      font-size: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-section {
+      padding: 8px 12px 2px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-top: 6px;
+    }
+    .nav-item {
+      padding: 9px 18px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: background 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover { background: var(--bg); }
+    .nav-item.active {
+      background: #EEF2FF;
+      color: var(--primary);
+      font-weight: 600;
+      border-left-color: var(--primary);
+    }
+
+    /* ---- Main layout ---- */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .content-header {
+      background: var(--surface);
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .content-header h2 { margin: 0; font-size: 1rem; min-width: 180px; }
+
+    .base-url-input {
+      flex: 1;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-family: monospace;
+    }
+    .token-pill {
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+      background: #FEE2E2;
+      color: var(--error);
+    }
+    .token-pill.has-token { background: #D1FAE5; color: #065F46; }
+
+    /* ---- Workspace ---- */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      padding: 20px;
+      gap: 16px;
+    }
+    .form-panel {
+      width: 380px;
+      min-width: 300px;
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 18px;
+      overflow-y: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .response-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    /* ---- Sections / Forms ---- */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .section {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .section h3 {
+      margin: 0 0 12px;
+      font-size: 0.92rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .form-group { margin-bottom: 10px; }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 500;
+      font-size: 0.82rem;
+      color: var(--text-light);
+    }
+    input[type="text"], input[type="date"], input[type="time"],
+    input[type="number"], select, textarea {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.88rem;
+    }
+    textarea { resize: vertical; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.85rem;
+      transition: background 0.15s;
+    }
+    button:hover { background: var(--primary-hover); }
+    button.btn-danger { background: var(--error); }
+    button.btn-danger:hover { background: #DC2626; }
+    button.btn-secondary { background: var(--text-light); }
+    button.btn-secondary:hover { background: #4B5563; }
+    button.btn-warning { background: var(--warning); }
+    button.btn-warning:hover { background: #D97706; }
+
+    /* ---- Response area ---- */
+    .response-meta {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 12px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .status-badge {
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      background: var(--border);
+      color: var(--text-light);
+    }
+    .status-badge.s2xx { background: var(--success); color: white; }
+    .status-badge.s4xx { background: var(--warning); color: white; }
+    .status-badge.s5xx { background: var(--error); color: white; }
+    .response-url {
+      font-size: 0.78rem;
+      color: var(--text-light);
+      font-family: monospace;
+      word-break: break-all;
+      flex: 1;
+    }
+    .copy-btn {
+      background: transparent;
+      color: var(--text-light);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      font-size: 0.78rem;
+    }
+    .copy-btn:hover { background: var(--bg); }
+
+    .response-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 8px 8px 0 0;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .resp-tab {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      border-bottom: 2px solid transparent;
+      background: none;
+      color: var(--text-light);
+    }
+    .resp-tab:hover { background: var(--bg); }
+    .resp-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 600;
+      background: var(--surface);
+    }
+
+    .response-body-wrap {
+      flex: 1;
+      background: var(--surface);
+      border-radius: 0 0 8px 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .response-box {
+      background: #1A1A2E;
+      color: #E2E8F0;
+      padding: 14px;
+      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      height: 100%;
+      overflow-y: auto;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .json-key { color: #93C5FD; }
+    .json-string { color: #86EFAC; }
+    .json-number { color: #FCD34D; }
+    .json-bool { color: #F9A8D4; }
+    .json-null { color: #94A3B8; }
+
+    /* ---- History panel ---- */
+    .history-panel {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 12px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+      max-height: 130px;
+      overflow-y: auto;
+    }
+    .history-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+      font-size: 0.78rem;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .history-item:hover { background: var(--bg); }
+    .hist-method {
+      font-weight: 700;
+      font-size: 0.7rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--primary);
+      color: white;
+      min-width: 40px;
+      text-align: center;
+    }
+    .hist-method.GET { background: #0EA5E9; }
+    .hist-method.POST { background: #10B981; }
+    .hist-method.PATCH { background: #F59E0B; }
+    .hist-method.PUT { background: #8B5CF6; }
+    .hist-method.DELETE { background: #EF4444; }
+    .hist-status { font-weight: 700; color: var(--text-light); font-size: 0.75rem; }
+    .hist-status.ok { color: var(--success); }
+    .hist-status.err { color: var(--error); }
+    .hist-url { color: var(--text-light); font-family: monospace; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hist-time { color: var(--text-light); font-size: 0.7rem; }
+
+    /* ---- Push notification toasts ---- */
+    #toast-container {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      background: #1E1B4B;
+      color: #E0E7FF;
+      border-radius: 12px;
+      padding: 14px 16px;
+      min-width: 300px;
+      max-width: 360px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      pointer-events: all;
+      animation: slideIn 0.3s ease;
+      border-left: 4px solid var(--primary);
+    }
+    .toast.booking   { border-left-color: #4F46E5; }
+    .toast.event     { border-left-color: #10B981; }
+    .toast.marketing { border-left-color: #F59E0B; }
+    @keyframes slideIn {
+      from { transform: translateX(120%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to   { opacity: 0; transform: translateY(-8px); }
+    }
+    .toast-icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
+    .toast-content { flex: 1; }
+    .toast-app   { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #818CF8; margin-bottom: 3px; }
+    .toast-title { font-weight: 700; font-size: 0.88rem; margin-bottom: 2px; }
+    .toast-body  { font-size: 0.8rem; color: #A5B4FC; }
+    .toast-time  { font-size: 0.68rem; color: #6366F1; margin-top: 4px; }
+    .toast-close {
+      background: none; border: none; color: #6366F1; font-size: 1rem; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0;
+    }
+    .toast-close:hover { color: #E0E7FF; }
+
+    /* ---- Push log panel ---- */
+    .push-log-panel {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 12px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      flex-shrink: 0;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    .push-log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .push-log-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .poll-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-light);
+    }
+    .poll-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+    .poll-dot.active { background: var(--success); animation: pulse 1.5s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .push-log-item {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 0.78rem;
+      padding: 2px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .push-log-item:last-child { border-bottom: none; }
+    .push-log-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .push-log-badge.booking   { background: #EEF2FF; color: #4F46E5; }
+    .push-log-badge.event     { background: #D1FAE5; color: #065F46; }
+    .push-log-badge.marketing { background: #FEF3C7; color: #92400E; }
+    .push-log-text { flex: 1; color: var(--text); }
+    .push-log-time { color: var(--text-light); font-size: 0.7rem; flex-shrink: 0; }
+    .push-log-empty { font-size: 0.78rem; color: var(--text-light); font-style: italic; }
+  </style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<div class="sidebar">
+  <div class="sidebar-title">📱 Panno Simulator</div>
+
+  <div class="nav-section">Auth</div>
+  <div class="nav-item active" onclick="switchTab('auth', this)">🔐 Auth &amp; Profile</div>
+
+  <div class="nav-section">Catalog</div>
+  <div class="nav-item" onclick="switchTab('menu', this)">🍽️ Menu</div>
+
+  <div class="nav-section">Interaction</div>
+  <div class="nav-item" onclick="switchTab('bookings', this)">📅 Bookings (User)</div>
+  <div class="nav-item" onclick="switchTab('events', this)">🎉 Events &amp; News</div>
+
+  <div class="nav-section">System</div>
+  <div class="nav-item" onclick="switchTab('core', this)">ℹ️ Core Info</div>
+  <div class="nav-item" onclick="switchTab('notifications', this)">🔔 Notifications</div>
+</div>
+
+<div class="main-content">
+  <div class="content-header">
+    <h2 id="current-tab-title">Auth &amp; Profile</h2>
+    <input class="base-url-input" id="base-url" value="http://localhost:8000" placeholder="http://localhost:8000">
+    <div id="token-status" class="token-pill">No Token</div>
+  </div>
+
+  <div class="workspace">
+    <!-- ======== FORM PANEL ======== -->
+    <div class="form-panel">
+
+      <!-- AUTH TAB -->
+      <div id="tab-auth" class="tab-content active">
+        <div class="section">
+          <h3>1. Request SMS</h3>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" id="req-phone" value="+77001234567">
+          </div>
+          <button onclick="requestSms()">Send SMS</button>
+        </div>
+
+        <div class="section">
+          <h3>2. Verify SMS → get JWT</h3>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" id="ver-phone" value="+77001234567">
+          </div>
+          <div class="form-group">
+            <label>OTP Code</label>
+            <input type="text" id="ver-otp" placeholder="1234">
+          </div>
+          <div class="btn-row">
+            <button onclick="verifySms()">Verify &amp; Login</button>
+            <button class="btn-danger" onclick="logout()">Logout</button>
+          </div>
+          <div id="token-display" style="margin-top:10px;font-size:0.75rem;color:var(--text-light);word-break:break-all;display:none;">
+            <b>Access:</b> <span id="access-display"></span><br>
+            <b>Refresh:</b> <span id="refresh-display"></span>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>3. User Profile</h3>
+          <div class="btn-row" style="margin-bottom:10px;">
+            <button onclick="getProfile()">GET Profile</button>
+          </div>
+          <div class="form-group">
+            <label>First Name</label>
+            <input type="text" id="prof-fname">
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <input type="text" id="prof-lname">
+          </div>
+          <div class="form-group">
+            <label>City (геолокация)</label>
+            <input type="text" id="prof-city" placeholder="Алматы">
+          </div>
+          <div class="form-group">
+            <label>Notifications Enabled (глобальный выключатель)</label>
+            <select id="prof-notif">
+              <option value="">— no change —</option>
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>notify_events</label>
+            <select id="prof-notify-events">
+              <option value="">— no change —</option>
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>notify_promotions</label>
+            <select id="prof-notify-promotions">
+              <option value="">— no change —</option>
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>notify_closed_events</label>
+            <select id="prof-notify-closed-events">
+              <option value="">— no change —</option>
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+          <button onclick="updateProfile()">PATCH Profile</button>
+        </div>
+      </div>
+
+      <!-- MENU TAB -->
+      <div id="tab-menu" class="tab-content">
+        <div class="section">
+          <h3>Categories</h3>
+          <button onclick="apiCall('GET', '/api/v1/menu/categories/')">GET /menu/categories/</button>
+        </div>
+
+        <div class="section">
+          <h3>Dishes</h3>
+          <div class="form-group">
+            <label>category_id (optional)</label>
+            <input type="number" id="dish-cat" placeholder="e.g. 1">
+          </div>
+          <div class="form-group">
+            <label>tag_ids (optional, через запятую)</label>
+            <input type="text" id="dish-tag" placeholder="e.g. 1,2,3">
+          </div>
+          <div class="form-group">
+            <label>search (optional)</label>
+            <input type="text" id="dish-search" placeholder="e.g. салат">
+          </div>
+          <div class="form-group">
+            <label>page</label>
+            <input type="number" id="dish-page" value="1">
+          </div>
+          <div class="form-group">
+            <label>page_size (default 5, max 20)</label>
+            <input type="number" id="dish-page-size" value="5">
+          </div>
+          <button onclick="getDishes()">GET /menu/dishes/</button>
+        </div>
+      </div>
+
+      <!-- BOOKINGS (USER) TAB -->
+      <div id="tab-bookings" class="tab-content">
+        <div class="section">
+          <h3>My Bookings</h3>
+          <div class="form-group">
+            <label>page</label>
+            <input type="number" id="my-book-page" value="1">
+          </div>
+          <button onclick="getMyBookings()">GET /bookings/</button>
+        </div>
+
+        <div class="section">
+          <h3>Create Booking</h3>
+          <div class="form-group">
+            <label>Guest Name</label>
+            <input type="text" id="book-name" value="Test User">
+          </div>
+          <div class="form-group">
+            <label>Phone (optional)</label>
+            <input type="text" id="book-phone" placeholder="+77001234567">
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="book-date">
+          </div>
+          <div class="form-group">
+            <label>Time</label>
+            <input type="time" id="book-time" value="19:30">
+          </div>
+          <div class="form-group">
+            <label>Guests Count (1–50)</label>
+            <input type="number" id="book-guests" value="2" min="1" max="50">
+          </div>
+          <div class="form-group">
+            <label>Zone</label>
+            <select id="book-zone">
+              <option value="">No preference</option>
+              <option value="main">Main Hall</option>
+              <option value="terrace">Terrace</option>
+              <option value="private">Private</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Comment (optional)</label>
+            <textarea id="book-comment" rows="2" placeholder="Special requests..."></textarea>
+          </div>
+          <div class="form-group">
+            <label style="display:flex;justify-content:space-between;align-items:center;">
+              <span>Idempotency-Key <span style="font-weight:400;color:var(--text-light)">(фиксированный — для теста)</span></span>
+              <button class="btn-warning" style="padding:2px 8px;font-size:0.75rem;" onclick="regenerateBookingKey()">New Key</button>
+            </label>
+            <input type="text" id="book-idem-key" readonly style="font-family:monospace;font-size:0.75rem;background:#F9FAFB;color:var(--text-light);">
+          </div>
+          <button onclick="createBooking()">POST /bookings/</button>
+        </div>
+      </div>
+
+      <!-- EVENTS TAB -->
+      <div id="tab-events" class="tab-content">
+        <div class="section">
+          <h3>Event Lists</h3>
+          <div class="form-group">
+            <label>page</label>
+            <input type="number" id="evt-page" value="1">
+          </div>
+          <div class="btn-row">
+            <button onclick="getEvents('upcoming')">Upcoming</button>
+            <button onclick="getEvents('archived')">Archived</button>
+            <button onclick="getNews()">News</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>My Event Reservations</h3>
+          <button onclick="apiCall('GET', '/api/v1/events/reservations/my/')">GET My Reservations</button>
+        </div>
+
+        <div class="section">
+          <h3>Reserve Event</h3>
+          <div class="form-group">
+            <label>Event ID</label>
+            <input type="number" id="res-event-id" value="1">
+          </div>
+          <div class="form-group">
+            <label>Guests Count</label>
+            <input type="number" id="res-guests" value="1" min="1">
+          </div>
+          <button onclick="reserveEvent()">POST /events/reservations/create/</button>
+        </div>
+      </div>
+
+      <!-- CORE TAB -->
+      <div id="tab-core" class="tab-content">
+        <div class="section">
+          <h3>Restaurant Info</h3>
+          <button onclick="apiCall('GET', '/api/v1/core/info/')">GET /core/info/</button>
+        </div>
+
+        <div class="section">
+          <h3>App Version</h3>
+          <div class="form-group">
+            <label>Platform</label>
+            <select id="ver-platform">
+              <option value="ios">iOS</option>
+              <option value="android">Android</option>
+            </select>
+          </div>
+          <button onclick="checkVersion()">GET /core/app-version/</button>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS TAB -->
+      <div id="tab-notifications" class="tab-content">
+        <div class="section">
+          <h3>Register FCM Device</h3>
+          <div class="form-group">
+            <label>FCM Token</label>
+            <input type="text" id="fcm-token" value="dummy_fcm_token_for_testing_123">
+          </div>
+          <button onclick="registerDevice()">POST /notifications/device/register/</button>
+        </div>
+
+        <div class="section">
+          <h3>Bulk Push (Content Manager only)</h3>
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="push-title" value="Test Push">
+          </div>
+          <div class="form-group">
+            <label>Body</label>
+            <textarea id="push-body" rows="2">Hello from simulator!</textarea>
+          </div>
+          <div class="form-group">
+            <label>Category (optional)</label>
+            <select id="push-category">
+              <option value="">— none —</option>
+              <option value="events">events</option>
+              <option value="promotions">promotions</option>
+              <option value="closed_events">closed_events</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Segment</label>
+            <select id="push-segment" onchange="updateSegmentFields()">
+              <option value="all">all</option>
+              <option value="last_visit_days">last_visit_days</option>
+              <option value="participated_in_event">participated_in_event</option>
+              <option value="registered_after">registered_after</option>
+              <option value="by_city">by_city</option>
+            </select>
+          </div>
+          <div id="seg-last-visit" style="display:none" class="form-group">
+            <label>last_visit_days</label>
+            <input type="number" id="push-last-visit-days" value="30" min="1">
+          </div>
+          <div id="seg-event-id" style="display:none" class="form-group">
+            <label>event_id</label>
+            <input type="number" id="push-event-id" value="1">
+          </div>
+          <div id="seg-registered-after" style="display:none" class="form-group">
+            <label>registered_after (YYYY-MM-DD)</label>
+            <input type="date" id="push-registered-after">
+          </div>
+          <div id="seg-city" style="display:none" class="form-group">
+            <label>city (точное название)</label>
+            <input type="text" id="push-city" placeholder="Алматы">
+          </div>
+          <button onclick="sendBulkPush()">POST /notifications/bulk-push/</button>
+        </div>
+      </div>
+
+    </div><!-- /form-panel -->
+
+    <!-- ======== RESPONSE PANEL ======== -->
+    <div class="response-panel">
+      <div class="response-meta">
+        <span id="response-status" class="status-badge">Waiting…</span>
+        <span id="response-url" class="response-url">—</span>
+        <button class="copy-btn" onclick="copyResponse()">Copy</button>
+      </div>
+      <div class="response-tabs">
+        <button class="resp-tab active" onclick="switchRespTab('body', this)">Response Body</button>
+        <button class="resp-tab" onclick="switchRespTab('request', this)">Request Sent</button>
+      </div>
+      <div class="response-body-wrap" style="flex:1;overflow:hidden;">
+        <pre id="resp-body" class="response-box">// JSON response will appear here</pre>
+        <pre id="resp-request" class="response-box" style="display:none;">// Request details will appear here</pre>
+      </div>
+      <!-- Push notification simulation log -->
+      <div class="push-log-panel">
+        <div class="push-log-header">
+          <span class="push-log-title">📲 Push Notifications (симуляция)</span>
+          <label class="poll-toggle" title="Polling каждые 3 сек — следит за изменением статусов бронирований">
+            <span id="poll-dot" class="poll-dot"></span>
+            <span id="poll-label">Polling off</span>
+            <input type="checkbox" id="poll-toggle" style="margin-left:4px;" onchange="togglePolling(this.checked)">
+          </label>
+        </div>
+        <div id="push-log-list"><span class="push-log-empty">Включи polling чтобы получать симулированные push-уведомления</span></div>
+      </div>
+
+      <div class="history-panel">
+        <div class="history-title">Request History</div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+  </div><!-- /workspace -->
+</div>
+
+<script>
+  // ─── State ────────────────────────────────────────────────────────────
+  let accessToken  = localStorage.getItem('access_token')  || null;
+  let refreshToken = localStorage.getItem('refresh_token') || null;
+  let lastRequestInfo = null;
+  let lastResponseData = null;
+  const historyLog = [];
+
+  // ─── Init ─────────────────────────────────────────────────────────────
+  document.getElementById('book-date').valueAsDate = new Date();
+  // Persistent Idempotency-Key — stays the same until user clicks "New Key"
+  let bookingIdempKey = localStorage.getItem('booking_idem_key') || uuid();
+  localStorage.setItem('booking_idem_key', bookingIdempKey);
+  document.getElementById('book-idem-key').value = bookingIdempKey;
+  updateTokenStatus();
+
+  function regenerateBookingKey() {
+    bookingIdempKey = uuid();
+    localStorage.setItem('booking_idem_key', bookingIdempKey);
+    document.getElementById('book-idem-key').value = bookingIdempKey;
+  }
+
+  // ─── Tab switching ─────────────────────────────────────────────────────
+  function switchTab(tabId, el) {
+    document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-' + tabId).classList.add('active');
+    document.getElementById('current-tab-title').innerText = el.innerText.replace(/^[^\w]+/, '').trim();
+  }
+
+  function switchRespTab(name, el) {
+    document.querySelectorAll('.resp-tab').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('resp-body').style.display    = name === 'body'    ? 'block' : 'none';
+    document.getElementById('resp-request').style.display = name === 'request' ? 'block' : 'none';
+  }
+
+  // ─── Token management ──────────────────────────────────────────────────
+  function updateTokenStatus() {
+    const el = document.getElementById('token-status');
+    if (accessToken) {
+      el.innerText = 'Token Active';
+      el.className = 'token-pill has-token';
+      const disp = document.getElementById('token-display');
+      if (disp) {
+        disp.style.display = 'block';
+        document.getElementById('access-display').innerText  = accessToken.substring(0, 40) + '…';
+        document.getElementById('refresh-display').innerText = refreshToken ? refreshToken.substring(0, 40) + '…' : '—';
+      }
+    } else {
+      el.innerText = 'No Token';
+      el.className = 'token-pill';
+      const disp = document.getElementById('token-display');
+      if (disp) disp.style.display = 'none';
+    }
+  }
+
+  function logout() {
+    accessToken = null; refreshToken = null;
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    updateTokenStatus();
+    showResponse(null, null, 'Logged out');
+  }
+
+  // ─── UUID ──────────────────────────────────────────────────────────────
+  function uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  // ─── JSON syntax highlight ─────────────────────────────────────────────
+  function highlight(json) {
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, match => {
+      let cls = 'json-number';
+      if (/^"/.test(match)) {
+        cls = /:$/.test(match) ? 'json-key' : 'json-string';
+      } else if (/true|false/.test(match)) {
+        cls = 'json-bool';
+      } else if (/null/.test(match)) {
+        cls = 'json-null';
+      }
+      return `<span class="${cls}">${match}</span>`;
+    });
+  }
+
+  // ─── Display response ──────────────────────────────────────────────────
+  function showResponse(method, url, data, statusCode, reqInfo) {
+    const statusEl = document.getElementById('response-status');
+    const urlEl    = document.getElementById('response-url');
+    const bodyEl   = document.getElementById('resp-body');
+    const reqEl    = document.getElementById('resp-request');
+
+    if (url) urlEl.innerText = `${method} ${url}`;
+
+    const text = typeof data === 'object' && data !== null
+      ? JSON.stringify(data, null, 2)
+      : String(data ?? '');
+
+    lastResponseData = text;
+    bodyEl.innerHTML = highlight(text);
+
+    if (reqInfo) {
+      lastRequestInfo = reqInfo;
+      reqEl.innerHTML = highlight(JSON.stringify(reqInfo, null, 2));
+    }
+
+    if (statusCode == null) {
+      statusEl.innerText = '—';
+      statusEl.className = 'status-badge';
+    } else if (statusCode >= 200 && statusCode < 300) {
+      statusEl.innerText = `${statusCode} OK`;
+      statusEl.className = 'status-badge s2xx';
+    } else if (statusCode >= 400 && statusCode < 500) {
+      statusEl.innerText = `${statusCode} Client Error`;
+      statusEl.className = 'status-badge s4xx';
+    } else {
+      statusEl.innerText = `${statusCode} Error`;
+      statusEl.className = 'status-badge s5xx';
+    }
+  }
+
+  function copyResponse() {
+    navigator.clipboard.writeText(lastResponseData || '').catch(() => {});
+  }
+
+  // ─── History ───────────────────────────────────────────────────────────
+  function addHistory(method, url, statusCode, data) {
+    historyLog.unshift({ method, url, statusCode, data, time: new Date().toLocaleTimeString() });
+    if (historyLog.length > 30) historyLog.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const el = document.getElementById('history-list');
+    el.innerHTML = historyLog.map((h, i) => {
+      const cls = h.statusCode >= 200 && h.statusCode < 300 ? 'ok' : 'err';
+      return `<div class="history-item" onclick="recallHistory(${i})">
+        <span class="hist-method ${h.method}">${h.method}</span>
+        <span class="hist-status ${cls}">${h.statusCode ?? '?'}</span>
+        <span class="hist-url">${h.url}</span>
+        <span class="hist-time">${h.time}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function recallHistory(i) {
+    const h = historyLog[i];
+    showResponse(h.method, h.url, h.data, h.statusCode);
+  }
+
+  // ─── Core fetch ────────────────────────────────────────────────────────
+  async function doFetch(method, endpoint, body = null, extraHeaders = {}) {
+    const base = document.getElementById('base-url').value.replace(/\/$/, '');
+    const url  = base + endpoint;
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (accessToken) headers['Authorization'] = 'Bearer ' + accessToken;
+    Object.assign(headers, extraHeaders);
+
+    const reqInfo = { method, url, headers: { ...headers }, body: body || undefined };
+    // Mask auth header in display
+    const displayHeaders = { ...headers };
+    if (displayHeaders['Authorization']) {
+      displayHeaders['Authorization'] = displayHeaders['Authorization'].substring(0, 30) + '…';
+    }
+    reqInfo.headers = displayHeaders;
+
+    document.getElementById('response-url').innerText = `${method} ${url}`;
+    document.getElementById('response-status').innerText = 'Loading…';
+    document.getElementById('response-status').className = 'status-badge';
+
+    const config = { method, headers };
+    if (body) config.body = JSON.stringify(body);
+
+    try {
+      const res  = await fetch(url, config);
+      const code = res.status;
+      let data;
+      try { data = await res.json(); } catch { data = await res.text(); }
+
+      showResponse(method, url, data, code, reqInfo);
+      addHistory(method, url, code, data);
+      return { status: code, data };
+    } catch (err) {
+      showResponse(method, url, { error: err.toString() }, 0, reqInfo);
+      addHistory(method, url, 0, { error: err.toString() });
+      return { status: 0, data: null };
+    }
+  }
+
+  function apiCall(method, endpoint) {
+    return doFetch(method, endpoint);
+  }
+
+  // ─── Segment fields ────────────────────────────────────────────────────
+  function updateSegmentFields() {
+    const seg = document.getElementById('push-segment').value;
+    document.getElementById('seg-last-visit').style.display      = seg === 'last_visit_days'       ? '' : 'none';
+    document.getElementById('seg-event-id').style.display         = seg === 'participated_in_event' ? '' : 'none';
+    document.getElementById('seg-registered-after').style.display = seg === 'registered_after'      ? '' : 'none';
+    document.getElementById('seg-city').style.display             = seg === 'by_city'               ? '' : 'none';
+  }
+
+  // ─── Auth ──────────────────────────────────────────────────────────────
+  async function requestSms() {
+    const phone = document.getElementById('req-phone').value;
+    await doFetch('POST', '/api/v1/users/auth/request-sms/', { phone });
+  }
+
+  async function verifySms() {
+    const phone = document.getElementById('ver-phone').value;
+    const otp   = document.getElementById('ver-otp').value;
+    const res   = await doFetch('POST', '/api/v1/users/auth/verify-sms/', { phone, otp });
+    if (res.status === 200 && res.data?.access) {
+      accessToken  = res.data.access;
+      refreshToken = res.data.refresh || null;
+      localStorage.setItem('access_token',  accessToken);
+      if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+      updateTokenStatus();
+    }
+  }
+
+  async function getProfile() {
+    const res = await doFetch('GET', '/api/v1/users/profile/');
+    if (res.status === 200 && res.data) {
+      document.getElementById('prof-fname').value = res.data.first_name || '';
+      document.getElementById('prof-lname').value = res.data.last_name  || '';
+      document.getElementById('prof-city').value  = res.data.city       || '';
+      const boolSel = (id, val) => {
+        if (val != null) document.getElementById(id).value = val ? 'true' : 'false';
+      };
+      boolSel('prof-notif',                res.data.notifications_enabled);
+      boolSel('prof-notify-events',        res.data.notify_events);
+      boolSel('prof-notify-promotions',    res.data.notify_promotions);
+      boolSel('prof-notify-closed-events', res.data.notify_closed_events);
+    }
+  }
+
+  async function updateProfile() {
+    const payload = {};
+    const fn   = document.getElementById('prof-fname').value;
+    const ln   = document.getElementById('prof-lname').value;
+    const city = document.getElementById('prof-city').value;
+    const nf   = document.getElementById('prof-notif').value;
+    const ne   = document.getElementById('prof-notify-events').value;
+    const np   = document.getElementById('prof-notify-promotions').value;
+    const nc   = document.getElementById('prof-notify-closed-events').value;
+    if (fn)   payload.first_name             = fn;
+    if (ln)   payload.last_name              = ln;
+    if (city) payload.city                   = city;
+    if (nf)   payload.notifications_enabled  = nf === 'true';
+    if (ne)   payload.notify_events          = ne === 'true';
+    if (np)   payload.notify_promotions      = np === 'true';
+    if (nc)   payload.notify_closed_events   = nc === 'true';
+    await doFetch('PATCH', '/api/v1/users/profile/', payload);
+  }
+
+  // ─── Menu ──────────────────────────────────────────────────────────────
+  function getDishes() {
+    const params = new URLSearchParams();
+    const cat  = document.getElementById('dish-cat').value;
+    const tag  = document.getElementById('dish-tag').value;
+    const srch = document.getElementById('dish-search').value;
+    const page = document.getElementById('dish-page').value;
+    const ps   = document.getElementById('dish-page-size').value;
+    if (cat)  params.append('category_id', cat);
+    if (tag)  params.append('tag_ids', tag);  // BaseInFilter: принимает "1,2,3"
+    if (srch) params.append('search', srch);
+    if (page) params.append('page', page);
+    if (ps)   params.append('page_size', ps);
+    const qs = params.toString();
+    doFetch('GET', `/api/v1/menu/dishes/${qs ? '?' + qs : ''}`);
+  }
+
+  // ─── Bookings (user) ───────────────────────────────────────────────────
+  function getMyBookings() {
+    const page = document.getElementById('my-book-page').value;
+    doFetch('GET', `/api/v1/bookings/?page=${page}`);
+  }
+
+  // createBooking определена ниже в секции Push Simulation (с симуляцией push)
+
+  // ─── Events ───────────────────────────────────────────────────────────
+  function getEvents(type) {
+    const page = document.getElementById('evt-page').value;
+    doFetch('GET', `/api/v1/events/${type}/?page=${page}`);
+  }
+
+  function getNews() {
+    const page = document.getElementById('evt-page').value;
+    doFetch('GET', `/api/v1/events/news/?page=${page}`);
+  }
+
+  // reserveEvent определена ниже в секции Push Simulation (с симуляцией push)
+
+  // ─── Core ──────────────────────────────────────────────────────────────
+  function checkVersion() {
+    const platform = document.getElementById('ver-platform').value;
+    doFetch('GET', `/api/v1/core/app-version/?platform=${platform}`);
+  }
+
+  // ─── Notifications ─────────────────────────────────────────────────────
+  function registerDevice() {
+    const fcm_token = document.getElementById('fcm-token').value;
+    doFetch('POST', '/api/v1/notifications/device/register/', { fcm_token });
+  }
+
+  async function sendBulkPush() {
+    const payload = {
+      title:   document.getElementById('push-title').value,
+      body:    document.getElementById('push-body').value,
+      segment: document.getElementById('push-segment').value,
+    };
+    const cat = document.getElementById('push-category').value;
+    if (cat) payload.category = cat;
+
+    const seg = payload.segment;
+    if (seg === 'last_visit_days') {
+      payload.last_visit_days = parseInt(document.getElementById('push-last-visit-days').value);
+    } else if (seg === 'participated_in_event') {
+      payload.event_id = parseInt(document.getElementById('push-event-id').value);
+    } else if (seg === 'registered_after') {
+      payload.registered_after = document.getElementById('push-registered-after').value;
+    } else if (seg === 'by_city') {
+      payload.city = document.getElementById('push-city').value;
+    }
+    await doFetch('POST', '/api/v1/notifications/bulk-push/', payload);
+    // Симулируем локальное уведомление о том, что рассылка отправлена
+    const title   = document.getElementById('push-title').value;
+    const body    = document.getElementById('push-body').value;
+    fireSimulatedPush({ title, body, type: 'marketing', source: 'Bulk push (вы отправили)' });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PUSH NOTIFICATION SIMULATION
+  // Логика: polling GET /api/v1/bookings/ каждые 3 сек.
+  // Если статус бронирования изменился с момента предыдущего запроса —
+  // показываем toast, как будто FCM доставил пуш на устройство.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const PUSH_MESSAGES = {
+    pending:   { title: 'Заявка принята',           body: 'Мы свяжемся с вами в ближайшее время.', icon: '🗓️' },
+    // confirmed: тело формируется динамически — содержит дату и время из брони (как на бэкенде)
+    confirmed: { title: 'Бронирование подтверждено', body: null,                                    icon: '✅' },
+    canceled:  { title: 'Бронирование отменено',     body: 'Ваше бронирование было отменено.',      icon: '❌' },
+    completed: { title: 'Спасибо за визит!',         body: 'Рады были вас видеть. Ждём снова!',     icon: '🙏' },
+  };
+
+  let pollTimer       = null;
+  const bookingState  = {};  // { id: status } — снимок последнего известного состояния
+  const pushLogItems  = [];
+
+  function togglePolling(enabled) {
+    const dot   = document.getElementById('poll-dot');
+    const label = document.getElementById('poll-label');
+    if (enabled) {
+      dot.classList.add('active');
+      label.textContent = 'Polling on (3s)';
+      pollOnce();
+      pollTimer = setInterval(pollOnce, 3000);
+    } else {
+      dot.classList.remove('active');
+      label.textContent = 'Polling off';
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  async function pollOnce() {
+    if (!accessToken) return;
+    const base = document.getElementById('base-url').value.replace(/\/$/, '');
+    try {
+      const res = await fetch(base + '/api/v1/bookings/?page_size=100', {
+        headers: { 'Authorization': 'Bearer ' + accessToken }
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const results = json.results ?? json;
+      if (!Array.isArray(results)) return;
+
+      results.forEach(booking => {
+        const prev = bookingState[booking.id];
+        const curr = booking.status;
+        if (prev === undefined) {
+          // Первый poll — просто запомнить состояние, не шуметь
+          bookingState[booking.id] = curr;
+        } else if (prev !== curr) {
+          // Статус изменился — симулируем push
+          bookingState[booking.id] = curr;
+          const msg = PUSH_MESSAGES[curr];
+          if (msg) {
+            // Для confirmed бэкенд добавляет дату и время: "на ДД.ММ.ГГГГ в ЧЧ:ММ"
+            let pushBody = msg.body;
+            if (curr === 'confirmed' && booking.date && booking.time) {
+              const [y, m, d] = booking.date.split('-');
+              const dateStr = `${d}.${m}.${y}`;
+              const timeStr = (booking.time || '').slice(0, 5);
+              pushBody = `Ваш столик забронирован на ${dateStr} в ${timeStr}. Ждём вас!`;
+            }
+            const detail = `Бронь #${booking.id} — ${booking.guest_name}`;
+            fireSimulatedPush({
+              title:  msg.title,
+              body:   pushBody + '\n' + detail,
+              icon:   msg.icon,
+              type:   'booking',
+              source: `booking #${booking.id}: ${prev} → ${curr}`,
+            });
+          }
+        }
+      });
+    } catch (_) { /* сеть недоступна — молчим */ }
+  }
+
+  function fireSimulatedPush({ title, body, icon = '🔔', type = 'booking', source = '' }) {
+    // 1. Toast
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    const now = new Date().toLocaleTimeString();
+    toast.innerHTML = `
+      <div class="toast-icon">${icon}</div>
+      <div class="toast-content">
+        <div class="toast-app">Panno</div>
+        <div class="toast-title">${escHtml(title)}</div>
+        <div class="toast-body">${escHtml(body)}</div>
+        <div class="toast-time">${now}</div>
+      </div>
+      <button class="toast-close" onclick="this.closest('.toast').remove()">✕</button>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.animation = 'fadeOut 0.4s ease forwards';
+      setTimeout(() => toast.remove(), 400);
+    }, 6000);
+
+    // 2. Log
+    pushLogItems.unshift({ title, body, type, source, time: now });
+    if (pushLogItems.length > 50) pushLogItems.pop();
+    renderPushLog();
+  }
+
+  function renderPushLog() {
+    const el = document.getElementById('push-log-list');
+    if (!pushLogItems.length) {
+      el.innerHTML = '<span class="push-log-empty">Нет уведомлений</span>';
+      return;
+    }
+    el.innerHTML = pushLogItems.map(p => `
+      <div class="push-log-item">
+        <span class="push-log-badge ${p.type}">${p.type}</span>
+        <span class="push-log-text"><b>${escHtml(p.title)}</b> — ${escHtml(p.body.split('\n')[0])}</span>
+        <span class="push-log-time">${p.time}</span>
+      </div>`).join('');
+  }
+
+  async function createBooking() {
+    const res = await doFetch('POST', '/api/v1/bookings/',
+      (() => {
+        const p = {
+          guest_name:   document.getElementById('book-name').value,
+          date:         document.getElementById('book-date').value,
+          time:         document.getElementById('book-time').value,
+          guests_count: parseInt(document.getElementById('book-guests').value),
+        };
+        const phone   = document.getElementById('book-phone').value;
+        const zone    = document.getElementById('book-zone').value;
+        const comment = document.getElementById('book-comment').value;
+        if (phone)   p.phone   = phone;
+        if (zone)    p.zone    = zone;
+        if (comment) p.comment = comment;
+        return p;
+      })(),
+      { 'Idempotency-Key': bookingIdempKey }
+    );
+    if (res.status === 201 && res.data?.id) {
+      bookingState[res.data.id] = 'pending';
+      fireSimulatedPush({
+        title:  'Заявка принята',
+        body:   `Мы свяжемся с вами в ближайшее время.\nБронь #${res.data.id} — ${res.data.guest_name}`,
+        icon:   '🗓️',
+        type:   'booking',
+        source: `booking #${res.data.id} created`,
+      });
+    }
+  }
+
+  async function reserveEvent() {
+    const eventId = parseInt(document.getElementById('res-event-id').value);
+    const guests  = parseInt(document.getElementById('res-guests').value);
+    const res = await doFetch('POST', '/api/v1/events/reservations/create/',
+      { event: eventId, guests_count: guests },
+      { 'Idempotency-Key': uuid() }
+    );
+    if (res.status === 201) {
+      fireSimulatedPush({
+        title:  'Вы записаны на мероприятие',
+        body:   `Мероприятие #${eventId} — ${guests} чел.`,
+        icon:   '🎉',
+        type:   'event',
+        source: `event reservation created`,
+      });
+    }
+  }
+
+  function escHtml(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
