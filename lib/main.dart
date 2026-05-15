@@ -1,9 +1,12 @@
 // Точка входа приложения PILIGRIM
 // Тема: piligrim_design_spec.md — тёмная тема, цвета Қара жер / Мөлдір су / Сары дала
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/ambient_preset.dart';
 import 'core/theme.dart';
+// firebase_options.dart генерируется командой: flutterfire configure
+import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/menu_screen.dart';
@@ -12,8 +15,13 @@ import 'screens/booking_screen.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/bottom_nav_bar.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Инициализация Firebase — должна быть до runApp
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Прозрачный статус-бар — органично вписывается в тёмный фон Қара жер
   SystemChrome.setSystemUIOverlayStyle(
