@@ -2,9 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.throttling import ScopedRateThrottle
-
-from .throttles import PhoneSMSThrottle
+from .throttles import PhoneSMSThrottle, SafeScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
@@ -32,8 +30,8 @@ _sms_request_400 = OpenApiResponse(
 @extend_schema(tags=['Auth'])
 class RequestSMSView(APIView):
     permission_classes = [AllowAny]
-    # Два уровня защиты: по IP (ScopedRateThrottle) + по номеру телефона (PhoneSMSThrottle)
-    throttle_classes = [ScopedRateThrottle, PhoneSMSThrottle]
+    # Два уровня защиты: по IP (SafeScopedRateThrottle) + по номеру телефона (PhoneSMSThrottle)
+    throttle_classes = [SafeScopedRateThrottle, PhoneSMSThrottle]
     throttle_scope = 'sms_request'
 
     @extend_schema(
@@ -87,7 +85,7 @@ class RequestSMSView(APIView):
 @extend_schema(tags=['Auth'])
 class VerifySMSView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [SafeScopedRateThrottle]
     throttle_scope = 'sms_verify'
 
     @extend_schema(

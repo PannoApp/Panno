@@ -1,7 +1,28 @@
-from rest_framework.throttling import SimpleRateThrottle
+import logging
+from rest_framework.throttling import SimpleRateThrottle, ScopedRateThrottle
+
+logger = logging.getLogger(__name__)
 
 
-class PhoneSMSThrottle(SimpleRateThrottle):
+class _RedisResistantThrottleMixin:
+    """
+    При недоступном Redis throttle пропускает запрос (fail open).
+    Альтернатива — блокировать всех, что хуже.
+    """
+
+    def allow_request(self, request, view):
+        try:
+            return super().allow_request(request, view)
+        except Exception:
+            logger.warning("Redis unavailable — throttle skipped for %s", self.__class__.__name__)
+            return True
+
+
+class SafeScopedRateThrottle(_RedisResistantThrottleMixin, ScopedRateThrottle):
+    """ScopedRateThrottle с защитой от падения Redis."""
+
+
+class PhoneSMSThrottle(_RedisResistantThrottleMixin, SimpleRateThrottle):
     """
     Второй уровень троттлинга для запросов SMS — по номеру телефона.
 
@@ -10,6 +31,7 @@ class PhoneSMSThrottle(SimpleRateThrottle):
     атак (разные IP → один номер) и спама на чужой номер.
 
     Ключ в Redis: throttle_sms_request_phone_{номер_телефона}
+    При недоступном Redis — пропускает запрос (fail open).
     """
 
     scope = 'sms_request_phone'
