@@ -39,6 +39,7 @@ class TableBookingSerializerTest(TestCase):
     def _data(self, **overrides):
         data = {
             'guest_name': 'Алихан',
+            'phone': '+77001234567',
             'date': '2026-06-15',
             'time': '19:30:00',
             'guests_count': 4,
@@ -112,6 +113,7 @@ class TableBookingListCreateViewTest(APITestCase):
         self._auth()
         payload = {
             'guest_name': 'Алихан',
+            'phone': '+77001234567',
             'date': '2026-06-20',
             'time': '19:00:00',
             'guests_count': 3,
@@ -127,6 +129,7 @@ class TableBookingListCreateViewTest(APITestCase):
         self._auth()
         payload = {
             'guest_name': 'Данияр',
+            'phone': '+77001234567',
             'date': '2026-06-20',
             'time': '20:00:00',
             'guests_count': 2,
@@ -372,10 +375,36 @@ class TableBookingPhoneFieldTest(TestCase):
         self.assertTrue(s.is_valid(), s.errors)
         self.assertEqual(s.validated_data['phone'], '+77001234567')
 
-    def test_phone_defaults_to_empty_string(self):
+    def test_phone_required(self):
         s = TableBookingSerializer(data=self._data())
-        self.assertTrue(s.is_valid(), s.errors)
-        self.assertEqual(s.validated_data.get('phone', ''), '')
+        self.assertFalse(s.is_valid())
+        self.assertIn('phone', s.errors)
+
+    def test_phone_empty_string_rejected(self):
+        s = TableBookingSerializer(data=self._data(phone=''))
+        self.assertFalse(s.is_valid())
+        self.assertIn('phone', s.errors)
+
+    def test_invalid_phone_no_plus(self):
+        s = TableBookingSerializer(data=self._data(phone='77001234567'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('phone', s.errors)
+
+    def test_invalid_phone_letters(self):
+        s = TableBookingSerializer(data=self._data(phone='+7700ABC1234'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('phone', s.errors)
+
+    def test_invalid_phone_too_short(self):
+        s = TableBookingSerializer(data=self._data(phone='+7700'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('phone', s.errors)
+
+    def test_valid_phone_formats(self):
+        for phone in ['+77001234567', '+14155552671', '+447911123456']:
+            with self.subTest(phone=phone):
+                s = TableBookingSerializer(data=self._data(phone=phone))
+                self.assertTrue(s.is_valid(), s.errors)
 
 class TableBookingPhoneAPITest(APITestCase):
     def setUp(self):
@@ -415,6 +444,7 @@ class BookingIdempotencyTest(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
         self.payload = {
             'guest_name': 'Идем Потент',
+            'phone': '+77001234567',
             'date': '2026-08-01',
             'time': '18:00:00',
             'guests_count': 2,
@@ -739,6 +769,41 @@ class TelegramNotificationTaskTest(TestCase):
         from apps.bookings.tasks import send_telegram_notification
         with self.assertRaises(HTTPError):
             send_telegram_notification(self.booking.pk)
+
+    # --- WhatsApp-ссылка ---
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_message_contains_whatsapp_link(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        self._call()
+        text = mock_post.call_args[1]['json']['text']
+        self.assertIn('wa.me/77001234567', text)
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_whatsapp_link_uses_user_phone_when_booking_phone_empty(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        booking = make_booking(user=self.user, phone='')
+        from apps.bookings.tasks import send_telegram_notification
+        send_telegram_notification(booking.pk)
+        text = mock_post.call_args[1]['json']['text']
+        # self.user.phone = '+77005000001' → digits: '77005000001'
+        self.assertIn('wa.me/77005000001', text)
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_no_whatsapp_link_for_anonymous_booking_without_phone(self, mock_post):
+        mock_post.return_value = self._mock_post()
+        anon = TableBooking.objects.create(
+            user=None, guest_name='Аноним',
+            date='2026-07-01', time='18:00:00',
+            guests_count=1, phone='',
+        )
+        from apps.bookings.tasks import send_telegram_notification
+        send_telegram_notification(anon.pk)
+        text = mock_post.call_args[1]['json']['text']
+        self.assertNotIn('wa.me', text)
 
     # --- конфигурация retry ---
 

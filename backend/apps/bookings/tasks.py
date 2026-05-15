@@ -39,7 +39,10 @@ def send_telegram_notification(booking_id):
     date_str = b.date.strftime('%d.%m.%Y')
     time_str = b.time.strftime('%H:%M')
     zone_str = _ZONE_LABELS.get(b.zone, b.zone or '—')
-    phone = html.escape(b.phone or (b.user.phone if b.user_id else '—'))
+    raw_phone = b.phone or (b.user.phone if b.user_id else '')
+    phone = html.escape(raw_phone or '—')
+    wa_digits = ''.join(c for c in raw_phone if c.isdigit())
+    whatsapp_line = f'🔗 <a href="https://wa.me/{wa_digits}">WhatsApp</a>' if wa_digits else ''
 
     lines = [
         f"🍽 <b>Новое бронирование #{b.pk}</b>",
@@ -52,6 +55,8 @@ def send_telegram_notification(booking_id):
     ]
     if b.comment:
         lines.append(f"💬 {html.escape(b.comment)}")
+    if whatsapp_line:
+        lines.append(whatsapp_line)
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     resp = requests.post(url, json={
