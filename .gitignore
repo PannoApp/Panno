@@ -46,3 +46,20 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# --- Brand / design sources (not for git; keep locally or in Drive) ---
+/brand/*.pdf
+/brand/**/*.pdf
+*.pdf
+
+# Brandbook SVG exports (heavy Illustrator dumps; app uses assets/images/)
+/Piligrim_brandbook_1,Piligrim_brandbook_2,Piligrim_brandbook_3/
+
+# Duplicate totem sources (canonical copies in assets/images/)
+/totems/
+
+# Duplicate fonts at repo root (canonical: assets/fonts/)
+/MuseoSans-*.ttf
+
+# Design mockups / archives
+/макет/

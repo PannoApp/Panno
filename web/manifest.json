@@ -1,6 +1,6 @@
 {
-    "name": "panno_app",
-    "short_name": "panno_app",
+    "name": "piligrim",
+    "short_name": "piligrim",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,0 +1,169 @@
+// Home Screen — «Карта путешествия» PILIGRIM
+// Кинематографичный, тихий luxury; без glass / неона (piligrim_design_spec.md)
+//
+// Виджеты: home_hero_section, home_cinematic_ambient, home_totem_path,
+//   home_action_block, home_event_block, home_status_line
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:sensors_plus/sensors_plus.dart';
+import '../core/theme.dart';
+import '../widgets/piligrim_background.dart';
+import '../widgets/home_cinematic_ambient.dart';
+import '../widgets/home_hero_section.dart';
+import '../widgets/home_totem_path.dart';
+import '../widgets/home_action_block.dart';
+import '../widgets/home_event_block.dart';
+import '../widgets/home_status_line.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key, this.onNavigate});
+  final ValueChanged<int>? onNavigate;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _scrollCtrl = ScrollController();
+  late final ValueNotifier<double> _scrollY;
+  late final ValueNotifier<double> _tiltXn;
+  late final ValueNotifier<double> _tiltYn;
+  late final Listenable _parallax;
+  StreamSubscription? _gyroSub;
+  DateTime _lastTiltEmit = DateTime.fromMillisecondsSinceEpoch(0);
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollY = ValueNotifier(0);
+    _tiltXn = ValueNotifier(0);
+    _tiltYn = ValueNotifier(0);
+    _parallax = Listenable.merge([_scrollY, _tiltXn, _tiltYn]);
+
+    _scrollCtrl.addListener(() {
+      _scrollY.value = _scrollCtrl.offset;
+    });
+
+    try {
+      _gyroSub = accelerometerEventStream().listen(_onAccelerometer);
+    } catch (_) {}
+  }
+
+  void _onAccelerometer(AccelerometerEvent event) {
+    if (!mounted) return;
+    final now = DateTime.now();
+    if (now.difference(_lastTiltEmit).inMilliseconds < 72) return;
+    _lastTiltEmit = now;
+    final nx = (event.x / 10).clamp(-1.0, 1.0);
+    final ny = (event.y / 10).clamp(-1.0, 1.0);
+    if ((nx - _tiltXn.value).abs() < 0.025 &&
+        (ny - _tiltYn.value).abs() < 0.025) {
+      return;
+    }
+    _tiltXn.value = nx;
+    _tiltYn.value = ny;
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    _gyroSub?.cancel();
+    _scrollY.dispose();
+    _tiltXn.dispose();
+    _tiltYn.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final heroHeight =
+        (size.height * 0.575).clamp(280.0, size.height * 0.60);
+
+    return Scaffold(
+      backgroundColor: PiligrimColors.earth,
+      extendBodyBehindAppBar: true,
+      extendBody: true,
+      body: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _parallax,
+                builder: (context, _) {
+                  final y = _scrollY.value;
+                  return PiligrimBackground(
+                    parallaxOffset: y * 0.016,
+                  );
+                },
+              ),
+            ),
+          ),
+
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _parallax,
+              builder: (context, _) {
+                return HomeCinematicAmbient(
+                  parallaxX: _tiltXn.value * 0.55,
+                  parallaxY: _tiltYn.value * 0.45,
+                );
+              },
+            ),
+          ),
+
+          CustomScrollView(
+            controller: _scrollCtrl,
+            clipBehavior: Clip.none,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            slivers: [
+              SliverToBoxAdapter(
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _parallax,
+                    builder: (context, _) {
+                      return HomeHeroSection(
+                        height: heroHeight,
+                        scrollOffset: _scrollY.value,
+                        tiltX: _tiltXn.value,
+                        tiltY: _tiltYn.value,
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              SliverToBoxAdapter(
+                child: RepaintBoundary(
+                  child: HomeActionBlock(onNavigate: widget.onNavigate),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              SliverToBoxAdapter(
+                child: RepaintBoundary(
+                  child: HomeTotemPathRow(onNavigate: widget.onNavigate),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 48)),
+              SliverToBoxAdapter(
+                child: RepaintBoundary(
+                  child: HomeEventBlock(onNavigate: widget.onNavigate),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 48)),
+              const SliverToBoxAdapter(
+                child: RepaintBoundary(
+                  child: HomeStatusLine(),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

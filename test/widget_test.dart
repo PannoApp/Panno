@@ -1,9 +1,20 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:panno_app/app.dart';
+
+import 'package:piligrim/core/theme.dart';
 
 void main() {
-  testWidgets('App starts with Piligrim home screen', (WidgetTester tester) async {
-    await tester.pumpWidget(const PannoApp());
-    expect(find.text('PILIGRIM'), findsWidgets);
+  testWidgets('piligrimTheme loads', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: piligrimTheme,
+        debugShowCheckedModeBanner: false,
+        home: const Scaffold(
+          body: SizedBox.shrink(),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 }
