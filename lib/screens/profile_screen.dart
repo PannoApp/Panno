@@ -209,41 +209,11 @@ class _HeroHeaderState extends State<_HeroHeader>
             ),
           ),
 
-          // Вертикальная декоративная линия
+          // Основной контент — в одной сетке с секциями ниже (20px)
           Positioned(
-            left: 26,
-            top: top + 20,
-            child: Column(
-              children: [
-                SvgPicture.asset(
-                  'assets/images/star_totem (1).svg',
-                  width: 10,
-                  height: 10,
-                  colorFilter: ColorFilter.mode(
-                    PiligrimColors.water.withValues(alpha: 0.4),
-                    BlendMode.srcIn,
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 110,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [PiligrimColors.water, PiligrimColors.clear],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ).animate().fadeIn(delay: 300.ms, duration: 600.ms),
-
-          // Основной контент
-          Positioned(
-            left: 52,
-            right: 24,
-            bottom: 30,
+            left: 20,
+            right: 20,
+            bottom: 28,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
