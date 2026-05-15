@@ -792,3 +792,30 @@ class BookingSignalTelegramTest(TestCase):
         booking.status = 'confirmed'
         booking.save()
         mock_tg.delay.assert_not_called()
+
+    # -----------------------------------------------------------------------
+    # Устойчивость к падению Redis/Celery-брокера
+    # -----------------------------------------------------------------------
+
+    @patch('apps.bookings.tasks.send_telegram_notification')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_booking_created_even_if_broker_unavailable(self, mock_push, mock_tg):
+        """Бронирование должно сохраняться в БД даже если брокер Celery недоступен."""
+        mock_push.delay.side_effect = Exception("Broker down")
+        mock_tg.delay.side_effect = Exception("Broker down")
+
+        booking = make_booking(user=self.user)
+
+        self.assertIsNotNone(booking.pk)
+        self.assertTrue(TableBooking.objects.filter(pk=booking.pk).exists())
+
+    @patch('apps.bookings.tasks.send_telegram_notification')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_status_change_does_not_raise_if_broker_unavailable(self, mock_push, mock_tg):
+        """Изменение статуса не должно падать если брокер Celery недоступен."""
+        mock_push.delay.side_effect = Exception("Broker down")
+        booking = make_booking(user=self.user)
+        booking = TableBooking.objects.get(pk=booking.pk)
+        booking.status = 'confirmed'
+        booking.save()
+        self.assertEqual(TableBooking.objects.get(pk=booking.pk).status, 'confirmed')

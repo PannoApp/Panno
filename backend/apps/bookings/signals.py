@@ -19,20 +19,33 @@ _STATUS_PUSH = {
 }
 
 
+def _safe_delay(task_fn, *args, **kwargs):
+    """Вызывает task.delay(), но не роняет запрос при недоступном Redis-брокере."""
+    try:
+        task_fn.delay(*args, **kwargs)
+    except Exception:
+        task_name = getattr(task_fn, '__name__', repr(task_fn))
+        logger.error(
+            "Celery broker unavailable — task %s not queued (args=%s kwargs=%s)",
+            task_name, args, kwargs,
+        )
+
+
 @receiver(post_save, sender=TableBooking)
 def notify_on_status_change(sender, instance, created, **kwargs):
     from apps.notifications.tasks import send_push_notification
 
     if created:
         if instance.user_id:
-            send_push_notification.delay(
+            _safe_delay(
+                send_push_notification,
                 user_id=instance.user_id,
                 title="Заявка принята",
                 body="Мы свяжемся с вами в ближайшее время.",
                 data={'booking_id': str(instance.pk), 'status': 'pending'},
             )
         from apps.bookings.tasks import send_telegram_notification
-        send_telegram_notification.delay(instance.pk)
+        _safe_delay(send_telegram_notification, instance.pk)
         logger.info("Push+Telegram queued: booking=%s created", instance.pk)
         return
 
@@ -55,7 +68,8 @@ def notify_on_status_change(sender, instance, created, **kwargs):
             return
         title, body = push
 
-    send_push_notification.delay(
+    _safe_delay(
+        send_push_notification,
         user_id=instance.user_id,
         title=title,
         body=body,

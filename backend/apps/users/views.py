@@ -78,8 +78,8 @@ class RequestSMSView(APIView):
             if SMSService.send_sms(phone):
                 return Response({'message': 'SMS код отправлен.'})
             return Response(
-                {'error': 'Ошибка при отправке SMS.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {'error': 'Сервис временно недоступен. Попробуйте позже.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

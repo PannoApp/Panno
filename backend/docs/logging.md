@@ -170,3 +170,45 @@ tail -f logs/app.log | jq
 docker compose exec backend python manage.py test apps.core.test_logging_middleware --settings=config.settings.test
 docker compose exec backend python manage.py test apps.core.test_exception_handler --settings=config.settings.test
 ```
+
+---
+
+## 5. Устойчивость к падению Redis (`utils/cache.py`)
+
+Все обращения к Redis-кэшу в Django-вью и сигналах обёрнуты в safe-хелперы из `utils/cache.py`.
+
+### Хелперы
+
+| Функция | Поведение при недоступном Redis |
+|---|---|
+| `safe_cache_get(key, default=None)` | Возвращает `default`, логирует `WARNING` |
+| `safe_cache_set(key, value, timeout)` | Пропускает запись, логирует `WARNING` |
+| `safe_cache_delete(key)` | Пропускает удаление, логирует `WARNING` |
+| `safe_cache_get_or_set(key, fn, timeout)` | Вызывает `fn()` напрямую, логирует `WARNING` |
+| `safe_cache_add(key, value, timeout)` | Возвращает `True`, логирует `WARNING` |
+
+### Поведение при падении Redis
+
+| Сценарий | Было | Стало |
+|---|---|---|
+| `GET /api/v1/menu/categories/` | 500 | 200 (запрос к БД) |
+| `GET /api/v1/menu/dishes/` | 500 | 200 (запрос к БД) |
+| `GET /api/v1/core/info/` | 500 | 200 (запрос к БД) |
+| `GET /api/v1/core/interior/` | 500 | 200 (запрос к БД) |
+| `POST /api/v1/users/auth/request-sms/` | 500 | 503 (Redis обязателен для OTP) |
+| Создание бронирования (сигнал push) | 500 | 201 (уведомление теряется, бронь сохраняется) |
+| Инвалидация кэша меню через сигнал | crash | тихий WARNING |
+
+### Логи при падении Redis
+
+```
+WARNING Redis unavailable — cache.get(menu_categories) skipped
+WARNING Redis unavailable — cache.set(menu_categories) skipped
+ERROR   Redis unavailable — OTP for +77001234567 not stored, SMS aborted
+ERROR   Celery broker unavailable — task send_push_notification not queued
+```
+
+### Запуск тестов resilience:
+```bash
+docker compose exec backend bash -c "DJANGO_SETTINGS_MODULE=config.settings.test python manage.py test utils.tests apps.users.tests apps.bookings.tests apps.menu.tests apps.core.tests"
+```

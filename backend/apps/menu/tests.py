@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -285,3 +287,33 @@ class DishCacheTest(APITestCase):
         names_filtered = [d['name'] for d in r_filtered.data['results']]
         self.assertIn('Стейк', names_all)
         self.assertNotIn('Стейк', names_filtered)
+
+
+# ---------------------------------------------------------------------------
+# Устойчивость к падению Redis (fallback к БД)
+# ---------------------------------------------------------------------------
+
+class MenuRedisResilienceTest(APITestCase):
+    """Проверяет что меню доступно даже при недоступном Redis."""
+
+    def setUp(self):
+        cache.clear()
+        self.cat = Category.objects.create(name='Основное', order=1)
+        make_dish(self.cat, name='Борщ')
+
+    def test_category_list_works_when_redis_unavailable(self):
+        """GET /api/v1/menu/categories/ должен вернуть 200 даже если Redis недоступен."""
+        with patch('utils.cache.cache') as mock_cache:
+            mock_cache.get.side_effect = Exception("Redis down")
+            mock_cache.set.side_effect = Exception("Redis down")
+            response = self.client.get('/api/v1/menu/categories/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_dish_list_works_when_redis_unavailable(self):
+        """GET /api/v1/menu/dishes/ должен вернуть 200 даже если Redis недоступен."""
+        with patch('utils.cache.cache') as mock_cache:
+            mock_cache.get.return_value = None
+            mock_cache.set.side_effect = Exception("Redis down")
+            response = self.client.get('/api/v1/menu/dishes/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

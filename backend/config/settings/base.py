@@ -307,6 +307,12 @@ CELERY_TASK_SERIALIZER = 'json'
 # Часовой пояс для периодических задач (синхронизируем с Django)
 CELERY_TIMEZONE = TIME_ZONE
 
+# Переподключение к брокеру при старте и в рантайме.
+# Без этого worker падает навсегда при временной недоступности Redis.
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_RETRY = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
+
 # Периодические задачи (Celery Beat)
 CELERY_BEAT_SCHEDULE = {
     'send-booking-reminders': {

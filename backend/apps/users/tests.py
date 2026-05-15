@@ -100,6 +100,26 @@ class SMSServiceTest(TestCase):
         SMSService.verify_otp('+77001234567', '1234')
         self.assertFalse(SMSService.verify_otp('+77001234567', '1234'))
 
+    @override_settings(DEBUG=True)
+    def test_send_sms_returns_false_when_redis_unavailable(self):
+        """При недоступном Redis send_sms должен вернуть False, а не 500."""
+        with patch('django.core.cache.cache.set', side_effect=Exception("Redis down")):
+            result = SMSService.send_sms('+77001234567')
+        self.assertFalse(result)
+
+    @override_settings(DEBUG=False, SMS_PROVIDER_URL='http://fake', SMS_LOGIN='l', SMS_PASSWORD='p')
+    def test_send_sms_returns_false_when_celery_broker_unavailable(self):
+        """При недоступном брокере Celery send_sms должен вернуть False, а не 500."""
+        with patch('apps.users.tasks.send_sms_task.delay', side_effect=Exception("Broker down")):
+            result = SMSService.send_sms('+77001234567')
+        self.assertFalse(result)
+
+    def test_verify_otp_returns_false_when_redis_unavailable(self):
+        """При недоступном Redis verify_otp должен вернуть False, а не 500."""
+        with patch('utils.cache.cache.get', side_effect=Exception("Redis down")):
+            result = SMSService.verify_otp('+77001234567', '1234')
+        self.assertFalse(result)
+
 
 # ---------------------------------------------------------------------------
 # send_sms_task (Celery)
@@ -219,9 +239,9 @@ class RequestSMSViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @patch('apps.users.views.SMSService.send_sms', return_value=False)
-    def test_sms_failure_returns_500(self, _):
+    def test_sms_failure_returns_503(self, _):
         response = self.client.post('/api/v1/users/auth/request-sms/', {'phone': '+77001234567'})
-        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertIn('error', response.data)
 
 

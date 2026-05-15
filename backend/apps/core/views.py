@@ -5,6 +5,7 @@ from rest_framework.generics import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from .models import RestaurantInfo, AppVersion, InteriorPhoto
 from .serializers import RestaurantInfoSerializer, AppVersionSerializer, InteriorPhotoSerializer
+from utils.cache import safe_cache_get_or_set, safe_cache_get, safe_cache_set
 
 # TTL для статичных данных, которые меняются редко (раз в неделю и реже)
 _CACHE_1H = 3600
@@ -48,7 +49,8 @@ class RestaurantInfoView(generics.RetrieveAPIView):
     def get_object(self):
         # Синглтон меняется крайне редко — кэшируем на 1 час.
         # Инвалидация через post_save-сигнал в apps/core/signals.py.
-        return cache.get_or_set('restaurant_info', RestaurantInfo.load, timeout=_CACHE_1H)
+        # При недоступном Redis — fallback к прямому запросу в БД.
+        return safe_cache_get_or_set('restaurant_info', RestaurantInfo.load, timeout=_CACHE_1H)
 
 
 class AppVersionView(generics.RetrieveAPIView):
@@ -88,9 +90,10 @@ class InteriorPhotoListView(generics.ListAPIView):
     def get_queryset(self):
         # Галерея меняется редко — кэшируем на 1 час.
         # Инвалидация через post_save/post_delete-сигнал в apps/core/signals.py.
-        photos = cache.get('interior_photos')
+        # При недоступном Redis — fallback к прямому запросу в БД.
+        photos = safe_cache_get('interior_photos')
         if photos is None:
             # Сортировка: сначала по зоне (алфавит), внутри зоны — по полю order
             photos = list(InteriorPhoto.objects.all().order_by('zone', 'order'))
-            cache.set('interior_photos', photos, timeout=_CACHE_1H)
+            safe_cache_set('interior_photos', photos, timeout=_CACHE_1H)
         return photos

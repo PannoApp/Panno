@@ -807,3 +807,36 @@ class InteriorPhotoCacheTest(APITestCase):
         self.assertIsNone(cache.get('interior_photos'))
         response = self.client.get('/api/v1/core/interior/')
         self.assertEqual(len(response.data), 1)
+
+
+# ---------------------------------------------------------------------------
+# Устойчивость к падению Redis (fallback к БД)
+# ---------------------------------------------------------------------------
+
+class CoreRedisResilienceTest(APITestCase):
+    """Проверяет что core-эндпоинты доступны при недоступном Redis."""
+
+    def setUp(self):
+        cache.clear()
+        RestaurantInfo.objects.create(
+            address='ул. Панфилова, 98',
+            working_hours='12:00–00:00',
+        )
+
+    def test_restaurant_info_works_when_redis_unavailable(self):
+        """GET /api/v1/core/info/ должен вернуть 200 даже если Redis недоступен."""
+        with patch('utils.cache.cache') as mock_cache:
+            mock_cache.get_or_set.side_effect = Exception("Redis down")
+            response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['address'], 'ул. Панфилова, 98')
+
+    def test_interior_photos_works_when_redis_unavailable(self):
+        """GET /api/v1/core/interior/ должен вернуть 200 даже если Redis недоступен."""
+        InteriorPhoto.objects.create(zone='main_hall', order=1)
+        with patch('utils.cache.cache') as mock_cache:
+            mock_cache.get.return_value = None
+            mock_cache.set.side_effect = Exception("Redis down")
+            response = self.client.get('/api/v1/core/interior/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)

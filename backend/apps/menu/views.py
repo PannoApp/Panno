@@ -9,6 +9,7 @@ from drf_spectacular.types import OpenApiTypes
 from .models import Dish, Category
 from .serializers import DishSerializer, CategorySerializer
 from utils.pagination import VideoFeedPagination
+from utils.cache import safe_cache_get, safe_cache_set
 from .filters import DishFilter
 
 # TTL кэша категорий (меняются редко) и страниц блюд (меняются чаще)
@@ -29,10 +30,11 @@ class CategoryListView(generics.ListAPIView):
     def get_queryset(self):
         # Категории меняются редко — кэшируем на 1 час.
         # Инвалидация через post_save/post_delete-сигнал в apps/menu/signals.py.
-        categories = cache.get('menu_categories')
+        # При недоступном Redis — fallback к прямому запросу в БД.
+        categories = safe_cache_get('menu_categories')
         if categories is None:
             categories = list(Category.objects.all().order_by('order'))
-            cache.set('menu_categories', categories, timeout=_CACHE_CATEGORIES)
+            safe_cache_set('menu_categories', categories, timeout=_CACHE_CATEGORIES)
         return categories
 
 
@@ -108,11 +110,12 @@ class DishListView(generics.ListAPIView):
         # Версионный кэш: при изменении любого блюда/категории/тега
         # signals.py инкрементирует 'menu_dishes_cache_version', что
         # автоматически делает все старые ключи недостижимыми.
-        version   = cache.get_or_set('menu_dishes_cache_version', 1, timeout=None)
+        # При недоступном Redis — fallback к прямому запросу в БД.
+        version = safe_cache_get('menu_dishes_cache_version', 1)
         cache_key = f'menu_dishes:{version}:{request.query_params.urlencode()}'
-        cached    = cache.get(cache_key)
+        cached = safe_cache_get(cache_key)
         if cached is not None:
             return Response(cached)
         response = super().list(request, *args, **kwargs)
-        cache.set(cache_key, response.data, timeout=_CACHE_DISHES)
+        safe_cache_set(cache_key, response.data, timeout=_CACHE_DISHES)
         return response
