@@ -29,6 +29,9 @@ _CATEGORY_FLAG = {
     default_retry_delay=60,
     acks_late=True,
     reject_on_worker_lost=True,
+    # Таймауты: FCM HTTP v1 API обычно отвечает за секунды; 120 с — жёсткий предел
+    time_limit=120,
+    soft_time_limit=90,
 )
 def send_push_notification(user_id, title, body, data=None, category=None, campaign_id=None):
     """
@@ -153,6 +156,9 @@ def send_push_notification(user_id, title, body, data=None, category=None, campa
     default_retry_delay=60,
     acks_late=True,
     reject_on_worker_lost=True,
+    # Таймауты: массовая рассылка — до 300 с (мягкий: 270 с для graceful завершения)
+    time_limit=300,
+    soft_time_limit=270,
 )
 def send_bulk_push_notification(user_ids, title, body, data=None, category=None, campaign_id=None):
     """

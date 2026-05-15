@@ -23,6 +23,9 @@ _ZONE_LABELS = {
     default_retry_delay=30,
     acks_late=True,
     reject_on_worker_lost=True,
+    # Таймауты: Telegram API обычно отвечает быстро; 60 с — жёсткий предел, 45 с — мягкий (SoftTimeLimitExceeded)
+    time_limit=60,
+    soft_time_limit=45,
 )
 def send_telegram_notification(booking_id):
     token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
@@ -82,6 +85,9 @@ def send_telegram_notification(booking_id):
     default_retry_delay=60,
     acks_late=True,
     reject_on_worker_lost=True,
+    # Таймауты: периодическая задача — максимум 120 с на итерацию (мягкий: 90 с)
+    time_limit=120,
+    soft_time_limit=90,
 )
 def send_booking_reminders():
     """

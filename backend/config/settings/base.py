@@ -223,14 +223,22 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny', # По умолчанию открыто, закрывать будем конкретные эндпоинты
     ),
-    # ДОБАВЛЯЕМ ТРОТТЛИНГ
+    # Глобальные классы троттлинга:
+    # AnonRateThrottle/UserRateThrottle — защита всех эндпоинтов от массового перебора.
+    # ScopedRateThrottle — точечный контроль SMS-эндпоинтов (задаётся через throttle_scope).
+    # Представления, которые явно задают throttle_classes, переопределяют этот список.
     'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
         'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
+        # Глобальные лимиты: анонимные запросы (по IP) и аутентифицированные (по user_id)
+        'anon': '60/min',
+        'user': '300/min',
+        # Точечные лимиты для SMS: жёстче, т.к. каждый запрос стоит денег
         'sms_request': '3/min',  # 3 запроса в минуту с одного IP
         'sms_verify': '5/min',   # 5 проверок в минуту с одного IP
-        # 'sms_request_day': '20/day', # Можно комбинировать, если нужно
     },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',

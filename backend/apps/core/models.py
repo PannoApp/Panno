@@ -99,8 +99,8 @@ class RestaurantInfo(models.Model):
 
     @classmethod
     def load(cls):
-        """Метод для получения синглтона."""
-        obj, _ = cls.objects.get_or_create(pk=1)
+        """Метод для получения синглтона. prefetch_related исключает N+1 при сериализации hero_slides."""
+        obj, _ = cls.objects.prefetch_related('hero_slides').get_or_create(pk=1)
         return obj
 
 

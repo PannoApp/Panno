@@ -50,6 +50,10 @@ class Event(models.Model):
         verbose_name_plural = "Мероприятия"
         # По умолчанию сортируем по дате проведения (ближайшие вверху)
         ordering = ['date_time']
+        indexes = [
+            # Составной индекс для получения активных мероприятий, отсортированных по дате
+            models.Index(fields=['is_active', 'date_time'], name='event_active_date_idx'),
+        ]
 
     def __str__(self):
         return f"{self.title} ({self.date_time})"

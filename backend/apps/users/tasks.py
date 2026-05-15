@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
     bind=True,
     max_retries=3,
     default_retry_delay=30,
+    # Таймауты: SMS API обычно быстрый; 60 с — жёсткий предел, 45 с — мягкий
+    time_limit=60,
+    soft_time_limit=45,
 )
 def send_sms_task(self, phone: str, otp: str):
     """

@@ -280,7 +280,22 @@ SMS_PASSWORD=your_password
 
 ## Троттлинг
 
-Эндпоинт `POST /api/v1/users/auth/request-sms/` защищён на двух уровнях:
+### Глобальный rate limiting (все эндпоинты)
+
+Все API-эндпоинты автоматически защищены глобальными лимитами через DRF:
+
+| Тип пользователя | Лимит | Ключ |
+|---|---|---|
+| Анонимный (по IP) | 60 запросов / минута | `AnonRateThrottle` |
+| Аутентифицированный (по user_id) | 300 запросов / минута | `UserRateThrottle` |
+
+При превышении лимита — `HTTP 429 Too Many Requests`.
+
+Настраивается в `config/settings/base.py` (секция `DEFAULT_THROTTLE_RATES`). В тестах отключено через `config/settings/test.py`.
+
+### SMS-эндпоинты (дополнительные лимиты)
+
+Эндпоинт `POST /api/v1/users/auth/request-sms/` дополнительно защищён на двух уровнях:
 
 | Уровень | Ключ в Redis | Лимит |
 |---|---|---|

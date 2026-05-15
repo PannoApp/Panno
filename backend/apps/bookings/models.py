@@ -96,6 +96,12 @@ class TableBooking(models.Model):
         verbose_name_plural = "Бронирования столов"
         # Сортировка: сначала отображаем самые ранние брони по дате и времени
         ordering = ['date', 'time']
+        indexes = [
+            # Составной индекс для фильтрации по статусу + дате (основной admin-запрос)
+            models.Index(fields=['status', 'date'], name='booking_status_date_idx'),
+            # Одиночный индекс для фильтрации только по статусу (API-запросы, сигналы)
+            models.Index(fields=['status'], name='booking_status_idx'),
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -109,10 +109,21 @@ class RequestLoggingMiddleware:
             return str(request.user.id)
         return 'Anonymous'
 
+    # Заголовки, которые могут содержать секреты — заменяем значение на '***'
+    _SENSITIVE_HEADERS = frozenset({
+        'Authorization', 'Cookie', 'Set-Cookie', 'X-Api-Key', 'X-Api-Secret',
+    })
+
+    # Поля тела запроса, которые могут содержать секреты — заменяем значение на '***'
+    _SENSITIVE_BODY_FIELDS = frozenset({
+        'otp', 'password', 'token', 'secret',
+    })
+
     def get_masked_headers(self, request: HttpRequest) -> dict:
         headers = dict(request.headers)
-        if 'Authorization' in headers:
-            headers['Authorization'] = '***'
+        for header in self._SENSITIVE_HEADERS:
+            if header in headers:
+                headers[header] = '***'
         return headers
 
     def get_masked_body(self, request: HttpRequest) -> str:
@@ -120,13 +131,14 @@ class RequestLoggingMiddleware:
             body_bytes = request.body
             if not body_bytes:
                 return ""
-            
+
             body_str = body_bytes.decode('utf-8')
             try:
                 body_json = json.loads(body_str)
-                # Маскируем OTP
-                if isinstance(body_json, dict) and 'otp' in body_json:
-                    body_json['otp'] = '***'
+                if isinstance(body_json, dict):
+                    for field in self._SENSITIVE_BODY_FIELDS:
+                        if field in body_json:
+                            body_json[field] = '***'
                 return json.dumps(body_json, ensure_ascii=False)
             except json.JSONDecodeError:
                 # Если это не JSON, возвращаем как есть

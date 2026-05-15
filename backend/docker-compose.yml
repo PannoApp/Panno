@@ -3,6 +3,7 @@ services:
   db:
     image: postgres:16-alpine
     container_name: postgres_db
+    restart: unless-stopped
     volumes:
       - pg_data:/var/lib/postgresql/data/
     environment:
@@ -14,9 +15,16 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-  
+    # Ограничения ресурсов: PostgreSQL не должен потреблять больше половины RAM хоста
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '1.0'
+
   pgbouncer:
     image: edoburu/pgbouncer:latest
+    restart: unless-stopped
     environment:
       # Указываем, куда стучаться (имя контейнера с БД)
       - DB_HOST=db
@@ -24,7 +32,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       # Имя базы данных
       - DB_NAME=${POSTGRES_DB}
-      
+
       # КРИТИЧНО: Режим пулирования
       - POOL_MODE=transaction
       # Максимальное количество соединений с самой БД
@@ -52,16 +60,40 @@ services:
     image: redis:7-alpine
     container_name: redis_cache
     restart: unless-stopped
+    # Если REDIS_PASSWORD задан — требуем аутентификацию.
+    # Пустая строка отключает requirepass (обратная совместимость).
+    command: >
+      sh -c "
+        if [ -n \"$${REDIS_PASSWORD:-}\" ]; then
+          redis-server --requirepass \"$${REDIS_PASSWORD}\"
+        else
+          redis-server
+        fi
+      "
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      # При наличии пароля redis-cli тоже передаёт -a, иначе просто ping
+      test: >
+        sh -c "
+          if [ -n \"$${REDIS_PASSWORD:-}\" ]; then
+            redis-cli -a \"$${REDIS_PASSWORD}\" ping
+          else
+            redis-cli ping
+          fi
+        "
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
 
   # Основное Django приложение
   backend:
     build: .
     container_name: django_backend
+    restart: unless-stopped
     volumes:
       - .:/app/backend # Монтируем код для горячей перезагрузки при разработке
       - ./logs:/app/backend/logs # Пробрасываем папку логов на хост-машину
@@ -78,12 +110,27 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '1.0'
 
   # Воркер Celery (использует тот же Dockerfile)
   worker:
     build: .
     container_name: celery_worker
-    command: celery -A config worker --loglevel=info
+    restart: unless-stopped
+    # --concurrency=4: ограничиваем число дочерних процессов (по количеству ядер)
+    # --max-tasks-per-child=1000: перезапускаем воркер после N задач, чтобы не было утечек памяти
+    # --time-limit/--soft-time-limit: жёсткий и мягкий таймаут на задачу
+    command: >
+      celery -A config worker
+      --loglevel=info
+      --concurrency=4
+      --max-tasks-per-child=1000
+      --time-limit=300
+      --soft-time-limit=270
     volumes:
       - .:/app/backend
       - ./logs:/app/backend/logs # Пробрасываем папку логов на хост-машину
@@ -96,12 +143,19 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '1.0'
 
   # Celery Beat (планировщик периодических задач)
   beat:
     build: .
     container_name: celery_beat
-    command: celery -A config beat --loglevel=info
+    restart: unless-stopped
+    # --pidfile: явный pidfile предотвращает запуск двух Beat-инстансов одновременно
+    command: celery -A config beat --loglevel=info --pidfile=/tmp/celerybeat.pid
     volumes:
       - .:/app/backend
       - ./logs:/app/backend/logs
@@ -114,12 +168,27 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
 
   # Flower — веб-интерфейс мониторинга Celery
   flower:
     build: .
     container_name: celery_flower
-    command: celery -A config flower --port=5555
+    restart: unless-stopped
+    # FLOWER_USER/FLOWER_PASSWORD задаются в .env — защита от несанкционированного доступа.
+    # Если переменные не заданы, Flower запускается без аутентификации (только для dev).
+    command: >
+      sh -c "
+        if [ -n \"$${FLOWER_USER:-}\" ] && [ -n \"$${FLOWER_PASSWORD:-}\" ]; then
+          celery -A config flower --port=5555 --basic_auth=$${FLOWER_USER}:$${FLOWER_PASSWORD}
+        else
+          celery -A config flower --port=5555
+        fi
+      "
     ports:
       - "5555:5555"
     env_file:
@@ -127,6 +196,11 @@ services:
     depends_on:
       - redis
       - worker
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
 
 volumes:
   pg_data:

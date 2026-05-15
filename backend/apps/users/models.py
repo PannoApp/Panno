@@ -69,6 +69,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
+        indexes = [
+            # Индекс для сегментирования пользователей по городу (push-рассылки по региону)
+            models.Index(fields=['city'], name='user_city_idx'),
+            # Индекс для сортировки/фильтрации по дате регистрации (аналитика)
+            models.Index(fields=['date_joined'], name='user_date_joined_idx'),
+        ]
 
     def save(self, *args, **kwargs):
         # Синхронизируем is_staff с полем role при любом сохранении:
