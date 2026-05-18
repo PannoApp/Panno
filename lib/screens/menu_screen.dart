@@ -849,7 +849,7 @@ class _ClassicDishCard extends StatelessWidget {
                               ),
                           const Spacer(),
                           Text(
-                            '${dish.price} ₸',
+                            '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
                             style: PiligrimTextStyles.button.copyWith(
                               color: PiligrimColors.steppe,
                               fontSize: 14,
@@ -965,7 +965,7 @@ class _DishDetailSheet extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       DishInfoChip(
-                        label: '${dish.price} ₸',
+                        label: '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
                         icon: 'assets/images/zerno.svg',
                         accent: true,
                       ),

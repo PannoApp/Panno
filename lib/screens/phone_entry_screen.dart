@@ -194,7 +194,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                       TextFormField(
                         controller: _codeCtrl,
                         keyboardType: TextInputType.number,
-                        maxLength: 6,
+                        maxLength: 4,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                         ],
@@ -203,7 +203,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                           fontSize: 16,
                           letterSpacing: 4,
                         ),
-                        decoration: _fieldDecoration('000000'),
+                        decoration: _fieldDecoration('0000'),
                       ),
                     ],
                     const Spacer(),

@@ -156,6 +156,17 @@ class _BookingScreenState extends State<BookingScreen> {
                 children: [
                   Row(
                     children: [
+                      PiligrimTap(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: const Padding(
+                          padding: EdgeInsets.only(right: 12),
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 18,
+                            color: PiligrimColors.sky,
+                          ),
+                        ),
+                      ),
                       SvgPicture.asset(
                         'assets/images/moon_totem (1).svg',
                         width: 28,

@@ -793,7 +793,9 @@ class _EventListCard extends StatelessWidget {
 
   String _subtitle() {
     final fmt = event.formatLabelRu.toLowerCase();
-    final price = event.priceFrom != null ? ' · от ${event.priceFrom} ₽' : '';
+    final price = event.priceFrom != null
+        ? ' · от ${'${event.priceFrom}'.replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸'
+        : '';
     return '$fmt$price';
   }
 

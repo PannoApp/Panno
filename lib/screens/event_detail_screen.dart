@@ -25,7 +25,8 @@ class EventDetailScreen extends StatelessWidget {
     if (event.priceFrom == null) {
       return 'Стоимость уточняется при записи';
     }
-    return 'Вход: от ${event.priceFrom} ₽ (не онлайн-оплата)';
+    final formatted = '${event.priceFrom}'.replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ');
+    return 'Вход: от $formatted ₸';
   }
 
   @override

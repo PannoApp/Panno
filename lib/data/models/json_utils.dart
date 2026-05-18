@@ -4,7 +4,10 @@ int parseInt(dynamic value, {String field = 'value'}) {
   }
   if (value is int) return value;
   if (value is double) return value.round();
-  if (value is String) return int.parse(value.trim());
+  if (value is String) {
+    final s = value.trim();
+    return s.contains('.') ? double.parse(s).round() : int.parse(s);
+  }
   throw FormatException('Cannot parse int for $field from $value');
 }
 

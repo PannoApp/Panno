@@ -121,6 +121,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _RulesCard(),
                     const SizedBox(height: 28),
 
+                    // Выход из аккаунта
+                        if (auth.isLoggedIn) ...[
+                          const SizedBox(height: 8),
+                          _LogoutButton(
+                            onTap: () async {
+                              await context.read<AuthProvider>().logout();
+                            },
+                          ),
+                          const SizedBox(height: 28),
+                        ],
+
                     // Юридическое + версия
                         _LegalFooter(onLaunch: _launch),
                       ]),
@@ -1125,6 +1136,40 @@ class _LegalFooter extends StatelessWidget {
     )
         .animate()
         .fadeIn(delay: 250.ms, duration: 600.ms);
+  }
+}
+
+class _LogoutButton extends StatelessWidget {
+  const _LogoutButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _BrandCard(
+      child: PiligrimTap(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Text(
+                'Выйти из аккаунта',
+                style: PiligrimTextStyles.body.copyWith(
+                  fontSize: 13,
+                  color: PiligrimColors.ember.withValues(alpha: 0.85),
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.logout_rounded,
+                size: 16,
+                color: PiligrimColors.ember.withValues(alpha: 0.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
