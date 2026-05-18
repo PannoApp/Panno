@@ -1,6 +1,7 @@
 // Блок действий главного экрана — CTA «Забронировать» + текстовые ссылки
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../core/auth_guard.dart';
 import '../core/theme.dart';
 import '../screens/booking_screen.dart';
 import 'piligrim_tap.dart';
@@ -20,8 +21,10 @@ class HomeActionBlock extends StatelessWidget {
           EmberCta(
             label: 'Забронировать стол',
             iconAsset: 'assets/images/moon_totem (1).svg',
-            onTap: () {
-              Navigator.of(context).push(
+            onTap: () async {
+              if (!await guardAuth(context)) return;
+              if (!context.mounted) return;
+              await Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const BookingScreen(),
                 ),

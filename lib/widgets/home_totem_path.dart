@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../core/theme.dart';
+import '../core/auth_guard.dart';
 import '../core/home_data.dart';
 import '../screens/booking_screen.dart';
 import 'piligrim_tap.dart';
@@ -18,11 +19,13 @@ class HomeTotemPathRow extends StatefulWidget {
 class _HomeTotemPathRowState extends State<HomeTotemPathRow> {
   int _selected = 0;
 
-  void _onItemTap(int index) {
+  Future<void> _onItemTap(int index) async {
     setState(() => _selected = index);
     final cat = kMenuCategories[index];
     if (cat.navIndex == kNavOpenBooking) {
-      Navigator.of(context).push(
+      if (!await guardAuth(context)) return;
+      if (!mounted) return;
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => const BookingScreen(),
         ),

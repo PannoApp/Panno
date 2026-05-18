@@ -4,9 +4,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/auth_guard.dart';
 import '../core/theme.dart';
 import '../core/profile_data.dart';
+import '../providers/auth_provider.dart';
 import '../core/home_data.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_section_header.dart';
@@ -27,9 +30,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'private': true,
   };
 
-  // Демо-пользователь (замените на реальный state)
-  final HeroUser _user = kDemoUser;
-
   Future<void> _launch(String url) async {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -49,30 +49,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: PiligrimColors.earth,
-      body: Stack(
-        children: [
-          const Positioned.fill(
-            child: PiligrimBackground(
-              textureOpacity: 0.45,
-              vignetteIntensity: 0.25,
-            ),
-          ),
-
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none,
-            slivers: [
-              // ── Хедер-карта Героя ───────────────────────────────────
-              SliverToBoxAdapter(child: _HeroHeader(user: _user)),
-
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // История
-                    _StatsRow(user: _user),
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final user = auth.user;
+        return Scaffold(
+          backgroundColor: PiligrimColors.earth,
+          body: Stack(
+            children: [
+              const Positioned.fill(
+                child: PiligrimBackground(
+                  textureOpacity: 0.45,
+                  vignetteIntensity: 0.25,
+                ),
+              ),
+              CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                clipBehavior: Clip.none,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _HeroHeader(
+                      user: user,
+                      onStartJourney: () async {
+                        await guardAuth(context);
+                      },
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _StatsRow(user: user),
                     const SizedBox(height: 28),
 
                     // Push-уведомления
@@ -116,14 +122,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 28),
 
                     // Юридическое + версия
-                    _LegalFooter(onLaunch: _launch),
-                  ]),
-                ),
+                        _LegalFooter(onLaunch: _launch),
+                      ]),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -132,8 +140,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // HERO HEADER
 // ─────────────────────────────────────────────────────────────────────────────
 class _HeroHeader extends StatefulWidget {
-  const _HeroHeader({required this.user});
+  const _HeroHeader({
+    required this.user,
+    required this.onStartJourney,
+  });
+
   final HeroUser user;
+  final Future<void> Function() onStartJourney;
 
   @override
   State<_HeroHeader> createState() => _HeroHeaderState();
@@ -298,6 +311,7 @@ class _HeroHeaderState extends State<_HeroHeader>
                 if (!authorized)
                   PiligrimTap(
                     borderRadius: BorderRadius.circular(8),
+                    onTap: widget.onStartJourney,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 9),
