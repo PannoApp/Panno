@@ -2,6 +2,8 @@
 // Выбор зоны, даты, кол-ва гостей, подтверждение. Согласно ТЗ раздел 4.4
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
 import '../widgets/ember_cta.dart';
@@ -39,6 +41,19 @@ class _BookingScreenState extends State<BookingScreen> {
     'Терраса',
     'Приват',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      if (!auth.isLoggedIn) return;
+      _nameCtrl.text = auth.user.name;
+      final phone = auth.user.phone.replaceAll(RegExp(r'[^\d+]'), '');
+      if (phone.isNotEmpty) _phoneCtrl.text = phone;
+    });
+  }
 
   @override
   void dispose() {

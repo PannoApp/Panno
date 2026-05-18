@@ -14,6 +14,8 @@ class PiligrimBackground extends StatefulWidget {
     this.showInterior = true,
     this.interiorOpacity = 0.45,
     this.blurSigma = 5.0,
+    /// Home: без искр, приглушённый жар — атмосфера, не «камин-игра».
+    this.cinematic = false,
   });
 
   final double parallaxOffset;
@@ -22,6 +24,7 @@ class PiligrimBackground extends StatefulWidget {
   final bool showInterior;
   final double interiorOpacity;
   final double blurSigma;
+  final bool cinematic;
 
   @override
   State<PiligrimBackground> createState() => _PiligrimBackgroundState();
@@ -36,7 +39,7 @@ class _PiligrimBackgroundState extends State<PiligrimBackground>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 20),
+      duration: Duration(seconds: widget.cinematic ? 48 : 20),
     )..repeat();
   }
 
@@ -55,6 +58,7 @@ class _PiligrimBackgroundState extends State<PiligrimBackground>
           painter: _FireplacePainter(
             time: _ctrl.value,
             parallaxOffset: widget.parallaxOffset,
+            cinematic: widget.cinematic,
           ),
           child: const SizedBox.expand(),
         ),
@@ -64,10 +68,15 @@ class _PiligrimBackgroundState extends State<PiligrimBackground>
 }
 
 class _FireplacePainter extends CustomPainter {
-  _FireplacePainter({required this.time, required this.parallaxOffset});
+  _FireplacePainter({
+    required this.time,
+    required this.parallaxOffset,
+    this.cinematic = false,
+  });
 
   final double time;
   final double parallaxOffset;
+  final bool cinematic;
 
   static const _tau = 2.0 * math.pi;
   static List<_Spark>? _sparks;
@@ -86,83 +95,98 @@ class _FireplacePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    _sparks ??= _makeSparks(60);
+    final em = cinematic ? 0.38 : 1.0;
     final w = size.width;
     final h = size.height;
     final rect = Rect.fromLTWH(0, 0, w, h);
 
-    // 1. Глубокая тёмная база
     canvas.drawRect(rect, Paint()..color = const Color(0xFF1E1B19));
 
-    // 2. Свечение углей — нижняя треть, яркое и тёплое
-    canvas.drawRect(rect, Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(0.0, 1.3),
-        radius: 0.9,
-        colors: [
-          PiligrimColors.ember.withValues(alpha: 0.55),
-          PiligrimColors.emberDeep.withValues(alpha: 0.30),
-          PiligrimColors.clear,
-        ],
-        stops: const [0.0, 0.35, 0.85],
-      ).createShader(rect));
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(0.0, 1.3),
+          radius: 0.9,
+          colors: [
+            PiligrimColors.ember.withValues(alpha: 0.55 * em),
+            PiligrimColors.emberDeep.withValues(alpha: 0.30 * em),
+            PiligrimColors.clear,
+          ],
+          stops: const [0.0, 0.35, 0.85],
+        ).createShader(rect),
+    );
 
-    // 3. Дополнительный жар — правее, пульсирует
-    final pulse = math.sin(time * _tau * 2) * 0.5 + 0.5;
-    final heatAlpha = 0.20 + pulse * 0.12;
-    canvas.drawRect(rect, Paint()
-      ..shader = RadialGradient(
-        center: Alignment(0.3 + math.sin(time * _tau) * 0.1, 1.1),
-        radius: 0.7,
-        colors: [
-          PiligrimColors.steppe.withValues(alpha: heatAlpha),
-          PiligrimColors.clear,
-        ],
-      ).createShader(rect));
+    final pulse = math.sin(time * _tau * (cinematic ? 0.65 : 2)) * 0.5 + 0.5;
+    final heatAlpha = (0.20 + pulse * 0.12) * em;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = RadialGradient(
+          center: Alignment(
+            0.3 + math.sin(time * _tau * (cinematic ? 0.4 : 1)) * 0.06,
+            1.1,
+          ),
+          radius: 0.7,
+          colors: [
+            PiligrimColors.steppe.withValues(alpha: heatAlpha),
+            PiligrimColors.clear,
+          ],
+        ).createShader(rect),
+    );
 
-    // 4. Второй жар — левее
-    canvas.drawRect(rect, Paint()
-      ..shader = RadialGradient(
-        center: Alignment(-0.4 + math.cos(time * _tau * 0.7) * 0.08, 1.2),
-        radius: 0.6,
-        colors: [
-          PiligrimColors.ember.withValues(alpha: 0.18 + pulse * 0.08),
-          PiligrimColors.clear,
-        ],
-      ).createShader(rect));
-
-    // 5. Лунный холодный блик сверху — контраст
-    canvas.drawRect(rect, Paint()
-      ..shader = const RadialGradient(
-        center: Alignment(-0.3, -0.9),
-        radius: 0.7,
-        colors: [
-          Color(0x187BA5B8),
-          Color(0x00000000),
-        ],
-      ).createShader(rect));
-
-    // 6. Искры — тёплые точки, поднимаются снизу вверх
-    for (final spark in _sparks!) {
-      final life = (time + spark.phase) % 1.0;
-      final y = 1.0 - life * (0.6 + spark.speed * 0.4);
-      if (y < -0.05 || y > 1.05) continue;
-
-      final fadeIn = (life * 5).clamp(0.0, 1.0);
-      final fadeOut = ((1.0 - life) * 3).clamp(0.0, 1.0);
-      final alpha = fadeIn * fadeOut;
-      if (alpha < 0.01) continue;
-
-      final x = spark.x + math.sin((time + spark.phase) * _tau * 2) * spark.drift;
-      final color = spark.bright
-          ? PiligrimColors.steppe.withValues(alpha: alpha * 0.7)
-          : PiligrimColors.ember.withValues(alpha: alpha * 0.5);
-
-      canvas.drawCircle(
-        Offset(x * w, y * h + parallaxOffset * 0.2),
-        spark.size,
-        Paint()..color = color,
+    if (!cinematic) {
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = RadialGradient(
+            center: Alignment(-0.4 + math.cos(time * _tau * 0.7) * 0.08, 1.2),
+            radius: 0.6,
+            colors: [
+              PiligrimColors.ember.withValues(alpha: (0.18 + pulse * 0.08)),
+              PiligrimColors.clear,
+            ],
+          ).createShader(rect),
       );
+
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = const RadialGradient(
+            center: Alignment(-0.3, -0.9),
+            radius: 0.7,
+            colors: [
+              Color(0x187BA5B8),
+              Color(0x00000000),
+            ],
+          ).createShader(rect),
+      );
+    }
+
+    if (!cinematic) {
+      _sparks ??= _makeSparks(60);
+      for (final spark in _sparks!) {
+        final life = (time + spark.phase) % 1.0;
+        final y = 1.0 - life * (0.6 + spark.speed * 0.4);
+        if (y < -0.05 || y > 1.05) continue;
+
+        final fadeIn = (life * 5).clamp(0.0, 1.0);
+        final fadeOut = ((1.0 - life) * 3).clamp(0.0, 1.0);
+        final alpha = fadeIn * fadeOut;
+        if (alpha < 0.01) continue;
+
+        final x =
+            spark.x + math.sin((time + spark.phase) * _tau * 2) * spark.drift;
+        final color = spark.bright
+            ? PiligrimColors.steppe.withValues(alpha: alpha * 0.7)
+            : PiligrimColors.ember.withValues(alpha: alpha * 0.5);
+
+        canvas.drawCircle(
+          Offset(x * w, y * h + parallaxOffset * 0.2),
+          spark.size,
+          Paint()..color = color,
+        );
+      }
     }
 
     // 7. Виньетка — сверху тёмная, снизу прозрачная
@@ -180,7 +204,9 @@ class _FireplacePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_FireplacePainter old) =>
-      old.time != time || old.parallaxOffset != parallaxOffset;
+      old.time != time ||
+      old.parallaxOffset != parallaxOffset ||
+      old.cinematic != cinematic;
 }
 
 class _Spark {

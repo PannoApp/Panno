@@ -6,6 +6,7 @@ import '../core/theme.dart';
 import '../data/events_news_data.dart';
 import '../widgets/event_signup_sheet.dart';
 import '../widgets/piligrim_background.dart';
+import '../core/auth_guard.dart';
 import '../widgets/piligrim_tap.dart';
 
 class EventDetailScreen extends StatelessWidget {
@@ -153,10 +154,14 @@ class EventDetailScreen extends StatelessWidget {
           child: SizedBox(
             height: 52,
             child: PiligrimTap(
-              onTap: () => showEventSignupSheet(
-                context,
-                eventTitle: event.title,
-              ),
+              onTap: () async {
+                if (!await guardAuth(context)) return;
+                if (!context.mounted) return;
+                await showEventSignupSheet(
+                  context,
+                  eventTitle: event.title,
+                );
+              },
               borderRadius: BorderRadius.circular(10),
               child: Container(
                 decoration: BoxDecoration(
