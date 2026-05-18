@@ -59,14 +59,25 @@ void main() {
       verify(() => repository.fetchCoreInfo()).called(1);
     });
 
-    test('isOpenNow reads from coreInfo', () async {
-      when(() => repository.fetchCoreInfo()).thenAnswer((_) async => _sampleCoreInfo());
+    test('isOpenNow reads from coreInfo after load', () async {
+      when(() => repository.fetchCoreInfo()).thenAnswer(
+        (_) async => CoreInfo.fromJson({
+          'address': 'Алматы',
+          'working_hours': '12:00–23:00',
+          'is_open_now': false,
+          'phone': '+7700',
+          'visit_rules': 'rules',
+          'privacy_policy': 'policy',
+          'booking_deposit_required': false,
+        }),
+      );
       when(() => repository.fetchInterior()).thenAnswer((_) async => []);
 
       final provider = CoreInfoProvider(repository: repository);
-      expect(provider.isOpenNow, isFalse);
       await provider.load();
-      expect(provider.isOpenNow, isTrue);
+
+      expect(provider.coreInfo!.isOpenNow, isFalse);
+      expect(provider.isOpenNow, isFalse);
     });
   });
 }

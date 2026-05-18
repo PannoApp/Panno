@@ -3,6 +3,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/interior_assets.dart';
+import 'models/json_utils.dart';
 
 /// Формат мероприятия: открытое / закрытое (ТЗ)
 enum EventAccessFormat {
@@ -51,12 +52,27 @@ class PiligrimNewsPost {
     required this.title,
     required this.body,
     required this.publishedAt,
+    this.imageUrl,
   });
 
   final String id;
   final String title;
   final String body;
   final DateTime publishedAt;
+  final String? imageUrl;
+
+  factory PiligrimNewsPost.fromJson(Map<String, dynamic> json) {
+    return PiligrimNewsPost(
+      id: parseInt(json['id'], field: 'id').toString(),
+      title: parseString(json['title'], field: 'title'),
+      body: parseString(json['content'] ?? json['body'], field: 'content'),
+      publishedAt: parseDateTime(
+        json['created_at'] ?? json['publishedAt'],
+        field: 'created_at',
+      ),
+      imageUrl: parseStringOrNull(json['image'] ?? json['image_url']),
+    );
+  }
 }
 
 const _m1 = [
