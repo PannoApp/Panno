@@ -14,6 +14,7 @@ import 'screens/booking_screen.dart';
 import 'providers/booking_provider.dart';
 import 'providers/core_info_provider.dart';
 import 'providers/events_provider.dart';
+import 'data/repositories/menu_repository.dart';
 import 'providers/menu_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
@@ -90,7 +91,9 @@ class _PiligrimAppState extends State<PiligrimApp>
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
         ChangeNotifierProvider(create: (_) => CoreInfoProvider()..load()),
-        ChangeNotifierProvider(create: (_) => MenuProvider()..load()),
+        ChangeNotifierProvider(
+          create: (_) => MenuProvider(repository: MenuRepository())..load(),
+        ),
         ChangeNotifierProvider(create: (_) => EventsProvider()..load()),
         ChangeNotifierProvider(create: (_) => BookingProvider()),
       ],
