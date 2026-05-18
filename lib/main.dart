@@ -6,8 +6,8 @@ import 'core/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/menu_screen.dart';
+import 'screens/interior_screen.dart';
 import 'screens/events_screen.dart';
-import 'screens/booking_screen.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/bottom_nav_bar.dart';
 
@@ -82,8 +82,8 @@ class _RootShellState extends State<RootShell> {
         children: [
           HomeScreen(onNavigate: _navigate),
           const MenuScreen(),
+          const InteriorScreen(),
           const EventsScreen(),
-          const BookingScreen(),
           const ProfileScreen(),
         ],
       ),

@@ -24,8 +24,8 @@ class PiligrimNavBar extends StatelessWidget {
   static const _items = [
     _NavItem(label: 'Главная', asset: 'assets/images/star_totem (1).svg'),
     _NavItem(label: 'Меню', asset: 'assets/images/bird_totem (1).svg'),
+    _NavItem(label: 'Интерьер', asset: 'assets/images/wheel_totem (1).svg'),
     _NavItem(label: 'Афиша', asset: 'assets/images/tree_totem (1).svg'),
-    _NavItem(label: 'Стол', asset: 'assets/images/moon_totem (1).svg'),
     _NavItem(label: 'Профиль', asset: 'assets/images/shaman.svg'),
   ];
 
