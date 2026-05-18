@@ -1,51 +1,30 @@
+// Переиспользуемые виджеты карточки блюда.
+// Перенесён с локальной модели Dish на ApiDish (блок 5).
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../core/menu_data.dart';
 import '../core/theme.dart';
+import '../data/models/api_dish.dart';
+import '../data/models/api_tag.dart';
 import 'piligrim_info_section.dart';
 import 'piligrim_tap.dart';
 
 /// Нижний информационный блок для Reel-карточки блюда.
-/// Вынесен из `dish_video_card.dart` без изменения UI/анимаций.
 class DishCardBottomInfo extends StatelessWidget {
   const DishCardBottomInfo({super.key, required this.dish});
 
-  final Dish dish;
+  final ApiDish dish;
 
   @override
   Widget build(BuildContext context) {
-    final cat = categoryById(dish.categoryId);
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 0, 80, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              SvgPicture.asset(
-                cat.totemAsset,
-                width: 12,
-                height: 12,
-                colorFilter: ColorFilter.mode(
-                  cat.accentColor.withValues(alpha: 0.8),
-                  BlendMode.srcIn,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                cat.title.toUpperCase(),
-                style: PiligrimTextStyles.caption.copyWith(
-                  color: cat.accentColor.withValues(alpha: 0.8),
-                  fontSize: 10,
-                  letterSpacing: 2.0,
-                ),
-              ),
-            ],
-          ).animate().fadeIn(delay: 100.ms, duration: 500.ms),
-          const SizedBox(height: 10),
           Text(
             dish.name,
             style: PiligrimTextStyles.display.copyWith(
@@ -64,15 +43,6 @@ class DishCardBottomInfo extends StatelessWidget {
                 end: 0,
                 duration: 550.ms,
               ),
-          const SizedBox(height: 6),
-          Text(
-            dish.nameSub,
-            style: PiligrimTextStyles.caption.copyWith(
-              color: PiligrimColors.steppe.withValues(alpha: 0.75),
-              fontSize: 12,
-              letterSpacing: 0.5,
-            ),
-          ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
           const SizedBox(height: 10),
           Text(
             dish.description,
@@ -95,9 +65,7 @@ class DishCardBottomInfo extends StatelessWidget {
                 child: Wrap(
                   spacing: 6,
                   runSpacing: 4,
-                  children: dish.tags
-                      .map((tag) => DishCardTagChip(tag: tag))
-                      .toList(),
+                  children: dish.tags.map((tag) => DishCardTagChip(tag: tag)).toList(),
                 ),
               ),
               const SizedBox(width: 12),
@@ -110,34 +78,38 @@ class DishCardBottomInfo extends StatelessWidget {
   }
 }
 
+/// Чип тега блюда с иконкой и цветом.
+/// Принимает ApiTag из API; стиль подбирается по имени из реестра в menu_data.dart.
+/// Неизвестные теги отображаются с дефолтным стилем без обновления приложения.
 class DishCardTagChip extends StatelessWidget {
   const DishCardTagChip({super.key, required this.tag});
 
-  final DishTag tag;
+  final ApiTag tag;
 
   @override
   Widget build(BuildContext context) {
+    final style = tagStyleFor(tag.name);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: tag.color.withValues(alpha: 0.18),
+        color: style.color.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: tag.color.withValues(alpha: 0.4)),
+        border: Border.all(color: style.color.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           SvgPicture.asset(
-            tag.iconAsset,
+            style.iconAsset,
             width: 11,
             height: 11,
-            colorFilter: ColorFilter.mode(tag.color, BlendMode.srcIn),
+            colorFilter: ColorFilter.mode(style.color, BlendMode.srcIn),
           ),
           const SizedBox(width: 4),
           Text(
-            tag.label,
+            tag.name,
             style: PiligrimTextStyles.caption.copyWith(
-              color: tag.color,
+              color: style.color,
               fontSize: 10,
             ),
           ),
@@ -177,7 +149,7 @@ class DishCardPriceTag extends StatelessWidget {
 
 class DishCardActionBar extends StatefulWidget {
   const DishCardActionBar({super.key, required this.dish});
-  final Dish dish;
+  final ApiDish dish;
 
   @override
   State<DishCardActionBar> createState() => _DishCardActionBarState();
@@ -387,9 +359,40 @@ class DishDetailSection extends StatelessWidget {
   }
 }
 
+/// Превью изображения блюда: сетевая картинка с fallback на cinematic-фон.
+/// Используется в детальном листе блюда (bottom sheet).
+class DishThumbnail extends StatelessWidget {
+  const DishThumbnail({
+    super.key,
+    required this.imageUrl,
+    required this.fallback,
+    this.height = 180,
+  });
+
+  final String? imageUrl;
+  final Widget fallback;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl == null || imageUrl!.isEmpty) return SizedBox(height: height, child: fallback);
+
+    return SizedBox(
+      height: height,
+      child: CachedNetworkImage(
+        imageUrl: imageUrl!,
+        fit: BoxFit.cover,
+        // При загрузке и при ошибке показываем кинематографический фон
+        placeholder: (_, __) => fallback,
+        errorWidget: (_, __, ___) => fallback,
+      ),
+    );
+  }
+}
+
 class DishBookingCta extends StatelessWidget {
   const DishBookingCta({super.key, required this.dish});
-  final Dish dish;
+  final ApiDish dish;
 
   @override
   Widget build(BuildContext context) {
@@ -412,16 +415,16 @@ class DishBookingCta extends StatelessWidget {
         onTap: () => Navigator.pop(context),
         borderRadius: BorderRadius.circular(10),
         child: Center(
-            child: Text(
-              'ЗАКАЗАТЬ ЗА ${dish.price} ₸',
-              style: PiligrimTextStyles.button.copyWith(
-                color: PiligrimColors.sky,
-                fontSize: 14,
-                letterSpacing: 1.2,
-              ),
+          child: Text(
+            'ЗАКАЗАТЬ ЗА ${dish.price} ₸',
+            style: PiligrimTextStyles.button.copyWith(
+              color: PiligrimColors.sky,
+              fontSize: 14,
+              letterSpacing: 1.2,
             ),
           ),
         ),
+      ),
     );
   }
 }

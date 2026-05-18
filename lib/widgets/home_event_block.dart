@@ -37,7 +37,7 @@ class HomeEventBlock extends StatelessWidget {
               ),
               const Spacer(),
               PiligrimTap(
-                onTap: () => onNavigate?.call(2),
+                onTap: () => onNavigate?.call(3),
                 child: Text(
                   'Все события →',
                   style: PiligrimTextStyles.caption.copyWith(
@@ -59,7 +59,7 @@ class HomeEventBlock extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           PiligrimTap(
-            onTap: () => onNavigate?.call(2),
+            onTap: () => onNavigate?.call(3),
             child: Text(
               event.title,
               style: PiligrimTextStyles.heading.copyWith(
