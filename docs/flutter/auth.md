@@ -1,9 +1,11 @@
 # Авторизация (Блок 2)
 
+HTTP-слой: [DioClient](api_client.md) (`lib/data/services/api_client.dart`), токены: `TokenStorage` (`lib/data/services/token_storage.dart`).
+
 ## Поток авторизации
 
-1. **requestSms** — `POST /auth/request-sms/` с телефоном.
-2. **verifySms** — `POST /auth/verify-sms/` с телефоном и кодом; ответ: `access`, `refresh`, `is_new_user`.
+1. **requestSms** — `POST /users/auth/request-sms/` с телефоном.
+2. **verifySms** — `POST /users/auth/verify-sms/` с `phone` и `otp`; ответ: `access`, `refresh`, `is_new_user`.
 3. **save tokens** — `TokenStorage.saveTokens(access, refresh)`.
 4. **load profile** — `GET /users/profile/` → `UserProfile` в `AuthProvider.currentUser`.
 

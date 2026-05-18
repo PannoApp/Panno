@@ -1,20 +1,20 @@
-import 'package:piligrim/data/token_storage.dart';
+import 'package:piligrim/data/services/token_storage.dart';
 
 class FakeTokenStorage implements TokenStorage {
   String? access;
   String? refresh;
 
   @override
-  Future<void> clear() async {
+  Future<void> clearTokens() async {
     access = null;
     refresh = null;
   }
 
   @override
-  Future<String?> getAccessToken() async => access;
+  Future<String?> readAccess() async => access;
 
   @override
-  Future<String?> getRefreshToken() async => refresh;
+  Future<String?> readRefresh() async => refresh;
 
   @override
   Future<void> saveTokens({

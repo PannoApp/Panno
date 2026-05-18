@@ -1,26 +1,26 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/profile_data.dart';
-import '../data/api_client.dart';
 import '../data/models/user_profile.dart';
+import '../data/services/api_client.dart';
 import '../data/services/auth_service.dart';
-import '../data/token_storage.dart';
+import '../data/services/token_storage.dart';
 
 /// Авторизация: SMS OTP + профиль пользователя.
 class AuthProvider extends ChangeNotifier {
   AuthProvider({
     AuthService? authService,
-    ApiClient? apiClient,
+    Dio? dio,
     TokenStorage? tokenStorage,
-  }) : _tokenStorage = tokenStorage ?? SharedPreferencesTokenStorage() {
-    _apiClient = apiClient ??
-        ApiClient(baseUrl: ApiConfig.baseUrl, tokenStorage: _tokenStorage);
-    _authService = authService ?? AuthService(_apiClient);
-  }
+  })  : _tokenStorage = tokenStorage ?? TokenStorage.instance,
+        _dio = dio ?? DioClient.instance.dio,
+        _authService = authService ??
+            AuthService(dio ?? DioClient.instance.dio);
 
   final TokenStorage _tokenStorage;
-  late final ApiClient _apiClient;
-  late final AuthService _authService;
+  final Dio _dio;
+  final AuthService _authService;
 
   UserProfile? currentUser;
   bool isLoading = false;
@@ -32,7 +32,8 @@ class AuthProvider extends ChangeNotifier {
   HeroUser get user {
     final profile = currentUser;
     if (profile == null) return kAnonymousHero;
-    final name = profile.displayName.isEmpty ? profile.phone : profile.displayName;
+    final name =
+        profile.displayName.isEmpty ? profile.phone : profile.displayName;
     return HeroUser(
       name: name.isEmpty ? 'Герой без имени' : name,
       phone: profile.phone,
@@ -45,7 +46,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final access = await _tokenStorage.getAccessToken();
+      final access = await _tokenStorage.readAccess();
       if (access == null || access.isEmpty) {
         currentUser = null;
         return;
@@ -54,7 +55,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       error = e.toString();
       currentUser = null;
-      await _tokenStorage.clear();
+      await _tokenStorage.clearTokens();
     } finally {
       isLoading = false;
       notifyListeners();
@@ -88,7 +89,7 @@ class AuthProvider extends ChangeNotifier {
         refresh: result.refresh,
       );
       await _loadProfile();
-      // TODO(fcm): зарегистрировать FCM token после появления FcmService.
+      // TODO(fcm): зарегистрировать FCM token после flutterfire configure.
       return isLoggedIn;
     } catch (e) {
       error = e.toString();
@@ -105,14 +106,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final refresh = await _tokenStorage.getRefreshToken();
+      final refresh = await _tokenStorage.readRefresh();
       if (refresh != null && refresh.isNotEmpty) {
         await _authService.logout(refresh);
       }
     } catch (_) {
       // Всегда очищаем локальную сессию.
     } finally {
-      await _tokenStorage.clear();
+      await _tokenStorage.clearTokens();
       currentUser = null;
       isLoading = false;
       notifyListeners();
@@ -136,8 +137,11 @@ class AuthProvider extends ChangeNotifier {
       if (promotions != null) body['notify_promotions'] = promotions;
       if (closedEvents != null) body['notify_closed_events'] = closedEvents;
 
-      final json = await _apiClient.patch('/users/profile/', body: body);
-      currentUser = UserProfile.fromJson(json);
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/users/profile/',
+        data: body,
+      );
+      currentUser = UserProfile.fromJson(response.data ?? {});
     } catch (e) {
       error = e.toString();
       rethrow;
@@ -148,7 +152,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _loadProfile() async {
-    final json = await _apiClient.get('/users/profile/');
-    currentUser = UserProfile.fromJson(json);
+    final response = await _dio.get<Map<String, dynamic>>('/users/profile/');
+    currentUser = UserProfile.fromJson(response.data ?? {});
   }
 }

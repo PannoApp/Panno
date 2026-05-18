@@ -1,17 +1,17 @@
-import '../api_client.dart';
+import 'package:dio/dio.dart';
+
 import '../models/json_utils.dart';
 
-/// SMS-авторизация через [ApiClient].
+/// SMS-авторизация через [Dio] (Блок 1: DioClient).
 class AuthService {
-  AuthService(this._client);
+  AuthService(this._dio);
 
-  final ApiClient _client;
+  final Dio _dio;
 
   Future<void> requestSms(String phone) async {
-    await _client.post(
-      '/auth/request-sms/',
-      body: {'phone': phone},
-      authenticated: false,
+    await _dio.post<Map<String, dynamic>>(
+      '/users/auth/request-sms/',
+      data: {'phone': phone},
     );
   }
 
@@ -19,11 +19,11 @@ class AuthService {
     String phone,
     String code,
   ) async {
-    final json = await _client.post(
-      '/auth/verify-sms/',
-      body: {'phone': phone, 'code': code},
-      authenticated: false,
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/users/auth/verify-sms/',
+      data: {'phone': phone, 'otp': code},
     );
+    final json = response.data ?? {};
     return (
       access: parseString(json['access'] ?? json['access_token'], field: 'access'),
       refresh: parseString(json['refresh'] ?? json['refresh_token'], field: 'refresh'),
@@ -32,10 +32,9 @@ class AuthService {
   }
 
   Future<void> logout(String refreshToken) async {
-    await _client.post(
-      '/auth/logout/',
-      body: {'refresh': refreshToken},
-      authenticated: true,
+    await _dio.post<Map<String, dynamic>>(
+      '/users/auth/logout/',
+      data: {'refresh': refreshToken},
     );
   }
 }
