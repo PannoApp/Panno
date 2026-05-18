@@ -1,7 +1,6 @@
 // Точка входа приложения PILIGRIM
 // Тема: piligrim_design_spec.md — тёмная тема, цвета Қара жер / Мөлдір су / Сары дала
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

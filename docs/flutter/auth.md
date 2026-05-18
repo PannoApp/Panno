@@ -87,3 +87,55 @@ const BookingRequest(
 ## TODO
 
 - Регистрация FCM-токена после появления `FcmService` (см. комментарий в `AuthProvider.confirmOtp`).
+
+---
+
+# Навигация и Auth Guard (Блок 3)
+
+## Навигационная схема (5 табов)
+
+| Индекс | Экран | Файл |
+|--------|-------|------|
+| 0 | HomeScreen | `lib/screens/home_screen.dart` |
+| 1 | MenuScreen | `lib/screens/menu_screen.dart` |
+| 2 | InteriorScreen | `lib/screens/interior_screen.dart` |
+| 3 | EventsScreen | `lib/screens/events_screen.dart` |
+| 4 | ProfileScreen | `lib/screens/profile_screen.dart` |
+
+**BookingScreen** не является табом — открывается через `Navigator.push` из `HomeActionBlock` и `HomeTotemPathRow`. Значение `navIndex: kNavOpenBooking` (`-1`) в `kMenuCategories` сигнализирует об этом.
+
+## PhoneEntryScreen
+
+**Файл:** `lib/screens/phone_entry_screen.dart`
+
+Один экран с двумя состояниями, управляемыми флагом `_awaitingCode`:
+
+1. **Ввод телефона** — поле `+7 7XX XXX XX XX`, валидация: strip non-digits → нужно ≥ 11 цифр. Кнопка «Получить код» → `AuthProvider.sendOtp(phone)`.
+2. **Ввод кода** — числовое поле `maxLength: 6`. Кнопка «Подтвердить» → `AuthProvider.confirmOtp(phone, code)` → `Navigator.pop()` при успехе.
+
+Параметров нет. Всегда открывается через `Navigator.push` (не роут в `IndexedStack`).
+
+## Auth Guard
+
+**Файл:** `lib/core/auth_guard.dart`
+
+```dart
+// Использование перед любым защищённым действием:
+if (!await guardAuth(context)) return;
+// продолжить действие — пользователь точно авторизован
+```
+
+`guardAuth` проверяет `AuthProvider.isLoggedIn`. Если `false` — открывает `PhoneEntryScreen` через push и ждёт возврата. Возвращает `true` только если после закрытия экрана `isLoggedIn == true`.
+
+## Как добавить экран, требующий авторизации
+
+1. В обработчике нажатия (кнопка / таб) вызвать `guardAuth`:
+   ```dart
+   onTap: () async {
+     if (!await guardAuth(context)) return;
+     if (!context.mounted) return;
+     // логика после авторизации
+   }
+   ```
+2. Не добавлять `PhoneEntryScreen` в `IndexedStack` — он всегда открывается через push.
+3. Не хранить состояние «нужна авторизация» в виджете — `AuthProvider.isLoggedIn` — единственный источник истины.
