@@ -5,6 +5,7 @@ import '../core/profile_data.dart';
 import '../data/models/user_profile.dart';
 import '../data/services/api_client.dart';
 import '../data/services/auth_service.dart';
+import '../data/services/fcm_service.dart';
 import '../data/services/token_storage.dart';
 
 /// Авторизация: SMS OTP + профиль пользователя.
@@ -52,6 +53,7 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
       await _loadProfile();
+      await _registerFcmIfPossible();
     } catch (e) {
       error = e.toString();
       currentUser = null;
@@ -89,7 +91,7 @@ class AuthProvider extends ChangeNotifier {
         refresh: result.refresh,
       );
       await _loadProfile();
-      // TODO(fcm): зарегистрировать FCM token после flutterfire configure.
+      await _registerFcmIfPossible();
       return isLoggedIn;
     } catch (e) {
       error = e.toString();
@@ -154,5 +156,14 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _loadProfile() async {
     final response = await _dio.get<Map<String, dynamic>>('/users/profile/');
     currentUser = UserProfile.fromJson(response.data ?? {});
+  }
+
+  Future<void> _registerFcmIfPossible() async {
+    if (!isLoggedIn) return;
+    try {
+      await FcmService.instance.registerTokenWithServer(_dio);
+    } catch (_) {
+      // FCM опционален до полной настройки Firebase.
+    }
   }
 }

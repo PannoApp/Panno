@@ -25,9 +25,27 @@ class InteriorSlide {
         json['zone_display'] ?? json['zoneDisplay'],
         field: 'zone_display',
       ),
-      imageUrl: parseString(json['image_url'] ?? json['imageUrl'], field: 'image_url'),
+      imageUrl: _parseImageUrl(json),
       caption: parseStringOrNull(json['caption']),
       order: parseInt(json['order'], field: 'order'),
+    );
+  }
+
+  /// Слайд главного экрана: `GET /core/info/` → `hero_slides[]`.
+  factory InteriorSlide.fromHeroJson(Map<String, dynamic> json) {
+    return InteriorSlide(
+      id: parseInt(json['id'], field: 'id'),
+      zone: '',
+      zoneDisplay: '',
+      imageUrl: _parseImageUrl(json),
+      order: parseInt(json['order'], field: 'order'),
+    );
+  }
+
+  static String _parseImageUrl(Map<String, dynamic> json) {
+    return parseString(
+      json['image_url'] ?? json['imageUrl'] ?? json['image'],
+      field: 'image',
     );
   }
 

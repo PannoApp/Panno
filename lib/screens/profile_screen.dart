@@ -10,7 +10,7 @@ import '../core/auth_guard.dart';
 import '../core/theme.dart';
 import '../core/profile_data.dart';
 import '../providers/auth_provider.dart';
-import '../core/home_data.dart';
+import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
@@ -859,7 +859,6 @@ class _HoursCardState extends State<_HoursCard>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
-    if (kRestaurantInfo.isOpen) _pulseCtrl.repeat(reverse: true);
   }
 
   @override
@@ -870,7 +869,17 @@ class _HoursCardState extends State<_HoursCard>
 
   @override
   Widget build(BuildContext context) {
-    final open = kRestaurantInfo.isOpen;
+    final core = context.watch<CoreInfoProvider>();
+    final open = core.isOpenNow;
+    if (open) {
+      if (!_pulseCtrl.isAnimating) _pulseCtrl.repeat(reverse: true);
+    } else if (_pulseCtrl.isAnimating) {
+      _pulseCtrl.stop();
+      _pulseCtrl.value = 0;
+    }
+    final hoursText = core.workingHoursNote?.isNotEmpty == true
+        ? '${core.workingHoursDisplay}\n${core.workingHoursNote}'
+        : core.workingHoursDisplay;
     return _BrandCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -915,7 +924,7 @@ class _HoursCardState extends State<_HoursCard>
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${kRestaurantInfo.scheduleLabel}  ·  ${kRestaurantInfo.hoursLabel}',
+                  hoursText,
                   style: PiligrimTextStyles.caption,
                 ),
               ],

@@ -1,21 +1,27 @@
 // Hero — только интерьер: затемнение и альфа-растворение внутри кадра.
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../core/interior_assets.dart';
 
 class CrossfadingHeroInterior extends StatefulWidget {
   const CrossfadingHeroInterior({
     super.key,
-    required this.paths,
+    required this.assetPaths,
+    this.networkUrls = const [],
     required this.index,
     required this.cacheWidth,
     required this.cacheHeight,
   });
 
-  final List<String> paths;
+  final List<String> assetPaths;
+  final List<String> networkUrls;
   final int index;
   final int cacheWidth;
   final int cacheHeight;
+
+  bool get _useNetwork => networkUrls.isNotEmpty;
+  int get _length => _useNetwork ? networkUrls.length : assetPaths.length;
 
   @override
   State<CrossfadingHeroInterior> createState() => _CrossfadingHeroInteriorState();
@@ -30,7 +36,7 @@ class _CrossfadingHeroInteriorState extends State<CrossfadingHeroInterior>
   @override
   void initState() {
     super.initState();
-    final len = widget.paths.length;
+    final len = widget._length;
     final i = len == 0 ? 0 : widget.index % len;
     _from = i;
     _to = i;
@@ -43,10 +49,12 @@ class _CrossfadingHeroInteriorState extends State<CrossfadingHeroInterior>
   @override
   void didUpdateWidget(covariant CrossfadingHeroInterior oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final len = widget.paths.length;
+    final len = widget._length;
     if (len == 0) return;
     final newIdx = widget.index % len;
-    final oldIdx = oldWidget.index % len;
+    final oldLen = oldWidget._length;
+    if (oldLen == 0) return;
+    final oldIdx = oldWidget.index % oldLen;
     if (newIdx != oldIdx) {
       _from = oldIdx;
       _to = newIdx;
@@ -62,12 +70,23 @@ class _CrossfadingHeroInteriorState extends State<CrossfadingHeroInterior>
 
   @override
   Widget build(BuildContext context) {
-    final len = widget.paths.length;
+    final len = widget._length;
     if (len == 0) return const SizedBox.expand();
 
     Widget shot(int i) {
+      if (widget._useNetwork) {
+        return CachedNetworkImage(
+          imageUrl: widget.networkUrls[i % len],
+          fit: BoxFit.cover,
+          alignment: const Alignment(0.0, 0.14),
+          memCacheWidth: widget.cacheWidth,
+          memCacheHeight: widget.cacheHeight,
+          placeholder: (_, __) => const ColoredBox(color: Color(0xFF1E1B19)),
+          errorWidget: (_, __, ___) => const ColoredBox(color: Color(0xFF1E1B19)),
+        );
+      }
       return Image.asset(
-        widget.paths[i % len],
+        widget.assetPaths[i % len],
         fit: BoxFit.cover,
         alignment: const Alignment(0.0, 0.14),
         isAntiAlias: true,
@@ -102,12 +121,14 @@ class HomeHeroSection extends StatefulWidget {
     required this.scrollOffset,
     required this.tiltX,
     required this.tiltY,
+    this.heroNetworkUrls,
   });
 
   final double height;
   final double scrollOffset;
   final double tiltX;
   final double tiltY;
+  final List<String>? heroNetworkUrls;
 
   @override
   State<HomeHeroSection> createState() => _HomeHeroSectionState();
@@ -120,6 +141,12 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
   static const double _heroImageScrollParallax = 0.10;
   static const double _heroImageScale = 1.26;
   static const _heroVisuals = PiligrimInteriorAssets.homeHeroCycle;
+
+  List<String> get _networkUrls =>
+      widget.heroNetworkUrls?.where((u) => u.isNotEmpty).toList() ?? const [];
+
+  int get _slideCount =>
+      _networkUrls.isNotEmpty ? _networkUrls.length : _heroVisuals.length;
 
   /// Затемнение только в нижних ~22% — верх и середина без overlay.
   static const _warmInteriorDarken = LinearGradient(
@@ -177,10 +204,13 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
     super.initState();
     _heroVisualTimer = Timer.periodic(const Duration(seconds: 7), (_) {
       if (!mounted) return;
-      setState(() => _heroVisualIndex = (_heroVisualIndex + 1) % _heroVisuals.length);
+      final count = _slideCount;
+      if (count == 0) return;
+      setState(() => _heroVisualIndex = (_heroVisualIndex + 1) % count);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (_networkUrls.isNotEmpty) return;
       final cw = PiligrimInteriorAssets.decodeCacheWidth(context);
       final ch = PiligrimInteriorAssets.decodeCacheHeight(context, widget.height);
       for (final p in _heroVisuals) {
@@ -190,6 +220,14 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
         );
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeHeroSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.heroNetworkUrls != widget.heroNetworkUrls) {
+      _heroVisualIndex = 0;
+    }
   }
 
   @override
@@ -218,7 +256,8 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
               fit: StackFit.expand,
               children: [
                 CrossfadingHeroInterior(
-                  paths: _heroVisuals,
+                  assetPaths: _heroVisuals,
+                  networkUrls: _networkUrls,
                   index: _heroVisualIndex,
                   cacheWidth: PiligrimInteriorAssets.decodeCacheWidth(context),
                   cacheHeight: PiligrimInteriorAssets.decodeCacheHeight(
