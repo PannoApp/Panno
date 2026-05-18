@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../core/theme.dart';
+import '../core/auth_guard.dart';
 import '../core/home_data.dart';
+import '../screens/booking_screen.dart';
 import 'piligrim_tap.dart';
 
 class HomeTotemPathRow extends StatefulWidget {
@@ -17,9 +19,19 @@ class HomeTotemPathRow extends StatefulWidget {
 class _HomeTotemPathRowState extends State<HomeTotemPathRow> {
   int _selected = 0;
 
-  void _onItemTap(int index) {
+  Future<void> _onItemTap(int index) async {
     setState(() => _selected = index);
     final cat = kMenuCategories[index];
+    if (cat.navIndex == kNavOpenBooking) {
+      if (!await guardAuth(context)) return;
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const BookingScreen(),
+        ),
+      );
+      return;
+    }
     widget.onNavigate?.call(cat.navIndex);
   }
 
@@ -85,20 +97,30 @@ class _HomeTotemPathRowState extends State<HomeTotemPathRow> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     color: selected
-                        ? PiligrimColors.sky.withValues(alpha: 0.048)
+                        ? PiligrimColors.sky.withValues(alpha: 0.03)
                         : PiligrimColors.clear,
                     border: Border.all(
-                      width: selected ? 1.2 : 1,
+                      width: selected ? 0.65 : 0.5,
                       color: selected
-                          ? cat.accentColor.withValues(alpha: 0.42)
-                          : PiligrimColors.sky.withValues(alpha: 0.1),
+                          ? cat.accentColor.withValues(alpha: 0.22)
+                          : PiligrimColors.sky.withValues(alpha: 0.055),
                     ),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: cat.accentColor.withValues(alpha: 0.10),
+                              blurRadius: 18,
+                              spreadRadius: -6,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       AnimatedScale(
-                        scale: selected ? 1.1 : 1.0,
+                        scale: selected ? 1.05 : 1.0,
                         duration: const Duration(milliseconds: 320),
                         curve: Curves.easeOutCubic,
                         child: SvgPicture.asset(

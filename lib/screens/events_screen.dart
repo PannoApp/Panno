@@ -2,9 +2,14 @@
 // Визуал и тон: piligrim_design_spec.md (§6 карточки, §8 герой, §9 мероприятия / «АУА»)
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
+import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
+import '../data/models/api_event.dart';
+import '../providers/events_provider.dart';
+import '../widgets/event_cover_image.dart';
 import '../widgets/piligrim_background.dart';
 import 'event_detail_screen.dart';
 import '../widgets/piligrim_tap.dart';
@@ -24,17 +29,8 @@ class _EventsScreenState extends State<EventsScreen> {
   bool _archiveOpen = false;
   int _heroIndex = 0;
 
-  late final List<PiligrimEvent> _allEvents;
-  late final List<PiligrimNewsPost> _news;
-
-  @override
-  void initState() {
-    super.initState();
-    _allEvents = buildMockEvents();
-    _news = mockNewsPosts();
-  }
-
-  void _openPhotoReport(PiligrimEvent e) {
+  void _openPhotoReport(ApiEvent e, int coverIndex) {
+    final coverAsset = e.fallbackCoverAsset(coverIndex);
     showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
@@ -71,7 +67,7 @@ class _EventsScreenState extends State<EventsScreen> {
               Builder(
                 builder: (context) {
                   final extras =
-                      PiligrimInteriorAssets.galleryExtrasExcluding(e.coverAssetPath);
+                      PiligrimInteriorAssets.galleryExtrasExcluding(coverAsset);
                   Widget galleryThumb(String asset) {
                     return Expanded(
                       child: ClipRRect(
@@ -109,7 +105,18 @@ class _EventsScreenState extends State<EventsScreen> {
 
                   return Row(
                     children: [
-                      galleryThumb(e.coverAssetPath),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: AspectRatio(
+                            aspectRatio: 1,
+                            child: EventCoverImage(
+                              imageUrl: e.coverUrl,
+                              fallbackAsset: coverAsset,
+                            ),
+                          ),
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       galleryThumb(extras[0]),
                       const SizedBox(width: 8),
@@ -141,10 +148,13 @@ class _EventsScreenState extends State<EventsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final upcoming = upcomingEventsSorted(_allEvents);
-    final past = pastEventsSorted(_allEvents);
+    return Consumer<EventsProvider>(
+      builder: (context, events, _) {
+        final upcoming = events.upcoming;
+        final past = events.archived;
+        final news = events.news;
 
-    return Scaffold(
+        return Scaffold(
       backgroundColor: PiligrimColors.earth,
       extendBodyBehindAppBar: true,
       extendBody: true,
@@ -222,6 +232,31 @@ class _EventsScreenState extends State<EventsScreen> {
                   ),
                 ),
                 if (_view == _AfichaView.events) ...[
+                  if (events.isLoadingUpcoming && upcoming.isEmpty)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: PiligrimColors.water,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (events.usedMockFallback && upcoming.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        child: Text(
+                          'Офлайн-режим: показаны демо-события',
+                          style: PiligrimTextStyles.caption.copyWith(
+                            fontSize: 11,
+                            color: PiligrimColors.steppe.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    ),
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     sliver: SliverToBoxAdapter(
@@ -245,10 +280,14 @@ class _EventsScreenState extends State<EventsScreen> {
                             padding: const EdgeInsets.only(bottom: 14),
                             child: _EventListCard(
                               event: e,
+                              coverFallbackIndex: i,
                               onOpen: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute<void>(
-                                    builder: (_) => EventDetailScreen(event: e),
+                                    builder: (_) => EventDetailScreen(
+                                      event: e,
+                                      coverFallbackIndex: i,
+                                    ),
                                   ),
                                 );
                               },
@@ -281,7 +320,7 @@ class _EventsScreenState extends State<EventsScreen> {
                               child: _PastEventCard(
                                 event: e,
                                 onPhotoReport: e.hasPhotoReport
-                                    ? () => _openPhotoReport(e)
+                                    ? () => _openPhotoReport(e, i)
                                     : null,
                               ),
                             );
@@ -309,13 +348,13 @@ class _EventsScreenState extends State<EventsScreen> {
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, i) {
-                          final n = _news[i];
+                          final n = news[i];
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 14),
                             child: _NewsCard(post: n),
                           );
                         },
-                        childCount: _news.length,
+                        childCount: news.length,
                       ),
                     ),
                   ),
@@ -325,6 +364,8 @@ class _EventsScreenState extends State<EventsScreen> {
             ),
         ],
       ),
+        );
+      },
     );
   }
 }
@@ -742,15 +783,17 @@ class _SegButton extends StatelessWidget {
 class _EventListCard extends StatelessWidget {
   const _EventListCard({
     required this.event,
+    required this.coverFallbackIndex,
     required this.onOpen,
   });
 
-  final PiligrimEvent event;
+  final ApiEvent event;
+  final int coverFallbackIndex;
   final VoidCallback onOpen;
 
   String _subtitle() {
-    final fmt = event.format.labelRu.toLowerCase();
-    final price = event.priceFromRub != null ? ' · от ${event.priceFromRub} ₽' : '';
+    final fmt = event.formatLabelRu.toLowerCase();
+    final price = event.priceFrom != null ? ' · от ${event.priceFrom} ₽' : '';
     return '$fmt$price';
   }
 
@@ -777,9 +820,9 @@ class _EventListCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.asset(
-                        event.coverAssetPath,
-                        fit: BoxFit.cover,
+                      EventCoverImage(
+                        imageUrl: event.coverUrl,
+                        fallbackAsset: event.fallbackCoverAsset(coverFallbackIndex),
                       ),
                       Positioned(
                         left: 0,
@@ -932,7 +975,7 @@ class _PastEventCard extends StatelessWidget {
     this.onPhotoReport,
   });
 
-  final PiligrimEvent event;
+  final ApiEvent event;
   final VoidCallback? onPhotoReport;
 
   @override

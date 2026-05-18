@@ -8,7 +8,7 @@ import 'piligrim_tap.dart';
 const Color _kNavBase = Color(0xFF211D1A);
 const Color _kNavTop = Color(0xFF2A2521);
 const Color _kNavActive = Color(0xFF7BA5B8);
-const Color _kNavInactive = Color(0x99F2EDE4);
+const Color _kNavInactive = Color(0x66F2EDE4);
 const Color _kNavRimTop = Color(0x14F2EDE4);
 
 class PiligrimNavBar extends StatelessWidget {
@@ -24,8 +24,8 @@ class PiligrimNavBar extends StatelessWidget {
   static const _items = [
     _NavItem(label: 'Главная', asset: 'assets/images/star_totem (1).svg'),
     _NavItem(label: 'Меню', asset: 'assets/images/bird_totem (1).svg'),
+    _NavItem(label: 'Интерьер', asset: 'assets/images/wheel_totem (1).svg'),
     _NavItem(label: 'Афиша', asset: 'assets/images/tree_totem (1).svg'),
-    _NavItem(label: 'Стол', asset: 'assets/images/moon_totem (1).svg'),
     _NavItem(label: 'Профиль', asset: 'assets/images/shaman.svg'),
   ];
 
@@ -111,10 +111,10 @@ class _NavTabCell extends StatelessWidget {
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeOutCubic,
           height: 2,
-          width: active ? 18 : 0,
+          width: active ? 14 : 0,
           decoration: BoxDecoration(
             color: active
-                ? _kNavActive.withValues(alpha: 0.45)
+                ? _kNavActive.withValues(alpha: 0.32)
                 : _kNavRimTop,
             borderRadius: BorderRadius.circular(2),
           ),
@@ -146,12 +146,14 @@ class _NavTotemIcon extends StatelessWidget {
   final String asset;
   final bool active;
 
-  static const double _sizeInactive = 16;
-  static const double _sizeActive = 22;
+  static const double _sizeInactive = 15;
+  static const double _sizeActive = 19;
 
   @override
   Widget build(BuildContext context) {
-    final iconSize = active ? _sizeActive : _sizeInactive;
+    final isHeavyGlyph = asset.contains('moon') || asset.contains('shaman');
+    final base = active ? _sizeActive : _sizeInactive;
+    final iconSize = base * (isHeavyGlyph ? 0.84 : 1.0);
 
     return SizedBox(
       width: 40,
@@ -163,20 +165,15 @@ class _NavTotemIcon extends StatelessWidget {
           if (active)
             IgnorePointer(
               child: Container(
-                width: 26,
-                height: 26,
+                width: 22,
+                height: 22,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x30A67C52),
-                      blurRadius: 8,
-                      offset: Offset(0, 1),
-                    ),
-                    BoxShadow(
-                      color: Color(0x227BA5B8),
-                      blurRadius: 6,
-                      spreadRadius: -2,
+                      color: Color(0x1A7BA5B8),
+                      blurRadius: 5,
+                      spreadRadius: -1,
                     ),
                   ],
                 ),
@@ -186,6 +183,7 @@ class _NavTotemIcon extends StatelessWidget {
             asset,
             width: iconSize,
             height: iconSize,
+            fit: BoxFit.contain,
             colorFilter: ColorFilter.mode(
               active ? _kNavActive : _kNavInactive,
               BlendMode.srcIn,

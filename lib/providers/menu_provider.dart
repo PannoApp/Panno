@@ -1,0 +1,158 @@
+// MenuProvider — состояние меню: категории, блюда, пагинация, поиск, режим отображения.
+// Подключён к MenuRepository; мок-данные не используются.
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../data/models/api_category.dart';
+import '../data/models/api_dish.dart';
+import '../data/models/api_tag.dart';
+import '../data/repositories/menu_repository.dart';
+
+enum MenuViewMode { feed, classic }
+
+class MenuProvider extends ChangeNotifier {
+  MenuProvider({MenuRepository? repository})
+      : _repository = repository ?? MenuRepository();
+
+  final MenuRepository _repository;
+
+  // ── Состояние ──────────────────────────────────────────────────────────────
+
+  List<ApiCategory> categories = const [];
+  List<ApiDish> dishes = const [];
+
+  bool isLoading = false;
+  bool isLoadingMore = false;
+  bool hasMore = true;
+
+  int _page = 1;
+  int? activeCategoryId;
+  String searchQuery = '';
+
+  MenuViewMode _mode = MenuViewMode.feed;
+  bool _loaded = false;
+
+  Timer? _debounce;
+
+  // ── Геттеры ────────────────────────────────────────────────────────────────
+
+  MenuViewMode get mode => _mode;
+  bool get loaded => _loaded;
+
+  // Уникальные теги из всех загруженных блюд — для динамических фильтр-чипов.
+  List<ApiTag> get availableTags {
+    final seen = <int>{};
+    final result = <ApiTag>[];
+    for (final dish in dishes) {
+      for (final tag in dish.tags) {
+        if (seen.add(tag.id)) result.add(tag);
+      }
+    }
+    return result;
+  }
+
+  // ── Инициализация ──────────────────────────────────────────────────────────
+
+  // Загружает сохранённый режим из SharedPreferences, затем параллельно
+  // запрашивает категории и первую страницу блюд.
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('menu_mode');
+    _mode = saved == 'classic' ? MenuViewMode.classic : MenuViewMode.feed;
+    _loaded = true;
+    notifyListeners();
+
+    await Future.wait([loadCategories(), loadDishes(refresh: true)]);
+  }
+
+  // ── Категории ──────────────────────────────────────────────────────────────
+
+  Future<void> loadCategories() async {
+    try {
+      categories = await _repository.fetchCategories();
+    } catch (_) {
+      categories = const [];
+    }
+    notifyListeners();
+  }
+
+  // ── Блюда (с пагинацией) ───────────────────────────────────────────────────
+
+  // refresh=true: сбросить страницу и список перед загрузкой.
+  Future<void> loadDishes({bool refresh = false}) async {
+    if (refresh) {
+      _page = 1;
+      dishes = const [];
+      hasMore = true;
+    }
+
+    // Не запускать параллельных запросов одного типа.
+    if (_page == 1 && isLoading) return;
+    if (_page > 1 && isLoadingMore) return;
+    if (!hasMore && !refresh) return;
+
+    if (_page == 1) {
+      isLoading = true;
+    } else {
+      isLoadingMore = true;
+    }
+    notifyListeners();
+
+    try {
+      final result = await _repository.fetchDishes(
+        categoryId: activeCategoryId,
+        search: searchQuery.isEmpty ? null : searchQuery,
+        page: _page,
+      );
+      dishes = [...dishes, ...result.dishes];
+      hasMore = result.hasMore;
+      _page++;
+    } catch (_) {
+      // При ошибке оставляем текущий список блюд, сбрасываем флаг пагинации.
+      hasMore = false;
+    } finally {
+      isLoading = false;
+      isLoadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Фильтры ────────────────────────────────────────────────────────────────
+
+  // Выбор категории — сброс и перезагрузка.
+  void setCategory(int? id) {
+    if (activeCategoryId == id) return;
+    activeCategoryId = id;
+    loadDishes(refresh: true);
+  }
+
+  // Поиск с debounce 400 мс — избегаем лишних запросов при быстром вводе.
+  void setSearch(String q) {
+    _debounce?.cancel();
+    searchQuery = q;
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      loadDishes(refresh: true);
+    });
+  }
+
+  // ── Режим отображения (feed / classic) ─────────────────────────────────────
+
+  Future<void> setMode(MenuViewMode mode) async {
+    if (_mode == mode) return;
+    _mode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'menu_mode',
+      mode == MenuViewMode.classic ? 'classic' : 'feed',
+    );
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+}
