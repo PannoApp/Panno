@@ -7,7 +7,10 @@ import 'package:provider/provider.dart';
 import 'core/ambient_preset_scope.dart';
 import 'core/theme.dart';
 import 'firebase_options.dart';
+import 'core/push_navigation.dart';
+import 'data/services/fcm_service.dart';
 import 'providers/auth_provider.dart';
+import 'screens/booking_screen.dart';
 import 'providers/booking_provider.dart';
 import 'providers/core_info_provider.dart';
 import 'providers/events_provider.dart';
@@ -20,6 +23,8 @@ import 'screens/events_screen.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/bottom_nav_bar.dart';
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -29,6 +34,12 @@ Future<void> main() async {
     );
   } catch (e, st) {
     debugPrint('Firebase init skipped: $e\n$st');
+  }
+
+  try {
+    await FcmService.instance.init(navigatorKey: rootNavigatorKey);
+  } catch (e, st) {
+    debugPrint('FCM init skipped: $e\n$st');
   }
 
   SystemChrome.setSystemUIOverlayStyle(
@@ -86,6 +97,7 @@ class _PiligrimAppState extends State<PiligrimApp>
       child: AmbientPresetScope(
         controller: _ambientCtrl,
         child: MaterialApp(
+          navigatorKey: rootNavigatorKey,
           title: 'PILIGRIM',
           debugShowCheckedModeBanner: false,
           theme: piligrimTheme,
@@ -114,6 +126,29 @@ class _RootShellState extends State<RootShell> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    PushNavigationHandler.onPushType = _onPushType;
+  }
+
+  @override
+  void dispose() {
+    if (PushNavigationHandler.onPushType == _onPushType) {
+      PushNavigationHandler.onPushType = null;
+    }
+    super.dispose();
+  }
+
+  void _onPushType(String type) {
+    if (!mounted) return;
+    switch (type) {
+      case 'event':
+        setState(() => _currentIndex = 3);
+      case 'booking':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BookingScreen()),
+        );
+      default:
+        break;
+    }
   }
 
   void _navigate(int index) {

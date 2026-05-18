@@ -24,6 +24,7 @@ class ApiEvent {
     this.coverUrl,
     this.priceFrom,
     required this.isPast,
+    this.hasPhotoReport = false,
   });
 
   final int id;
@@ -34,20 +35,32 @@ class ApiEvent {
   final String? coverUrl;
   final int? priceFrom;
   final bool isPast;
+  final bool hasPhotoReport;
 
-  factory ApiEvent.fromJson(Map<String, dynamic> json) {
+  factory ApiEvent.fromJson(
+    Map<String, dynamic> json, {
+    bool isPast = false,
+  }) {
     return ApiEvent(
       id: parseInt(json['id'], field: 'id'),
       title: parseString(json['title'], field: 'title'),
       description: parseString(json['description'], field: 'description'),
       startsAt: parseDateTime(
-        json['starts_at'] ?? json['startsAt'],
+        json['starts_at'] ?? json['startsAt'] ?? json['date_time'],
         field: 'starts_at',
       ),
       format: _parseFormat(json['format']),
-      coverUrl: parseStringOrNull(json['cover_url'] ?? json['coverUrl']),
-      priceFrom: parseIntOrNull(json['price_from'] ?? json['priceFrom']),
-      isPast: parseBool(json['is_past'] ?? json['isPast']),
+      coverUrl: parseStringOrNull(
+        json['cover_url'] ?? json['coverUrl'] ?? json['image'],
+      ),
+      priceFrom: parseIntOrNull(
+        json['price_from'] ?? json['priceFrom'] ?? json['price'],
+      ),
+      isPast: parseBool(json['is_past'] ?? json['isPast'], defaultValue: isPast),
+      hasPhotoReport: parseBool(
+        json['has_photo_report'] ?? json['hasPhotoReport'],
+        defaultValue: false,
+      ),
     );
   }
 
@@ -60,5 +73,6 @@ class ApiEvent {
         if (coverUrl != null) 'cover_url': coverUrl,
         if (priceFrom != null) 'price_from': priceFrom,
         'is_past': isPast,
+        'has_photo_report': hasPhotoReport,
       };
 }

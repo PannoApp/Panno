@@ -5,7 +5,14 @@ import '../core/theme.dart';
 import '../core/home_data.dart';
 
 class HomeStatusLine extends StatefulWidget {
-  const HomeStatusLine({super.key});
+  const HomeStatusLine({
+    super.key,
+    this.isOpen,
+    this.hoursLabel,
+  });
+
+  final bool? isOpen;
+  final String? hoursLabel;
 
   @override
   State<HomeStatusLine> createState() => _HomeStatusLineState();
@@ -15,6 +22,12 @@ class _HomeStatusLineState extends State<HomeStatusLine>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseCtrl;
 
+  bool get _open => widget.isOpen ?? kRestaurantInfo.isOpen;
+
+  String get _hours =>
+      widget.hoursLabel ??
+      '${kRestaurantInfo.scheduleLabel} · ${kRestaurantInfo.hoursLabel}';
+
   @override
   void initState() {
     super.initState();
@@ -22,7 +35,20 @@ class _HomeStatusLineState extends State<HomeStatusLine>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
-    if (kRestaurantInfo.isOpen) _pulseCtrl.repeat(reverse: true);
+    if (_open) _pulseCtrl.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeStatusLine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isOpen != widget.isOpen) {
+      if (_open) {
+        _pulseCtrl.repeat(reverse: true);
+      } else {
+        _pulseCtrl.stop();
+        _pulseCtrl.value = 0;
+      }
+    }
   }
 
   @override
@@ -33,8 +59,7 @@ class _HomeStatusLineState extends State<HomeStatusLine>
 
   @override
   Widget build(BuildContext context) {
-    const info = kRestaurantInfo;
-    final open = info.isOpen;
+    final open = _open;
     final dotColor =
         open ? PiligrimColors.water : PiligrimColors.sky.withValues(alpha: 0.2);
 
@@ -76,11 +101,15 @@ class _HomeStatusLineState extends State<HomeStatusLine>
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            '${info.scheduleLabel} · ${info.hoursLabel}',
-            style: PiligrimTextStyles.caption.copyWith(
-              color: PiligrimColors.sky.withValues(alpha: 0.45),
-              fontSize: 11,
+          Flexible(
+            child: Text(
+              _hours,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: PiligrimTextStyles.caption.copyWith(
+                color: PiligrimColors.sky.withValues(alpha: 0.45),
+                fontSize: 11,
+              ),
             ),
           ),
         ],
