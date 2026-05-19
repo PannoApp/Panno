@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -34,16 +36,19 @@ class FcmService {
 
   GlobalKey<NavigatorState>? _navigatorKey;
 
-  Future<void> init({GlobalKey<NavigatorState>? navigatorKey}) async {
+  /// Слушатели без системного диалога — можно вызвать до [runApp].
+  Future<void> initEarly({GlobalKey<NavigatorState>? navigatorKey}) async {
     final messaging = _messaging;
     if (messaging == null) return;
 
     _navigatorKey = navigatorKey;
-    await messaging.requestPermission();
 
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpened);
-    final initial = await messaging.getInitialMessage();
+    final initial = await messaging.getInitialMessage().timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => null,
+    );
     if (initial != null) {
       _handleNavigation(initial.data);
     }
@@ -51,6 +56,18 @@ class FcmService {
     messaging.onTokenRefresh.listen((_) async {
       await registerTokenWithServer(DioClient.instance.dio);
     });
+  }
+
+  /// Диалог разрешений — только после первого кадра UI (не на белом Launch Screen).
+  Future<void> requestPermissionIfNeeded() async {
+    final messaging = _messaging;
+    if (messaging == null) return;
+    await messaging.requestPermission();
+  }
+
+  Future<void> init({GlobalKey<NavigatorState>? navigatorKey}) async {
+    await initEarly(navigatorKey: navigatorKey);
+    await requestPermissionIfNeeded();
   }
 
   Future<String?> getToken() async {

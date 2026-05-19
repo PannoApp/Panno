@@ -1,5 +1,7 @@
 // Точка входа приложения PILIGRIM
 // Тема: piligrim_design_spec.md — тёмная тема, цвета Қара жер / Мөлдір су / Сары дала
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,20 +31,6 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e, st) {
-    debugPrint('Firebase init skipped: $e\n$st');
-  }
-
-  try {
-    await FcmService.instance.init(navigatorKey: rootNavigatorKey);
-  } catch (e, st) {
-    debugPrint('FCM init skipped: $e\n$st');
-  }
-
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -52,11 +40,35 @@ Future<void> main() async {
     ),
   );
 
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
-  ]).then((_) {
-    runApp(const PiligrimApp());
-  });
+  ]);
+
+  runApp(const PiligrimApp());
+}
+
+/// Firebase/FCM не блокируют первый кадр (splash).
+Future<void> bootstrapFirebase() async {
+  if (!DefaultFirebaseOptions.isConfigured) {
+    debugPrint(
+      'Firebase: заглушка (placeholder). Пуши отключены. '
+      'Выполните flutterfire configure для продакшена.',
+    );
+    return;
+  }
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 15));
+    await FcmService.instance
+        .initEarly(navigatorKey: rootNavigatorKey)
+        .timeout(const Duration(seconds: 5));
+    await FcmService.instance.requestPermissionIfNeeded();
+  } on TimeoutException {
+    debugPrint('Firebase bootstrap timed out — UI continues without FCM');
+  } catch (e, st) {
+    debugPrint('Firebase bootstrap skipped: $e\n$st');
+  }
 }
 
 class PiligrimApp extends StatefulWidget {
@@ -77,6 +89,10 @@ class _PiligrimAppState extends State<PiligrimApp>
       vsync: this,
       duration: const Duration(seconds: 120),
     )..repeat();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(bootstrapFirebase());
+    });
   }
 
   @override
