@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/dio_errors.dart';
 import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
 import '../data/models/api_event.dart';
@@ -40,7 +41,7 @@ class EventsProvider extends ChangeNotifier {
       upcoming = upcomingApiSorted(await _repository.fetchUpcoming());
       _usedMockFallback = false;
     } catch (e) {
-      upcomingError = e.toString();
+      upcomingError = dioErrorMessage(e);
       upcoming = upcomingApiSorted(mockEventsAsApi());
       _usedMockFallback = true;
     } finally {
@@ -58,7 +59,7 @@ class EventsProvider extends ChangeNotifier {
     try {
       archived = pastApiSorted(await _repository.fetchArchived());
     } catch (e) {
-      archivedError = e.toString();
+      archivedError = dioErrorMessage(e);
       archived = pastApiSorted(mockEventsAsApi());
       _usedMockFallback = true;
     } finally {
@@ -76,7 +77,7 @@ class EventsProvider extends ChangeNotifier {
     try {
       news = await _repository.fetchNews();
     } catch (e) {
-      newsError = e.toString();
+      newsError = dioErrorMessage(e);
       news = List.unmodifiable(mockNewsPosts());
     } finally {
       isLoadingNews = false;
@@ -92,6 +93,8 @@ class EventsProvider extends ChangeNotifier {
     ]);
   }
 
+  Future<void> retry() => load();
+
   Future<void> reserveEvent(int eventId, int guestsCount) async {
     isReserving = true;
     reserveError = null;
@@ -103,7 +106,7 @@ class EventsProvider extends ChangeNotifier {
         guestsCount: guestsCount,
       );
     } catch (e) {
-      reserveError = e.toString();
+      reserveError = dioErrorMessage(e);
       rethrow;
     } finally {
       isReserving = false;

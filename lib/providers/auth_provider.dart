@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/dio_errors.dart';
 import '../core/profile_data.dart';
 import '../data/models/user_profile.dart';
 import '../data/repositories/profile_repository.dart';
@@ -60,7 +61,7 @@ class AuthProvider extends ChangeNotifier {
       await _loadProfile();
       await _registerFcmIfPossible();
     } catch (e) {
-      error = e.toString();
+      error = dioErrorMessage(e);
       currentUser = null;
       await _tokenStorage.clearTokens();
     } finally {
@@ -76,7 +77,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authService.requestSms(phone);
     } catch (e) {
-      error = e.toString();
+      error = dioErrorMessage(e);
       rethrow;
     } finally {
       isLoading = false;
@@ -99,7 +100,7 @@ class AuthProvider extends ChangeNotifier {
       await _registerFcmIfPossible();
       return isLoggedIn;
     } catch (e) {
-      error = e.toString();
+      error = dioErrorMessage(e);
       return false;
     } finally {
       isLoading = false;
@@ -146,7 +147,7 @@ class AuthProvider extends ChangeNotifier {
 
       currentUser = await _profileRepository.updateProfile(body);
     } catch (e) {
-      error = e.toString();
+      error = dioErrorMessage(e);
       rethrow;
     } finally {
       isLoading = false;

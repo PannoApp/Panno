@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/dio_errors.dart';
 import '../data/models/api_booking.dart';
 import '../data/models/booking_request.dart';
 import '../data/repositories/booking_repository.dart';
@@ -60,7 +61,7 @@ class BookingProvider extends ChangeNotifier {
       isSuccess = true;
       _resetForm();
     } catch (e) {
-      error = e.toString();
+      error = dioErrorMessage(e);
     } finally {
       isSubmitting = false;
       notifyListeners();
@@ -76,7 +77,7 @@ class BookingProvider extends ChangeNotifier {
     try {
       history = await _repository.fetchHistory(page: page);
     } catch (e) {
-      historyError = e.toString();
+      historyError = dioErrorMessage(e);
     } finally {
       isLoadingHistory = false;
       notifyListeners();
@@ -88,6 +89,8 @@ class BookingProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
   }
+
+  Future<void> retryHistory() => loadHistory();
 
   void _resetForm() {
     selectedZone = 'Главный зал';

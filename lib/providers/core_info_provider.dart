@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/dio_errors.dart';
 import '../core/home_data.dart';
 import '../data/models/core_info.dart';
 import '../data/models/interior_slide.dart';
@@ -44,7 +45,7 @@ class CoreInfoProvider extends ChangeNotifier {
       coreInfo = results[0] as CoreInfo;
       interiorSlides = results[1] as List<InteriorSlide>;
     } catch (e) {
-      error = e.toString();
+      error = dioErrorMessage(e);
       coreInfo = null;
     } finally {
       isLoading = false;
@@ -57,4 +58,6 @@ class CoreInfoProvider extends ChangeNotifier {
     interiorSlides = const [];
     await load();
   }
+
+  Future<void> retry() => reload();
 }

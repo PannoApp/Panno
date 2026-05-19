@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/dio_errors.dart';
 import '../data/models/api_category.dart';
 import '../data/models/api_dish.dart';
 import '../data/models/api_tag.dart';
@@ -26,6 +27,7 @@ class MenuProvider extends ChangeNotifier {
   bool isLoading = false;
   bool isLoadingMore = false;
   bool hasMore = true;
+  String? error;
 
   int _page = 1;
   int? activeCategoryId;
@@ -43,6 +45,7 @@ class MenuProvider extends ChangeNotifier {
 
   /// true, если есть ещё страницы для подгрузки (курсор не null после первой загрузки).
   bool hasMoreFeed = true;
+  String? feedError;
 
   MenuViewMode _mode = MenuViewMode.feed;
   bool _loaded = false;
@@ -103,6 +106,7 @@ class MenuProvider extends ChangeNotifier {
       _page = 1;
       dishes = const [];
       hasMore = true;
+      error = null;
     }
 
     // Не запускать параллельных запросов одного типа.
@@ -126,8 +130,8 @@ class MenuProvider extends ChangeNotifier {
       dishes = [...dishes, ...result.dishes];
       hasMore = result.hasMore;
       _page++;
-    } catch (_) {
-      // При ошибке оставляем текущий список блюд, сбрасываем флаг пагинации.
+    } catch (e) {
+      error = dioErrorMessage(e);
       hasMore = false;
     } finally {
       isLoading = false;
@@ -145,6 +149,7 @@ class MenuProvider extends ChangeNotifier {
       _feedNextCursor = null;
       feedDishes = const [];
       hasMoreFeed = true;
+      feedError = null;
     }
 
     // Не запускать параллельных запросов и не грузить, если страниц больше нет.
@@ -159,14 +164,16 @@ class MenuProvider extends ChangeNotifier {
       feedDishes = [...feedDishes, ...result.dishes];
       _feedNextCursor = result.nextCursor;
       hasMoreFeed = result.nextCursor != null;
-    } catch (_) {
-      // При ошибке оставляем текущий список, прекращаем пагинацию.
+    } catch (e) {
+      feedError = dioErrorMessage(e);
       hasMoreFeed = false;
     } finally {
       isLoadingFeed = false;
       notifyListeners();
     }
   }
+
+  Future<void> retry() => load();
 
   // ── Фильтры ────────────────────────────────────────────────────────────────
 

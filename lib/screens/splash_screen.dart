@@ -1,13 +1,26 @@
 // Splash Screen — «Начало пути» (согласно piligrim_design_spec.md, раздел 9)
 // Анимации на встроенном AnimationController (без flutter_animate — стабильнее на iOS).
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../core/home_data.dart';
 import '../core/theme.dart';
+import '../data/repositories/core_repository.dart';
 import '../main.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  const SplashScreen({
+    super.key,
+    this.coreRepository,
+    this.onNavigateToHome,
+  });
+
+  final CoreRepository? coreRepository;
+
+  /// Переопределяет переход на главный экран — используется в тестах.
+  final VoidCallback? onNavigateToHome;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -27,6 +40,10 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _bottomOpacity;
 
   static const _navigateAfter = Duration(milliseconds: 3200);
+
+  // Баннер «рекомендуем обновить» — показывается при min ≤ current < latest
+  bool _showUpdateBanner = false;
+  String _bannerStoreUrl = '';
 
   @override
   void initState() {
@@ -80,11 +97,102 @@ class _SplashScreenState extends State<SplashScreen>
       if (mounted) _shimmer.repeat(reverse: true);
     });
 
-    Future<void>.delayed(_navigateAfter, _goToHome);
+    Future<void>.delayed(_navigateAfter, _checkVersionThenNavigate);
+  }
+
+  Future<void> _checkVersionThenNavigate() async {
+    if (!mounted) return;
+
+    try {
+      final platform = Platform.isIOS ? 'ios' : 'android';
+      final info = await (widget.coreRepository ?? CoreRepository())
+          .fetchAppVersion(platform);
+
+      final current = _parseVersion(kAppVersion);
+      final min = _parseVersion(info.minVersion);
+      final latest = _parseVersion(info.latestVersion);
+
+      if (_versionLessThan(current, min)) {
+        // Версия ниже минимальной — неотклоняемый диалог с переходом в магазин
+        if (!mounted) return;
+        await _showForceUpdateDialog(info.storeUrl);
+        return; // не переходим на главную — пользователь заблокирован
+      }
+
+      if (_versionLessThan(current, latest)) {
+        // Версия между min и latest — показываем отклоняемый баннер после навигации
+        if (mounted) {
+          setState(() {
+            _showUpdateBanner = true;
+            _bannerStoreUrl = info.storeUrl;
+          });
+        }
+      }
+    } catch (_) {
+      // Ошибка сети — молча продолжаем, не блокируем запуск
+    }
+
+    _goToHome();
+  }
+
+  // Разбирает строку "major.minor.patch" в список из трёх int
+  List<int> _parseVersion(String v) {
+    final parts = v.split('.');
+    return List.generate(3, (i) => i < parts.length ? (int.tryParse(parts[i]) ?? 0) : 0);
+  }
+
+  // Возвращает true если a строго меньше b (сравнение major → minor → patch)
+  bool _versionLessThan(List<int> a, List<int> b) {
+    for (var i = 0; i < 3; i++) {
+      if (a[i] < b[i]) return true;
+      if (a[i] > b[i]) return false;
+    }
+    return false; // равны
+  }
+
+  Future<void> _showForceUpdateDialog(String storeUrl) async {
+    if (!mounted) return;
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // неотклоняемый
+      builder: (ctx) => PopScope(
+        canPop: false, // запрещаем закрытие кнопкой «назад»
+        child: AlertDialog(
+          backgroundColor: PiligrimColors.earthDeep,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Text(
+            'Необходимо обновление',
+            style: PiligrimTextStyles.heading.copyWith(color: PiligrimColors.sky),
+          ),
+          content: Text(
+            'Ваша версия приложения устарела. Пожалуйста, обновите приложение, чтобы продолжить.',
+            style: PiligrimTextStyles.body.copyWith(
+              color: PiligrimColors.sky.withValues(alpha: 0.75),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => launchUrl(
+                Uri.parse(storeUrl),
+                mode: LaunchMode.externalApplication,
+              ),
+              child: Text(
+                'Обновить',
+                style: PiligrimTextStyles.button.copyWith(color: PiligrimColors.water),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _goToHome() {
     if (!mounted) return;
+    if (widget.onNavigateToHome != null) {
+      widget.onNavigateToHome!();
+      return;
+    }
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => const RootShell(),
@@ -129,6 +237,7 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
           _buildBottomLabel(),
+          if (_showUpdateBanner) _buildUpdateBanner(),
         ],
       ),
     );
@@ -292,6 +401,58 @@ class _SplashScreenState extends State<SplashScreen>
             fontSize: 10,
           ),
           textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  // Отклоняемый баннер — показывается когда min ≤ current < latest
+  Widget _buildUpdateBanner() {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 12,
+      left: 16,
+      right: 16,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: PiligrimColors.earthDeep,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: PiligrimColors.steppe.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Доступна новая версия приложения',
+                  style: PiligrimTextStyles.body.copyWith(
+                    fontSize: 13,
+                    color: PiligrimColors.sky,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => launchUrl(
+                  Uri.parse(_bannerStoreUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Обновить',
+                  style: PiligrimTextStyles.button.copyWith(color: PiligrimColors.water),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => setState(() => _showUpdateBanner = false),
+                child: const Icon(Icons.close, size: 16, color: PiligrimColors.navInactive),
+              ),
+            ],
+          ),
         ),
       ),
     );

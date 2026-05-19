@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:piligrim/data/models/user_profile.dart';
 import 'package:piligrim/data/repositories/profile_repository.dart';

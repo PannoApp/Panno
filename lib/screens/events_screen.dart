@@ -9,6 +9,7 @@ import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
 import '../data/models/api_event.dart';
 import '../providers/events_provider.dart';
+import '../widgets/error_view.dart';
 import '../widgets/event_cover_image.dart';
 import '../widgets/piligrim_background.dart';
 import 'event_detail_screen.dart';
@@ -243,6 +244,11 @@ class _EventsScreenState extends State<EventsScreen> {
                           ),
                         ),
                       ),
+                    ),
+                  if (events.upcomingError != null && upcoming.isEmpty)
+                    SliverErrorView(
+                      message: events.upcomingError!,
+                      onRetry: () => context.read<EventsProvider>().retry(),
                     ),
                   if (events.usedMockFallback && upcoming.isNotEmpty)
                     SliverToBoxAdapter(

@@ -15,6 +15,7 @@ import '../data/models/api_tag.dart';
 import '../providers/menu_provider.dart';
 import '../widgets/dish_elements.dart';
 import '../widgets/dish_video_card.dart';
+import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_tap.dart';
 
@@ -269,6 +270,13 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
       );
     }
 
+    if (menuProvider.error != null && dishes.isEmpty) {
+      return ErrorView(
+        message: menuProvider.error!,
+        onRetry: () => context.read<MenuProvider>().retry(),
+      );
+    }
+
     if (dishes.isEmpty) {
       return Center(
         child: Text(
@@ -445,6 +453,11 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
             child: Center(
               child: CircularProgressIndicator(color: PiligrimColors.water),
             ),
+          )
+        else if (menuProvider.error != null && filtered.isEmpty)
+          SliverErrorView(
+            message: menuProvider.error!,
+            onRetry: () => context.read<MenuProvider>().retry(),
           )
         else if (filtered.isEmpty)
           SliverFillRemaining(
