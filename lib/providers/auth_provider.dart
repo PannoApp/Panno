@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/profile_data.dart';
 import '../data/models/user_profile.dart';
+import '../data/repositories/profile_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/auth_service.dart';
 import '../data/services/fcm_service.dart';
@@ -14,14 +15,18 @@ class AuthProvider extends ChangeNotifier {
     AuthService? authService,
     Dio? dio,
     TokenStorage? tokenStorage,
+    ProfileRepository? profileRepository,
   })  : _tokenStorage = tokenStorage ?? TokenStorage.instance,
         _dio = dio ?? DioClient.instance.dio,
         _authService = authService ??
-            AuthService(dio ?? DioClient.instance.dio);
+            AuthService(dio ?? DioClient.instance.dio),
+        _profileRepository = profileRepository ??
+            ProfileRepository(dio: dio ?? DioClient.instance.dio);
 
   final TokenStorage _tokenStorage;
   final Dio _dio;
   final AuthService _authService;
+  final ProfileRepository _profileRepository;
 
   UserProfile? currentUser;
   bool isLoading = false;
@@ -139,11 +144,7 @@ class AuthProvider extends ChangeNotifier {
       if (promotions != null) body['notify_promotions'] = promotions;
       if (closedEvents != null) body['notify_closed_events'] = closedEvents;
 
-      final response = await _dio.patch<Map<String, dynamic>>(
-        '/users/profile/',
-        data: body,
-      );
-      currentUser = UserProfile.fromJson(response.data ?? {});
+      currentUser = await _profileRepository.updateProfile(body);
     } catch (e) {
       error = e.toString();
       rethrow;
@@ -154,8 +155,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _loadProfile() async {
-    final response = await _dio.get<Map<String, dynamic>>('/users/profile/');
-    currentUser = UserProfile.fromJson(response.data ?? {});
+    currentUser = await _profileRepository.fetchProfile();
   }
 
   Future<void> _registerFcmIfPossible() async {
