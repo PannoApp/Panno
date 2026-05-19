@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/auth_guard.dart';
 import '../core/theme.dart';
 import '../core/profile_data.dart';
+import '../data/models/core_info.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../providers/core_info_provider.dart';
@@ -25,12 +26,54 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Состояние toggles (в реальном приложении — через SharedPreferences / Provider)
-  final Map<String, bool> _notifState = {
-    'events': true,
-    'promo': false,
-    'private': true,
-  };
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (context.read<AuthProvider>().isLoggedIn) {
+        context.read<BookingProvider>().loadHistory();
+      }
+    });
+  }
+
+  bool _notifValue(AuthProvider auth, String id) {
+    final user = auth.currentUser;
+    if (user == null) return false;
+    return switch (id) {
+      'events' => user.notifyEvents,
+      'promo' => user.notifyPromotions,
+      'private' => user.notifyClosedEvents,
+      _ => false,
+    };
+  }
+
+  Future<void> _onNotifToggle(String id, bool value) async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) return;
+
+    try {
+      switch (id) {
+        case 'events':
+          await auth.updateNotificationPreferences(events: value);
+        case 'promo':
+          await auth.updateNotificationPreferences(promotions: value);
+        case 'private':
+          await auth.updateNotificationPreferences(closedEvents: value);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: PiligrimColors.earthDeep,
+          content: Text(
+            auth.error ?? 'Не удалось сохранить настройки',
+            style: PiligrimTextStyles.body.copyWith(fontSize: 13),
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> _launch(String url) async {
     final uri = Uri.parse(url);
@@ -51,6 +94,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final core = context.watch<CoreInfoProvider>();
+    final coreInfo = core.coreInfo;
+
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         final user = auth.user;
@@ -90,9 +136,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 12),
                     _NotificationsCard(
-                      state: _notifState,
-                      onToggle: (id, val) =>
-                          setState(() => _notifState[id] = val),
+                      enabled: auth.isLoggedIn,
+                      isOn: (id) => _notifValue(auth, id),
+                      onToggle: _onNotifToggle,
                     ),
                     const SizedBox(height: 28),
 
@@ -102,7 +148,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: 'assets/images/splash_path (1).svg',
                     ),
                     const SizedBox(height: 12),
-                    _ContactsCard(onLaunch: _launch),
+                    _ContactsCard(
+                      coreInfo: coreInfo,
+                      onLaunch: _launch,
+                    ),
                     const SizedBox(height: 28),
 
                     // Часы работы
@@ -120,7 +169,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: 'assets/images/shaman.svg',
                     ),
                     const SizedBox(height: 12),
-                    _RulesCard(),
+                    _RulesCard(
+                      rules: coreInfo?.visitRules.isNotEmpty == true
+                          ? coreInfo!.visitRules
+                          : null,
+                    ),
                     const SizedBox(height: 28),
 
                     // Выход из аккаунта
@@ -135,7 +188,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
 
                     // Юридическое + версия
-                        _LegalFooter(onLaunch: _launch),
+                        _LegalFooter(
+                          privacyUrl: coreInfo?.privacyPolicy,
+                          onLaunch: _launch,
+                        ),
                       ]),
                     ),
                   ),
@@ -519,26 +575,43 @@ class _StatCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _NotificationsCard extends StatelessWidget {
   const _NotificationsCard({
-    required this.state,
+    required this.enabled,
+    required this.isOn,
     required this.onToggle,
   });
 
-  final Map<String, bool> state;
-  final void Function(String id, bool val) onToggle;
+  final bool enabled;
+  final bool Function(String id) isOn;
+  final Future<void> Function(String id, bool value) onToggle;
 
   @override
   Widget build(BuildContext context) {
+    if (!enabled) {
+      return _BrandCard(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Войдите, чтобы управлять уведомлениями',
+            style: PiligrimTextStyles.body.copyWith(
+              fontSize: 13,
+              color: PiligrimColors.sky.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+      );
+    }
+
     return _BrandCard(
       child: Column(
         children: kNotifCategories.asMap().entries.map((entry) {
           final i = entry.key;
           final cat = entry.value;
-          final isOn = state[cat.id] ?? false;
+          final on = isOn(cat.id);
           return Column(
             children: [
               _NotifRow(
                 category: cat,
-                isOn: isOn,
+                isOn: on,
                 onChanged: (val) => onToggle(cat.id, val),
               ),
               if (i < kNotifCategories.length - 1)
@@ -658,15 +731,99 @@ class _NotifRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONTACTS CARD
-// ─────────────────────────────────────────────────────────────────────────────
-class _ContactsCard extends StatelessWidget {
-  const _ContactsCard({required this.onLaunch});
+({Color color, String totemAsset}) _messengerStyle(String label) {
+  final lower = label.toLowerCase();
+  if (lower.contains('whatsapp')) {
+    return (color: const Color(0xFF25D366), totemAsset: 'assets/images/wheel_totem (1).svg');
+  }
+  if (lower.contains('telegram') || lower.contains('tg')) {
+    return (color: const Color(0xFF2AABEE), totemAsset: 'assets/images/bird_totem (1).svg');
+  }
+  if (lower.contains('instagram')) {
+    return (color: const Color(0xFFE1306C), totemAsset: 'assets/images/star_totem (1).svg');
+  }
+  return (color: PiligrimColors.water, totemAsset: 'assets/images/splash_path (1).svg');
+}
+
+class _MessengerChip extends StatelessWidget {
+  const _MessengerChip({
+    required this.label,
+    required this.url,
+    required this.color,
+    required this.totemAsset,
+    required this.onLaunch,
+  });
+
+  final String label;
+  final String url;
+  final Color color;
+  final String totemAsset;
   final Future<void> Function(String url) onLaunch;
 
   @override
   Widget build(BuildContext context) {
+    return Expanded(
+      child: PiligrimTap(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => onLaunch(url),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            children: [
+              SvgPicture.asset(
+                totemAsset,
+                width: 22,
+                height: 22,
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: PiligrimTextStyles.caption.copyWith(
+                  fontSize: 10,
+                  color: color.withValues(alpha: 0.85),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTACTS CARD
+// ─────────────────────────────────────────────────────────────────────────────
+class _ContactsCard extends StatelessWidget {
+  const _ContactsCard({
+    required this.coreInfo,
+    required this.onLaunch,
+  });
+
+  final CoreInfo? coreInfo;
+  final Future<void> Function(String url) onLaunch;
+
+  @override
+  Widget build(BuildContext context) {
+    final address = coreInfo?.address.isNotEmpty == true
+        ? coreInfo!.address
+        : kRestaurantAddress;
+    final phone = coreInfo?.phone.isNotEmpty == true
+        ? coreInfo!.phone
+        : kRestaurantPhone;
+    final messengers = coreInfo?.socialLinks.isNotEmpty == true
+        ? coreInfo!.socialLinks
+        : null;
+
     return _BrandCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -689,7 +846,7 @@ class _ContactsCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    kRestaurantAddress,
+                    address,
                     style: PiligrimTextStyles.body.copyWith(
                       fontSize: 13,
                       color: PiligrimColors.sky.withValues(alpha: 0.75),
@@ -757,7 +914,7 @@ class _ContactsCard extends StatelessWidget {
 
           // Телефон
           PiligrimTap(
-            onTap: () => onLaunch('tel:$kRestaurantPhone'),
+            onTap: () => onLaunch('tel:$phone'),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
@@ -773,7 +930,7 @@ class _ContactsCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    kRestaurantPhone,
+                    phone,
                     style: PiligrimTextStyles.body.copyWith(
                       fontSize: 14,
                       color: PiligrimColors.water,
@@ -810,50 +967,25 @@ class _ContactsCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Row(
-                  children: kMessengers.map((m) {
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: m == kMessengers.last ? 0 : 10,
-                        ),
-                        child: PiligrimTap(
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: () => onLaunch(m.url),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 11),
-                            decoration: BoxDecoration(
-                              color: m.color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: m.color.withValues(alpha: 0.25),
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                SvgPicture.asset(
-                                  m.totemAsset,
-                                  width: 22,
-                                  height: 22,
-                                  colorFilter: ColorFilter.mode(
-                                    m.color,
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  m.label,
-                                  style: PiligrimTextStyles.caption.copyWith(
-                                    fontSize: 10,
-                                    color: m.color.withValues(alpha: 0.85),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                  children: (messengers != null
+                          ? messengers.map((link) {
+                              final style = _messengerStyle(link.label);
+                              return _MessengerChip(
+                                label: link.label,
+                                url: link.url,
+                                color: style.color,
+                                totemAsset: style.totemAsset,
+                                onLaunch: onLaunch,
+                              );
+                            })
+                          : kMessengers.map((m) => _MessengerChip(
+                                label: m.label,
+                                url: m.url,
+                                color: m.color,
+                                totemAsset: m.totemAsset,
+                                onLaunch: onLaunch,
+                              )))
+                      .toList(),
                 ),
               ],
             ),
@@ -977,6 +1109,11 @@ class _HoursCardState extends State<_HoursCard>
 // RULES CARD — раскрываемые пункты
 // ─────────────────────────────────────────────────────────────────────────────
 class _RulesCard extends StatefulWidget {
+  const _RulesCard({this.rules});
+
+  /// Если null или пусто — fallback на [kVisitRules].
+  final List<VisitRuleItem>? rules;
+
   @override
   State<_RulesCard> createState() => _RulesCardState();
 }
@@ -984,11 +1121,30 @@ class _RulesCard extends StatefulWidget {
 class _RulesCardState extends State<_RulesCard> {
   int? _expanded;
 
+  List<({String title, String body, String iconAsset})> get _items {
+    final api = widget.rules;
+    if (api != null && api.isNotEmpty) {
+      return api
+          .map(
+            (r) => (
+              title: r.title,
+              body: r.body,
+              iconAsset: 'assets/images/shaman.svg',
+            ),
+          )
+          .toList();
+    }
+    return kVisitRules
+        .map((r) => (title: r.title, body: r.body, iconAsset: r.iconAsset))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final items = _items;
     return _BrandCard(
       child: Column(
-        children: kVisitRules.asMap().entries.map((entry) {
+        children: items.asMap().entries.map((entry) {
           final i = entry.key;
           final rule = entry.value;
           final isOpen = _expanded == i;
@@ -1061,7 +1217,7 @@ class _RulesCardState extends State<_RulesCard> {
                       )
                     : const SizedBox.shrink(),
               ),
-              if (i < kVisitRules.length - 1)
+              if (i < items.length - 1)
                 const Divider(
                   height: 1,
                   color: PiligrimColors.divider,
@@ -1081,11 +1237,20 @@ class _RulesCardState extends State<_RulesCard> {
 // LEGAL FOOTER
 // ─────────────────────────────────────────────────────────────────────────────
 class _LegalFooter extends StatelessWidget {
-  const _LegalFooter({required this.onLaunch});
+  const _LegalFooter({
+    required this.onLaunch,
+    this.privacyUrl,
+  });
+
   final Future<void> Function(String url) onLaunch;
+  final String? privacyUrl;
 
   @override
   Widget build(BuildContext context) {
+    final privacy = privacyUrl?.isNotEmpty == true
+        ? privacyUrl!
+        : 'https://piligrim.kz/privacy';
+
     return Column(
       children: [
         // Центральный тотем-разделитель
@@ -1112,7 +1277,7 @@ class _LegalFooter extends StatelessWidget {
               const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
               _LegalRow(
                 label: 'Политика конфиденциальности',
-                onTap: () => onLaunch('https://piligrim.kz/privacy'),
+                onTap: () => onLaunch(privacy),
               ),
               const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
               _LegalRow(
