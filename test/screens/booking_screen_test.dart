@@ -15,7 +15,7 @@ import 'package:piligrim/data/services/auth_service.dart';
 import 'package:piligrim/providers/auth_provider.dart';
 import 'package:piligrim/providers/booking_provider.dart';
 import 'package:piligrim/providers/core_info_provider.dart';
-import 'package:piligrim/screens/booking_screen.dart';
+import 'package:piligrim/screens/booking_screen.dart' show BookingScreen, bookingTimeForApi;
 import 'package:piligrim/screens/phone_entry_screen.dart';
 
 import '../support/fake_token_storage.dart';
@@ -58,6 +58,24 @@ CoreInfo _coreInfo({bool depositRequired = false}) => CoreInfo(
 void main() {
   setUpAll(() {
     registerFallbackValue(_fallbackReq);
+  });
+
+  group('bookingTimeForApi', () {
+    test('дополняет нулями часы и минуты, добавляет :00 секунд', () {
+      expect(bookingTimeForApi(const TimeOfDay(hour: 9, minute: 5)), '09:05:00');
+    });
+
+    test('граничное значение: 23:59 → 23:59:00', () {
+      expect(bookingTimeForApi(const TimeOfDay(hour: 23, minute: 59)), '23:59:00');
+    });
+
+    test('_timeLabel остаётся HH:MM — без секунд (дефолтное время 19:30)', () {
+      // _timeLabel использует тот же padLeft-формат, но без :00
+      final h = 19.toString().padLeft(2, '0');
+      final m = 30.toString().padLeft(2, '0');
+      expect('$h:$m', '19:30');
+      expect(bookingTimeForApi(const TimeOfDay(hour: 19, minute: 30)), '19:30:00');
+    });
   });
 
   group('BookingScreen', () {

@@ -68,6 +68,65 @@ void main() {
       expect(dish.tags, isEmpty);
     });
 
+    // --- Тесты для video_url / video фолбэка ---
+
+    test('video_url присутствует → videoUrl берётся из video_url', () {
+      final dish = ApiDish.fromJson({
+        'id': 10,
+        'name': 'Блюдо',
+        'description': '',
+        'price': 1000,
+        'category': 1,
+        'tags': [],
+        'allergens': [],
+        'weight': '0',
+        'story': '',
+        'is_active': true,
+        'video': 'https://cdn.example/raw.mp4',
+        'video_url': 'https://cdn.example/processed_720p.mp4',
+      });
+
+      // Должны получить обработанный H.264, а не сырой файл
+      expect(dish.videoUrl, 'https://cdn.example/processed_720p.mp4');
+    });
+
+    test('только video без video_url → videoUrl читается из video (фолбэк)', () {
+      final dish = ApiDish.fromJson({
+        'id': 11,
+        'name': 'Блюдо',
+        'description': '',
+        'price': 1000,
+        'category': 1,
+        'tags': [],
+        'allergens': [],
+        'weight': '0',
+        'story': '',
+        'is_active': true,
+        'video': 'https://cdn.example/raw.mp4',
+        // video_url отсутствует — старый формат ответа сервера
+      });
+
+      expect(dish.videoUrl, 'https://cdn.example/raw.mp4');
+    });
+
+    test('ни video ни video_url → videoUrl == null', () {
+      final dish = ApiDish.fromJson({
+        'id': 12,
+        'name': 'Блюдо',
+        'description': '',
+        'price': 1000,
+        'category': 1,
+        'tags': [],
+        'allergens': [],
+        'weight': '0',
+        'story': '',
+        'is_active': true,
+        // оба поля отсутствуют
+      });
+
+      expect(dish.videoUrl, isNull);
+    });
+
     test('converts price from string to int', () {
       final dish = ApiDish.fromJson({
         'id': 3,

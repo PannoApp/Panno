@@ -2,6 +2,11 @@ import 'json_utils.dart';
 
 enum ApiEventFormat { open, closed }
 
+int? _parseDecimalPrice(dynamic v) {
+  if (v == null) return null;
+  return (double.tryParse('$v') ?? 0.0).round();
+}
+
 ApiEventFormat _parseFormat(dynamic value) {
   final raw = parseString(value, field: 'format').toLowerCase();
   switch (raw) {
@@ -53,9 +58,7 @@ class ApiEvent {
       coverUrl: parseStringOrNull(
         json['cover_url'] ?? json['coverUrl'] ?? json['image'],
       ),
-      priceFrom: parseIntOrNull(
-        json['price_from'] ?? json['priceFrom'] ?? json['price'],
-      ),
+      priceFrom: _parseDecimalPrice(json['price'] ?? json['price_from']),
       isPast: parseBool(json['is_past'] ?? json['isPast'], defaultValue: isPast),
       hasPhotoReport: parseBool(
         json['has_photo_report'] ?? json['hasPhotoReport'],

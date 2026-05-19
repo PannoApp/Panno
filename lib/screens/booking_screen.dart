@@ -14,6 +14,13 @@ import '../widgets/ember_cta.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_tap.dart';
 
+// Форматирует TimeOfDay в строку HH:MM:SS для Django TimeField.
+String bookingTimeForApi(TimeOfDay time) {
+  final h = time.hour.toString().padLeft(2, '0');
+  final m = time.minute.toString().padLeft(2, '0');
+  return '$h:$m:00';
+}
+
 // Согласно brand/piligrim_design_spec.md:
 // - палитра Қара жер / Мөлдір су / Сары дала
 // - мягкая геометрия карточек и медитативные анимации
@@ -114,6 +121,9 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
+  // Формат времени для Django TimeField: HH:MM → HH:MM:SS
+  String get _timeForApi => bookingTimeForApi(_visitTime);
+
   // Формат даты для API Django DateField
   String get _dateForApi {
     final d = _visitDate;
@@ -134,7 +144,7 @@ class _BookingScreenState extends State<BookingScreen> {
       guestName: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       date: _dateForApi,
-      time: _timeLabel,
+      time: _timeForApi,
       guestsCount: int.parse(_guestsCtrl.text),
       zone: _selectedZone != null ? _zoneApiMap[_selectedZone] : null,
       comment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),

@@ -60,8 +60,9 @@ class ApiDish {
       allergens: _parseAllergens(json['allergens']),
       // backend поле называется 'image' (не image_url)
       imageUrl: parseStringOrNull(json['image']),
-      // backend поле называется 'video' (не video_url)
-      videoUrl: parseStringOrNull(json['video']),
+      // Предпочитаем video_url (H.264 720×1280, готово к стримингу),
+      // фолбэк на video — на случай старого формата ответа сервера.
+      videoUrl: parseStringOrNull(json['video_url'] ?? json['video']),
       weight: parseString(json['weight'] ?? '', field: 'weight'),
       story: parseString(json['story'] ?? '', field: 'story'),
       isActive: parseBool(json['is_active'] ?? json['isActive'], defaultValue: true),
