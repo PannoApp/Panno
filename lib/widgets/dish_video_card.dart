@@ -231,14 +231,7 @@ class _DishVideoCardState extends State<DishVideoCard>
                   child: DishCardBottomInfo(dish: widget.dish),
                 ),
 
-                // ── 6. Правый action-бар ───────────────────────────────
-                Positioned(
-                  right: 14,
-                  bottom: 160,
-                  child: DishCardActionBar(dish: widget.dish),
-                ),
-
-                // ── 7. Хинт «свайп → история» (появляется на секунду) ─
+                // ── 6. Хинт «свайп → история» (появляется на секунду) ─
                 if (widget.isActive)
                   Positioned(
                     left: 20,
@@ -501,10 +494,6 @@ class _DishDetailSheet extends StatelessWidget {
                       content: dish.allergens.join(' · '),
                     ),
 
-                  const SizedBox(height: 24),
-
-                  // CTA
-                  DishBookingCta(dish: dish),
                 ],
               ),
             ),

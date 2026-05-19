@@ -1,118 +1,38 @@
-# PILIGRIM — Flutter App: Roadmap & Tickets
+# PILIGRIM — Flutter App: План исправлений и доработок
 
-> Документ описывает пошаговый план интеграции Flutter-приложения с бэкендом Django REST API.
-> Разработчики: **Архат** (инфраструктура / бэкенд-интеграция) и **Шерхан** (контент / UI).
+> Документ описывает актуальные задачи по устранению расхождений Flutter-приложения с ТЗ и бэкендом.
+> Разработчики: **Шерхан** (слой данных — модели, провайдеры, репозитории, сервисы) и **Архат** (слой UI — экраны, виджеты, очистка интерфейса).
+>
+> Бэкенд соответствует ТЗ и является источником истины. Все расхождения — на стороне Flutter.
 
 ---
 
 ## Контекст
 
-Приложение имеет полностью готовый UI на моковых данных (8 экранов, 25+ виджетов, брендовая тема). Бэкенд полностью написан и задокументирован (Django REST + Celery + FCM). Цель — подключить Flutter к реальному API, добавить аутентификацию, пуш-уведомления и устранить расхождение навигационной структуры с ТЗ.
+Приложение имеет полностью готовый UI и интеграцию с API (8 экранов, 25+ виджетов, провайдеры, репозитории, сервисы). В ходе аудита выявлены критические баги парсинга данных, несуществующий по ТЗ функционал в UI, и хардкоженные данные вместо значений из API.
 
-**Ключевое расхождение с ТЗ:**
-- Текущие 5 табов: `Home / Menu / Events / Booking / Profile`
-- По ТЗ: `Home / Menu / Интерьер / Афиша / Профиль`
+**Принцип разделения:**
+- Шерхан — слой данных (модели, провайдеры, репозитории, сервисы, авторизация)
+- Архат — слой UI (экраны, виджеты, очистка, навигация)
 
-Бронирование → quick action с главного экрана (уже есть `HomeTotemPathRow` + `home_action_block.dart`).
-
----
-
-## Архитектурные решения
-
-| Решение | Выбор | Причина |
-|---|---|---|
-| HTTP client | `dio ^5.7` | JWT-интерцептор, retry, конфигурируемость |
-| Хранение токенов | `flutter_secure_storage ^9.2` | Безопасность, keychain/keystore |
-| State management | `provider ^6.1` + `ChangeNotifier` | Минимальная надстройка над уже используемым `ValueNotifier`/`InheritedNotifier` |
-| Изображения из API | `cached_network_image ^3.4` | Кэш, плейсхолдеры |
-| Видео | `video_player ^2.9` | Официальный Flutter-пакет, достаточен для ленты |
-| Push | `firebase_core ^3.6` + `firebase_messaging ^15.1` | Бэкенд уже использует FCM |
-| UUID | `uuid ^4.5` | Idempotency-Key для booking/event reservation |
-| Тестирование | `mocktail ^1.0` | Мокирование Dio и сервисов без кодогенерации |
-
-### Новые пакеты (pubspec.yaml)
-
-```yaml
-dependencies:
-  dio: ^5.7.0
-  flutter_secure_storage: ^9.2.2
-  provider: ^6.1.2
-  firebase_core: ^3.6.0
-  firebase_messaging: ^15.1.3
-  video_player: ^2.9.1
-  cached_network_image: ^3.4.1
-  uuid: ^4.5.1
-
-dev_dependencies:
-  mocktail: ^1.0.4
-```
+**Параллельный старт:** оба начинают с первого дня. Архат разблокируется для Блока А-3 после того, как Шерхан закрыл Блок Ш-2.
 
 ---
 
-## Новая структура директорий
+## Архитектура (зафиксирована)
 
-```
-lib/
-├── data/
-│   ├── models/               ← Dart-классы fromJson/toJson (без Flutter)
-│   │   ├── api_dish.dart
-│   │   ├── api_category.dart
-│   │   ├── api_event.dart
-│   │   ├── api_booking.dart
-│   │   ├── api_user.dart
-│   │   ├── api_core_info.dart
-│   │   └── api_interior.dart
-│   ├── services/
-│   │   ├── api_client.dart       ← Dio singleton + interceptors
-│   │   ├── auth_service.dart     ← request-sms, verify-sms, logout
-│   │   ├── token_storage.dart    ← flutter_secure_storage wrapper
-│   │   └── fcm_service.dart      ← Firebase init + device registration
-│   └── repositories/
-│       ├── menu_repository.dart
-│       ├── events_repository.dart
-│       ├── booking_repository.dart
-│       ├── profile_repository.dart
-│       └── core_repository.dart
-├── providers/
-│   ├── auth_provider.dart
-│   ├── core_info_provider.dart
-│   ├── menu_provider.dart
-│   ├── events_provider.dart
-│   └── booking_provider.dart
-├── screens/
-│   ├── interior_screen.dart        ← НОВЫЙ (3-й таб)
-│   ├── auth/
-│   │   ├── phone_entry_screen.dart ← НОВЫЙ
-│   │   └── otp_screen.dart         ← НОВЫЙ
-│   └── booking_history_screen.dart ← НОВЫЙ
-docs/
-└── flutter/                        ← Документация по Flutter-интеграции
-    ├── api_client.md
-    ├── auth.md
-    ├── menu.md
-    ├── events.md
-    ├── booking.md
-    ├── notifications.md
-    └── core_info.md
-```
+| Решение | Выбор |
+|---|---|
+| HTTP client | `dio ^5.7` — JWT-интерцептор, retry |
+| Хранение токенов | `flutter_secure_storage ^9.2` |
+| State management | `provider ^6.1` + `ChangeNotifier` |
+| Изображения из API | `cached_network_image ^3.4` |
+| Видео | `video_player ^2.9` |
+| Push | `firebase_core + firebase_messaging` |
+| UUID | `uuid ^4.5` — Idempotency-Key |
+| Тестирование | `mocktail ^1.0` |
 
----
-
-## Изменение навигации (важно понять перед стартом)
-
-**Файлы:** `lib/main.dart`, `lib/widgets/bottom_nav_bar.dart`, `lib/widgets/home_action_block.dart`, `lib/widgets/home_event_block.dart`, `lib/core/home_data.dart`
-
-Новый порядок `IndexedStack`: `Home(0) / Menu(1) / InteriorScreen(2) / EventsScreen(3) / ProfileScreen(4)`
-
-- `kMenuCategories[3]` (id: `book`) → `navIndex: -1` (sentinel)
-- В `home_totem_path.dart._onItemTap`: если `navIndex == -1` → `Navigator.push(BookingScreen)`
-- `home_action_block.dart`: `EmberCta.onTap` → `Navigator.push(BookingScreen)`
-- `home_event_block.dart`: `onNavigate?.call(2)` → `onNavigate?.call(3)`
-
----
-
-## Auth Guard Pattern (используется везде)
-
+**Auth Guard Pattern (используется везде):**
 ```dart
 if (!context.read<AuthProvider>().isLoggedIn) {
   await Navigator.push(context, MaterialPageRoute(
@@ -120,780 +40,718 @@ if (!context.read<AuthProvider>().isLoggedIn) {
   ));
   if (!context.read<AuthProvider>().isLoggedIn) return;
 }
-// продолжить действие
+```
+
+**CoreInfo singleton** загружается при старте через `CoreInfoProvider()..load()` и используется на всех экранах.
+
+---
+
+## Зависимости между блоками
+
+```
+Ш-1 ──────────────────────────────────── независимый, стартует сразу
+Ш-2 ──── разблокирует → А-3 (карта, ссылки, депозит)
+Ш-3 ──── разблокирует → А-4 (уведомления, статистика, онбординг)
+А-1 ──────────────────────────────────── независимый, стартует сразу
+А-2 ──────────────────────────────────── независимый, стартует сразу
 ```
 
 ---
 
-## MultiProvider (lib/main.dart)
+---
+
+# ШЕРХАН — Слой данных
+
+---
+
+## Ш-1 | Критические баги парсинга данных
+
+**Ветка:** `fix/data-parsing-bugs`
+**Зависимости:** нет — стартует сразу
+
+---
+
+### Ш-1.1 | Видеополе блюда
+
+**Файл:** `lib/data/models/api_dish.dart:64`
+
+**Проблема:** Backend возвращает два поля: `video` (исходный файл) и `video_url` (обработанное H.264 720×1280, готово к стримингу). Flutter читает `video` — видео либо не воспроизводится, либо воспроизводится нестабильно. Рвётся вся видео-лента.
+
+**Изменение:**
+```dart
+// БЫЛО:
+videoUrl: parseStringOrNull(json['video']),
+
+// СТАЛО:
+videoUrl: parseStringOrNull(json['video_url'] ?? json['video']),
+```
+Фолбэк на `json['video']` — защита на случай если сервер вернёт старый формат.
+
+**Тесты** (`test/data/models/api_dish_test.dart`):
+- JSON с `video_url` → `videoUrl` не null
+- JSON только с `video` (без `video_url`) → `videoUrl` читается из `video`
+- JSON без обоих полей → `videoUrl == null`
+
+---
+
+### Ш-1.2 | Формат времени при бронировании
+
+**Файл:** `lib/screens/booking_screen.dart:166-170`
+
+**Проблема:** Django `TimeField` требует `"HH:MM:SS"`. Flutter отправляет `"HH:MM"` → бронирование падает с 400. Пользователь при этом выбирает время в формате HH:MM — так и должно оставаться в UI.
+
+**Изменение:** разделить display-строку и API-строку.
 
 ```dart
-MultiProvider(
-  providers: [
-    ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
-    ChangeNotifierProvider(create: (_) => CoreInfoProvider()..load()),
-    ChangeNotifierProvider(create: (_) => MenuProvider()),
-    ChangeNotifierProvider(create: (_) => EventsProvider()),
-    ChangeNotifierProvider(create: (_) => BookingProvider()),
-  ],
-  child: AmbientPresetScope(controller: _ambientCtrl, child: MaterialApp(...)),
-)
+// Строка для отображения пользователю — без изменений:
+String get _timeLabel {
+  final h = _visitTime.hour.toString().padLeft(2, '0');
+  final m = _visitTime.minute.toString().padLeft(2, '0');
+  return '$h:$m';
+}
+
+// Строка для отправки на API — добавить:
+String get _timeForApi {
+  final h = _visitTime.hour.toString().padLeft(2, '0');
+  final m = _visitTime.minute.toString().padLeft(2, '0');
+  return '$h:$m:00';
+}
 ```
 
----
+В методе `_submit` заменить `_timeLabel` на `_timeForApi` при формировании тела запроса.
+
+**Тесты** (`test/screens/booking_screen_test.dart`):
+- `TimeOfDay(hour: 9, minute: 5)` → `_timeForApi == '09:05:00'`
+- `TimeOfDay(hour: 23, minute: 59)` → `_timeForApi == '23:59:00'`
+- `_timeLabel` по-прежнему возвращает `'HH:MM'` (без секунд)
 
 ---
 
-# Блоки задач
+### Ш-1.3 | Парсинг цены события
 
----
+**Файл:** `lib/data/models/api_event.dart:56-57`
 
-## Блок 1 — API Client + Firebase Setup
-**Разработчик:** Архат
-**Ветка:** `feature/infra-api-client`
-**Зависимости:** нет (стартовый блок)
+**Проблема:** Два бага одновременно:
+1. Backend возвращает поле `"price"`, не `"price_from"`. Приоритет поиска в коде неверный.
+2. Backend возвращает `"3500.00"` (строка-десятичная). `int.tryParse("3500.00")` → `null`. Цена всегда теряется.
 
-### Тикет 1.1 — Добавить пакеты + настроить Firebase
+**Изменение:**
 
-**Файлы:** `pubspec.yaml`, `lib/main.dart`, `android/app/build.gradle.kts`, `android/app/google-services.json` (новый), `ios/Runner/GoogleService-Info.plist` (новый), `ios/Runner/AppDelegate.swift`, `android/app/src/main/AndroidManifest.xml`
-
-- Добавить все 9 пакетов через `flutter pub add`
-- Запустить `flutterfire configure` → сгенерирует Firebase-конфиги
-- В `main()`: `WidgetsFlutterBinding.ensureInitialized()` + `await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)` перед `runApp`
-- `AndroidManifest.xml`: добавить `android:allowBackup="false"` (безопасность токенов)
-- iOS `Info.plist`: добавить `FirebaseAppDelegateProxyEnabled = NO`
-
-### Тикет 1.2 — API client + token storage
-
-**Файлы:** `lib/data/services/api_client.dart`, `lib/data/services/token_storage.dart`
-
-`token_storage.dart` — обёртка над `flutter_secure_storage`:
 ```dart
-Future<void> saveTokens({required String access, required String refresh})
-Future<String?> readAccess()
-Future<String?> readRefresh()
-Future<void> clearTokens()
+// Добавить вспомогательную функцию в файл:
+int? _parseDecimalPrice(dynamic v) {
+  if (v == null) return null;
+  return (double.tryParse('$v') ?? 0.0).round();
+}
+
+// БЫЛО:
+priceFrom: parseIntOrNull(
+  json['price_from'] ?? json['priceFrom'] ?? json['price'],
+),
+
+// СТАЛО:
+priceFrom: _parseDecimalPrice(json['price'] ?? json['price_from']),
 ```
 
-`api_client.dart` — `DioClient` singleton:
-- `baseUrl = 'https://piligrim.kz/api/v1'`
-- `connectTimeout: 30s, receiveTimeout: 30s`
-- `AuthInterceptor`: читает access-токен → `Authorization: Bearer`. При 401 → рефреш → retry. При повторном 401 → `clearTokens()` + `onUnauthenticated.add(null)` (StreamController)
-- `LoggingInterceptor` (только `kDebugMode`)
+**Тесты** (`test/data/models/api_event_test.dart`):
+- `{"price": "3500.00"}` → `priceFrom == 3500`
+- `{"price": "0.00"}` → `priceFrom == 0`
+- `{"price": null}` → `priceFrom == null`
+- `{"price": 3500}` (int) → `priceFrom == 3500` (защита от int-ответа)
+- JSON без поля `price` → `priceFrom == null`
 
 ---
 
-### Тесты для Блока 1
+## Ш-2 | Расширение модели CoreInfo
 
-**Файлы:** `test/data/services/token_storage_test.dart`, `test/data/services/api_client_test.dart`
-
-```
-token_storage_test.dart:
-  ✓ saveTokens() → readAccess() возвращает сохранённый access
-  ✓ saveTokens() → readRefresh() возвращает сохранённый refresh
-  ✓ clearTokens() → readAccess() возвращает null
-  ✓ clearTokens() → readRefresh() возвращает null
-
-api_client_test.dart (с mocktail):
-  ✓ AuthInterceptor добавляет заголовок Authorization при наличии токена
-  ✓ AuthInterceptor НЕ добавляет заголовок когда токен null
-  ✓ При 401 → вызывается refresh endpoint
-  ✓ После успешного refresh → исходный запрос повторяется
-  ✓ При повторном 401 → clearTokens() вызван
-```
-
-### Документация для Блока 1
-
-**Файл:** `docs/flutter/api_client.md`
-
-Содержит:
-- Описание `DioClient` и как его использовать
-- Схема JWT flow (request → 401 → refresh → retry)
-- `TokenStorage` API
-- `baseUrl` конфигурация (где менять для dev/prod)
-- Пример добавления нового endpoint
+**Ветка:** `fix/core-info-missing-fields`
+**Зависимости:** нет — стартует сразу
+> ⚠️ Этот блок блокирует А-3. Приоритет — выполнить до А-3.
 
 ---
 
-## Блок 2 — Data Models + Auth Logic
-**Разработчик:** Шерхан
-**Ветка:** `feature/data-models-auth`
-**Зависимости:** Блок 1 (api_client.dart, token_storage.dart)
+### Ш-2.1 | Добавить 6 полей в CoreInfo
 
-### Тикет 2.1 — Data models (fromJson/toJson)
+**Файл:** `lib/data/models/core_info.dart`
 
-**Файлы:** `lib/data/models/` — 7 новых файлов
+**Проблема:** Backend на `GET /api/v1/core/info/` возвращает поля, которых нет в модели. Карта, обратная связь и пользовательское соглашение используют захардкоженные данные вместо API.
 
-Чистые Dart-классы, только `dart:core`. Каждый — `factory fromJson(Map<String, dynamic>)` и, где нужно, `toJson()`.
+**Изменение — добавить в конструктор и класс:**
 
-| Класс | Ключевые поля |
+```dart
+// Новые nullable-поля:
+final String? twogisLink;
+final String? googleMapsLink;
+final String? yandexMapsLink;
+final String? feedbackUrl;
+final String? termsOfService;
+final String? tourLink; // парсим, UI не строим — ресторан ещё не открыт
+```
+
+**Изменение — в `fromJson()`:**
+
+```dart
+twogisLink: parseStringOrNull(json['twogis_link'] ?? json['twogisLink']),
+googleMapsLink: parseStringOrNull(json['google_maps_link'] ?? json['googleMapsLink']),
+yandexMapsLink: parseStringOrNull(json['yandex_maps_link'] ?? json['yandexMapsLink']),
+feedbackUrl: parseStringOrNull(json['feedback_url'] ?? json['feedbackUrl']),
+termsOfService: parseStringOrNull(json['terms_of_service'] ?? json['termsOfService']),
+tourLink: parseStringOrNull(json['tour_link'] ?? json['tourLink']),
+```
+
+**Изменение — в `toJson()`:** добавить шесть nullable-записей через `if (field != null)`.
+
+**Тесты** (`test/data/models/core_info_test.dart`):
+- JSON со всеми шестью полями → все поля не null
+- JSON без этих полей → все поля null
+- Существующие поля не нарушены
+
+**Документация:** обновить описание `CoreInfo` в этом файле (раздел «Архитектура CoreInfo»).
+
+---
+
+## Ш-3 | UserProfile, Auth flow, статистика профиля
+
+**Ветка:** `fix/auth-profile-data`
+**Зависимости:** нет — стартует сразу
+> Блок А-4 зависит от Ш-3.
+
+---
+
+### Ш-3.1 | Добавить поля в UserProfile
+
+**Файл:** `lib/data/models/user_profile.dart`
+
+**Проблема:** Модель не содержит `notifications_enabled` (глобальный мастер-переключатель уведомлений) и `date_joined` (нужен для вычисления `journeyStartLabel`).
+
+**Изменение — добавить поля:**
+
+```dart
+final bool notificationsEnabled;
+final DateTime? dateJoined;
+```
+
+**В `fromJson()`:**
+```dart
+notificationsEnabled: parseBool(
+  json['notifications_enabled'] ?? json['notificationsEnabled'],
+  defaultValue: true,
+),
+dateJoined: json['date_joined'] != null
+    ? DateTime.tryParse(json['date_joined'] as String)
+    : null,
+```
+
+**В `copyWith()`:** добавить параметры `notificationsEnabled` и `dateJoined`.
+
+**В `toJson()`:** добавить `'notifications_enabled': notificationsEnabled`.
+
+**Тесты** (`test/data/models/user_profile_test.dart`):
+- `{"notifications_enabled": false}` → `notificationsEnabled == false`
+- поле отсутствует → defaultValue `true`
+- `{"date_joined": "2024-03-15T10:00:00Z"}` → `dateJoined` не null
+
+---
+
+### Ш-3.2 | Пробросить is_new_user через AuthProvider
+
+**Файл:** `lib/providers/auth_provider.dart:88-109`
+
+**Проблема:** `AuthService.verifySms()` уже возвращает `isNewUser` (реализовано в сервисе), но `AuthProvider.confirmOtp()` это поле игнорирует. Новые пользователи попадают сразу на главный экран без онбординга.
+
+**Изменение:**
+
+```dart
+// Добавить поле:
+bool isNewUser = false;
+
+// В confirmOtp() — сохранить флаг:
+final result = await _authService.verifySms(phone, code);
+isNewUser = result.isNewUser;
+await _tokenStorage.saveTokens(access: result.access, refresh: result.refresh);
+await _loadProfile();
+await _registerFcmIfPossible();
+return isLoggedIn;
+```
+
+После перехода на главный экран (или онбординг) — сбросить: `isNewUser = false`.
+
+**Тесты** (`test/providers/auth_provider_test.dart`):
+- `AuthService` возвращает `isNewUser: true` → `provider.isNewUser == true`
+- повторный вызов с `isNewUser: false` → `provider.isNewUser == false`
+
+---
+
+### Ш-3.3 | notifications_enabled в updateNotificationPreferences
+
+**Файл:** `lib/providers/auth_provider.dart:131-156`
+
+**Проблема:** Метод `updateNotificationPreferences` не поддерживает глобальный мастер-переключатель, хотя API (`PATCH /api/v1/users/profile/`) его принимает.
+
+**Изменение:**
+
+```dart
+Future<void> updateNotificationPreferences({
+  bool? events,
+  bool? promotions,
+  bool? closedEvents,
+  bool? notificationsEnabled, // <-- добавить
+}) async {
+  // ...
+  if (notificationsEnabled != null) body['notifications_enabled'] = notificationsEnabled;
+  // ...
+}
+```
+
+**Тесты:** mock-тест — PATCH-запрос содержит `notifications_enabled` при передаче параметра.
+
+---
+
+### Ш-3.4 | journeyStartLabel из dateJoined
+
+**Файл:** `lib/providers/auth_provider.dart` — геттер `HeroUser get user`
+
+**Проблема:** `journeyStartLabel` всегда `null`, потому что поле `date_joined` отсутствовало в модели (исправлено в Ш-3.1).
+
+**Изменение в геттере `user`:**
+
+```dart
+HeroUser get user {
+  final profile = currentUser;
+  if (profile == null) return kAnonymousHero;
+  final name = profile.displayName.isEmpty ? profile.phone : profile.displayName;
+  return HeroUser(
+    name: name.isEmpty ? 'Герой без имени' : name,
+    phone: profile.phone,
+    journeyStartLabel: _formatJourneyStart(profile.dateJoined),
+    eventsCount: eventsCount,
+  );
+}
+
+String? _formatJourneyStart(DateTime? dt) {
+  if (dt == null) return null;
+  const months = [
+    '', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+  ];
+  return '${months[dt.month]} ${dt.year}';
+}
+```
+
+**Тесты:**
+- `DateTime(2024, 3, 15)` → `'Март 2024'`
+- `null` → `null`
+
+---
+
+### Ш-3.5 | eventsCount из API
+
+**Файл:** новый `lib/data/repositories/event_reservation_repository.dart`
+
+**Проблема:** `eventsCount` в профиле всегда равен 0 — реального запроса к API нет.
+
+**Создать репозиторий:**
+
+```dart
+class EventReservationRepository {
+  EventReservationRepository({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
+  final Dio _dio;
+
+  Future<int> fetchMyReservationsCount() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/events/reservations/my/',
+    );
+    final results = (response.data?['results'] as List?) ?? [];
+    return results.length;
+  }
+}
+```
+
+В `AuthProvider`: добавить поле `int eventsCount = 0;`. После `_loadProfile()` вызывать репозиторий и сохранять счётчик в `eventsCount`. Геттер `user` (Ш-3.4) передаёт `eventsCount: eventsCount` в `HeroUser`.
+
+**Тесты:**
+- mock response с `results: [{...}, {...}]` → метод возвращает `2`
+- пустой `results` → `0`
+
+---
+
+---
+
+# АРХАТ — Слой UI
+
+---
+
+## А-1 | Удаление несуществующего функционала
+
+**Ветка:** `fix/remove-fake-ui`
+**Зависимости:** нет — стартует сразу
+
+---
+
+### А-1.1 | Убрать кнопку «ЗАКАЗАТЬ»
+
+**Файл:** `lib/widgets/dish_elements.dart:393-430`
+
+**Проблема:** `DishBookingCta` отображает `'ЗАКАЗАТЬ ЗА ${dish.price} ₸'` и при нажатии просто закрывает модальное окно (`Navigator.pop`). Функционала заказа в ТЗ и API нет. Кнопка вводит пользователя в заблуждение.
+
+**Изменение:** Удалить класс `DishBookingCta` полностью. Найти все вызовы `DishBookingCta(...)` и убрать. Детальный экран блюда остаётся — без CTA-кнопки заказа.
+
+**Тесты** (`test/widgets/dish_elements_test.dart`):
+- открыть detail sheet блюда → текст `'ЗАКАЗАТЬ'` не найден в дереве виджетов
+
+---
+
+### А-1.2 | Убрать Like/Save/Share с видео-карточек
+
+**Файл:** `lib/widgets/dish_elements.dart:150-193`
+
+**Проблема:** `DishCardActionBar` со стейтом `_liked`/`_saved` — все действия локальные, на сервер ничего не уходит. API для лайков/сохранения нет в ТЗ.
+
+**Изменение:** Удалить классы `DishCardActionBar`, `_DishCardActionBarState`, `_DishActionBtn`. Найти все места использования и убрать.
+
+**Тесты:**
+- в видео-карточке нет кнопок «Нравится», «Запомнить», «Поделиться»
+
+---
+
+### А-1.3 | Убрать диалог «Фотоотчёт»
+
+**Файл:** `lib/screens/events_screen.dart:33-100`
+
+**Проблема:** `_openPhotoReport` показывает случайные локальные интерьерные PNG, никак не связанные с конкретным событием. API не возвращает ссылки на фотоотчёт. Функция дезориентирует пользователя.
+
+**Изменение:** Удалить метод `_openPhotoReport`. Удалить кнопку «Фотоотчёт» из карточки события. Поле `hasPhotoReport` в модели `ApiEvent` оставить — понадобится когда функционал появится на бэкенде.
+
+**Тесты:**
+- в карточке прошедшего события нет кнопки «Фотоотчёт»
+
+---
+
+## А-2 | Hero slider — фото из бэкенда
+
+**Ветка:** `fix/hero-slider-from-api`
+**Зависимости:** нет — `CoreInfo.heroSlides` уже парсится, блок независимый
+
+---
+
+### А-2.1 | Подключить heroSlides к слайдеру афиши
+
+**Файл:** `lib/screens/events_screen.dart:420-464`
+
+**Проблема:** `_AfishaHero` использует `PiligrimInteriorAssets.allInteriorPngs` — 21 локальный PNG. Фотографии должны приходить из синглтона `CoreInfo` через `heroSlides`.
+
+**Изменение:**
+
+1. Добавить в `_AfishaHero` параметр `imageUrls`:
+```dart
+class _AfishaHero extends StatefulWidget {
+  const _AfishaHero({
+    required this.selectedIndex,
+    required this.onChanged,
+    required this.imageUrls,
+  });
+  final List<String> imageUrls;
+```
+
+2. В родительском виджете передавать из `CoreInfoProvider`:
+```dart
+final coreInfo = context.watch<CoreInfoProvider>().coreInfo;
+final imageUrls = (coreInfo?.heroImageUrls.isNotEmpty == true)
+    ? coreInfo!.heroImageUrls
+    : PiligrimInteriorAssets.triptychInteriorAmbient; // fallback
+```
+
+3. Внутри `_AfishaHero` использовать `widget.imageUrls`. Для сетевых URL — `CachedNetworkImage`, для локальных (fallback) — `Image.asset`.
+
+**Тесты:**
+- `CoreInfo` с непустым `heroSlides` → слайдер использует сетевые URL
+- пустой `heroSlides` → слайдер показывает fallback локальные ассеты
+
+---
+
+## А-3 | Замена захардкоженных данных на CoreInfo
+
+**Ветка:** `fix/hardcoded-data-to-api`
+**Зависимости:** ⚠️ Ш-2.1 должен быть смёрджен
+
+---
+
+### А-3.1 | Карта — кнопки из CoreInfo
+
+**Файлы:** `lib/screens/profile_screen.dart:865`, `lib/core/profile_data.dart:57-73`
+
+**Проблема:** Кнопки 2ГИС / Google / Яндекс ведут на координаты-заглушку `51.128207,71.430544`. Правильные ссылки приходят из `CoreInfo`.
+
+**Изменение в `profile_screen.dart`:**
+```dart
+final coreInfo = context.watch<CoreInfoProvider>().coreInfo;
+
+final mapLinks = [
+  if (coreInfo?.twogisLink != null)
+    (label: '2ГИС', url: coreInfo!.twogisLink!, asset: 'assets/images/splash_path (1).svg'),
+  if (coreInfo?.googleMapsLink != null)
+    (label: 'Google', url: coreInfo!.googleMapsLink!, asset: 'assets/images/star_totem (1).svg'),
+  if (coreInfo?.yandexMapsLink != null)
+    (label: 'Яндекс', url: coreInfo!.yandexMapsLink!, asset: 'assets/images/wheel_totem (1).svg'),
+];
+
+// Если все три null — скрыть блок
+if (mapLinks.isEmpty) return const SizedBox.shrink();
+```
+
+Константы `kMapTargets` и `kRestaurantCoords` в `lib/core/profile_data.dart` — удалить.
+
+**Тесты:**
+- с `twogisLink == null` кнопка «2ГИС» не рендерится
+- с непустым `twogisLink` — рендерится с правильным URL
+
+---
+
+### А-3.2 | Пользовательское соглашение из CoreInfo
+
+**Файл:** `lib/screens/profile_screen.dart:1275`
+
+```dart
+// БЫЛО:
+onTap: () => onLaunch('https://piligrim.kz/terms'),
+
+// СТАЛО — скрываем строку если поле null:
+if (coreInfo?.termsOfService != null)
+  _LegalRow(
+    label: 'Пользовательское соглашение',
+    onTap: () => onLaunch(coreInfo!.termsOfService!),
+  ),
+```
+
+**Тесты:** с `termsOfService == null` строка не отображается.
+
+---
+
+### А-3.3 | Обратная связь из CoreInfo
+
+**Файл:** `lib/screens/profile_screen.dart:1287`
+
+```dart
+// БЫЛО:
+onTap: () => onLaunch('mailto:hello@piligrim.kz'),
+
+// СТАЛО:
+if (coreInfo?.feedbackUrl != null)
+  _LegalRow(
+    label: 'Обратная связь',
+    accent: true,
+    onTap: () => onLaunch(coreInfo!.feedbackUrl!),
+  ),
+```
+
+**Тесты:** аналогично А-3.2.
+
+---
+
+### А-3.4 | Заметка о депозите из CoreInfo
+
+**Файл:** `lib/screens/booking_screen.dart:386`
+
+`CoreInfoProvider` уже подключён в этом экране (строка 176).
+
+```dart
+// БЫЛО (хардкод):
+'Для выбранного стола может потребоваться депозит. Менеджер направит вас на звонок.'
+
+// СТАЛО:
+context.watch<CoreInfoProvider>().coreInfo?.bookingDepositNote
+    ?? 'Для выбранного стола может потребоваться депозит. Уточните у менеджера.'
+```
+
+**Тесты:**
+- с непустым `bookingDepositNote` отображается текст из API
+- с `null` — фолбэк текст
+
+---
+
+## А-4 | Экраны профиля — новые фичи
+
+**Ветка:** `fix/profile-screens`
+**Зависимости:** ⚠️ Ш-3.1 и Ш-3.3 должны быть смёрджены (А-4.1), Ш-3.5 (А-4.2), Ш-3.2 (А-4.3)
+
+---
+
+### А-4.1 | Мастер-переключатель уведомлений
+
+**Файл:** `lib/screens/profile_screen.dart:576-629`
+
+**Проблема:** `_NotificationsCard` показывает только 3 категориальных переключателя. Отсутствует главный `notifications_enabled` — если пользователь его выключил на другом устройстве, приложение не отражает это состояние.
+
+**Изменение:** добавить в `_NotificationsCard` строку-переключатель выше категорий:
+
+```dart
+_NotifRow(
+  category: NotifCategory(
+    id: 'global',
+    label: 'Уведомления',
+    subtitle: 'Включить все push-уведомления',
+    iconAsset: 'assets/images/moon_totem (1).svg',
+  ),
+  isOn: currentUser?.notificationsEnabled ?? true,
+  onChanged: (val) => onToggle('global', val),
+),
+const Divider(height: 1, color: PiligrimColors.divider, indent: 48),
+// ... существующие категории ...
+```
+
+При `notificationsEnabled == false` — категории показывать задизабленными (opacity 0.4, `onChanged: null`).
+
+В обработчике `_handleNotifToggle`:
+```dart
+case 'global':
+  await auth.updateNotificationPreferences(notificationsEnabled: value);
+```
+
+**Тесты:**
+- при `notificationsEnabled: false` категории визуально задизаблены
+- переключение вызывает `updateNotificationPreferences(notificationsEnabled: ...)`
+
+---
+
+### А-4.2 | eventsCount в статистике профиля
+
+**Файл:** `lib/screens/profile_screen.dart:473`
+
+**Проблема:** `user.eventsCount` всегда `0` — реальных данных нет. После Ш-3.5 поле заполняется из API.
+
+**Изменение:** Проверить, что `_user` берётся из `context.watch<AuthProvider>().user`, а не из `kDemoUser`. Поле `eventsCount` подтянется автоматически. Дополнительного кода не требуется.
+
+**Проверка:** убедиться что нигде в `ProfileScreen` не используется `kDemoUser` как источник данных.
+
+---
+
+### А-4.3 | Онбординг-экран для новых пользователей
+
+**Файл:** новый `lib/screens/onboarding_screen.dart`, изменение `lib/screens/splash_screen.dart`
+**Зависит от:** Ш-3.2
+
+**Изменение в `SplashScreen._goToHome()`:**
+```dart
+void _goToHome() {
+  final auth = context.read<AuthProvider>();
+  if (auth.isNewUser) {
+    auth.isNewUser = false;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+    );
+    return;
+  }
+  // существующий код перехода на RootShell
+}
+```
+
+`OnboardingScreen` — минимальный экран: приветствие, необязательное поле имени, кнопка «Начать путь» → `PATCH /api/v1/users/profile/` → переход на `RootShell`.
+
+**Тесты:**
+- при `isNewUser == true` навигация идёт на `OnboardingScreen`
+- при `isNewUser == false` навигация идёт на `RootShell`
+
+---
+
+## А-5 | Документация
+
+**Ветка:** `fix/readme-urls`
+**Зависимости:** нет
+
+---
+
+### А-5.1 | Исправить неверные URL в README.md
+
+**Файл:** `README.md:116-117`
+
+| Неверно | Верно |
 |---|---|
-| `ApiDish` | id, name, description, price (int), category (int), tags, allergens, imageUrl?, videoUrl?, weight, story, isActive |
-| `ApiCategory` | id, name, slug |
-| `ApiEvent` | id, title, description, startsAt (DateTime.parse), format (open/closed), coverUrl?, priceFrom (int?), isPast |
-| `ApiBooking` | id, guestName, phone, date, time, guestsCount, zone?, comment?, status |
-| `BookingRequest` | поля + `toJson()` |
-| `UserProfile` | id, phone, firstName, lastName, notifyEvents, notifyPromotions, notifyClosedEvents |
-| `CoreInfo` | address, workingHours, isOpenNow, phone, socialLinks, heroSlides, heroVideoUrl?, bookingDepositRequired, visitRules, privacyPolicy |
-| `InteriorSlide` | id, zone, zoneDisplay, imageUrl, caption?, order |
-
-**Реиспользовать:** `PiligrimNewsPost` из `lib/data/events_news_data.dart` — структура совпадает с API `/events/news/`. Не создавать дублирующий класс.
-
-### Тикет 2.2 — Auth service + AuthProvider
-
-**Файлы:** `lib/data/services/auth_service.dart`, `lib/providers/auth_provider.dart`
-
-`auth_service.dart`:
-```dart
-Future<void> requestSms(String phone)
-Future<({String access, String refresh, bool isNewUser})> verifySms(String phone, String code)
-Future<void> logout(String refreshToken)
-```
-
-`auth_provider.dart` — `AuthProvider extends ChangeNotifier`:
-- State: `UserProfile? currentUser`, `bool isLoading`, `String? error`
-- `Future<void> init()` — читает access из `TokenStorage`; если есть, GET `/users/profile/` → `currentUser`
-- `Future<void> sendOtp(String phone)`
-- `Future<bool> confirmOtp(String phone, String code)` — сохраняет токены, загружает профиль, регистрирует FCM-токен
-- `Future<void> logout()`
-- `bool get isLoggedIn => currentUser != null`
-- `Future<void> updateNotificationPreferences({bool? events, bool? promotions, bool? closedEvents})` — PATCH `/users/profile/` + обновляет `currentUser`
+| `POST /api/v1/bookings/create/` | `POST /api/v1/bookings/` |
+| `GET /api/v1/bookings/my/` | `GET /api/v1/bookings/` |
+| `POST /api/v1/notifications/devices/register/` | `POST /api/v1/notifications/device/register/` |
 
 ---
 
-### Тесты для Блока 2
-
-**Файлы:** `test/data/models/`, `test/providers/auth_provider_test.dart`
-
-```
-api_dish_test.dart:
-  ✓ fromJson() корректно парсит все поля
-  ✓ fromJson() не падает при null imageUrl / videoUrl
-  ✓ fromJson() конвертирует price из строки в int
-
-api_event_test.dart:
-  ✓ fromJson() парсит startsAt как DateTime
-  ✓ fromJson() распознаёт format: "open" / "closed"
-
-booking_request_test.dart:
-  ✓ toJson() формирует корректный Map для POST-тела
-  ✓ toJson() не включает null поля (zone, comment)
-
-auth_provider_test.dart:
-  ✓ init() — если нет токена → isLoggedIn == false
-  ✓ init() — если есть токен → загружает профиль → isLoggedIn == true
-  ✓ confirmOtp() → сохраняет токены + устанавливает currentUser
-  ✓ logout() → очищает токены + currentUser == null
-  ✓ updateNotificationPreferences() → патчит профиль + обновляет currentUser
-```
-
-### Документация для Блока 2
-
-**Файл:** `docs/flutter/auth.md`
-
-Содержит:
-- Auth flow диаграмма: requestSms → verifySms → сохранение токенов → профиль
-- Описание `AuthProvider` API (все публичные методы)
-- Где и как использовать Auth Guard в новых экранах
-- Схема моделей (поля, типы, nullable)
-- `BookingRequest.toJson()` пример
-
 ---
 
-## Блок 3 — Navigation Restructure + Auth Screens
-**Разработчик:** Архат
-**Ветка:** `feature/nav-auth-screens`
-**Зависимости:** Блок 2 (AuthProvider)
+# Итоговая таблица тикетов
 
-### Тикет 3.1 — Navigation restructure + InteriorScreen shell
-
-**Файлы:** `lib/main.dart`, `lib/widgets/bottom_nav_bar.dart`, `lib/widgets/home_action_block.dart`, `lib/widgets/home_event_block.dart`, `lib/core/home_data.dart`, `lib/screens/interior_screen.dart` (новый)
-
-`interior_screen.dart` — временная заглушка:
-- `PiligrimBackground` + `GridView.builder` из `PiligrimInteriorAssets.allInteriorPngs` (2 колонки, `childAspectRatio: 0.75`)
-- Будет полностью заменён в Блоке 6
-
-Изменения навигации (детали описаны в секции выше).
-
-### Тикет 3.2 — Auth screens: PhoneEntryScreen + OTPScreen
-
-**Файлы:** `lib/screens/auth/phone_entry_screen.dart`, `lib/screens/auth/otp_screen.dart`
-
-`phone_entry_screen.dart`:
-- `PiligrimBackground` + логотип + поле телефона `+7 7XX XXX XX XX`
-- Валидация: strip non-digits, требуется 11 цифр (`7XXXXXXXXXX`)
-- `AuthProvider.sendOtp()` → push `OTPScreen(phone: phone)`
-- States: loading (кнопка disabled), error (SnackBar)
-
-`otp_screen.dart`:
-- Принимает `phone` и `returnAfterLogin: bool`
-- Одно поле `TextFormField(maxLength: 6, keyboardType: numeric)` — стилизованное под бренд
-- Таймер 60 сек → кнопка "Отправить повторно"
-- `AuthProvider.confirmOtp()` → на успех: `Navigator.pop()`
-
----
-
-### Тесты для Блока 3
-
-**Файлы:** `test/screens/auth/phone_entry_screen_test.dart`, `test/screens/auth/otp_screen_test.dart`
-
-```
-phone_entry_screen_test.dart:
-  ✓ Кнопка отправки задизаблена при пустом поле
-  ✓ Кнопка активна при корректном номере (11 цифр)
-  ✓ Невалидный номер (менее 11 цифр) → SnackBar с ошибкой
-  ✓ При успешном sendOtp() → переход на OTPScreen
-
-otp_screen_test.dart:
-  ✓ Кнопка подтверждения задизаблена при коде < 6 символов
-  ✓ Кнопка "Повторить" скрыта до истечения 60 сек таймера
-  ✓ При успешном confirmOtp() → Navigator.pop() вызван
-
-navigation_test.dart:
-  ✓ Таб 2 открывает InteriorScreen
-  ✓ Таб 3 открывает EventsScreen
-  ✓ Кнопка "Забронировать" открывает BookingScreen через push (не меняет таб)
-```
-
-### Документация для Блока 3
-
-**Файл:** `docs/flutter/auth.md` (дополнение)
-
-Добавить раздел:
-- Навигационная схема (5 табов, новый порядок)
-- Как добавить новый экран, требующий авторизации
-- Экраны `PhoneEntryScreen` и `OTPScreen` — параметры и поведение
-- Где и когда показывать Auth Guard
-
----
-
-## Блок 4 — Core Info + FCM
-**Разработчик:** Шерхан
-**Ветка:** `feature/core-info-fcm`
-**Зависимости:** Блок 1 (api_client), Блок 2 (models, AuthProvider)
-
-### Тикет 4.1 — CoreInfoProvider + wire HomeScreen/ProfileScreen
-
-**Файлы:** `lib/data/repositories/core_repository.dart`, `lib/providers/core_info_provider.dart`, `lib/screens/home_screen.dart`, `lib/screens/profile_screen.dart`
-
-`core_repository.dart`:
-```dart
-Future<CoreInfo> fetchCoreInfo()              // GET /core/info/
-Future<List<InteriorSlide>> fetchInterior()   // GET /core/interior/
-Future<({String minVersion, String latestVersion, String storeUrl})>
-    fetchAppVersion(String platform)           // GET /core/app-version/?platform=
-```
-
-`core_info_provider.dart` — guard от двойного fetch: `if (_isLoading || _coreInfo != null) return;`
-
-`home_screen.dart` — `context.watch<CoreInfoProvider>()`:
-- `HomeStatusLine` → `coreInfo?.isOpenNow` (fallback на mock)
-- `HomeHeroSection` → `coreInfo?.heroSlides` (fallback — локальные ассеты)
-
-`profile_screen.dart` → `_HoursCard`:
-- Заменить `kRestaurantInfo.scheduleLabel` на `coreInfo?.workingHours`
-
-### Тикет 4.2 — FCM service
-
-**Файл:** `lib/data/services/fcm_service.dart`
-
-```dart
-Future<void> init()                              // requestPermission + listeners
-Future<String?> getToken()
-Future<void> registerTokenWithServer(Dio dio)    // POST /notifications/device/register/
-```
-
-- `onMessage` → брендовый in-app SnackBar (`PiligrimColors.earth` bg, `PiligrimColors.sky` текст)
-- `onMessageOpenedApp` → навигация по `data['type']`: `booking` → индекс 4, `event` → индекс 3
-- В `AuthProvider.confirmOtp()` после сохранения профиля → `FcmService().registerTokenWithServer()`
-
----
-
-### Тесты для Блока 4
-
-**Файлы:** `test/data/repositories/core_repository_test.dart`, `test/providers/core_info_provider_test.dart`
-
-```
-core_repository_test.dart:
-  ✓ fetchCoreInfo() возвращает CoreInfo при 200
-  ✓ fetchCoreInfo() бросает исключение при 500
-  ✓ fetchInterior() возвращает список InteriorSlide
-  ✓ fetchAppVersion() парсит min/latest/storeUrl
-
-core_info_provider_test.dart:
-  ✓ load() устанавливает coreInfo после успешного запроса
-  ✓ load() устанавливает error при сетевой ошибке
-  ✓ load() НЕ делает двойной запрос если coreInfo уже загружен
-  ✓ isOpenNow корректно читается из coreInfo
-
-fcm_service_test.dart:
-  ✓ registerTokenWithServer() вызывает POST /notifications/device/register/
-  ✓ registerTokenWithServer() не падает если getToken() вернул null
-```
-
-### Документация для Блока 4
-
-**Файлы:** `docs/flutter/core_info.md`, `docs/flutter/notifications.md`
-
-`core_info.md`:
-- Какие данные приходят с `/core/info/` и как используются
-- Как `CoreInfoProvider.load()` вызывается при старте
-- Паттерн fallback на локальные данные
-
-`notifications.md`:
-- Как работает FCM в приложении
-- Какие категории уведомлений существуют (`events`, `promotions`, `closed_events`)
-- Как тестировать пуши локально (Firebase Console)
-- Формат `data`-поля в пуше для навигации
-
----
-
-## Блок 5 — Menu Integration
-**Разработчик:** Архат
-**Ветка:** `feature/menu-integration`
-**Зависимости:** Блок 1, Блок 2 (models)
-
-### Тикет 5.1 — Menu repository + MenuProvider
-
-**Файлы:** `lib/data/repositories/menu_repository.dart`, `lib/providers/menu_provider.dart`
-
-`menu_repository.dart`:
-```dart
-Future<List<ApiCategory>> fetchCategories()
-Future<({List<ApiDish> dishes, bool hasMore})> fetchDishes({
-  int? categoryId, List<int>? tagIds, String? search, int page = 1,
-})
-```
-
-`menu_provider.dart` — `MenuProvider extends ChangeNotifier`:
-- State: `categories`, `dishes`, `isLoading`, `isLoadingMore`, `hasMore`, `_page`, `activeCategoryId`, `searchQuery`
-- `loadDishes({bool refresh = false})` — refresh сбрасывает страницу
-- `setCategory(String? id)` — сброс + перезагрузка
-- `setSearch(String q)` — debounce 400 мс
-
-### Тикет 5.2 — Wire MenuScreen + video_player + cached images
-
-**Файлы:** `lib/screens/menu_screen.dart`, `lib/widgets/dish_video_card.dart`, `lib/widgets/dish_elements.dart`
-
-`menu_screen.dart`:
-- `context.watch<MenuProvider>()` вместо `kDishes` / `kDishCategories`
-- Infinite scroll: `ScrollController` listener → при proximity к концу и `hasMore == true` → `menuProvider.loadDishes()`
-- `CircularProgressIndicator` в `PiligrimColors.water` при `isLoading`
-
-`dish_video_card.dart`:
-- Если `dish.videoUrl != null` → `VideoPlayerController.networkUrl(Uri.parse(dish.videoUrl!))`
-- Пауза (не dispose) когда `isActive` → false; возобновление когда → true
-- `addListener(() => setState(() {}))` для rebuild при буферизации
-- Fallback: существующий gradient если `videoUrl == null`
-
-`dish_elements.dart` (detail sheet):
-- `CachedNetworkImage(imageUrl: dish.imageUrl ?? '')` когда `imageUrl != null`
-- Fallback: существующий `_CinematicBackground`
-
----
-
-### Тесты для Блока 5
-
-**Файлы:** `test/data/repositories/menu_repository_test.dart`, `test/providers/menu_provider_test.dart`
-
-```
-menu_repository_test.dart:
-  ✓ fetchCategories() парсит список ApiCategory
-  ✓ fetchDishes() без фильтров возвращает первую страницу
-  ✓ fetchDishes(categoryId: 2) добавляет query param category_id=2
-  ✓ fetchDishes() устанавливает hasMore=false когда next == null
-  ✓ fetchDishes(search: 'стейк') добавляет query param search=стейк
-
-menu_provider_test.dart:
-  ✓ loadDishes() на пустом state → isLoading=true → isLoading=false
-  ✓ loadDishes() добавляет dishes в список
-  ✓ loadDishes() с hasMore=false не делает повторный запрос
-  ✓ setCategory() сбрасывает список и запрашивает заново
-  ✓ setSearch() с debounce 400 мс не делает несколько запросов подряд
-```
-
-### Документация для Блока 5
-
-**Файл:** `docs/flutter/menu.md`
-
-Содержит:
-- Описание dual-mode (feed / classic) и как переключаться
-- `MenuProvider` API: все методы и поля
-- Как работает пагинация (бесконечная прокрутка)
-- Как добавить новый тег или фильтр
-- Как `VideoPlayerController` управляется в `DishVideoCard` (lifecycle)
-
----
-
-## Блок 6 — Events Integration
-**Разработчик:** Шерхан
-**Ветка:** `feature/events-integration`
-**Зависимости:** Блок 1, Блок 2 (models), Блок 3 (InteriorScreen shell), Блок 4 (CoreInfoProvider)
-
-### Тикет 6.1 — Events repository + EventsProvider
-
-**Файлы:** `lib/data/repositories/events_repository.dart`, `lib/providers/events_provider.dart`
-
-`events_repository.dart`:
-```dart
-Future<List<ApiEvent>> fetchUpcoming({int page = 1})
-Future<List<ApiEvent>> fetchArchived({int page = 1})
-Future<List<PiligrimNewsPost>> fetchNews({int page = 1})  // реиспользовать существующий класс
-Future<void> createReservation(int eventId, int guestsCount)
-  // POST /events/reservations/create/ + Idempotency-Key: Uuid().v4()
-Future<List<ApiReservation>> fetchMyReservations()
-```
-
-`events_provider.dart` — loading flags per list. `Future<void> reserveEvent(int, int)`.
-
-### Тикет 6.2 — Wire EventsScreen + EventDetailScreen
-
-**Файлы:** `lib/screens/events_screen.dart`, `lib/screens/event_detail_screen.dart`, `lib/widgets/event_signup_sheet.dart`
-
-`events_screen.dart`:
-- Заменить `buildMockEvents()` / `mockNewsPosts()` на `EventsProvider`
-- `Image.asset(event.coverAssetPath)` → `CachedNetworkImage(imageUrl: event.coverUrl)`
-- `initState`: `context.read<EventsProvider>().loadUpcoming()` и т.д.
-
-`event_detail_screen.dart`:
-- Параметр меняется: `PiligrimEvent` → `ApiEvent`
-- Обновить все поля: `event.coverUrl`, `event.startsAt`
-
-`event_signup_sheet.dart`:
-- Добавить параметр `int eventId`
-- Auth guard: `if (!auth.isLoggedIn)` → pop sheet → push `PhoneEntryScreen`
-- Заменить mock submit на `EventsProvider.reserveEvent(eventId, guestsCount)`
-- Поля: только `guestsCount` (stepper) — имя/телефон берётся из токена на бэке
-
-### Тикет 6.3 — Wire InteriorScreen к API
-
-**Файл:** `lib/screens/interior_screen.dart` (замена заглушки из Блока 3)
-
-- `context.watch<CoreInfoProvider>().interiorSlides` вместо локальных ассетов
-- `CachedNetworkImage` с zone label overlay (`slide.zoneDisplay`) и caption
-- Fallback на локальные ассеты при пустом списке
-
----
-
-### Тесты для Блока 6
-
-**Файлы:** `test/data/repositories/events_repository_test.dart`, `test/providers/events_provider_test.dart`, `test/widgets/event_signup_sheet_test.dart`
-
-```
-events_repository_test.dart:
-  ✓ fetchUpcoming() возвращает список ApiEvent
-  ✓ fetchNews() возвращает список PiligrimNewsPost (реиспользование класса)
-  ✓ createReservation() отправляет POST с Idempotency-Key заголовком
-  ✓ createReservation() бросает исключение если пользователь не авторизован (401)
-
-events_provider_test.dart:
-  ✓ loadUpcoming() устанавливает список событий
-  ✓ reserveEvent() при успехе не бросает ошибку
-  ✓ reserveEvent() при 400 устанавливает error сообщение
-
-event_signup_sheet_test.dart:
-  ✓ При isLoggedIn=false → pop sheet + push PhoneEntryScreen
-  ✓ Stepper не позволяет выбрать 0 гостей
-  ✓ Кнопка submit вызывает EventsProvider.reserveEvent()
-```
-
-### Документация для Блока 6
-
-**Файлы:** `docs/flutter/events.md`
-
-Содержит:
-- Структура экрана Events (табы: upcoming / archived / news)
-- `EventsProvider` API: все методы
-- Как работает регистрация на мероприятие (EventSignupSheet + Auth guard)
-- Как интегрируется InteriorScreen с CoreInfoProvider
-- Fallback-логика при отсутствии интернета
-
----
-
-## Блок 7 — Booking Integration
-**Разработчик:** Архат
-**Ветка:** `feature/booking-integration`
-**Зависимости:** Блок 2 (models, AuthProvider), Блок 3 (auth screens), Блок 4 (CoreInfoProvider)
-
-### Тикет 7.1 — Booking repository + BookingProvider
-
-**Файлы:** `lib/data/repositories/booking_repository.dart`, `lib/providers/booking_provider.dart`
-
-`booking_repository.dart`:
-```dart
-Future<void> createBooking(BookingRequest req)
-  // POST /bookings/ + Idempotency-Key: Uuid().v4()
-Future<List<ApiBooking>> fetchHistory({int page = 1})
-```
-
-`booking_provider.dart` — State: `isSubmitting`, `isSuccess`, `error`, `history`. Methods: `submitBooking(BookingRequest)`, `loadHistory()`.
-
-### Тикет 7.2 — Wire BookingScreen к API
-
-**Файл:** `lib/screens/booking_screen.dart`
-
-- Auth guard перед submit
-- `_phoneCtrl` prefill: `AuthProvider.currentUser?.phone`
-- `_depositRequired`: из `CoreInfoProvider.coreInfo?.bookingDepositRequired`
-- Зоны: `['main', 'terrace', 'private']` (статически, как в API)
-- Submit → `BookingProvider.submitBooking()` → success state / SnackBar для ошибки
-
-### Тикет 7.3 — BookingHistoryScreen + profile stats
-
-**Файл:** `lib/screens/booking_history_screen.dart`
-
-Список `ApiBooking` из `BookingProvider.history`. Каждая карточка: дата, время, гостей, зона, badge статуса:
-- `pending` → `PiligrimColors.steppe`
-- `confirmed` → `PiligrimColors.water`
-- `completed` → dim green
-- `canceled` → grey
-
-Pull-to-refresh. Empty state с тотем-иконкой.
-
-`profile_screen.dart` → `_StatsRow`:
-- `bookingsCount` из `BookingProvider.history.length`
-- `_StatCard` tappable → push `BookingHistoryScreen`
-
----
-
-### Тесты для Блока 7
-
-**Файлы:** `test/data/repositories/booking_repository_test.dart`, `test/providers/booking_provider_test.dart`, `test/screens/booking_screen_test.dart`
-
-```
-booking_repository_test.dart:
-  ✓ createBooking() отправляет POST с Idempotency-Key заголовком
-  ✓ createBooking() body содержит корректные поля из BookingRequest
-  ✓ createBooking() бросает исключение при 400 (validation error)
-  ✓ fetchHistory() возвращает список ApiBooking
-
-booking_provider_test.dart:
-  ✓ submitBooking() устанавливает isSubmitting=true → false
-  ✓ submitBooking() при успехе → isSuccess=true
-  ✓ submitBooking() при ошибке → error != null
-
-booking_screen_test.dart:
-  ✓ При isLoggedIn=false → submit → push PhoneEntryScreen
-  ✓ Поле телефона prefilled из AuthProvider.currentUser.phone
-  ✓ Если depositRequired=true → предупреждение видно
-  ✓ При успешном submitBooking() → success state отображается
-```
-
-### Документация для Блока 7
-
-**Файл:** `docs/flutter/booking.md`
-
-Содержит:
-- Схема состояний бронирования (pending → confirmed → completed/canceled)
-- `BookingProvider` API: все методы
-- Idempotency-Key: зачем нужен и где генерируется
-- Как работает prefill телефона из профиля
-- Статусы и их цветовое кодирование в `BookingHistoryScreen`
-
----
-
-## Блок 8 — Profile Integration
-**Разработчик:** Шерхан
-**Ветка:** `feature/profile-integration`
-**Зависимости:** Блок 2 (AuthProvider), Блок 4 (CoreInfoProvider), Блок 7 (BookingProvider)
-
-### Тикет 8.1 — Wire ProfileScreen к API
-
-**Файлы:** `lib/data/repositories/profile_repository.dart`, `lib/screens/profile_screen.dart`
-
-`profile_repository.dart`:
-```dart
-Future<UserProfile> fetchProfile()
-Future<UserProfile> updateProfile(Map<String, dynamic> patch) // PATCH /users/profile/
-```
-
-Методы добавить в `AuthProvider.updateNotificationPreferences` — отдельный provider не создавать.
-
-`profile_screen.dart`:
-- `_user` → `context.watch<AuthProvider>().currentUser`
-- `_notifState` Map → из `user?.notifyEvents / notifyPromotions / notifyClosedEvents`; onChange → `AuthProvider.updateNotificationPreferences(...)`
-- `_HeroHeader` "НАЧАТЬ ПУТЬ" → push `PhoneEntryScreen`
-- `_LegalFooter` privacy URL → `CoreInfoProvider.coreInfo?.privacyPolicy`
-- `_StatsRow` bookingsCount → `BookingProvider.history.length`
-
----
-
-### Тесты для Блока 8
-
-**Файлы:** `test/data/repositories/profile_repository_test.dart`, `test/screens/profile_screen_test.dart`
-
-```
-profile_repository_test.dart:
-  ✓ fetchProfile() возвращает UserProfile
-  ✓ updateProfile({'notify_events': false}) → PATCH с корректным телом
-
-profile_screen_test.dart:
-  ✓ При isLoggedIn=false → "НАЧАТЬ ПУТЬ" кнопка видна
-  ✓ При isLoggedIn=true → имя и телефон из AuthProvider.currentUser
-  ✓ Переключение notify_events → AuthProvider.updateNotificationPreferences() вызван
-  ✓ Тап на "Бронирований" → push BookingHistoryScreen
-  ✓ Privacy link → URL из CoreInfoProvider.coreInfo.privacyPolicy
-```
-
-### Документация для Блока 8
-
-**Файл:** `docs/flutter/profile.md`
-
-Содержит:
-- Что видит авторизованный пользователь vs неавторизованный
-- Управление push-уведомлениями: какие категории, как они синхронизируются
-- `updateNotificationPreferences` — когда вызывается и что отправляет на сервер
-- Контакты ресторана: что статично, что приходит с API
-
----
-
-## Блок 9 — Polish: Version Check + Error States
-**Разработчик:** Архат
-**Ветка:** `feature/polish-version-errors`
-**Зависимости:** Блок 4 (CoreRepository), все блоки контента (5–8)
-
-### Тикет 9.1 — App version check в SplashScreen
-
-**Файл:** `lib/screens/splash_screen.dart`
-
-После splash-задержки (3200 мс): вызов `CoreRepository().fetchAppVersion(Platform.isIOS ? 'ios' : 'android')`. Сравнить `minVersion` с текущей (const `kAppVersion = '1.0.0'` в `lib/core/theme.dart`).
-
-Сравнение по `major.minor.patch` как три int. Логика:
-- `текущая < min` → неотклоняемый `AlertDialog` → `launchUrl(storeUrl)`
-- `min ≤ текущая < latest` → отклоняемый баннер
-
-### Тикет 9.2 — Error handling + loading states
-
-**Файлы:** `lib/providers/menu_provider.dart`, `lib/providers/events_provider.dart`, `lib/providers/core_info_provider.dart`, `lib/providers/booking_provider.dart`
-
-Стандартизировать: `error` — `String?` (читаемое RU сообщение). Добавить `retry()`.
-
-Catch `DioException`:
-- `connectionTimeout / receiveTimeout` → `'Нет соединения'`
-- 5xx → `'Сервер временно недоступен'`
-- 4xx → поле `message` из JSON или generic
-
-На каждом экране: error widget с тотем-иконкой + кнопка "Попробовать снова".
-
----
-
-### Тесты для Блока 9
-
-**Файлы:** `test/screens/splash_screen_test.dart`, `test/providers/error_handling_test.dart`
-
-```
-splash_screen_test.dart:
-  ✓ Если текущая версия < minVersion → AlertDialog показан
-  ✓ AlertDialog не имеет кнопки закрытия (неотклоняемый)
-  ✓ Если версия актуальная → нет диалога
-
-error_handling_test.dart:
-  ✓ DioException connectionTimeout → error = 'Нет соединения'
-  ✓ DioException 503 → error = 'Сервер временно недоступен'
-  ✓ retry() сбрасывает error и повторяет запрос
-  ✓ MenuProvider: при ошибке сохраняет stale данные
-```
-
-### Документация для Блока 9
-
-**Файл:** `docs/flutter/api_client.md` (дополнение)
-
-Добавить раздел:
-- Стандартные тексты ошибок (таблица: причина → текст)
-- `retry()` pattern: как использовать в новых экранах
-- Как работает version check и где задаётся `kAppVersion`
-- Как добавить force-update при релизе новой версии
-
----
-
-## Сводная таблица тикетов
-
-| Блок | Ветка | Разработчик | Тикеты | Зависит от |
+| # | Разработчик | Тикет | Приоритет | Зависит от |
 |---|---|---|---|---|
-| 1 | `feature/infra-api-client` | Архат | 1.1, 1.2 | — |
-| 2 | `feature/data-models-auth` | Шерхан | 2.1, 2.2 | Блок 1 |
-| 3 | `feature/nav-auth-screens` | Архат | 3.1, 3.2 | Блок 2 |
-| 4 | `feature/core-info-fcm` | Шерхан | 4.1, 4.2 | Блок 1, 2 |
-| 5 | `feature/menu-integration` | Архат | 5.1, 5.2 | Блок 1, 2 |
-| 6 | `feature/events-integration` | Шерхан | 6.1, 6.2, 6.3 | Блок 1, 2, 3, 4 |
-| 7 | `feature/booking-integration` | Архат | 7.1, 7.2, 7.3 | Блок 2, 3, 4 |
-| 8 | `feature/profile-integration` | Шерхан | 8.1 | Блок 2, 4, 7 |
-| 9 | `feature/polish-version-errors` | Архат | 9.1, 9.2 | Блок 4–8 |
+| Ш-1.1 | Шерхан | Видеополе блюда (`video_url`) | P0 | — |
+| Ш-1.2 | Шерхан | Формат времени (`HH:MM:SS` на API) | P0 | — |
+| Ш-1.3 | Шерхан | Цена события (decimal + поле `price`) | P0 | — |
+| Ш-2.1 | Шерхан | CoreInfo — 6 новых полей | P1 | — |
+| Ш-3.1 | Шерхан | UserProfile — `notificationsEnabled` + `dateJoined` | P1 | — |
+| Ш-3.2 | Шерхан | `is_new_user` в `AuthProvider` | P1 | — |
+| Ш-3.3 | Шерхан | `notifications_enabled` в `updateNotificationPreferences` | P1 | Ш-3.1 |
+| Ш-3.4 | Шерхан | `journeyStartLabel` из `dateJoined` | P2 | Ш-3.1 |
+| Ш-3.5 | Шерхан | `EventReservationRepository` + `eventsCount` | P2 | — |
+| А-1.1 | Архат | Удалить кнопку «ЗАКАЗАТЬ» | P0 | — |
+| А-1.2 | Архат | Удалить Like/Save/Share | P0 | — |
+| А-1.3 | Архат | Удалить диалог «Фотоотчёт» | P0 | — |
+| А-2.1 | Архат | Hero slider — фото из `CoreInfo.heroSlides` | P1 | — |
+| А-3.1 | Архат | Карта — кнопки из `CoreInfo` | P1 | Ш-2.1 |
+| А-3.2 | Архат | Пользовательское соглашение из `CoreInfo` | P1 | Ш-2.1 |
+| А-3.3 | Архат | Обратная связь из `CoreInfo` | P1 | Ш-2.1 |
+| А-3.4 | Архат | Заметка о депозите из `CoreInfo` | P1 | Ш-2.1 |
+| А-4.1 | Архат | Мастер-переключатель уведомлений | P2 | Ш-3.1, Ш-3.3 |
+| А-4.2 | Архат | `eventsCount` в UI профиля | P2 | Ш-3.5 |
+| А-4.3 | Архат | Онбординг-экран | P2 | Ш-3.2 |
+| А-5.1 | Архат | Исправить URL в README.md | P3 | — |
+
+**P0** — исправить в первую очередь (данные ломаются или UI вводит в заблуждение).
+**P1** — необходимо для корректной работы по ТЗ.
+**P2** — завершает функционал профиля.
+**P3** — документация.
 
 ---
 
-## Sprint Timeline
+# Timeline
 
 ```
-Sprint 0 (дни 1–3)
-  Архат:  Блок 1 (infra-api-client)
-  Шерхан: ожидает Блок 1
+День 1–2 (параллельно)
+  Шерхан: Ш-1 (три критических бага) + Ш-2.1 (CoreInfo поля) + Ш-3.1 (UserProfile поля)
+  Архат:  А-1 (удалить ЗАКАЗАТЬ / лайки / фотоотчёт) + А-2.1 (hero slider)
 
-Sprint 1 (дни 4–7)  — ПАРАЛЛЕЛЬНО
-  Архат:  Блок 2 уже готов от Шерхана (B-02) → начинает Блок 3 (nav-auth-screens)
-  Шерхан: Блок 2 (data-models-auth)
+День 3–4 (параллельно)
+  Шерхан: Ш-3.2 (is_new_user) + Ш-3.3 (notifications_enabled) + Ш-3.4 (journeyStart) + Ш-3.5 (eventsCount)
+  Архат:  А-3 (карта, ссылки, депозит) — стартует после мёрджа Ш-2.1
 
-  * Шерхан начинает Блок 2 сразу после Блока 1 (Архат мёрджит в main)
-
-Sprint 2 (дни 8–12) — ПАРАЛЛЕЛЬНО
-  Архат:  Блок 5 (menu-integration)
-  Шерхан: Блок 4 (core-info-fcm)
-
-Sprint 3 (дни 13–17) — ПАРАЛЛЕЛЬНО
-  Архат:  Блок 7 (booking-integration)
-  Шерхан: Блок 6 (events-integration)
-
-Sprint 4 (дни 18–20) — ПАРАЛЛЕЛЬНО
-  Шерхан: Блок 8 (profile-integration)
-  Архат:  Блок 9 старт (version check)
-
-Sprint 5 (день 21–22)
-  Архат:  Блок 9 завершение (error handling)
+День 5 (параллельно)
+  Шерхан: code review, тесты
+  Архат:  А-4 (переключатель, онбординг) + А-5.1 (README)
 ```
 
 ---
 
-## Verification
+# Верификация после каждого блока
 
-### После Блока 1
+### После Ш-1 + А-1
 ```bash
-flutter pub get   # завершается без ошибок
-flutter analyze   # 0 ошибок
-flutter run       # UI идентичен текущему (мок-данные)
+flutter run
 ```
+- Видео в ленте блюд воспроизводится (поле `video_url`)
+- Кнопка «ЗАКАЗАТЬ» отсутствует на детальном экране блюда
+- Лайк/Share/Save кнопки отсутствуют на видео-карточках
+- Кнопка «Фотоотчёт» отсутствует на карточках событий
 
-### После Блока 3
-- Таб 2 → InteriorScreen (заглушка)
-- Таб 3 → EventsScreen
-- "Забронировать" → push BookingScreen (не меняет таб)
-- Profile "НАЧАТЬ ПУТЬ" → PhoneEntryScreen
+### После Ш-2 + А-3
+- Кнопки карты показывают реальные ссылки из CoreInfo (или скрыты если null)
+- Строка «Пользовательское соглашение» скрыта если `termsOfService == null`
+- Заметка о депозите показывает текст из `bookingDepositNote`
 
-### После Блоков 5 + 6
-```bash
-cd backend && docker compose up -d
-```
-- Меню: категории и блюда из API, видео воспроизводится
-- События: реальный список, регистрация требует входа
-
-### После Блоков 7 + 8
-- Бронирование: форма отправляется, push "Заявка принята" приходит
-- Профиль: имя/телефон из API, toggles синхронизируются
-
-### После Блока 9
-- Запуск устаревшей версии → неотклоняемый диалог
-- Отсутствие сети → error state + "Попробовать снова"
-
-### Backend Docs
-```
-http://localhost:8000/api/docs/    # Swagger
-http://localhost:8000/api/redoc/   # ReDoc
-```
+### После Ш-3 + А-4
+- Бронирование успешно уходит на сервер (время в формате `HH:MM:SS`)
+- Профиль: мастер-переключатель уведомлений работает
+- Профиль: `eventsCount` показывает реальное число, `journeyStartLabel` заполнен
+- Новый пользователь после верификации OTP попадает на онбординг
 
 ### Запуск тестов
 ```bash
-flutter test                        # все тесты
-flutter test test/data/             # только unit tests
-flutter test test/screens/          # только widget tests
-flutter test --coverage             # с покрытием
-genhtml coverage/lcov.info -o coverage/html  # HTML отчёт
+flutter test                  # все тесты
+flutter test test/data/       # только unit tests
+flutter test test/widgets/    # только widget tests
+flutter test test/screens/    # только screen tests
+flutter test --coverage       # с покрытием
 ```

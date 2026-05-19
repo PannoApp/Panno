@@ -1023,8 +1023,6 @@ class _DishDetailSheet extends StatelessWidget {
                     ),
                   ],
 
-                  const SizedBox(height: 24),
-                  DishBookingCta(dish: dish),
                 ],
               ),
             ),

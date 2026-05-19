@@ -30,123 +30,6 @@ class _EventsScreenState extends State<EventsScreen> {
   bool _archiveOpen = false;
   int _heroIndex = 0;
 
-  void _openPhotoReport(ApiEvent e, int coverIndex) {
-    final coverAsset = e.fallbackCoverAsset(coverIndex);
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: PiligrimColors.earthDeep,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Фотоотчёт',
-                style: PiligrimTextStyles.heading.copyWith(color: PiligrimColors.sky),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                e.title,
-                style: PiligrimTextStyles.caption.copyWith(
-                  color: PiligrimColors.water,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Подборка кадров с вечера — полная галерея появится в каналах PILIGRIM. Здесь герой видит атмосферу в духе бренда: тёплый свет, детали стола.',
-                style: PiligrimTextStyles.body.copyWith(
-                  fontSize: 13,
-                  color: PiligrimColors.sky.withValues(alpha: 0.85),
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Builder(
-                builder: (context) {
-                  final extras =
-                      PiligrimInteriorAssets.galleryExtrasExcluding(coverAsset);
-                  Widget galleryThumb(String asset) {
-                    return Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              Image.asset(asset, fit: BoxFit.cover),
-                              Positioned(
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                height: 28,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        PiligrimColors.earth.withValues(alpha: 0.0),
-                                        PiligrimColors.earth.withValues(alpha: 0.7),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: AspectRatio(
-                            aspectRatio: 1,
-                            child: EventCoverImage(
-                              imageUrl: e.coverUrl,
-                              fallbackAsset: coverAsset,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      galleryThumb(extras[0]),
-                      const SizedBox(width: 8),
-                      galleryThumb(extras[1]),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text(
-                    'Закрыть',
-                    style: PiligrimTextStyles.body.copyWith(
-                      color: PiligrimColors.water,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<EventsProvider>(
@@ -323,12 +206,7 @@ class _EventsScreenState extends State<EventsScreen> {
                             final e = past[i];
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
-                              child: _PastEventCard(
-                                event: e,
-                                onPhotoReport: e.hasPhotoReport
-                                    ? () => _openPhotoReport(e, i)
-                                    : null,
-                              ),
+                              child: _PastEventCard(event: e),
                             );
                           },
                           childCount: past.length,
@@ -976,15 +854,11 @@ class _ArchiveHeader extends StatelessWidget {
   }
 }
 
-// Карточка прошедшего мероприятия (название, дата, ссылка на фотоотчёт)
+// Карточка прошедшего мероприятия (название, дата)
 class _PastEventCard extends StatelessWidget {
-  const _PastEventCard({
-    required this.event,
-    this.onPhotoReport,
-  });
+  const _PastEventCard({required this.event});
 
   final ApiEvent event;
-  final VoidCallback? onPhotoReport;
 
   @override
   Widget build(BuildContext context) {
@@ -1012,31 +886,6 @@ class _PastEventCard extends StatelessWidget {
               color: PiligrimColors.sky.withValues(alpha: 0.35),
             ),
           ),
-          if (onPhotoReport != null) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: onPhotoReport,
-                style: TextButton.styleFrom(
-                  foregroundColor: PiligrimColors.water,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  'Фотоотчёт',
-                  style: PiligrimTextStyles.body.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: PiligrimColors.water,
-                    decoration: TextDecoration.underline,
-                    decorationColor: PiligrimColors.water.withValues(alpha: 0.5),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

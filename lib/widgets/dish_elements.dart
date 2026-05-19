@@ -9,7 +9,6 @@ import '../core/theme.dart';
 import '../data/models/api_dish.dart';
 import '../data/models/api_tag.dart';
 import 'piligrim_info_section.dart';
-import 'piligrim_tap.dart';
 
 /// Нижний информационный блок для Reel-карточки блюда.
 class DishCardBottomInfo extends StatelessWidget {
@@ -142,110 +141,6 @@ class DishCardPriceTag extends StatelessWidget {
           fontSize: 14,
           letterSpacing: 0.3,
         ),
-      ),
-    );
-  }
-}
-
-class DishCardActionBar extends StatefulWidget {
-  const DishCardActionBar({super.key, required this.dish});
-  final ApiDish dish;
-
-  @override
-  State<DishCardActionBar> createState() => _DishCardActionBarState();
-}
-
-class _DishCardActionBarState extends State<DishCardActionBar> {
-  bool _liked = false;
-  bool _saved = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _DishActionBtn(
-          asset: 'assets/images/star_totem (1).svg',
-          label: _liked ? 'В пути' : 'Нравится',
-          active: _liked,
-          color: PiligrimColors.steppe,
-          onTap: () => setState(() => _liked = !_liked),
-        ),
-        const SizedBox(height: 22),
-        _DishActionBtn(
-          asset: 'assets/images/moon_totem (1).svg',
-          label: _saved ? 'Сохранено' : 'Запомнить',
-          active: _saved,
-          color: PiligrimColors.water,
-          onTap: () => setState(() => _saved = !_saved),
-        ),
-        const SizedBox(height: 22),
-        _DishActionBtn(
-          asset: 'assets/images/luk.svg',
-          label: 'Поделиться',
-          active: false,
-          color: PiligrimColors.sky,
-          onTap: () {},
-        ),
-      ],
-    );
-  }
-}
-
-class _DishActionBtn extends StatelessWidget {
-  const _DishActionBtn({
-    required this.asset,
-    required this.label,
-    required this.active,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String asset;
-  final String label;
-  final bool active;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PiligrimTap(
-      onTap: onTap,
-      child: Column(
-        children: [
-          AnimatedContainer(
-            duration: 200.ms,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: active
-                  ? color.withValues(alpha: 0.25)
-                  : Colors.black.withValues(alpha: 0.3),
-              border: Border.all(
-                color: active
-                    ? color.withValues(alpha: 0.6)
-                    : Colors.white.withValues(alpha: 0.12),
-              ),
-            ),
-            child: SvgPicture.asset(
-              asset,
-              width: 20,
-              height: 20,
-              colorFilter: ColorFilter.mode(
-                active ? color : PiligrimColors.sky.withValues(alpha: 0.7),
-                BlendMode.srcIn,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: PiligrimTextStyles.caption.copyWith(
-              fontSize: 9.5,
-              color: active ? color : PiligrimColors.sky.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -390,41 +285,3 @@ class DishThumbnail extends StatelessWidget {
   }
 }
 
-class DishBookingCta extends StatelessWidget {
-  const DishBookingCta({super.key, required this.dish});
-  final ApiDish dish;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [PiligrimColors.steppe, PiligrimColors.emberDeep],
-        ),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: PiligrimColors.ember.withValues(alpha: 0.3),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: PiligrimTap(
-        onTap: () => Navigator.pop(context),
-        borderRadius: BorderRadius.circular(10),
-        child: Center(
-          child: Text(
-            'ЗАКАЗАТЬ ЗА ${dish.price} ₸',
-            style: PiligrimTextStyles.button.copyWith(
-              color: PiligrimColors.sky,
-              fontSize: 14,
-              letterSpacing: 1.2,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
