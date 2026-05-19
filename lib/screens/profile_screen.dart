@@ -10,10 +10,12 @@ import '../core/auth_guard.dart';
 import '../core/theme.dart';
 import '../core/profile_data.dart';
 import '../providers/auth_provider.dart';
+import '../providers/booking_provider.dart';
 import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
+import 'booking_history_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -394,13 +396,21 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bookingsCount =
+        context.watch<BookingProvider>().history.length;
+
     return Row(
       children: [
         _StatCard(
-          value: '${user.bookingsCount}',
+          value: '$bookingsCount',
           label: 'Бронирований',
           totemAsset: 'assets/images/moon_totem (1).svg',
           delay: 0.ms,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const BookingHistoryScreen(),
+            ),
+          ),
         ),
         const SizedBox(width: 10),
         _StatCard(
@@ -430,6 +440,7 @@ class _StatCard extends StatelessWidget {
     required this.totemAsset,
     required this.delay,
     this.small = false,
+    this.onTap,
   });
 
   final String value;
@@ -437,11 +448,15 @@ class _StatCard extends StatelessWidget {
   final String totemAsset;
   final Duration delay;
   final bool small;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
+      child: PiligrimTap(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap ?? () {},
+        child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         decoration: BoxDecoration(
           color: PiligrimColors.earthDeep,
@@ -490,6 +505,7 @@ class _StatCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       )
           .animate(delay: delay)
           .fadeIn(duration: 500.ms)

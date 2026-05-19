@@ -1,44 +1,98 @@
 import 'package:flutter/foundation.dart';
 
-/// Черновик заявки на бронь (общий state между экранами).
+import '../data/models/api_booking.dart';
+import '../data/models/booking_request.dart';
+import '../data/repositories/booking_repository.dart';
+
 class BookingProvider extends ChangeNotifier {
-  String? _selectedZone = 'Главный зал';
-  int _guests = 2;
-  DateTime? _visitDate;
-  DateTime? _visitTime;
+  BookingProvider({BookingRepository? repository})
+      : _repository = repository ?? BookingRepository();
+
+  final BookingRepository _repository;
+
+  // Черновик формы (выбранные пользователем значения до отправки)
+  String? selectedZone = 'Главный зал';
+  int guests = 2;
+  DateTime? visitDate;
+  DateTime? visitTime;
 
   static const zones = ['Главный зал', 'Терраса', 'Приват'];
 
-  String? get selectedZone => _selectedZone;
-  int get guests => _guests;
-  DateTime? get visitDate => _visitDate;
-  DateTime? get visitTime => _visitTime;
+  // Состояние отправки заявки
+  bool isSubmitting = false;
+  bool isSuccess = false;
+  String? error;
+
+  // История бронирований текущего пользователя
+  List<ApiBooking> history = const [];
+  bool isLoadingHistory = false;
+  String? historyError;
 
   void setZone(String? zone) {
-    _selectedZone = zone;
+    selectedZone = zone;
     notifyListeners();
   }
 
   void setGuests(int count) {
-    _guests = count.clamp(1, 20);
+    guests = count.clamp(1, 50);
     notifyListeners();
   }
 
   void setVisitDate(DateTime date) {
-    _visitDate = date;
+    visitDate = date;
     notifyListeners();
   }
 
   void setVisitTime(DateTime time) {
-    _visitTime = time;
+    visitTime = time;
     notifyListeners();
   }
 
-  void reset() {
-    _selectedZone = 'Главный зал';
-    _guests = 2;
-    _visitDate = null;
-    _visitTime = null;
+  Future<void> submitBooking(BookingRequest req) async {
+    if (isSubmitting) return;
+    isSubmitting = true;
+    isSuccess = false;
+    error = null;
     notifyListeners();
+
+    try {
+      await _repository.createBooking(req);
+      isSuccess = true;
+      _resetForm();
+    } catch (e) {
+      error = e.toString();
+    } finally {
+      isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadHistory({int page = 1}) async {
+    if (isLoadingHistory) return;
+    isLoadingHistory = true;
+    historyError = null;
+    notifyListeners();
+
+    try {
+      history = await _repository.fetchHistory(page: page);
+    } catch (e) {
+      historyError = e.toString();
+    } finally {
+      isLoadingHistory = false;
+      notifyListeners();
+    }
+  }
+
+  void resetSubmitState() {
+    isSuccess = false;
+    error = null;
+    notifyListeners();
+  }
+
+  void _resetForm() {
+    selectedZone = 'Главный зал';
+    guests = 2;
+    visitDate = null;
+    visitTime = null;
   }
 }
