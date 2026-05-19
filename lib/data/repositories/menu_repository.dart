@@ -44,4 +44,25 @@ class MenuRepository {
     );
     return (dishes: paginated.results, hasMore: paginated.hasMore);
   }
+
+  /// Загружает страницу видео-ленты с cursor-based пагинацией.
+  /// [cursor] — значение из предыдущего ответа; null означает первую страницу.
+  /// Возвращает record: dishes — список блюд, nextCursor — курсор следующей страницы
+  /// (null, если страниц больше нет).
+  Future<({List<ApiDish> dishes, String? nextCursor})> fetchFeed({
+    String? cursor,
+  }) async {
+    final query = <String, dynamic>{};
+    if (cursor != null) query['cursor'] = cursor;
+
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/menu/feed/',
+      queryParameters: query.isEmpty ? null : query,
+    );
+    final paginated = PaginatedResponse.parseCursor(
+      response.data ?? {},
+      ApiDish.fromJson,
+    );
+    return (dishes: paginated.results, nextCursor: paginated.nextCursor);
+  }
 }

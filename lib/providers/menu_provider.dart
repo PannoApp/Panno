@@ -31,6 +31,19 @@ class MenuProvider extends ChangeNotifier {
   int? activeCategoryId;
   String searchQuery = '';
 
+  // ── Состояние видео-ленты (cursor pagination) ──────────────────────────────
+
+  List<ApiDish> feedDishes = const [];
+
+  /// Курсор следующей страницы; null — следующей страницы нет или ещё не загружали.
+  String? _feedNextCursor;
+
+  /// true, пока первая страница ленты ещё не загружена или идёт refresh.
+  bool isLoadingFeed = false;
+
+  /// true, если есть ещё страницы для подгрузки (курсор не null после первой загрузки).
+  bool hasMoreFeed = true;
+
   MenuViewMode _mode = MenuViewMode.feed;
   bool _loaded = false;
 
@@ -56,7 +69,7 @@ class MenuProvider extends ChangeNotifier {
   // ── Инициализация ──────────────────────────────────────────────────────────
 
   // Загружает сохранённый режим из SharedPreferences, затем параллельно
-  // запрашивает категории и первую страницу блюд.
+  // запрашивает категории, первую страницу блюд и первую страницу ленты.
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('menu_mode');
@@ -64,7 +77,11 @@ class MenuProvider extends ChangeNotifier {
     _loaded = true;
     notifyListeners();
 
-    await Future.wait([loadCategories(), loadDishes(refresh: true)]);
+    await Future.wait([
+      loadCategories(),
+      loadDishes(refresh: true),
+      loadFeed(refresh: true),
+    ]);
   }
 
   // ── Категории ──────────────────────────────────────────────────────────────
@@ -115,6 +132,38 @@ class MenuProvider extends ChangeNotifier {
     } finally {
       isLoading = false;
       isLoadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Видео-лента (cursor pagination) ───────────────────────────────────────
+
+  /// refresh=true: сбрасывает курсор и список перед загрузкой первой страницы.
+  /// Повторный вызов без refresh подгружает следующую страницу по сохранённому курсору.
+  Future<void> loadFeed({bool refresh = false}) async {
+    if (refresh) {
+      _feedNextCursor = null;
+      feedDishes = const [];
+      hasMoreFeed = true;
+    }
+
+    // Не запускать параллельных запросов и не грузить, если страниц больше нет.
+    if (isLoadingFeed) return;
+    if (!hasMoreFeed && !refresh) return;
+
+    isLoadingFeed = true;
+    notifyListeners();
+
+    try {
+      final result = await _repository.fetchFeed(cursor: _feedNextCursor);
+      feedDishes = [...feedDishes, ...result.dishes];
+      _feedNextCursor = result.nextCursor;
+      hasMoreFeed = result.nextCursor != null;
+    } catch (_) {
+      // При ошибке оставляем текущий список, прекращаем пагинацию.
+      hasMoreFeed = false;
+    } finally {
+      isLoadingFeed = false;
       notifyListeners();
     }
   }

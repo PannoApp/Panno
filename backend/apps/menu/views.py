@@ -8,7 +8,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 from drf_spectacular.types import OpenApiTypes
 from .models import Dish, Category
 from .serializers import DishSerializer, CategorySerializer
-from utils.pagination import VideoFeedPagination
+from utils.pagination import VideoFeedPagination, VideoCursorPagination
 from utils.cache import safe_cache_get, safe_cache_set
 from .filters import DishFilter
 
@@ -119,3 +119,32 @@ class DishListView(generics.ListAPIView):
         response = super().list(request, *args, **kwargs)
         safe_cache_set(cache_key, response.data, timeout=_CACHE_DISHES)
         return response
+
+
+@extend_schema(
+    tags=['Menu'],
+    summary='Видеолента блюд',
+    description=(
+        'Возвращает только активные блюда с готовым видео (`video_status=ready`).\n\n'
+        'Использует курсорную пагинацию — передайте параметр `cursor` из поля `next` '
+        'предыдущего ответа для получения следующей порции.'
+    ),
+    responses={200: DishSerializer(many=True)},
+)
+class VideoFeedView(generics.ListAPIView):
+    serializer_class = DishSerializer
+    pagination_class = VideoCursorPagination
+    permission_classes = [AllowAny]
+    # Глобальные throttle-классы (anon/user) наследуются из DEFAULT_THROTTLE_CLASSES.
+    # Явный пустой список здесь отключил бы их — оставляем атрибут без переопределения.
+
+    def get_queryset(self):
+        # Кэш здесь не применяется: курсор кодирует позицию конкретного запроса,
+        # поэтому кэширование ответа сломало бы навигацию по страницам.
+        return (
+            Dish.objects
+            .filter(is_active=True, video_status=Dish.VideoStatus.READY)
+            .select_related('category')
+            .prefetch_related('tags', 'allergens')
+            .order_by('id')
+        )
