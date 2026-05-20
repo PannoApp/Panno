@@ -190,6 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     // Юридическое + версия
                         _LegalFooter(
                           privacyUrl: coreInfo?.privacyPolicy,
+                          coreInfo: coreInfo,
                           onLaunch: _launch,
                         ),
                       ]),
@@ -820,6 +821,16 @@ class _ContactsCard extends StatelessWidget {
     final phone = coreInfo?.phone.isNotEmpty == true
         ? coreInfo!.phone
         : kRestaurantPhone;
+    // Список карт — только те, у которых есть ссылка из CoreInfo
+    final mapLinks = [
+      if (coreInfo?.twogisLink != null)
+        (label: '2ГИС', url: coreInfo!.twogisLink!, asset: 'assets/images/splash_path (1).svg'),
+      if (coreInfo?.googleMapsLink != null)
+        (label: 'Google', url: coreInfo!.googleMapsLink!, asset: 'assets/images/star_totem (1).svg'),
+      if (coreInfo?.yandexMapsLink != null)
+        (label: 'Яндекс', url: coreInfo!.yandexMapsLink!, asset: 'assets/images/wheel_totem (1).svg'),
+    ];
+
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
         ? coreInfo!.socialLinks
         : null;
@@ -858,57 +869,58 @@ class _ContactsCard extends StatelessWidget {
             ),
           ),
 
-          // Кнопки карт
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Row(
-              children: kMapTargets.map((t) {
-                return Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      right: t == kMapTargets.last ? 0 : 8,
-                    ),
-                    child: PiligrimTap(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => onLaunch(t.url),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 9),
-                        decoration: BoxDecoration(
-                          color: PiligrimColors.steppe.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: PiligrimColors.steppe.withValues(alpha: 0.3),
+          // Кнопки карт — скрываем если все ссылки null
+          if (mapLinks.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: mapLinks.map((t) {
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        right: t == mapLinks.last ? 0 : 8,
+                      ),
+                      child: PiligrimTap(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => onLaunch(t.url),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: PiligrimColors.steppe.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: PiligrimColors.steppe.withValues(alpha: 0.3),
+                            ),
                           ),
-                        ),
-                        child: Column(
-                          children: [
-                            SvgPicture.asset(
-                              t.totemAsset,
-                              width: 16,
-                              height: 16,
-                              colorFilter: const ColorFilter.mode(
-                                PiligrimColors.steppe,
-                                BlendMode.srcIn,
+                          child: Column(
+                            children: [
+                              SvgPicture.asset(
+                                t.asset,
+                                width: 16,
+                                height: 16,
+                                colorFilter: const ColorFilter.mode(
+                                  PiligrimColors.steppe,
+                                  BlendMode.srcIn,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              t.label,
-                              style: PiligrimTextStyles.caption.copyWith(
-                                fontSize: 10,
-                                color: PiligrimColors.steppe.withValues(alpha: 0.8),
-                                letterSpacing: 0.5,
+                              const SizedBox(height: 3),
+                              Text(
+                                t.label,
+                                style: PiligrimTextStyles.caption.copyWith(
+                                  fontSize: 10,
+                                  color: PiligrimColors.steppe.withValues(alpha: 0.8),
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
 
           const Divider(height: 1, color: PiligrimColors.divider),
 
@@ -1240,10 +1252,12 @@ class _LegalFooter extends StatelessWidget {
   const _LegalFooter({
     required this.onLaunch,
     this.privacyUrl,
+    this.coreInfo,
   });
 
   final Future<void> Function(String url) onLaunch;
   final String? privacyUrl;
+  final CoreInfo? coreInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -1270,21 +1284,25 @@ class _LegalFooter extends StatelessWidget {
         _BrandCard(
           child: Column(
             children: [
-              _LegalRow(
-                label: 'Пользовательское соглашение',
-                onTap: () => onLaunch('https://piligrim.kz/terms'),
-              ),
-              const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
+              if (coreInfo?.termsOfService != null) ...[
+                _LegalRow(
+                  label: 'Пользовательское соглашение',
+                  onTap: () => onLaunch(coreInfo!.termsOfService!),
+                ),
+                const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
+              ],
               _LegalRow(
                 label: 'Политика конфиденциальности',
                 onTap: () => onLaunch(privacy),
               ),
-              const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
-              _LegalRow(
-                label: 'Обратная связь',
-                accent: true,
-                onTap: () => onLaunch('mailto:hello@piligrim.kz'),
-              ),
+              if (coreInfo?.feedbackUrl != null) ...[
+                const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
+                _LegalRow(
+                  label: 'Обратная связь',
+                  accent: true,
+                  onTap: () => onLaunch(coreInfo!.feedbackUrl!),
+                ),
+              ],
             ],
           ),
         ),
