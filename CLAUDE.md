@@ -15,7 +15,7 @@ This is a **Flutter mobile app + Django REST API** monorepo named **Piligrim** (
 /Plan_For_Flutter.md ← Flutter implementation plan
 ```
 
-All backend commands must be run from `/Users/arhat/Desktop/Panno/backend/`.
+All backend commands: `cd backend` from the repo root.
 
 ---
 
@@ -120,33 +120,37 @@ Flutter-facing API reference: `backend/API_FOR_FLUTTER.md` (includes Dio interce
 
 ## Flutter App
 
-The Flutter project lives at the repo root. The app is a culturally-themed restaurant mobile client with a Kazakhstan aesthetic.
+The Flutter project lives at the repo root. Culturally-themed restaurant client (Kazakh aesthetic).
+
+**Cursor rules (UI, nav, layout):** `.cursor/rules/piligrim-*.mdc` — prefer these over guessing conventions.
+
+**Flutter docs (per feature):** `docs/flutter/*.md` — auth, menu, booking, events, api_client, etc.
+
+**Implementation plan / audit:** `Plan_For_Flutter.md` (architecture decisions, open tasks).
 
 ### App Structure (`lib/`)
 
-- `main.dart` — entry point; `RootShell` widget with `IndexedStack` + bottom nav
-- `screens/` — one file per screen: `splash`, `home`, `menu`, `events`, `booking`, `profile`, `event_detail`, `about`
-- `widgets/` — 25+ reusable components grouped by purpose:
-  - Navigation: `bottom_nav_bar.dart`, `piligrim_tap.dart`
-  - Home ambient effects: `home_hero_section.dart`, `home_cinematic_ambient.dart`, `ethno_ambient_background.dart`
-  - Content cards: `dish_video_card.dart`, `event_signup_sheet.dart`
-- `core/` — app-wide config:
-  - `theme.dart` — complete `ThemeData`; color names are Kazakh (`Қара жер` earth, `Мөлдір су` water, `Сары дала` steppe, `Жалын` ember, `Nomad Cream`)
-  - `ambient_preset.dart` — `AppAmbientPreset` enum (calm/ember/mystic) with `AmbientPresetScope` `InheritedNotifier` + `SharedPreferences` persistence
-  - `home_data.dart`, `menu_data.dart`, `profile_data.dart` — currently mock data models
-- `data/` — static mock data for events/news
+- `main.dart` — `MultiProvider`, `SplashScreen` → `RootShell` (`IndexedStack` + `PiligrimNavBar`)
+- `screens/` — splash, home, menu, interior, events, profile, booking, phone_entry, event_detail, …
+- `widgets/` — brand UI (`piligrim_*`, `home_*`, `ember_*`), e.g. `piligrim_tap.dart`, `home_cinematic_ambient.dart`, `dish_video_card.dart`
+- `providers/` — `AuthProvider`, `CoreInfoProvider`, `MenuProvider`, `EventsProvider`, `BookingProvider` (`ChangeNotifier`)
+- `data/repositories/` + `data/services/` — Dio API layer (`DioClient`, JWT interceptor, `TokenStorage`)
+- `core/` — `theme.dart`, `ambient_preset_scope.dart` (global ambient `AnimationController`), `home_data.dart` / `menu_data.dart` / `profile_data.dart` (static UI registries, not API mocks)
 
-### State Management
+### State & navigation
 
-Lightweight by design: `InheritedNotifier` (`AmbientPresetScope`) for the ambient theme state, `SharedPreferences` for local persistence. No Riverpod, Provider, or GetX. Navigation is `IndexedStack` for tabs; named routes for detail screens.
+- **State:** `provider` + `ChangeNotifier` only (no Riverpod / Bloc / GetX).
+- **Tabs:** fixed order in `RootShell` — Home · Menu · Interior · Events · Profile.
+- **Details / booking / auth:** `Navigator.push` + `MaterialPageRoute` (no `go_router`, no named routes).
+- **Auth gate:** `guardAuth(context)` in `lib/core/auth_guard.dart`.
 
 ### Key Flutter Facts
 
-- **No HTTP client is wired up yet.** All data is mocked. Adding backend integration requires a `dio` (or `http`) package and an API service layer. `backend/API_FOR_FLUTTER.md` is the reference.
-- Font: MuseoSans 300/700 only (loaded from assets). All typography must use these weights.
-- Portrait-only orientation lock in `main.dart`.
-- `sensors_plus` is used for gyro/motion-driven interactive ambient effects in the home screen.
-- Design spec: `brand/piligrim_design_spec.md`
+- **API wired:** `dio`, repositories, providers; reference `backend/API_FOR_FLUTTER.md`.
+- Events may fall back to mocks in `data/events_news_data.dart` on network failure; menu uses live API.
+- Font: MuseoSans 300/700 only. Design: `brand/piligrim_design_spec.md`.
+- Portrait-only in `main.dart`. Home uses `sensors_plus` parallax + cinematic ambient layers.
+- Large screens (`profile_screen`, `menu_screen`, `events_screen`) are intentional monoliths — do not split unless asked.
 
 ### Flutter Commands
 

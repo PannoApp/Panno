@@ -1,0 +1,26 @@
+---
+description: PILIGRIM scope — minimal diffs, fixed stack, trust docs/flutter
+alwaysApply: true
+---
+
+# PILIGRIM — project guardrails
+
+Flutter app: repo root (`lib/`, `pubspec.yaml`). Backend: `backend/` — only touch when the task says so.
+
+## Stack (do not replace)
+- State: `provider` + `ChangeNotifier`; app providers live in `lib/main.dart` `MultiProvider`.
+- HTTP: `DioClient` + `lib/data/repositories/`.
+- Navigation: `RootShell` + `IndexedStack` + `Navigator.push` / `MaterialPageRoute` (no `go_router`, no named routes, no new state packages).
+
+## Scope
+- Change only what the task needs. No drive-by refactors.
+- Do not split large screens (`profile_screen`, `menu_screen`, `events_screen`) or rename tabs/providers unless explicitly asked.
+- Extend existing files/widgets before adding parallel ones (second error widget, second API wrapper, `*_v2.dart`).
+
+## Source of truth
+- Flutter: `docs/flutter/*.md`, `backend/API_FOR_FLUTTER.md`, and source.
+- Brand: `brand/piligrim_design_spec.md`, `lib/core/theme.dart`.
+- `CLAUDE.md` Flutter section may be stale — prefer `docs/flutter` + code.
+
+## Copy
+- User-facing text: Russian, calm premium tone (путь / герой / традиции).
