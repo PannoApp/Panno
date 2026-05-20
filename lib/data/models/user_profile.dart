@@ -9,6 +9,8 @@ class UserProfile {
     required this.notifyEvents,
     required this.notifyPromotions,
     required this.notifyClosedEvents,
+    required this.notificationsEnabled,
+    this.dateJoined,
   });
 
   final int id;
@@ -18,6 +20,8 @@ class UserProfile {
   final bool notifyEvents;
   final bool notifyPromotions;
   final bool notifyClosedEvents;
+  final bool notificationsEnabled;
+  final DateTime? dateJoined;
 
   String get displayName => '$firstName $lastName'.trim();
 
@@ -37,7 +41,18 @@ class UserProfile {
       notifyClosedEvents: parseBool(
         json['notify_closed_events'] ?? json['notifyClosedEvents'],
       ),
+      notificationsEnabled: parseBool(
+        json['notifications_enabled'] ?? json['notificationsEnabled'],
+        defaultValue: true,
+      ),
+      dateJoined: _parseDateJoined(json['date_joined'] ?? json['dateJoined']),
     );
+  }
+
+  static DateTime? _parseDateJoined(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
   }
 
   Map<String, dynamic> toJson() => {
@@ -48,12 +63,16 @@ class UserProfile {
         'notify_events': notifyEvents,
         'notify_promotions': notifyPromotions,
         'notify_closed_events': notifyClosedEvents,
+        'notifications_enabled': notificationsEnabled,
+        if (dateJoined != null) 'date_joined': dateJoined!.toIso8601String(),
       };
 
   UserProfile copyWith({
     bool? notifyEvents,
     bool? notifyPromotions,
     bool? notifyClosedEvents,
+    bool? notificationsEnabled,
+    DateTime? dateJoined,
   }) {
     return UserProfile(
       id: id,
@@ -63,6 +82,8 @@ class UserProfile {
       notifyEvents: notifyEvents ?? this.notifyEvents,
       notifyPromotions: notifyPromotions ?? this.notifyPromotions,
       notifyClosedEvents: notifyClosedEvents ?? this.notifyClosedEvents,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      dateJoined: dateJoined ?? this.dateJoined,
     );
   }
 }

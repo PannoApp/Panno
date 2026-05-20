@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../core/dio_errors.dart';
 import '../core/profile_data.dart';
 import '../data/models/user_profile.dart';
+import '../data/repositories/event_reservation_repository.dart';
 import '../data/repositories/profile_repository.dart';
 import '../data/services/api_client.dart';
 import '../data/services/auth_service.dart';
@@ -17,21 +18,27 @@ class AuthProvider extends ChangeNotifier {
     Dio? dio,
     TokenStorage? tokenStorage,
     ProfileRepository? profileRepository,
+    EventReservationRepository? eventReservationRepository,
   })  : _tokenStorage = tokenStorage ?? TokenStorage.instance,
         _dio = dio ?? DioClient.instance.dio,
         _authService = authService ??
             AuthService(dio ?? DioClient.instance.dio),
         _profileRepository = profileRepository ??
-            ProfileRepository(dio: dio ?? DioClient.instance.dio);
+            ProfileRepository(dio: dio ?? DioClient.instance.dio),
+        _eventReservationRepository = eventReservationRepository ??
+            EventReservationRepository(dio: dio ?? DioClient.instance.dio);
 
   final TokenStorage _tokenStorage;
   final Dio _dio;
   final AuthService _authService;
   final ProfileRepository _profileRepository;
+  final EventReservationRepository _eventReservationRepository;
 
   UserProfile? currentUser;
   bool isLoading = false;
   String? error;
+  bool isNewUser = false;
+  int eventsCount = 0;
 
   bool get isLoggedIn => currentUser != null;
 
@@ -44,7 +51,14 @@ class AuthProvider extends ChangeNotifier {
     return HeroUser(
       name: name.isEmpty ? 'Герой без имени' : name,
       phone: profile.phone,
+      journeyStartLabel: _formatJourneyStart(profile.dateJoined),
+      eventsCount: eventsCount,
     );
+  }
+
+  void clearNewUserFlag() {
+    isNewUser = false;
+    notifyListeners();
   }
 
   Future<void> init() async {
@@ -56,13 +70,16 @@ class AuthProvider extends ChangeNotifier {
       final access = await _tokenStorage.readAccess();
       if (access == null || access.isEmpty) {
         currentUser = null;
+        eventsCount = 0;
         return;
       }
       await _loadProfile();
+      await _loadEventsCount();
       await _registerFcmIfPossible();
     } catch (e) {
       error = dioErrorMessage(e);
       currentUser = null;
+      eventsCount = 0;
       await _tokenStorage.clearTokens();
     } finally {
       isLoading = false;
@@ -92,11 +109,13 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final result = await _authService.verifySms(phone, code);
+      isNewUser = result.isNewUser;
       await _tokenStorage.saveTokens(
         access: result.access,
         refresh: result.refresh,
       );
       await _loadProfile();
+      await _loadEventsCount();
       await _registerFcmIfPossible();
       return isLoggedIn;
     } catch (e) {
@@ -123,6 +142,8 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       await _tokenStorage.clearTokens();
       currentUser = null;
+      isNewUser = false;
+      eventsCount = 0;
       isLoading = false;
       notifyListeners();
     }
@@ -132,6 +153,7 @@ class AuthProvider extends ChangeNotifier {
     bool? events,
     bool? promotions,
     bool? closedEvents,
+    bool? notificationsEnabled,
   }) async {
     if (currentUser == null) return;
 
@@ -144,6 +166,9 @@ class AuthProvider extends ChangeNotifier {
       if (events != null) body['notify_events'] = events;
       if (promotions != null) body['notify_promotions'] = promotions;
       if (closedEvents != null) body['notify_closed_events'] = closedEvents;
+      if (notificationsEnabled != null) {
+        body['notifications_enabled'] = notificationsEnabled;
+      }
 
       currentUser = await _profileRepository.updateProfile(body);
     } catch (e) {
@@ -159,6 +184,18 @@ class AuthProvider extends ChangeNotifier {
     currentUser = await _profileRepository.fetchProfile();
   }
 
+  Future<void> _loadEventsCount() async {
+    if (!isLoggedIn) {
+      eventsCount = 0;
+      return;
+    }
+    try {
+      eventsCount = await _eventReservationRepository.fetchMyReservationsCount();
+    } catch (_) {
+      eventsCount = 0;
+    }
+  }
+
   Future<void> _registerFcmIfPossible() async {
     if (!isLoggedIn) return;
     try {
@@ -167,4 +204,24 @@ class AuthProvider extends ChangeNotifier {
       // FCM опционален до полной настройки Firebase.
     }
   }
+}
+
+String? _formatJourneyStart(DateTime? dt) {
+  if (dt == null) return null;
+  const months = [
+    '',
+    'Январь',
+    'Февраль',
+    'Март',
+    'Апрель',
+    'Май',
+    'Июнь',
+    'Июль',
+    'Август',
+    'Сентябрь',
+    'Октябрь',
+    'Ноябрь',
+    'Декабрь',
+  ];
+  return '${months[dt.month]} ${dt.year}';
 }

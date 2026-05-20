@@ -13,7 +13,13 @@ Map<String, dynamic> _sampleProfile() => {
       'notify_events': true,
       'notify_promotions': false,
       'notify_closed_events': true,
+      'notifications_enabled': true,
+      'date_joined': '2024-03-15T10:00:00Z',
     };
+
+void _enqueueEmptyReservations(MockDioAdapter adapter) {
+  adapter.enqueue(200, {'count': 0, 'results': []});
+}
 
 void main() {
   group('AuthProvider', () {
@@ -45,6 +51,7 @@ void main() {
       storage.access = 'stored-access';
       storage.refresh = 'stored-refresh';
       adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
 
       final auth = buildProvider();
       await auth.init();
@@ -64,6 +71,7 @@ void main() {
         'is_new_user': false,
       });
       adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
 
       final auth = buildProvider();
       final ok = await auth.confirmOtp('+77001234567', '1234');
@@ -78,6 +86,7 @@ void main() {
       storage.access = 'stored-access';
       storage.refresh = 'stored-refresh';
       adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
       adapter.enqueue(200, <String, dynamic>{});
 
       final auth = buildProvider();
@@ -96,6 +105,7 @@ void main() {
       storage.access = 'stored-access';
       storage.refresh = 'stored-refresh';
       adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
       adapter.enqueue(200, {
         ..._sampleProfile(),
         'notify_promotions': true,
@@ -106,6 +116,67 @@ void main() {
       await auth.updateNotificationPreferences(promotions: true);
 
       expect(auth.currentUser?.notifyPromotions, isTrue);
+    });
+
+    test('confirmOtp sets isNewUser from verify response', () async {
+      adapter.enqueue(200, {
+        'access': 'access-token',
+        'refresh': 'refresh-token',
+        'is_new_user': true,
+      });
+      adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
+
+      final auth = buildProvider();
+      await auth.confirmOtp('+77001234567', '1234');
+
+      expect(auth.isNewUser, isTrue);
+    });
+
+    test('user journeyStartLabel from date_joined', () async {
+      storage.access = 'stored-access';
+      adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
+
+      final auth = buildProvider();
+      await auth.init();
+
+      expect(auth.user.journeyStartLabel, 'Март 2024');
+    });
+
+    test('updateNotificationPreferences sends notifications_enabled', () async {
+      storage.access = 'stored-access';
+      adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
+      adapter.enqueue(200, {
+        ..._sampleProfile(),
+        'notifications_enabled': false,
+      });
+
+      final auth = buildProvider();
+      await auth.init();
+      await auth.updateNotificationPreferences(notificationsEnabled: false);
+
+      final patch = adapter.captured
+          .where((r) => r.method == 'PATCH' && r.path == '/users/profile/')
+          .single;
+      expect(patch.data, {'notifications_enabled': false});
+      expect(auth.currentUser?.notificationsEnabled, isFalse);
+    });
+
+    test('init loads eventsCount from reservations API', () async {
+      storage.access = 'stored-access';
+      adapter.enqueue(200, _sampleProfile());
+      adapter.enqueue(200, {
+        'count': 2,
+        'results': [{'id': 1}, {'id': 2}],
+      });
+
+      final auth = buildProvider();
+      await auth.init();
+
+      expect(auth.eventsCount, 2);
+      expect(auth.user.eventsCount, 2);
     });
   });
 }

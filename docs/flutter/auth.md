@@ -19,12 +19,24 @@ HTTP-слой: [DioClient](api_client.md) (`lib/data/services/api_client.dart`),
 | `sendOtp(phone)` | Запрос SMS-кода |
 | `confirmOtp(phone, code)` | Проверка кода, сохранение токенов, загрузка профиля |
 | `logout()` | Logout на сервере + очистка локальной сессии |
-| `updateNotificationPreferences(...)` | `PATCH /users/profile/` |
+| `updateNotificationPreferences(...)` | `PATCH /users/profile/` (категории + `notifications_enabled`) |
 | `isLoggedIn` | `currentUser != null` |
+| `isNewUser` | `true` после verify-sms для нового пользователя (онбординг — А-4) |
+| `eventsCount` | число записей на мероприятия (`GET /events/reservations/my/`) |
+| `clearNewUserFlag()` | сброс `isNewUser` после онбординга |
 
 Состояние: `currentUser`, `isLoading`, `error`.
 
-Свойство `user` (`HeroUser`) — мост для существующих экранов (профиль, бронь).
+Свойство `user` (`HeroUser`) — мост для экранов: имя, телефон, `journeyStartLabel` (из `date_joined`), `eventsCount`.
+
+### UserProfile (Ш-3)
+
+| Поле | JSON | Описание |
+|------|------|----------|
+| `notificationsEnabled` | `notifications_enabled` | Мастер-переключатель push (по умолчанию `true`) |
+| `dateJoined` | `date_joined` | Дата регистрации → «С нами: Март 2024» |
+
+`EventReservationRepository.fetchMyReservationsCount()` — длина `results` из `/events/reservations/my/`.
 
 ## Auth Guard
 

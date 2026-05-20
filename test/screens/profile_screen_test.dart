@@ -25,6 +25,7 @@ UserProfile _sampleProfile() => const UserProfile(
       notifyEvents: true,
       notifyPromotions: false,
       notifyClosedEvents: false,
+      notificationsEnabled: true,
     );
 
 CoreInfo _coreInfo({String privacyPolicy = 'https://api.piligrim.kz/privacy'}) =>
