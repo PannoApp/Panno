@@ -20,7 +20,9 @@ import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_tap.dart';
 
 class MenuScreen extends StatefulWidget {
-  const MenuScreen({super.key});
+  const MenuScreen({super.key, this.isTabActive = true});
+
+  final bool isTabActive;
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -41,12 +43,11 @@ class _MenuScreenState extends State<MenuScreen>
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          const Positioned.fill(
-            child: PiligrimBackground(
-              textureOpacity: 0.45,
-              vignetteIntensity: 0.25,
-            ),
+          const PiligrimBackground(
+            textureOpacity: 0.45,
+            vignetteIntensity: 0.25,
           ),
 
           // Контент режима
@@ -59,7 +60,7 @@ class _MenuScreenState extends State<MenuScreen>
               child: child,
             ),
             child: menuProvider.mode == MenuViewMode.feed
-                ? const _VideoFeedSection(key: ValueKey('feed'))
+                ? _VideoFeedSection(key: const ValueKey('feed'), isTabActive: widget.isTabActive)
                 : const _ClassicMenuSection(key: ValueKey('classic')),
           ),
 
@@ -242,7 +243,9 @@ class _ModeTab extends StatelessWidget {
 // РЕЖИМ 1: ВИДЕО-ЛЕНТА
 // ─────────────────────────────────────────────────────────────────────────────
 class _VideoFeedSection extends StatefulWidget {
-  const _VideoFeedSection({super.key});
+  const _VideoFeedSection({super.key, this.isTabActive = true});
+
+  final bool isTabActive;
 
   @override
   State<_VideoFeedSection> createState() => _VideoFeedSectionState();
@@ -289,6 +292,7 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
     }
 
     return Stack(
+      fit: StackFit.expand,
       children: [
         PageView.builder(
           controller: _pageCtrl,
@@ -306,7 +310,7 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
           itemCount: dishes.length,
           itemBuilder: (_, i) => DishVideoCard(
             dish: dishes[i],
-            isActive: i == _currentPage,
+            isActive: i == _currentPage && widget.isTabActive,
           ),
         ),
 

@@ -10,7 +10,6 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../core/theme.dart';
 import '../data/models/api_dish.dart';
 import 'dish_elements.dart';
-import 'piligrim_tap.dart';
 
 // Дефолтные цвета кинематографического фона (используются когда нет видео и нет imageUrl)
 const _kDefaultCinematicColors = [
@@ -42,7 +41,7 @@ class _DishVideoCardState extends State<DishVideoCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _ambientCtrl;
   VideoPlayerController? _videoCtrl;
-  double _dragX = 0;
+  bool _isMuted = true;
 
   @override
   void initState() {
@@ -67,6 +66,7 @@ class _DishVideoCardState extends State<DishVideoCard>
       ctrl = VideoPlayerController.file(file);
       await ctrl.initialize();
       ctrl.setLooping(true);
+      await ctrl.setVolume(0);
       if (!mounted) {
         ctrl.dispose();
         return;
@@ -97,8 +97,9 @@ class _DishVideoCardState extends State<DishVideoCard>
     super.dispose();
   }
 
-  void _handleHorizontalDrag(DragUpdateDetails d) {
-    setState(() => _dragX = d.localPosition.dx);
+  void _toggleMute() {
+    setState(() => _isMuted = !_isMuted);
+    _videoCtrl?.setVolume(_isMuted ? 0 : 1);
   }
 
   void _handleDragEnd(DragEndDetails d) {
@@ -106,7 +107,6 @@ class _DishVideoCardState extends State<DishVideoCard>
       widget.onSwipeRight?.call();
       _showDishDetail();
     }
-    setState(() => _dragX = 0);
   }
 
   void _showDishDetail() {
@@ -120,129 +120,214 @@ class _DishVideoCardState extends State<DishVideoCard>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
+    final videoReady = _videoCtrl != null && _videoCtrl!.value.isInitialized;
+    final topInset = MediaQuery.viewPaddingOf(context).top;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return GestureDetector(
-      onHorizontalDragUpdate: _handleHorizontalDrag,
+      onTap: _showDishDetail,
       onHorizontalDragEnd: _handleDragEnd,
-      child: PiligrimTap(
-        onTap: _showDishDetail,
-        child: AnimatedBuilder(
-          animation: _ambientCtrl,
-          builder: (_, child) {
-            final t = _ambientCtrl.value;
-            final glow = 0.6 +
-                0.25 * math.sin(t * math.pi * 1.7) +
-                0.15 * math.sin(t * math.pi * 3.3);
-
-            final videoReady = _videoCtrl != null &&
-                _videoCtrl!.value.isInitialized;
-
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                // ── 1. Видео или кинематографический фон ──────────────
-                if (videoReady)
-                  // Растягиваем видео на весь экран с сохранением пропорций
-                  FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: _videoCtrl!.value.size.width,
-                      height: _videoCtrl!.value.size.height,
-                      child: VideoPlayer(_videoCtrl!),
-                    ),
-                  )
-                else
-                  _CinematicBackground(
+      child: ColoredBox(
+        color: PiligrimColors.earthDeep,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ── 1. Видео на весь экран ────────────────────────────
+            if (videoReady)
+              ClipRect(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: _videoCtrl!.value.size.width,
+                    height: _videoCtrl!.value.size.height,
+                    child: VideoPlayer(_videoCtrl!),
+                  ),
+                ),
+              )
+            else
+              AnimatedBuilder(
+                animation: _ambientCtrl,
+                builder: (_, __) {
+                  final t = _ambientCtrl.value;
+                  final glow = 0.6 +
+                      0.25 * math.sin(t * math.pi * 1.7) +
+                      0.15 * math.sin(t * math.pi * 3.3);
+                  return _CinematicBackground(
                     colors: _kDefaultCinematicColors,
                     breathValue: t,
                     glowValue: glow,
-                  ),
+                  );
+                },
+              ),
 
-                // ── 2. Декоративный тотем (медленно вращается) ─────────
-                Positioned(
-                  right: -60,
-                  top: size.height * 0.1,
-                  child: Transform.rotate(
-                    angle: t * 2 * math.pi * 0.15,
-                    child: SvgPicture.asset(
-                      _kDefaultTotem,
-                      width: 220,
-                      height: 220,
-                      colorFilter: ColorFilter.mode(
-                        Colors.white.withValues(alpha: 0.04 + glow * 0.03),
-                        BlendMode.srcIn,
-                      ),
-                    ),
+            // ── 2. Верхний скрим (читаемость хэдера) ─────────────
+            Positioned(
+              top: 0, left: 0, right: 0,
+              height: topInset + 100,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x99000000), Colors.transparent],
                   ),
                 ),
+              ),
+            ),
 
-                // ── 3. Тонкий «плёночный» grain сверху ────────────────
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.35),
-                          Colors.transparent,
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.75),
-                        ],
-                        stops: const [0, 0.2, 0.55, 1.0],
-                      ),
-                    ),
+            // ── 3. Боковой виньет (кинематографичность) ──────────
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.center,
+                    radius: 1.0,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.28),
+                    ],
+                    stops: const [0.55, 1.0],
                   ),
                 ),
+              ),
+            ),
 
-                // ── 4. Правый edge-hint «свайп вправо» ─────────────────
-                if (_dragX > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 60,
-                    child: AnimatedOpacity(
-                      opacity: (_dragX / 200).clamp(0.0, 0.8),
-                      duration: 80.ms,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Colors.transparent,
-                              PiligrimColors.steppe.withValues(alpha: 0.35),
-                            ],
+            // ── 4. Нижний градиент — плавный переход в earthDeep ─
+            const Positioned(
+              bottom: 0, left: 0, right: 0,
+              height: 340,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: [0.0, 0.4, 0.72, 1.0],
+                    colors: [
+                      Colors.transparent,
+                      Color(0xBB2A2826),
+                      Color(0xEE2A2826),
+                      Color(0xFF2A2826),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // ── 5. Инфо о блюде (поверх градиента) ───────────────
+            Positioned(
+              bottom: 0, left: 0, right: 0,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(24, 0, 24, bottomInset + 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Название — крупно, это герой экрана
+                    Text(
+                      widget.dish.name,
+                      style: const TextStyle(
+                        fontFamily: 'MuseoSans',
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: PiligrimColors.nomadCream,
+                        letterSpacing: 0.4,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Цена + вес
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${widget.dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
+                          style: const TextStyle(
+                            fontFamily: 'MuseoSans',
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: PiligrimColors.ember,
+                            letterSpacing: 0.6,
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 14),
+                        DishInfoChip(
+                          label: widget.dish.weight,
+                          icon: 'assets/images/stone.svg',
+                        ),
+                      ],
                     ),
-                  ),
 
-                // ── 5. Нижний инфо-блок ────────────────────────────────
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: DishCardBottomInfo(dish: widget.dish),
+                    // Теги (если есть)
+                    if (widget.dish.tags.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 7,
+                        runSpacing: 7,
+                        children: widget.dish.tags
+                            .take(4)
+                            .map((t) => DishCardTagChip(tag: t))
+                            .toList(),
+                      ),
+                    ],
+                  ],
                 ),
+              ),
+            ),
 
-                // ── 6. Хинт «свайп → история» (появляется на секунду) ─
-                if (widget.isActive)
-                  Positioned(
-                    left: 20,
-                    bottom: 170,
-                    child: const DishCardSwipeHint()
-                        .animate(delay: 1800.ms)
-                        .fadeIn(duration: 600.ms)
-                        .then(delay: 2000.ms)
-                        .fadeOut(duration: 500.ms),
-                  ),
-              ],
-            );
-          },
+            // ── 6. Кнопка звука ───────────────────────────────────
+            if (videoReady)
+              Positioned(
+                top: topInset + 12,
+                right: 16,
+                child: _MuteButton(isMuted: _isMuted, onToggle: _toggleMute),
+              ),
+
+            // ── 7. Хинт свайпа ────────────────────────────────────
+            if (widget.isActive)
+              Positioned(
+                left: 24,
+                bottom: bottomInset + 170,
+                child: const DishCardSwipeHint()
+                    .animate(delay: 1800.ms)
+                    .fadeIn(duration: 600.ms)
+                    .then(delay: 2000.ms)
+                    .fadeOut(duration: 500.ms),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Кнопка вкл/выкл звука на видео
+// ─────────────────────────────────────────────────────────────────────────────
+class _MuteButton extends StatelessWidget {
+  const _MuteButton({required this.isMuted, required this.onToggle});
+
+  final bool isMuted;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onToggle,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+          color: Colors.white,
+          size: 18,
         ),
       ),
     );
