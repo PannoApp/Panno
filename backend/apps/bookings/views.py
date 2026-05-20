@@ -1,3 +1,11 @@
+import json
+import logging
+
+from django.conf import settings
+from django.http import JsonResponse
+from django.utils.decorators import method_decorator
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
@@ -6,6 +14,9 @@ from utils.idempotency import IdempotencyMixin
 from utils.pagination import StandardPagination
 from .models import TableBooking
 from .serializers import TableBookingSerializer
+from .tasks import _build_booking_html, _tg_post
+
+logger = logging.getLogger(__name__)
 
 
 _error_401 = OpenApiResponse(description='Токен не передан или недействителен')
@@ -99,3 +110,80 @@ class TableBookingListCreateView(IdempotencyMixin, generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class TelegramWebhookView(View):
+    """
+    Принимает callback_query от Telegram при нажатии inline-кнопок
+    «Подтвердить» / «Отменить» в уведомлениях о бронировании.
+    """
+
+    def post(self, request):
+        token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
+        if not token:
+            return JsonResponse({'ok': False}, status=500)
+
+        secret = getattr(settings, 'TELEGRAM_WEBHOOK_SECRET', '')
+        if secret and request.headers.get('X-Telegram-Bot-Api-Secret-Token', '') != secret:
+            return JsonResponse({'ok': False}, status=403)
+
+        try:
+            data = json.loads(request.body)
+        except (json.JSONDecodeError, ValueError):
+            return JsonResponse({'ok': False}, status=400)
+
+        callback_query = data.get('callback_query')
+        if not callback_query:
+            return JsonResponse({'ok': True})
+
+        callback_id = callback_query['id']
+        callback_data = callback_query.get('data', '')
+        message = callback_query.get('message', {})
+        chat_id = message.get('chat', {}).get('id')
+        message_id = message.get('message_id')
+
+        parts = callback_data.split(':', 1)
+        if len(parts) != 2 or parts[0] not in ('confirm', 'cancel'):
+            _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Неизвестная команда'}, token)
+            return JsonResponse({'ok': True})
+
+        action, booking_id_str = parts
+        try:
+            booking = TableBooking.objects.select_related('user').get(pk=int(booking_id_str))
+        except (TableBooking.DoesNotExist, ValueError):
+            _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Бронирование не найдено'}, token)
+            return JsonResponse({'ok': True})
+
+        if booking.status != 'pending':
+            _tg_post('answerCallbackQuery', {
+                'callback_query_id': callback_id,
+                'text': f'Уже обработано: {booking.get_status_display()}',
+                'show_alert': True,
+            }, token)
+            return JsonResponse({'ok': True})
+
+        if action == 'confirm':
+            booking.status = 'confirmed'
+            status_label = '✅ <b>Подтверждено администратором</b>'
+            answer_text = 'Бронирование подтверждено'
+        else:
+            booking.status = 'canceled'
+            status_label = '❌ <b>Отменено администратором</b>'
+            answer_text = 'Бронирование отменено'
+
+        booking.save()
+
+        _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': answer_text}, token)
+
+        if chat_id and message_id:
+            _tg_post('editMessageText', {
+                'chat_id': chat_id,
+                'message_id': message_id,
+                'text': _build_booking_html(booking, status_label=status_label),
+                'parse_mode': 'HTML',
+                'reply_markup': {'inline_keyboard': []},
+            }, token)
+
+        logger.info("Telegram webhook: booking=%s action=%s", booking_id_str, action)
+        return JsonResponse({'ok': True})

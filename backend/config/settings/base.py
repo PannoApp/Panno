@@ -214,6 +214,8 @@ FIREBASE_CREDENTIALS_PATH = env('FIREBASE_CREDENTIALS_PATH', default='')
 # ==========================================
 TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_CHAT_ID = env('TELEGRAM_CHAT_ID', default='')
+# Секрет для верификации входящих webhook-запросов от Telegram (X-Telegram-Bot-Api-Secret-Token)
+TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='')
 
 
 # Настройки Django REST Framework

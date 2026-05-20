@@ -16,6 +16,47 @@ _ZONE_LABELS = {
 }
 
 
+def _build_booking_html(b, status_label=None):
+    """Возвращает HTML-текст сообщения для Telegram по объекту TableBooking."""
+    date_str = b.date.strftime('%d.%m.%Y')
+    time_str = b.time.strftime('%H:%M')
+    zone_str = _ZONE_LABELS.get(b.zone, b.zone or '—')
+    raw_phone = b.phone or (b.user.phone if b.user_id else '')
+    phone_escaped = html.escape(raw_phone or '—')
+    wa_digits = ''.join(c for c in raw_phone if c.isdigit())
+    whatsapp_line = f'🔗 <a href="https://wa.me/{wa_digits}">WhatsApp</a>' if wa_digits else ''
+
+    lines = [
+        f"🍽 <b>Бронирование #{b.pk}</b>",
+        "",
+        f"👤 {html.escape(b.guest_name)}",
+        f"📞 {phone_escaped}",
+        f"📅 {date_str} в {time_str}",
+        f"👥 {b.guests_count} гост.",
+        f"🏠 {zone_str}",
+    ]
+    if b.comment:
+        lines.append(f"💬 {html.escape(b.comment)}")
+    if whatsapp_line:
+        lines.append(whatsapp_line)
+    if status_label:
+        lines += ["", status_label]
+    return '\n'.join(lines)
+
+
+def _tg_post(method, payload, token):
+    """Отправляет запрос к Telegram Bot API. Логирует ошибки, не бросает исключений."""
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    try:
+        resp = requests.post(url, json=payload, timeout=10)
+        if not resp.ok:
+            logger.error("Telegram %s error: status=%s body=%s", method, resp.status_code, resp.text)
+        return resp
+    except Exception:
+        logger.exception("Telegram %s request failed", method)
+        return None
+
+
 @shared_task(
     name='apps.bookings.tasks.send_telegram_notification',
     autoretry_for=(Exception,),
@@ -39,37 +80,22 @@ def send_telegram_notification(booking_id):
     except TableBooking.DoesNotExist:
         return
 
-    date_str = b.date.strftime('%d.%m.%Y')
-    time_str = b.time.strftime('%H:%M')
-    zone_str = _ZONE_LABELS.get(b.zone, b.zone or '—')
-    raw_phone = b.phone or (b.user.phone if b.user_id else '')
-    phone = html.escape(raw_phone or '—')
-    wa_digits = ''.join(c for c in raw_phone if c.isdigit())
-    whatsapp_line = f'🔗 <a href="https://wa.me/{wa_digits}">WhatsApp</a>' if wa_digits else ''
+    text = _build_booking_html(b)
+    reply_markup = {
+        'inline_keyboard': [[
+            {'text': '✅ Подтвердить', 'callback_data': f'confirm:{b.pk}'},
+            {'text': '❌ Отменить',    'callback_data': f'cancel:{b.pk}'},
+        ]]
+    }
 
-    lines = [
-        f"🍽 <b>Новое бронирование #{b.pk}</b>",
-        "",
-        f"👤 {html.escape(b.guest_name)}",
-        f"📞 {phone}",
-        f"📅 {date_str} в {time_str}",
-        f"👥 {b.guests_count} гост.",
-        f"🏠 {zone_str}",
-    ]
-    if b.comment:
-        lines.append(f"💬 {html.escape(b.comment)}")
-    if whatsapp_line:
-        lines.append(whatsapp_line)
-
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    resp = requests.post(url, json={
+    resp = _tg_post('sendMessage', {
         'chat_id': chat_id,
-        'text': '\n'.join(lines),
+        'text': text,
         'parse_mode': 'HTML',
-    }, timeout=10)
-    if not resp.ok:
-        logger.error("Telegram API error: status=%s body=%s", resp.status_code, resp.text)
-    resp.raise_for_status()
+        'reply_markup': reply_markup,
+    }, token)
+    if resp is not None:
+        resp.raise_for_status()
     logger.info("Telegram notification sent: booking=%s", booking_id)
 
 

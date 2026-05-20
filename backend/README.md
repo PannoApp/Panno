@@ -59,12 +59,13 @@ REST API для мобильного приложения ресторана. Dj
 |-------|-----|----------|------|
 | GET | `/api/bookings/` | Список моих броней | JWT |
 | POST | `/api/bookings/` | Создать бронь | JWT |
+| POST | `/api/bookings/telegram-webhook/` | Webhook для Telegram inline-кнопок | — |
 
 Поля брони: имя гостя, дата, время, количество гостей (1–50), комментарий.
 
 Статусы: `pending` → `confirmed` / `canceled` / `completed`
 
-При смене статуса бронирования пользователю автоматически уходит push-уведомление (через Celery + FCM).
+При создании брони в Telegram-чат менеджеров уходит уведомление с кнопками **✅ Подтвердить** / **❌ Отменить** — статус меняется прямо из чата без входа в админку. При смене статуса пользователю автоматически уходит push-уведомление (Celery + FCM).
 
 ---
 
@@ -128,6 +129,10 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 USE_S3=False
 
 FIREBASE_CREDENTIALS_PATH=/app/firebase-credentials.json
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TELEGRAM_WEBHOOK_SECRET=
 ```
 
 ---

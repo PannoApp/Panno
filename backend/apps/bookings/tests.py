@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import date as dt_date, time as dt_time
 from unittest.mock import MagicMock, patch
@@ -884,3 +885,494 @@ class BookingSignalTelegramTest(TestCase):
         booking.status = 'confirmed'
         booking.save()
         self.assertEqual(TableBooking.objects.get(pk=booking.pk).status, 'confirmed')
+
+
+# ---------------------------------------------------------------------------
+# _build_booking_html helper
+# ---------------------------------------------------------------------------
+
+class BuildBookingHtmlHelperTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77008100001')
+        self.booking = make_booking(
+            user=self.user,
+            phone='+77001234567',
+            zone='main',
+            comment='У окна',
+        )
+        # refresh_from_db() converts SQLite string dates to proper date/time objects
+        self.booking.refresh_from_db()
+
+    def _html(self, **kwargs):
+        from apps.bookings.tasks import _build_booking_html
+        return _build_booking_html(self.booking, **kwargs)
+
+    def test_contains_booking_id(self):
+        self.assertIn(str(self.booking.pk), self._html())
+
+    def test_contains_guest_name(self):
+        self.assertIn(self.booking.guest_name, self._html())
+
+    def test_contains_phone(self):
+        self.assertIn('+77001234567', self._html())
+
+    def test_contains_date_and_time(self):
+        text = self._html()
+        self.assertIn('15.06.2026', text)
+        self.assertIn('19:00', text)
+
+    def test_contains_zone_label(self):
+        self.assertIn('Главный зал', self._html())
+
+    def test_contains_comment(self):
+        self.assertIn('У окна', self._html())
+
+    def test_contains_whatsapp_link(self):
+        self.assertIn('wa.me/77001234567', self._html())
+
+    def test_status_label_appended_when_provided(self):
+        text = self._html(status_label='✅ <b>Подтверждено администратором</b>')
+        self.assertIn('Подтверждено администратором', text)
+
+    def test_no_status_label_by_default(self):
+        text = self._html()
+        self.assertNotIn('Подтверждено', text)
+        self.assertNotIn('Отменено', text)
+
+    def test_no_whatsapp_link_for_anonymous_without_phone(self):
+        anon = TableBooking.objects.create(
+            user=None, guest_name='Аноним',
+            date='2026-07-01', time='18:00:00', guests_count=1, phone='',
+        )
+        anon.refresh_from_db()
+        from apps.bookings.tasks import _build_booking_html
+        self.assertNotIn('wa.me', _build_booking_html(anon))
+
+    def test_terrace_zone_label(self):
+        booking = make_booking(user=self.user, phone='+77000000001', zone='terrace')
+        booking.refresh_from_db()
+        from apps.bookings.tasks import _build_booking_html
+        self.assertIn('Терраса', _build_booking_html(booking))
+
+    def test_private_zone_label(self):
+        booking = make_booking(user=self.user, phone='+77000000002', zone='private')
+        booking.refresh_from_db()
+        from apps.bookings.tasks import _build_booking_html
+        self.assertIn('Приват', _build_booking_html(booking))
+
+    def test_unknown_zone_renders_raw_value(self):
+        booking = make_booking(user=self.user, phone='+77000000003', zone='roof')
+        booking.refresh_from_db()
+        from apps.bookings.tasks import _build_booking_html
+        self.assertIn('roof', _build_booking_html(booking))
+
+
+# ---------------------------------------------------------------------------
+# _tg_post helper
+# ---------------------------------------------------------------------------
+
+class TgPostHelperTest(TestCase):
+    @patch('apps.bookings.tasks.requests.post')
+    def test_posts_to_correct_url(self, mock_post):
+        from apps.bookings.tasks import _tg_post
+        mock_post.return_value = MagicMock(ok=True)
+        _tg_post('sendMessage', {'text': 'hi'}, 'mytoken')
+        mock_post.assert_called_once()
+        url = mock_post.call_args[0][0]
+        self.assertIn('mytoken', url)
+        self.assertIn('sendMessage', url)
+
+    @patch('apps.bookings.tasks.requests.post')
+    def test_passes_payload_as_json(self, mock_post):
+        from apps.bookings.tasks import _tg_post
+        mock_post.return_value = MagicMock(ok=True)
+        _tg_post('sendMessage', {'chat_id': 42, 'text': 'hello'}, 'tok')
+        sent_json = mock_post.call_args[1]['json']
+        self.assertEqual(sent_json['chat_id'], 42)
+        self.assertEqual(sent_json['text'], 'hello')
+
+    @patch('apps.bookings.tasks.requests.post')
+    def test_returns_none_on_network_exception(self, mock_post):
+        from apps.bookings.tasks import _tg_post
+        mock_post.side_effect = ConnectionError('network unreachable')
+        result = _tg_post('sendMessage', {}, 'tok')
+        self.assertIsNone(result)
+
+    @patch('apps.bookings.tasks.requests.post')
+    def test_does_not_raise_on_non_ok_response(self, mock_post):
+        from apps.bookings.tasks import _tg_post
+        mock_post.return_value = MagicMock(ok=False, status_code=400, text='Bad Request')
+        result = _tg_post('sendMessage', {}, 'tok')
+        self.assertIsNotNone(result)
+
+    @patch('apps.bookings.tasks.requests.post')
+    def test_returns_response_on_success(self, mock_post):
+        from apps.bookings.tasks import _tg_post
+        fake_resp = MagicMock(ok=True)
+        mock_post.return_value = fake_resp
+        result = _tg_post('sendMessage', {}, 'tok')
+        self.assertIs(result, fake_resp)
+
+
+# ---------------------------------------------------------------------------
+# send_telegram_notification: inline-кнопки в сообщении
+# ---------------------------------------------------------------------------
+
+class TelegramNotificationInlineKeyboardTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77008200001')
+        self.booking = make_booking(user=self.user, phone='+77001234567', zone='main')
+
+    def _call(self):
+        from apps.bookings.tasks import send_telegram_notification
+        send_telegram_notification(self.booking.pk)
+
+    def _mock_ok(self):
+        m = MagicMock(ok=True)
+        m.raise_for_status.return_value = None
+        return m
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_message_has_inline_keyboard(self, mock_post):
+        mock_post.return_value = self._mock_ok()
+        self._call()
+        payload = mock_post.call_args[1]['json']
+        self.assertIn('reply_markup', payload)
+        self.assertIn('inline_keyboard', payload['reply_markup'])
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_confirm_button_callback_data(self, mock_post):
+        mock_post.return_value = self._mock_ok()
+        self._call()
+        buttons = mock_post.call_args[1]['json']['reply_markup']['inline_keyboard'][0]
+        confirm = next(b for b in buttons if 'Подтвердить' in b['text'])
+        self.assertEqual(confirm['callback_data'], f'confirm:{self.booking.pk}')
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_cancel_button_callback_data(self, mock_post):
+        mock_post.return_value = self._mock_ok()
+        self._call()
+        buttons = mock_post.call_args[1]['json']['reply_markup']['inline_keyboard'][0]
+        cancel = next(b for b in buttons if 'Отменить' in b['text'])
+        self.assertEqual(cancel['callback_data'], f'cancel:{self.booking.pk}')
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks.requests.post')
+    def test_two_buttons_in_one_row(self, mock_post):
+        mock_post.return_value = self._mock_ok()
+        self._call()
+        keyboard = mock_post.call_args[1]['json']['reply_markup']['inline_keyboard']
+        self.assertEqual(len(keyboard), 1)
+        self.assertEqual(len(keyboard[0]), 2)
+
+
+# ---------------------------------------------------------------------------
+# TelegramWebhookView
+# ---------------------------------------------------------------------------
+
+_WEBHOOK_URL = '/api/v1/bookings/telegram-webhook/'
+_TG_WEBHOOK_SETTINGS = dict(
+    TELEGRAM_BOT_TOKEN='test_bot_token',
+    TELEGRAM_CHAT_ID='-1001234567890',
+    TELEGRAM_WEBHOOK_SECRET='',  # no secret by default; override per-test where needed
+)
+
+
+def _cbq_payload(action, booking_pk, chat_id=100, message_id=42):
+    """Минимальный payload callback_query от Telegram."""
+    return {
+        'callback_query': {
+            'id': 'cbq_test_id',
+            'data': f'{action}:{booking_pk}',
+            'message': {
+                'message_id': message_id,
+                'chat': {'id': chat_id},
+            },
+        }
+    }
+
+
+class TelegramWebhookSecretTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77008300001')
+        self.booking = make_booking(user=self.user, phone='+77001234567')
+
+    def _post(self, data, secret_header=None):
+        kwargs = {'content_type': 'application/json'}
+        if secret_header is not None:
+            kwargs['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] = secret_header
+        return self.client.post(_WEBHOOK_URL, json.dumps(data), **kwargs)
+
+    @override_settings(
+        TELEGRAM_BOT_TOKEN='test_bot_token', TELEGRAM_CHAT_ID='-100123',
+        TELEGRAM_WEBHOOK_SECRET='my_secret',
+    )
+    @patch('apps.bookings.views._tg_post')
+    def test_missing_secret_header_returns_403(self, mock_tg):
+        resp = self._post(_cbq_payload('confirm', self.booking.pk))
+        self.assertEqual(resp.status_code, 403)
+        mock_tg.assert_not_called()
+
+    @override_settings(
+        TELEGRAM_BOT_TOKEN='test_bot_token', TELEGRAM_CHAT_ID='-100123',
+        TELEGRAM_WEBHOOK_SECRET='my_secret',
+    )
+    @patch('apps.bookings.views._tg_post')
+    def test_wrong_secret_returns_403(self, mock_tg):
+        resp = self._post(_cbq_payload('confirm', self.booking.pk), secret_header='wrong')
+        self.assertEqual(resp.status_code, 403)
+        mock_tg.assert_not_called()
+
+    @override_settings(
+        TELEGRAM_BOT_TOKEN='test_bot_token', TELEGRAM_CHAT_ID='-100123',
+        TELEGRAM_WEBHOOK_SECRET='my_secret',
+    )
+    @patch('apps.bookings.views._tg_post')
+    def test_correct_secret_passes(self, mock_tg):
+        resp = self._post(_cbq_payload('confirm', self.booking.pk), secret_header='my_secret')
+        self.assertNotEqual(resp.status_code, 403)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_no_secret_configured_skips_check(self, mock_tg):
+        resp = self._post(_cbq_payload('confirm', self.booking.pk))
+        self.assertNotEqual(resp.status_code, 403)
+
+
+class TelegramWebhookBasicTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77008400001')
+        self.booking = make_booking(user=self.user, phone='+77001234567')
+
+    def _post(self, data):
+        return self.client.post(
+            _WEBHOOK_URL, json.dumps(data), content_type='application/json',
+        )
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    def test_invalid_json_returns_400(self):
+        resp = self.client.post(_WEBHOOK_URL, 'not-json', content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_no_callback_query_returns_200(self, mock_tg):
+        resp = self._post({'update_id': 999})
+        self.assertEqual(resp.status_code, 200)
+        mock_tg.assert_not_called()
+
+    @override_settings(TELEGRAM_BOT_TOKEN='', TELEGRAM_CHAT_ID='', TELEGRAM_WEBHOOK_SECRET='')
+    @patch('apps.bookings.views._tg_post')
+    def test_missing_bot_token_returns_500(self, mock_tg):
+        resp = self._post(_cbq_payload('confirm', self.booking.pk))
+        self.assertEqual(resp.status_code, 500)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_unknown_action_returns_200(self, mock_tg):
+        data = {
+            'callback_query': {
+                'id': 'cbq1', 'data': 'delete:1',
+                'message': {'message_id': 1, 'chat': {'id': 1}},
+            }
+        }
+        resp = self._post(data)
+        self.assertEqual(resp.status_code, 200)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_malformed_callback_data_returns_200(self, mock_tg):
+        data = {
+            'callback_query': {
+                'id': 'cbq1', 'data': 'single_part',
+                'message': {'message_id': 1, 'chat': {'id': 1}},
+            }
+        }
+        resp = self._post(data)
+        self.assertEqual(resp.status_code, 200)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_nonexistent_booking_returns_200(self, mock_tg):
+        resp = self._post(_cbq_payload('confirm', 99999))
+        self.assertEqual(resp.status_code, 200)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_nonexistent_booking_answers_callback(self, mock_tg):
+        self._post(_cbq_payload('confirm', 99999))
+        answer = next(
+            (c for c in mock_tg.call_args_list if c[0][0] == 'answerCallbackQuery'), None,
+        )
+        self.assertIsNotNone(answer)
+        self.assertIn('не найдено', answer[0][1]['text'])
+
+
+class TelegramWebhookConfirmTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77008500001')
+        self.booking = make_booking(user=self.user, phone='+77001234567', zone='main')
+
+    def _post(self, data):
+        return self.client.post(
+            _WEBHOOK_URL, json.dumps(data), content_type='application/json',
+        )
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_sets_status_confirmed(self, mock_tg):
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, 'confirmed')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_returns_200(self, mock_tg):
+        resp = self._post(_cbq_payload('confirm', self.booking.pk))
+        self.assertEqual(resp.status_code, 200)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_calls_answer_callback(self, mock_tg):
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        calls = [c[0][0] for c in mock_tg.call_args_list]
+        self.assertIn('answerCallbackQuery', calls)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_calls_edit_message(self, mock_tg):
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        calls = [c[0][0] for c in mock_tg.call_args_list]
+        self.assertIn('editMessageText', calls)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_edit_contains_confirmed_label(self, mock_tg):
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        edit = next(c for c in mock_tg.call_args_list if c[0][0] == 'editMessageText')
+        self.assertIn('Подтверждено', edit[0][1]['text'])
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_edit_uses_correct_chat_and_message_id(self, mock_tg):
+        self._post(_cbq_payload('confirm', self.booking.pk, chat_id=555, message_id=77))
+        edit = next(c for c in mock_tg.call_args_list if c[0][0] == 'editMessageText')
+        self.assertEqual(edit[0][1]['chat_id'], 555)
+        self.assertEqual(edit[0][1]['message_id'], 77)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_edit_clears_inline_keyboard(self, mock_tg):
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        edit = next(c for c in mock_tg.call_args_list if c[0][0] == 'editMessageText')
+        self.assertEqual(edit[0][1]['reply_markup'], {'inline_keyboard': []})
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_answer_callback_id_matches(self, mock_tg):
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        answer = next(c for c in mock_tg.call_args_list if c[0][0] == 'answerCallbackQuery')
+        self.assertEqual(answer[0][1]['callback_query_id'], 'cbq_test_id')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.notifications.tasks.send_push_notification')
+    @patch('apps.bookings.views._tg_post')
+    def test_confirm_triggers_push_notification(self, mock_tg, mock_push):
+        mock_push.delay.reset_mock()
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        mock_push.delay.assert_called_once()
+        _, kwargs = mock_push.delay.call_args
+        self.assertEqual(kwargs['data']['status'], 'confirmed')
+
+
+class TelegramWebhookCancelTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77008600001')
+        self.booking = make_booking(user=self.user, phone='+77001234567', zone='terrace')
+
+    def _post(self, data):
+        return self.client.post(
+            _WEBHOOK_URL, json.dumps(data), content_type='application/json',
+        )
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_cancel_sets_status_canceled(self, mock_tg):
+        self._post(_cbq_payload('cancel', self.booking.pk))
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, 'canceled')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_cancel_edit_contains_canceled_label(self, mock_tg):
+        self._post(_cbq_payload('cancel', self.booking.pk))
+        edit = next(c for c in mock_tg.call_args_list if c[0][0] == 'editMessageText')
+        self.assertIn('Отменено', edit[0][1]['text'])
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.notifications.tasks.send_push_notification')
+    @patch('apps.bookings.views._tg_post')
+    def test_cancel_triggers_push_notification(self, mock_tg, mock_push):
+        mock_push.delay.reset_mock()
+        self._post(_cbq_payload('cancel', self.booking.pk))
+        mock_push.delay.assert_called_once()
+        _, kwargs = mock_push.delay.call_args
+        self.assertEqual(kwargs['data']['status'], 'canceled')
+
+
+class TelegramWebhookAlreadyProcessedTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77008700001')
+        self.booking = make_booking(user=self.user, phone='+77001234567')
+
+    def _post(self, data):
+        return self.client.post(
+            _WEBHOOK_URL, json.dumps(data), content_type='application/json',
+        )
+
+    def _set_status(self, new_status):
+        TableBooking.objects.filter(pk=self.booking.pk).update(status=new_status)
+        self.booking.refresh_from_db()
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_already_confirmed_shows_alert(self, mock_tg):
+        self._set_status('confirmed')
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        answer = next(c for c in mock_tg.call_args_list if c[0][0] == 'answerCallbackQuery')
+        self.assertTrue(answer[0][1].get('show_alert'))
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_already_confirmed_does_not_change_status(self, mock_tg):
+        self._set_status('confirmed')
+        self._post(_cbq_payload('cancel', self.booking.pk))
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, 'confirmed')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_already_canceled_shows_alert(self, mock_tg):
+        self._set_status('canceled')
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        answer = next(c for c in mock_tg.call_args_list if c[0][0] == 'answerCallbackQuery')
+        self.assertTrue(answer[0][1].get('show_alert'))
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_already_processed_does_not_call_edit_message(self, mock_tg):
+        self._set_status('canceled')
+        self._post(_cbq_payload('confirm', self.booking.pk))
+        calls = [c[0][0] for c in mock_tg.call_args_list]
+        self.assertNotIn('editMessageText', calls)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_alert_text_contains_current_status(self, mock_tg):
+        self._set_status('confirmed')
+        self._post(_cbq_payload('cancel', self.booking.pk))
+        answer = next(c for c in mock_tg.call_args_list if c[0][0] == 'answerCallbackQuery')
+        self.assertIn('Подтверждено', answer[0][1]['text'])
