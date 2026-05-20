@@ -1,6 +1,52 @@
 import re
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import models
+
+
+def validate_hero_image(image):
+    """
+    Проверяет, что загружаемое фото пригодно для hero-слайдера:
+    - формат JPEG или PNG
+    - минимальное разрешение 800 × 450 px
+    - соотношение сторон от 1.5:1 до 2.4:1 (ландшафт, близко к 16:9)
+    - размер файла не более 5 МБ
+    """
+    # Размер файла
+    max_bytes = 5 * 1024 * 1024
+    if hasattr(image, 'size') and image.size > max_bytes:
+        raise ValidationError(
+            f'Файл слишком большой ({image.size // (1024*1024)} МБ). Максимум — 5 МБ.'
+        )
+
+    # Формат
+    name = getattr(image, 'name', '') or ''
+    if not name.lower().endswith(('.jpg', '.jpeg', '.png')):
+        raise ValidationError('Допустимые форматы: JPEG (.jpg) и PNG (.png).')
+
+    # Размеры и соотношение сторон
+    try:
+        from PIL import Image as PilImage
+        img = PilImage.open(image)
+        w, h = img.size
+        if w < 800 or h < 450:
+            raise ValidationError(
+                f'Слишком маленькое изображение ({w}×{h} px). '
+                'Минимум — 800×450 px.'
+            )
+        ratio = w / h
+        if not (1.5 <= ratio <= 2.4):
+            raise ValidationError(
+                f'Неподходящее соотношение сторон ({w}:{h} ≈ {ratio:.2f}:1). '
+                'Нужно горизонтальное фото близко к 16:9 (соотношение от 1.5:1 до 2.4:1).'
+            )
+        # Сбрасываем указатель, чтобы Django смог сохранить файл после валидации
+        image.seek(0)
+    except ValidationError:
+        raise
+    except Exception:
+        # Если Pillow недоступен или файл повреждён — пропускаем размерную проверку
+        pass
 
 
 class RestaurantInfo(models.Model):
@@ -161,7 +207,12 @@ class HeroSlide(models.Model):
         related_name='hero_slides',
         verbose_name="Ресторан"
     )
-    image = models.ImageField("Изображение", upload_to='core/hero/')
+    image = models.ImageField(
+        "Изображение",
+        upload_to='core/hero/',
+        validators=[validate_hero_image],
+        help_text="JPEG или PNG, горизонтальное, минимум 800×450 px, не более 5 МБ.",
+    )
     order = models.PositiveIntegerField("Порядок", default=0)
 
     class Meta:

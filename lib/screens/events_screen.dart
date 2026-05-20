@@ -1,5 +1,6 @@
 // Афиша и новости — ТЗ: лента мероприятий (ближайшие первыми), карточка, запись, архив, новости
 // Визуал и тон: piligrim_design_spec.md (§6 карточки, §8 герой, §9 мероприятия / «АУА»)
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import '../core/theme.dart';
 import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
 import '../data/models/api_event.dart';
+import '../providers/core_info_provider.dart';
 import '../providers/events_provider.dart';
 import '../widgets/error_view.dart';
 import '../widgets/event_cover_image.dart';
@@ -107,10 +109,19 @@ class _EventsScreenState extends State<EventsScreen> {
                           onChanged: (v) => setState(() => _view = v),
                         ),
                         const SizedBox(height: 14),
-                        _AfishaHero(
-                          selectedIndex: _heroIndex,
-                          onChanged: (index) => setState(() => _heroIndex = index),
-                        ),
+                        Builder(builder: (context) {
+                          // Берём URL-слайды из CoreInfo; если ещё не загружены — фоллбэк на локальные PNG
+                          final coreInfo = context.watch<CoreInfoProvider>().coreInfo;
+                          final imageUrls =
+                              (coreInfo?.heroImageUrls.isNotEmpty == true)
+                                  ? coreInfo!.heroImageUrls
+                                  : PiligrimInteriorAssets.triptychInteriorAmbient;
+                          return _AfishaHero(
+                            selectedIndex: _heroIndex,
+                            onChanged: (index) => setState(() => _heroIndex = index),
+                            imageUrls: imageUrls,
+                          );
+                        }),
                       ],
                     ),
                   ),
@@ -300,15 +311,18 @@ class _AfishaHero extends StatefulWidget {
   const _AfishaHero({
     required this.selectedIndex,
     required this.onChanged,
+    required this.imageUrls,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onChanged;
+  // Список URL (сетевых или asset-путей) для слайдов
+  final List<String> imageUrls;
 
-  static int get _slideCount => PiligrimInteriorAssets.allInteriorPngs.length;
+  int get _slideCount => imageUrls.length;
 
-  static _HeroItem itemForSlide(int index) {
-    final image = PiligrimInteriorAssets.allInteriorPngs[index];
+  _HeroItem itemForSlide(int index) {
+    final image = imageUrls[index];
     const titles = [
       'Атмосфера зала',
       'Ритуал вечера',
@@ -351,19 +365,35 @@ class _AfishaHeroState extends State<_AfishaHero> {
   @override
   void initState() {
     super.initState();
-    final maxI = _AfishaHero._slideCount - 1;
+    final maxI = widget._slideCount - 1;
     final page = widget.selectedIndex.clamp(0, maxI < 0 ? 0 : maxI);
     _controller = PageController(
       viewportFraction: 0.94,
       initialPage: page,
     );
+    // Предзагружаем первые 3 слайда сразу после первого кадра
+    WidgetsBinding.instance.addPostFrameCallback((_) => _preload(page));
+  }
+
+  // Предзагрузка текущего + соседних слайдов через CachedNetworkImageProvider
+  void _preload(int current) {
+    if (!mounted) return;
+    final urls = widget.imageUrls;
+    for (var offset = -1; offset <= 1; offset++) {
+      final i = current + offset;
+      if (i < 0 || i >= urls.length) continue;
+      final url = urls[i];
+      if (url.startsWith('http')) {
+        precacheImage(CachedNetworkImageProvider(url), context);
+      }
+    }
   }
 
   @override
   void didUpdateWidget(covariant _AfishaHero oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedIndex != widget.selectedIndex) {
-      final maxI = _AfishaHero._slideCount - 1;
+      final maxI = widget._slideCount - 1;
       final target = widget.selectedIndex.clamp(0, maxI < 0 ? 0 : maxI);
       _controller.animateToPage(
         target,
@@ -380,7 +410,7 @@ class _AfishaHeroState extends State<_AfishaHero> {
   }
 
   void _goTo(int index) {
-    final maxI = _AfishaHero._slideCount - 1;
+    final maxI = widget._slideCount - 1;
     final i = index.clamp(0, maxI < 0 ? 0 : maxI);
     _controller.animateToPage(
       i,
@@ -392,7 +422,7 @@ class _AfishaHeroState extends State<_AfishaHero> {
 
   @override
   Widget build(BuildContext context) {
-    final total = _AfishaHero._slideCount;
+    final total = widget._slideCount;
     final idx = widget.selectedIndex.clamp(0, total > 0 ? total - 1 : 0);
     return Column(
       children: [
@@ -401,9 +431,12 @@ class _AfishaHeroState extends State<_AfishaHero> {
           child: PageView.builder(
             itemCount: total,
             controller: _controller,
-            onPageChanged: widget.onChanged,
+            onPageChanged: (page) {
+              widget.onChanged(page);
+              _preload(page); // предзагружаем соседей при свайпе
+            },
             itemBuilder: (context, index) {
-              final item = _AfishaHero.itemForSlide(index);
+              final item = widget.itemForSlide(index);
               final active = idx == index;
               return _HeroSlide(
                 item: item,
@@ -492,7 +525,24 @@ class _HeroSlide extends StatelessWidget {
                 curve: Curves.easeInOut,
                 builder: (context, value, child) =>
                     Transform.scale(scale: value, child: child),
-                child: Image.asset(item.imageAsset, fit: BoxFit.cover),
+                // Сетевой URL (из API) — CachedNetworkImage; локальный asset (fallback) — Image.asset
+                child: item.imageAsset.startsWith('http')
+                    ? CachedNetworkImage(
+                        imageUrl: item.imageAsset,
+                        fit: BoxFit.cover,
+                        // Ограничиваем размер декодирования: слайдер ~194px, 2x DPR → 800px достаточно
+                        memCacheWidth: 800,
+                        memCacheHeight: 500,
+                        fadeInDuration: const Duration(milliseconds: 180),
+                        placeholder: (_, __) => const ColoredBox(
+                          color: PiligrimColors.earthDeep,
+                        ),
+                        errorWidget: (_, __, ___) => Image.asset(
+                          PiligrimInteriorAssets.triptychInteriorAmbient[0],
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Image.asset(item.imageAsset, fit: BoxFit.cover),
               ),
               DecoratedBox(
                 decoration: BoxDecoration(
