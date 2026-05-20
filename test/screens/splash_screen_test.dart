@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:provider/provider.dart';
 import 'package:piligrim/data/models/app_version_info.dart';
 import 'package:piligrim/data/repositories/core_repository.dart';
+import 'package:piligrim/data/services/auth_service.dart';
+import 'package:piligrim/providers/auth_provider.dart';
+import 'package:piligrim/screens/onboarding_screen.dart';
 import 'package:piligrim/screens/splash_screen.dart';
+
+import '../support/fake_token_storage.dart';
+import '../support/mock_dio_adapter.dart';
 
 class _MockCoreRepository extends Mock implements CoreRepository {}
 
@@ -15,6 +22,16 @@ AppVersionInfo _versionInfo({required String min, required String latest}) =>
       storeUrl: 'https://example.com',
     );
 
+AuthProvider _fakeAuth({bool isNewUser = false}) {
+  final adapter = MockDioAdapter();
+  final dio = createMockDio(adapter);
+  return AuthProvider(
+    tokenStorage: FakeTokenStorage(),
+    dio: dio,
+    authService: AuthService(dio),
+  )..isNewUser = isNewUser;
+}
+
 void main() {
   group('SplashScreen — версионирование', () {
     late _MockCoreRepository mockRepo;
@@ -23,10 +40,18 @@ void main() {
       mockRepo = _MockCoreRepository();
     });
 
-    Widget buildSplash({VoidCallback? onNavigateToHome}) => MaterialApp(
-          home: SplashScreen(
-            coreRepository: mockRepo,
-            onNavigateToHome: onNavigateToHome ?? () {},
+    Widget buildSplash({VoidCallback? onNavigateToHome, AuthProvider? auth}) =>
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthProvider>.value(
+              value: auth ?? _fakeAuth(),
+            ),
+          ],
+          child: MaterialApp(
+            home: SplashScreen(
+              coreRepository: mockRepo,
+              onNavigateToHome: onNavigateToHome ?? () {},
+            ),
           ),
         );
 
@@ -84,6 +109,37 @@ void main() {
 
       expect(find.byType(AlertDialog), findsNothing);
       expect(navigated, isTrue);
+    });
+
+    testWidgets('При isNewUser=true навигация идёт на OnboardingScreen',
+        (tester) async {
+      when(() => mockRepo.fetchAppVersion(any()))
+          .thenAnswer((_) async => _versionInfo(min: '1.0.0', latest: '1.0.0'));
+
+      await tester.pumpWidget(buildSplash(auth: _fakeAuth(isNewUser: true)));
+      await pumpPastSplash(tester);
+      // Ждём завершения flutter_animate анимаций OnboardingScreen (max delay+duration = 1000ms)
+      await tester.pump(const Duration(milliseconds: 1000));
+
+      expect(find.byType(OnboardingScreen), findsOneWidget);
+    });
+
+    testWidgets('При isNewUser=false навигация идёт на RootShell',
+        (tester) async {
+      when(() => mockRepo.fetchAppVersion(any()))
+          .thenAnswer((_) async => _versionInfo(min: '1.0.0', latest: '1.0.0'));
+
+      var navigated = false;
+      await tester.pumpWidget(
+        buildSplash(
+          auth: _fakeAuth(isNewUser: false),
+          onNavigateToHome: () => navigated = true,
+        ),
+      );
+      await pumpPastSplash(tester);
+
+      expect(navigated, isTrue);
+      expect(find.byType(OnboardingScreen), findsNothing);
     });
   });
 }

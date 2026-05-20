@@ -112,9 +112,9 @@ POST /api/v1/users/auth/verify-sms/    ← номер + OTP → access + refresh
 | GET | `/api/v1/events/archived/` | Прошедшие мероприятия | — |
 | GET | `/api/v1/events/news/` | Новости ресторана | — |
 | POST | `/api/v1/events/reservations/create/` | Записаться на мероприятие | JWT |
-| POST | `/api/v1/bookings/create/` | Забронировать стол | JWT |
-| GET | `/api/v1/bookings/my/` | Мои бронирования | JWT |
-| POST | `/api/v1/notifications/devices/register/` | Зарегистрировать FCM-токен | JWT |
+| POST | `/api/v1/bookings/` | Забронировать стол | JWT |
+| GET | `/api/v1/bookings/` | Мои бронирования | JWT |
+| POST | `/api/v1/notifications/device/register/` | Зарегистрировать FCM-токен | JWT |
 
 Полная документация — [Swagger UI](http://localhost:8000/api/docs/) или `backend/API_FOR_FLUTTER.md`.
 

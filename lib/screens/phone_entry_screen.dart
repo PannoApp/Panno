@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/ember_cta.dart';
+import 'onboarding_screen.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_tap.dart';
 
@@ -67,7 +68,15 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
     if (!mounted) return;
     setState(() => _submitting = false);
     if (ok) {
-      Navigator.of(context).pop();
+      final auth = context.read<AuthProvider>();
+      if (auth.isNewUser) {
+        auth.clearNewUserFlag();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      } else {
+        Navigator.of(context).pop();
+      }
       return;
     }
     setState(() {

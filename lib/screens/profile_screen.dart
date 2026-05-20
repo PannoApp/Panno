@@ -48,12 +48,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     };
   }
 
-  Future<void> _onNotifToggle(String id, bool value) async {
+  Future<void> _handleNotifToggle(String id, bool value) async {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) return;
 
     try {
       switch (id) {
+        case 'global':
+          await auth.updateNotificationPreferences(notificationsEnabled: value);
         case 'events':
           await auth.updateNotificationPreferences(events: value);
         case 'promo':
@@ -137,8 +139,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 12),
                     _NotificationsCard(
                       enabled: auth.isLoggedIn,
+                      globalEnabled:
+                          auth.currentUser?.notificationsEnabled ?? true,
                       isOn: (id) => _notifValue(auth, id),
-                      onToggle: _onNotifToggle,
+                      onToggle: _handleNotifToggle,
                     ),
                     const SizedBox(height: 28),
 
@@ -577,11 +581,14 @@ class _StatCard extends StatelessWidget {
 class _NotificationsCard extends StatelessWidget {
   const _NotificationsCard({
     required this.enabled,
+    required this.globalEnabled,
     required this.isOn,
     required this.onToggle,
   });
 
   final bool enabled;
+  // Глобальный флаг из UserProfile.notificationsEnabled
+  final bool globalEnabled;
   final bool Function(String id) isOn;
   final Future<void> Function(String id, bool value) onToggle;
 
@@ -604,26 +611,47 @@ class _NotificationsCard extends StatelessWidget {
 
     return _BrandCard(
       child: Column(
-        children: kNotifCategories.asMap().entries.map((entry) {
-          final i = entry.key;
-          final cat = entry.value;
-          final on = isOn(cat.id);
-          return Column(
-            children: [
-              _NotifRow(
-                category: cat,
-                isOn: on,
-                onChanged: (val) => onToggle(cat.id, val),
-              ),
-              if (i < kNotifCategories.length - 1)
-                const Divider(
-                  height: 1,
-                  color: PiligrimColors.divider,
-                  indent: 48,
-                ),
-            ],
-          );
-        }).toList(),
+        children: [
+          // Главный переключатель — отражает notifications_enabled с сервера
+          _NotifRow(
+            category: const NotifCategory(
+              id: 'global',
+              label: 'Уведомления',
+              subtitle: 'Включить все push-уведомления',
+              iconAsset: 'assets/images/moon_totem (1).svg',
+            ),
+            isOn: globalEnabled,
+            onChanged: (val) => onToggle('global', val),
+          ),
+          const Divider(height: 1, color: PiligrimColors.divider, indent: 48),
+          // Категории — задизаблены визуально и функционально при globalEnabled=false
+          Opacity(
+            opacity: globalEnabled ? 1.0 : 0.4,
+            child: Column(
+              children: kNotifCategories.asMap().entries.map((entry) {
+                final i = entry.key;
+                final cat = entry.value;
+                final on = isOn(cat.id);
+                return Column(
+                  children: [
+                    _NotifRow(
+                      category: cat,
+                      isOn: on,
+                      onChanged:
+                          globalEnabled ? (val) => onToggle(cat.id, val) : null,
+                    ),
+                    if (i < kNotifCategories.length - 1)
+                      const Divider(
+                        height: 1,
+                        color: PiligrimColors.divider,
+                        indent: 48,
+                      ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -639,7 +667,7 @@ class _NotifRow extends StatelessWidget {
 
   final NotifCategory category;
   final bool isOn;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -681,7 +709,7 @@ class _NotifRow extends StatelessWidget {
           ),
           // Брендовый toggle
           GestureDetector(
-            onTap: () => onChanged(!isOn),
+            onTap: onChanged != null ? () => onChanged!(!isOn) : null,
             child: AnimatedContainer(
               duration: 250.ms,
               width: 44,

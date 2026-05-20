@@ -222,5 +222,72 @@ void main() {
 
       expect(find.byType(PhoneEntryScreen), findsOneWidget);
     });
+
+    testWidgets('При notificationsEnabled: false категории визуально задизаблены',
+        (tester) async {
+      auth.currentUser = const UserProfile(
+        id: 1,
+        phone: '+77001234567',
+        firstName: 'Айдар',
+        lastName: 'Нурланов',
+        notifyEvents: true,
+        notifyPromotions: false,
+        notifyClosedEvents: false,
+        notificationsEnabled: false,
+      );
+      auth.notifyListeners();
+
+      await tester.pumpWidget(buildApp());
+      await settle(tester);
+
+      await scrollTo(tester, find.text('Мероприятия'));
+      // Ждём завершения flutter_animate анимаций (delay 150ms + duration 600ms)
+      await tester.pump(const Duration(milliseconds: 800));
+
+      // Блок категорий завёрнут в Opacity с opacity 0.4
+      final dimmed = tester
+          .widgetList<Opacity>(find.byType(Opacity))
+          .where((o) => o.opacity == 0.4)
+          .toList();
+      expect(dimmed, isNotEmpty);
+    });
+
+    testWidgets('Глобальный переключатель → PATCH notifications_enabled',
+        (tester) async {
+      auth.currentUser = _sampleProfile(); // notificationsEnabled: true
+      auth.notifyListeners();
+      adapter.enqueue(200, {
+        'id': 1,
+        'phone': '+77001234567',
+        'first_name': 'Айдар',
+        'last_name': 'Нурланов',
+        'notify_events': true,
+        'notify_promotions': false,
+        'notify_closed_events': false,
+        'notifications_enabled': false,
+      });
+
+      await tester.pumpWidget(buildApp());
+      await settle(tester);
+
+      final globalLabel = find.text('Уведомления');
+      await scrollTo(tester, globalLabel);
+      final toggle = find.descendant(
+        of: find.ancestor(
+          of: globalLabel,
+          matching: find.byType(Row),
+        ),
+        matching: find.byType(GestureDetector),
+      );
+      await tester.tap(toggle.first);
+      await settle(tester);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final patch = adapter.captured
+          .where((r) => r.method == 'PATCH' && r.path == '/users/profile/')
+          .single;
+      expect(patch.data, {'notifications_enabled': false});
+      expect(auth.currentUser?.notificationsEnabled, isFalse);
+    });
   });
 }

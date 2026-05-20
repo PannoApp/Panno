@@ -3,12 +3,15 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/home_data.dart';
 import '../core/theme.dart';
 import '../data/repositories/core_repository.dart';
 import '../main.dart';
+import '../providers/auth_provider.dart';
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({
@@ -189,6 +192,14 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _goToHome() {
     if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    if (auth.isNewUser) {
+      auth.isNewUser = false;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      );
+      return;
+    }
     if (widget.onNavigateToHome != null) {
       widget.onNavigateToHome!();
       return;

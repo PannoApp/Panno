@@ -149,6 +149,43 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> updateName(String firstName) async {
+    if (currentUser == null) return;
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      currentUser = await _profileRepository.updateProfile({'first_name': firstName});
+    } catch (e) {
+      error = dioErrorMessage(e);
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Обновляет имя и/или фамилию одним PATCH-запросом.
+  Future<void> updateDisplayProfile({String? firstName, String? lastName}) async {
+    if (currentUser == null) return;
+    final body = <String, dynamic>{};
+    if (firstName != null && firstName.isNotEmpty) body['first_name'] = firstName;
+    if (lastName != null && lastName.isNotEmpty) body['last_name'] = lastName;
+    if (body.isEmpty) return;
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      currentUser = await _profileRepository.updateProfile(body);
+    } catch (e) {
+      error = dioErrorMessage(e);
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> updateNotificationPreferences({
     bool? events,
     bool? promotions,
