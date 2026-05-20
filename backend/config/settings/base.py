@@ -28,6 +28,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 # Стандартные приложения Django
 INSTALLED_APPS = [
 
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -390,5 +391,96 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+    },
+}
+
+# ==========================================
+# Jazzmin — тема админ-панели
+# ==========================================
+
+JAZZMIN_SETTINGS = {
+    "site_title": "Пилигрим",
+    "site_header": "Пилигрим — Панель управления",
+    "site_brand": "Пилигрим",
+    "welcome_sign": "Добро пожаловать в панель управления",
+    "copyright": "Piligrim Restaurant",
+
+    # Глобальный поиск по моделям
+    "search_model": ["users.User", "menu.Dish", "bookings.TableBooking"],
+
+    # Иконки FontAwesome 5 Free
+    "icons": {
+        "auth":                          "fas fa-users-cog",
+        "users.user":                    "fas fa-user",
+        "menu.category":                 "fas fa-th-large",
+        "menu.dish":                     "fas fa-utensils",
+        "menu.tag":                      "fas fa-tag",
+        "menu.allergen":                 "fas fa-exclamation-triangle",
+        "events.event":                  "fas fa-calendar-alt",
+        "events.news":                   "fas fa-newspaper",
+        "events.eventreservation":       "fas fa-ticket-alt",
+        "bookings.tablebooking":         "fas fa-chair",
+        "notifications.userdevice":      "fas fa-mobile-alt",
+        "notifications.pushcampaign":    "fas fa-bell",
+        "core.restaurantinfo":           "fas fa-store",
+        "core.interiorphoto":            "fas fa-images",
+        "core.appversion":               "fas fa-code-branch",
+    },
+
+    # Порядок разделов в сайдбаре
+    "order_with_respect_to": [
+        "bookings",
+        "events",
+        "menu",
+        "core",
+        "users",
+        "notifications",
+    ],
+
+    # Скрыть стандартный раздел auth — используем кастомные роли через users.User
+    "hide_apps": ["auth"],
+
+    "show_ui_builder": False,
+    "navigation_expanded": True,
+    "show_sidebar": True,
+    "autosize_content": True,
+
+    "topmenu_links": [
+        {"name": "Сайт",     "url": "/",          "new_window": True},
+        {"name": "API Docs", "url": "/api/docs/", "new_window": True},
+    ],
+    "usermenu_links": [
+        {"name": "API Docs", "url": "/api/docs/", "new_window": True},
+    ],
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text":      False,
+    "footer_small_text":      False,
+    "body_small_text":        False,
+    "brand_small_text":       False,
+    "brand_colour":           "navbar-dark",
+    "accent":                 "accent-danger",
+    "navbar":                 "navbar-dark",
+    "no_navbar_border":       True,
+    "navbar_fixed":           True,
+    "layout_boxed":           False,
+    "footer_fixed":           False,
+    "sidebar_fixed":          True,
+    "sidebar":                "sidebar-dark-maroon",
+    "sidebar_nav_small_text":     False,
+    "sidebar_disable_expand":     False,
+    "sidebar_nav_child_indent":   True,
+    "sidebar_nav_compact_style":  False,
+    "sidebar_nav_legacy_style":   False,
+    "sidebar_nav_flat_style":     False,
+    "theme": "flatly",
+    "button_classes": {
+        "primary":   "btn-primary",
+        "secondary": "btn-secondary",
+        "info":      "btn-info",
+        "warning":   "btn-warning",
+        "danger":    "btn-danger",
+        "success":   "btn-success",
     },
 }
