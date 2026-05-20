@@ -60,10 +60,13 @@ class DishAdmin(ContentManagerMixin, ModelAdmin):
     # Группировка полей внутри карточки блюда
     fieldsets = (
         ('Основная информация', {
-            'fields': ('name', 'description', 'price', 'category', 'is_active')
+            'fields': ('name', 'description', 'price', 'category', 'weight', 'is_active')
         }),
         ('Характеристики', {
             'fields': ('tags', 'allergens')
+        }),
+        ('История блюда', {
+            'fields': ('story',)
         }),
         ('Медиа', {
             # video_status — только для чтения; отображает текущий этап транскодирования Celery
