@@ -8,7 +8,7 @@ import 'piligrim_tap.dart';
 const Color _kNavBase = Color(0xFF211D1A);
 const Color _kNavTop = Color(0xFF2A2521);
 const Color _kNavActive = Color(0xFF7BA5B8);
-const Color _kNavInactive = Color(0x66F2EDE4);
+const Color _kNavInactive = PiligrimColors.navInactive;
 const Color _kNavRimTop = Color(0x14F2EDE4);
 
 class PiligrimNavBar extends StatelessWidget {
@@ -66,7 +66,7 @@ class PiligrimNavBar extends StatelessWidget {
           top: false,
           minimum: const EdgeInsets.only(bottom: 5),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 5, 4, 0),
+            padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: List.generate(_items.length, (i) {
@@ -106,30 +106,30 @@ class _NavTabCell extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _NavTotemIcon(asset: item.asset, active: active),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
         AnimatedContainer(
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeOutCubic,
           height: 2,
-          width: active ? 14 : 0,
+          width: active ? 18 : 0,
           decoration: BoxDecoration(
             color: active
-                ? _kNavActive.withValues(alpha: 0.32)
+                ? _kNavActive.withValues(alpha: 0.42)
                 : _kNavRimTop,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
         Text(
           item.label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
           style: PiligrimTextStyles.caption.copyWith(
-            fontSize: 8.25,
-            height: 1.0,
+            fontSize: 10,
+            height: 1.05,
             color: active ? _kNavActive : _kNavInactive,
-            letterSpacing: 0.28,
+            letterSpacing: 0.45,
           ),
         ),
       ],
@@ -146,14 +146,14 @@ class _NavTotemIcon extends StatelessWidget {
   final String asset;
   final bool active;
 
-  static const double _sizeInactive = 15;
-  static const double _sizeActive = 19;
+  static const double _sizeInactive = 18;
+  static const double _sizeActive = 22;
 
   @override
   Widget build(BuildContext context) {
     final isHeavyGlyph = asset.contains('moon') || asset.contains('shaman');
     final base = active ? _sizeActive : _sizeInactive;
-    final iconSize = base * (isHeavyGlyph ? 0.84 : 1.0);
+    final iconSize = base * (isHeavyGlyph ? 0.88 : 1.0);
 
     return SizedBox(
       width: 40,
@@ -165,14 +165,14 @@ class _NavTotemIcon extends StatelessWidget {
           if (active)
             IgnorePointer(
               child: Container(
-                width: 22,
-                height: 22,
+                width: 28,
+                height: 28,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x1A7BA5B8),
-                      blurRadius: 5,
+                      color: Color(0x247BA5B8),
+                      blurRadius: 8,
                       spreadRadius: -1,
                     ),
                   ],
