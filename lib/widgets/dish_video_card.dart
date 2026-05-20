@@ -103,7 +103,7 @@ class _DishVideoCardState extends State<DishVideoCard>
   }
 
   void _handleDragEnd(DragEndDetails d) {
-    if (d.velocity.pixelsPerSecond.dx > 300) {
+    if (d.velocity.pixelsPerSecond.dx < -300) {
       widget.onSwipeRight?.call();
       _showDishDetail();
     }
