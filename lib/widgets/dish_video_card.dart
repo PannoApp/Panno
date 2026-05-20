@@ -448,7 +448,7 @@ class _DishDetailSheet extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       DishInfoChip(
-                        label: '${dish.price} ₸',
+                        label: '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
                         icon: 'assets/images/zerno.svg',
                         accent: true,
                       ),

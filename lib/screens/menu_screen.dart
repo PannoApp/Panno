@@ -261,18 +261,18 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
   @override
   Widget build(BuildContext context) {
     final menuProvider = context.watch<MenuProvider>();
-    final dishes = menuProvider.dishes;
+    final dishes = menuProvider.feedDishes;
 
     // Пока блюда загружаются — показываем индикатор
-    if (menuProvider.isLoading && dishes.isEmpty) {
+    if (menuProvider.isLoadingFeed && dishes.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: PiligrimColors.water),
       );
     }
 
-    if (menuProvider.error != null && dishes.isEmpty) {
+    if (menuProvider.feedError != null && dishes.isEmpty) {
       return ErrorView(
-        message: menuProvider.error!,
+        message: menuProvider.feedError!,
         onRetry: () => context.read<MenuProvider>().retry(),
       );
     }
@@ -294,7 +294,15 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
           controller: _pageCtrl,
           scrollDirection: Axis.vertical,
           physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
-          onPageChanged: (i) => setState(() => _currentPage = i),
+          onPageChanged: (i) {
+            setState(() => _currentPage = i);
+            final provider = context.read<MenuProvider>();
+            if (i >= dishes.length - 2 &&
+                provider.hasMoreFeed &&
+                !provider.isLoadingFeed) {
+              provider.loadFeed();
+            }
+          },
           itemCount: dishes.length,
           itemBuilder: (_, i) => DishVideoCard(
             dish: dishes[i],

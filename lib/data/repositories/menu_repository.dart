@@ -31,7 +31,7 @@ class MenuRepository {
   }) async {
     final query = <String, dynamic>{'page': page};
     if (categoryId != null) query['category_id'] = categoryId;
-    if (tagIds != null && tagIds.isNotEmpty) query['tags'] = tagIds;
+    if (tagIds != null && tagIds.isNotEmpty) query['tag_ids'] = tagIds.join(',');
     if (search != null && search.isNotEmpty) query['search'] = search;
 
     final response = await _dio.get<Map<String, dynamic>>(
