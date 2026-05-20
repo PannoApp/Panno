@@ -127,6 +127,7 @@ services:
     command: >
       celery -A config worker
       --loglevel=info
+      --queues=celery
       --concurrency=4
       --max-tasks-per-child=1000
       --time-limit=300
@@ -148,6 +149,38 @@ services:
         limits:
           memory: 512m
           cpus: '1.0'
+
+  # Celery Video Worker (изолированная очередь для FFmpeg-транскодирования)
+  # Отдельный воркер чтобы тяжёлые задачи обработки видео не блокировали SMS/push/booking
+  video-worker:
+    build: .
+    container_name: celery_video_worker
+    restart: unless-stopped
+    command: >
+      celery -A config worker
+      --loglevel=info
+      --queues=video
+      --concurrency=2
+      --max-tasks-per-child=50
+      --time-limit=960
+      --soft-time-limit=900
+    volumes:
+      - .:/app/backend
+      - ./logs:/app/backend/logs
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '2.0'
 
   # Celery Beat (планировщик периодических задач)
   beat:

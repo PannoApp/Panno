@@ -330,6 +330,10 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+CELERY_TASK_ROUTES = {
+    'apps.menu.tasks.process_dish_video': {'queue': 'video'},
+}
+
 # ==========================================
 # Push-уведомления: ограничения
 # ==========================================

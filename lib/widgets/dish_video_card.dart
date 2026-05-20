@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../core/theme.dart';
 import '../data/models/api_dish.dart';
 import 'dish_elements.dart';
@@ -57,17 +58,15 @@ class _DishVideoCardState extends State<DishVideoCard>
     }
   }
 
-  // Асинхронная инициализация VideoPlayerController.
-  // После готовности: зацикливаем и воспроизводим если карточка активна.
+  // Скачивает видео в локальный кэш (flutter_cache_manager) и открывает как
+  // файл. Повторные открытия той же карточки читают с диска без сетевых запросов.
   Future<void> _initVideo(String url) async {
-    final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
+    VideoPlayerController? ctrl;
     try {
+      final file = await DefaultCacheManager().getSingleFile(url);
+      ctrl = VideoPlayerController.file(file);
       await ctrl.initialize();
       ctrl.setLooping(true);
-      // Перестройка при изменении буферизации / состояния воспроизведения
-      ctrl.addListener(() {
-        if (mounted) setState(() {});
-      });
       if (!mounted) {
         ctrl.dispose();
         return;
@@ -75,8 +74,7 @@ class _DishVideoCardState extends State<DishVideoCard>
       setState(() => _videoCtrl = ctrl);
       if (widget.isActive) ctrl.play();
     } catch (_) {
-      // При ошибке загрузки — остаёмся на cinematic gradient
-      ctrl.dispose();
+      ctrl?.dispose();
     }
   }
 

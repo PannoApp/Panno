@@ -26,6 +26,8 @@ dependencies:
   firebase_messaging: ^15.1.3
   # Воспроизведение видео для ленты блюд
   video_player: ^2.9.1
+  # Кэширование видеофайлов на диске (избегаем повторных сетевых запросов)
+  flutter_cache_manager: ^3.4.1
   # Кэшированная загрузка изображений из API с плейсхолдерами
   cached_network_image: ^3.4.1
   # Генерация UUID для Idempotency-Key в booking/event reservation
