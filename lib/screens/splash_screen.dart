@@ -232,19 +232,22 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           _buildBackgroundLayer(),
           Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildStarTotem(),
-                const SizedBox(height: 8),
-                _buildPathLine(),
-                const SizedBox(height: 16),
-                _buildLogo(),
-                const SizedBox(height: 20),
-                _buildTagline(),
-                const SizedBox(height: 18),
-                _buildConcept(),
-              ],
+            child: Transform.translate(
+              offset: const Offset(0, -6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildStarTotem(),
+                  const SizedBox(height: 8),
+                  _buildPathLine(),
+                  const SizedBox(height: 20),
+                  _buildLogo(),
+                  const SizedBox(height: 20),
+                  _buildTagline(),
+                  const SizedBox(height: 20),
+                  _buildConcept(),
+                ],
+              ),
             ),
           ),
           _buildBottomLabel(),
@@ -255,19 +258,54 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _buildBackgroundLayer() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment(0.0, -0.3),
-          radius: 1.2,
-          colors: [
-            Color(0xFF4A4744),
-            PiligrimColors.earth,
-            PiligrimColors.earthDeep,
-          ],
-          stops: [0.0, 0.5, 1.0],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                PiligrimColors.earthDeep,
+                PiligrimColors.earth,
+                PiligrimColors.earthWarm,
+                PiligrimColors.earthDeep,
+              ],
+              stops: [0.0, 0.36, 0.72, 1.0],
+            ),
+          ),
         ),
-      ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                PiligrimColors.ember.withValues(alpha: 0.15),
+                PiligrimColors.steppe.withValues(alpha: 0.05),
+                PiligrimColors.clear,
+              ],
+              stops: [0.0, 0.40, 0.80],
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                PiligrimColors.earthDeep.withValues(alpha: 0.34),
+                PiligrimColors.clear,
+                PiligrimColors.clear,
+                PiligrimColors.earthDeep.withValues(alpha: 0.52),
+              ],
+              stops: [0.0, 0.30, 0.60, 1.0],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -380,17 +418,17 @@ class _SplashScreenState extends State<SplashScreen>
     return FadeTransition(
       opacity: _conceptOpacity,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
+        padding: const EdgeInsets.symmetric(horizontal: 52),
         child: Text(
           kModernNomadConcept,
           textAlign: TextAlign.center,
           maxLines: 4,
           overflow: TextOverflow.ellipsis,
           style: PiligrimTextStyles.body.copyWith(
-            fontSize: 12,
-            height: 1.4,
+            fontSize: 11.5,
+            height: 1.5,
             fontWeight: FontWeight.w300,
-            color: PiligrimColors.sky.withValues(alpha: 0.5),
+            color: PiligrimColors.sky.withValues(alpha: 0.52),
           ),
         ),
       ),
@@ -407,8 +445,8 @@ class _SplashScreenState extends State<SplashScreen>
         child: Text(
           'PILIGRIM',
           style: PiligrimTextStyles.caption.copyWith(
-            color: PiligrimColors.sky.withValues(alpha: 0.2),
-            letterSpacing: 8,
+            color: PiligrimColors.sky.withValues(alpha: 0.24),
+            letterSpacing: 7.5,
             fontSize: 10,
           ),
           textAlign: TextAlign.center,
