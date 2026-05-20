@@ -86,6 +86,12 @@ class CoreInfo {
     required this.visitRules,
     required this.privacyPolicy,
     this.conceptDescription,
+    this.twogisLink,
+    this.googleMapsLink,
+    this.yandexMapsLink,
+    this.feedbackUrl,
+    this.termsOfService,
+    this.tourLink,
   });
 
   final String address;
@@ -101,6 +107,12 @@ class CoreInfo {
   final List<VisitRuleItem> visitRules;
   final String privacyPolicy;
   final String? conceptDescription;
+  final String? twogisLink;
+  final String? googleMapsLink;
+  final String? yandexMapsLink;
+  final String? feedbackUrl;
+  final String? termsOfService;
+  final String? tourLink;
 
   List<String> get heroImageUrls => heroSlides
       .map((s) => s.imageUrl)
@@ -136,6 +148,18 @@ class CoreInfo {
       conceptDescription: parseStringOrNull(
         json['concept_description'] ?? json['conceptDescription'],
       ),
+      twogisLink: parseStringOrNull(json['twogis_link'] ?? json['twogisLink']),
+      googleMapsLink: parseStringOrNull(
+        json['google_maps_link'] ?? json['googleMapsLink'],
+      ),
+      yandexMapsLink: parseStringOrNull(
+        json['yandex_maps_link'] ?? json['yandexMapsLink'],
+      ),
+      feedbackUrl: parseStringOrNull(json['feedback_url'] ?? json['feedbackUrl']),
+      termsOfService: parseStringOrNull(
+        json['terms_of_service'] ?? json['termsOfService'],
+      ),
+      tourLink: parseStringOrNull(json['tour_link'] ?? json['tourLink']),
     );
   }
 
@@ -153,5 +177,11 @@ class CoreInfo {
         'visit_rules': visitRules.map((e) => e.toJson()).toList(),
         'privacy_policy': privacyPolicy,
         if (conceptDescription != null) 'concept_description': conceptDescription,
+        if (twogisLink != null) 'twogis_link': twogisLink,
+        if (googleMapsLink != null) 'google_maps_link': googleMapsLink,
+        if (yandexMapsLink != null) 'yandex_maps_link': yandexMapsLink,
+        if (feedbackUrl != null) 'feedback_url': feedbackUrl,
+        if (termsOfService != null) 'terms_of_service': termsOfService,
+        if (tourLink != null) 'tour_link': tourLink,
       };
 }
