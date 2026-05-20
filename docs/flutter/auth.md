@@ -114,7 +114,7 @@ const BookingRequest(
 | 3 | EventsScreen | `lib/screens/events_screen.dart` |
 | 4 | ProfileScreen | `lib/screens/profile_screen.dart` |
 
-**BookingScreen** не является табом — открывается через `Navigator.push` из `HomeActionBlock` и `HomeTotemPathRow`. Значение `navIndex: kNavOpenBooking` (`-1`) в `kMenuCategories` сигнализирует об этом.
+**BookingScreen** не является табом — открывается через `Navigator.push` из кнопки «Забронировать стол» в `HomeActionBlock`. Константа `kNavOpenBooking` (`-1`) в `home_data.dart` остаётся для сценариев вне нижних табов при необходимости.
 
 ## PhoneEntryScreen
 

@@ -175,6 +175,32 @@ class MenuProvider extends ChangeNotifier {
 
   Future<void> retry() => load();
 
+  // ── С главной (Путь героя / быстрые действия) ───────────────────────────────
+
+  /// Полное меню: видео-лента, без фильтра категории (ТЗ: лента по умолчанию).
+  Future<void> openMenuBrowseAll() async {
+    await setMode(MenuViewMode.feed);
+    setCategory(null);
+  }
+
+  /// «Путь героя» в меню: классический режим + категория по подстроке имени (RU).
+  Future<void> openMenuPathCategory(String nameHintRu) async {
+    await setMode(MenuViewMode.classic);
+    final hint = nameHintRu.toLowerCase().trim();
+    if (hint.isEmpty) {
+      setCategory(null);
+      return;
+    }
+    int? id;
+    for (final c in categories) {
+      if (c.name.toLowerCase().contains(hint)) {
+        id = c.id;
+        break;
+      }
+    }
+    setCategory(id);
+  }
+
   // ── Фильтры ────────────────────────────────────────────────────────────────
 
   // Выбор категории — сброс и перезагрузка.

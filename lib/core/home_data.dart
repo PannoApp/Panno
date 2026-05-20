@@ -17,6 +17,7 @@ class MenuCategory {
     required this.totemAsset,
     required this.accentColor,
     required this.navIndex,
+    this.menuCategoryNameHint,
     this.badge,
   });
 
@@ -27,42 +28,70 @@ class MenuCategory {
   final Color accentColor;
   /// Индекс вкладки RootShell или [kNavOpenBooking] для push BookingScreen.
   final int navIndex;
+  /// Подстрока [ApiCategory.name] (RU) для фильтра при переходе с «Пути героя».
+  final String? menuCategoryNameHint;
   final String? badge; // опциональный бейдж (например «NEW»)
 }
 
+/// Карточки пути: тотемы **не** те же SVG, что в [PiligrimNavBar], чтобы не путать с табами.
 const kMenuCategories = [
   MenuCategory(
     id: 'start',
     titleRu: 'Начало пути',
     subtitle: 'Закуски',
-    totemAsset: 'assets/images/bird_totem (1).svg',
+    totemAsset: 'assets/images/spiral.svg',
     accentColor: PiligrimColors.water,
     navIndex: 1,
+    menuCategoryNameHint: 'закуск',
   ),
   MenuCategory(
     id: 'main',
     titleRu: 'Основной путь',
     subtitle: 'Горячие блюда',
-    totemAsset: 'assets/images/wheel_totem (1).svg',
+    totemAsset: 'assets/images/sun.svg',
     accentColor: PiligrimColors.steppe,
     navIndex: 1,
+    menuCategoryNameHint: 'горяч',
   ),
   MenuCategory(
     id: 'events',
     titleRu: 'Ивент-спейс АУА',
     subtitle: 'Мероприятия',
-    totemAsset: 'assets/images/tree_totem (1).svg',
+    totemAsset: 'assets/images/pegasus.svg',
     accentColor: Color(0xFF9BB898), // приглушённый зелёный (природа, АУА)
     navIndex: 3,
     badge: 'СКОРО',
   ),
-  MenuCategory(
-    id: 'book',
-    titleRu: 'Забронировать',
-    subtitle: 'Стол на вечер',
-    totemAsset: 'assets/images/moon_totem (1).svg',
-    accentColor: PiligrimColors.water,
-    navIndex: kNavOpenBooking,
+];
+
+/// Быстрые действия под карточками «Путь героя»: тотемы **не** из [PiligrimNavBar].
+class HeroPathFooterAction {
+  const HeroPathFooterAction({
+    required this.label,
+    required this.totemAsset,
+    required this.tabIndex,
+    this.openMenuBrowseAll = false,
+  });
+
+  final String label;
+  final String totemAsset;
+  /// Вкладка [RootShell] после действия.
+  final int tabIndex;
+  /// true: полное меню (лента), затем переход на вкладку меню.
+  final bool openMenuBrowseAll;
+}
+
+const kHeroPathFooterActions = [
+  HeroPathFooterAction(
+    label: 'Меню ресторана',
+    totemAsset: 'assets/images/zerno.svg',
+    tabIndex: 1,
+    openMenuBrowseAll: true,
+  ),
+  HeroPathFooterAction(
+    label: 'Как добраться',
+    totemAsset: 'assets/images/stone.svg',
+    tabIndex: 4,
   ),
 ];
 

@@ -1,6 +1,9 @@
 // Home Screen — «Карта путешествия» PILIGRIM
 // Кинематографичный, тихий luxury; без glass / неона (piligrim_design_spec.md)
 //
+// ТЗ §4.1 (brand/TZ Piligrim App.md): hero и/или видео-визуал, концепция Modern Nomad,
+// бронь (Ember CTA), меню и маршрут под блоком «Путь героя», анонс события, часы и статус.
+//
 // Виджеты: home_hero_section, home_cinematic_ambient, home_totem_path,
 //   home_action_block, home_event_block, home_status_line
 import 'dart:async';
@@ -146,14 +149,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               // Контент на PiligrimBackground — без ColoredBox / серой плашки.
-              SliverToBoxAdapter(
+              const SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const RepaintBoundary(child: HomeHeroIntroBlock()),
-                    RepaintBoundary(
-                      child: HomeActionBlock(onNavigate: widget.onNavigate),
-                    ),
+                    RepaintBoundary(child: HomeHeroIntroBlock()),
+                    RepaintBoundary(child: HomeActionBlock()),
                   ],
                 ),
               ),
