@@ -393,7 +393,8 @@ class _BookingScreenState extends State<BookingScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'Для выбранного стола может потребоваться депозит. Менеджер направит вас на звонок.',
+                                      context.watch<CoreInfoProvider>().coreInfo?.bookingDepositNote
+                                          ?? 'Для выбранного стола может потребоваться депозит. Уточните у менеджера.',
                                       style: PiligrimTextStyles.caption.copyWith(
                                         color: PiligrimColors.sky.withValues(alpha: 0.85),
                                       ),
