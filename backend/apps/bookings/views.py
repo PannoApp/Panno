@@ -116,12 +116,56 @@ class TableBookingListCreateView(IdempotencyMixin, generics.ListCreateAPIView):
         serializer.save(user=self.request.user)
 
 
+def _get_manager_keyboard():
+    return {
+        'keyboard': [
+            [{'text': '📢 Отправить пуш'}],
+            [{'text': '📰 Создать новость'}, {'text': '📅 Создать мероприятие'}]
+        ],
+        'resize_keyboard': True,
+    }
+
+
+def _download_telegram_photo(file_id, token):
+    """
+    Downloads a photo from Telegram by file_id.
+    Returns (filename, ContentFile) or None.
+    """
+    import os
+    import requests
+    from django.core.files.base import ContentFile
+
+    file_info_url = f"https://api.telegram.org/bot{token}/getFile"
+    try:
+        resp = requests.post(file_info_url, json={'file_id': file_id}, timeout=10)
+        if not resp.ok:
+            logger.error("Telegram getFile error: status=%s body=%s", resp.status_code, resp.text)
+            return None
+        file_path = resp.json().get('result', {}).get('file_path')
+        if not file_path:
+            logger.error("Telegram getFile response does not contain file_path: %s", resp.text)
+            return None
+
+        file_download_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
+        img_resp = requests.get(file_download_url, timeout=15)
+        if img_resp.ok:
+            ext = os.path.splitext(file_path)[1] or '.jpg'
+            filename = f"{file_id}{ext}"
+            return filename, ContentFile(img_resp.content)
+        else:
+            logger.error("Failed to download file from Telegram: status=%s", img_resp.status_code)
+    except Exception:
+        logger.exception("Error downloading photo from Telegram")
+    return None
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class TelegramWebhookView(View):
     """
     Принимает callback_query от Telegram при нажатии inline-кнопок
     «Подтвердить» / «Отменить» в уведомлениях о бронировании,
-    а также обрабатывает текстовые сообщения и команды для рассылки push-уведомлений.
+    а также обрабатывает текстовые сообщения и команды для рассылки push-уведомлений,
+    создания новостей и мероприятий контент-менеджерами.
     """
 
     def post(self, request):
@@ -158,7 +202,7 @@ class TelegramWebhookView(View):
         message_id = message.get('message_id')
 
         parts = callback_data.split(':', 1)
-        if len(parts) != 2 or parts[0] not in ('confirm', 'cancel', 'bulk_push'):
+        if len(parts) != 2 or parts[0] not in ('confirm', 'cancel', 'bulk_push', 'news', 'event', 'event_format'):
             _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Неизвестная команда'}, token)
             return JsonResponse({'ok': True})
 
@@ -186,11 +230,8 @@ class TelegramWebhookView(View):
                 }, token)
                 _tg_post('sendMessage', {
                     'chat_id': chat_id,
-                    'text': 'Вы можете начать заново, нажав кнопку «📢 Отправить пуш».',
-                    'reply_markup': {
-                        'keyboard': [[{'text': '📢 Отправить пуш'}]],
-                        'resize_keyboard': True,
-                    }
+                    'text': 'Вы можете начать заново в любое время.',
+                    'reply_markup': _get_manager_keyboard()
                 }, token)
                 return JsonResponse({'ok': True})
 
@@ -225,10 +266,7 @@ class TelegramWebhookView(View):
                         _tg_post('sendMessage', {
                             'chat_id': chat_id,
                             'text': 'Вы можете создать новую рассылку в любое время.',
-                            'reply_markup': {
-                                'keyboard': [[{'text': '📢 Отправить пуш'}]],
-                                'resize_keyboard': True,
-                            }
+                            'reply_markup': _get_manager_keyboard()
                         }, token)
                         return JsonResponse({'ok': True})
                     else:
@@ -272,10 +310,7 @@ class TelegramWebhookView(View):
                             _tg_post('sendMessage', {
                                 'chat_id': chat_id,
                                 'text': 'Вы можете создать новую рассылку в любое время.',
-                                'reply_markup': {
-                                    'keyboard': [[{'text': '📢 Отправить пуш'}]],
-                                    'resize_keyboard': True,
-                                }
+                                'reply_markup': _get_manager_keyboard()
                             }, token)
                         else:
                             _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Недостаточно прав.'}, token)
@@ -283,6 +318,226 @@ class TelegramWebhookView(View):
                         logger.exception("Direct fallback execution also failed")
                         _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Ошибка при отправке.'}, token)
 
+                return JsonResponse({'ok': True})
+
+        # Обработка подтверждения/отмены создания новости
+        elif parts[0] == 'news':
+            action = parts[1]
+            cache_key = f"tg_fsm:{chat_id}"
+            state_data = cache.get(cache_key)
+
+            if not state_data or state_data.get('state') != 'waiting_for_news_confirmation':
+                _tg_post('answerCallbackQuery', {
+                    'callback_query_id': callback_id,
+                    'text': 'Время ожидания истекло или новость уже создана.',
+                    'show_alert': True,
+                }, token)
+                return JsonResponse({'ok': True})
+
+            if action == 'cancel':
+                cache.delete(cache_key)
+                _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Создание новости отменено.'}, token)
+                _tg_post('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': message_id,
+                    'text': '❌ Создание новости отменено.',
+                }, token)
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Вы можете начать заново в любое время.',
+                    'reply_markup': _get_manager_keyboard()
+                }, token)
+                return JsonResponse({'ok': True})
+
+            elif action == 'confirm':
+                title = state_data['data']['title']
+                content = state_data['data']['content']
+                file_id = state_data['data'].get('file_id')
+                cache.delete(cache_key)
+
+                from apps.events.models import News
+                news = News(title=title, content=content)
+
+                if file_id:
+                    downloaded = _download_telegram_photo(file_id, token)
+                    if downloaded:
+                        filename, content_file = downloaded
+                        news.image.save(filename, content_file, save=False)
+                    else:
+                        _tg_post('answerCallbackQuery', {
+                            'callback_query_id': callback_id,
+                            'text': 'Ошибка скачивания фото. Создана новость без картинки.',
+                            'show_alert': True,
+                        }, token)
+
+                news.save()
+
+                _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Новость успешно создана!'}, token)
+                _tg_post('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': message_id,
+                    'text': f"✅ <b>Новость успешно опубликована!</b>\n\n<b>Заголовок:</b> {html.escape(title)}\n<b>Текст:</b> {html.escape(content)}",
+                    'parse_mode': 'HTML',
+                }, token)
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Вы можете создать еще новости или мероприятия в любое время.',
+                    'reply_markup': _get_manager_keyboard()
+                }, token)
+                return JsonResponse({'ok': True})
+
+        # Обработка выбора формата мероприятия
+        elif parts[0] == 'event_format':
+            action = parts[1]  # 'open' or 'closed'
+            cache_key = f"tg_fsm:{chat_id}"
+            state_data = cache.get(cache_key)
+
+            if not state_data or state_data.get('state') != 'waiting_for_event_format':
+                _tg_post('answerCallbackQuery', {
+                    'callback_query_id': callback_id,
+                    'text': 'Время ожидания истекло или неверное состояние.',
+                    'show_alert': True,
+                }, token)
+                return JsonResponse({'ok': True})
+
+            state_data['state'] = 'waiting_for_event_price'
+            state_data['data']['format'] = action
+            cache.set(cache_key, state_data, timeout=600)
+
+            format_label = 'Открытое' if action == 'open' else 'Закрытое'
+            _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': f'Формат: {format_label}'}, token)
+            _tg_post('editMessageText', {
+                'chat_id': chat_id,
+                'message_id': message_id,
+                'text': f"Выбран формат: <b>{format_label}</b>",
+                'parse_mode': 'HTML',
+            }, token)
+
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': 'Шаг 5 из 7: Укажите <b>цену входа</b> (в тенге) или нажмите кнопку «🆓 Вход свободный»:',
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '🆓 Вход свободный'}], [{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        # Обработка подтверждения/отмены создания мероприятия
+        elif parts[0] == 'event':
+            action = parts[1]
+            cache_key = f"tg_fsm:{chat_id}"
+            state_data = cache.get(cache_key)
+
+            if not state_data or state_data.get('state') != 'waiting_for_event_confirmation':
+                _tg_post('answerCallbackQuery', {
+                    'callback_query_id': callback_id,
+                    'text': 'Время ожидания истекло или мероприятие уже создано.',
+                    'show_alert': True,
+                }, token)
+                return JsonResponse({'ok': True})
+
+            if action == 'cancel':
+                cache.delete(cache_key)
+                _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Создание мероприятия отменено.'}, token)
+                _tg_post('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': message_id,
+                    'text': '❌ Создание мероприятия отменено.',
+                }, token)
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Вы можете начать заново в любое время.',
+                    'reply_markup': _get_manager_keyboard()
+                }, token)
+                return JsonResponse({'ok': True})
+
+            elif action == 'confirm':
+                title = state_data['data']['title']
+                description = state_data['data']['description']
+                datetime_str = state_data['data']['datetime']
+                format_val = state_data['data']['format']
+                price_val = state_data['data']['price']
+                file_id = state_data['data'].get('file_id')
+                cache.delete(cache_key)
+
+                from datetime import datetime
+                from django.utils import timezone
+                import pytz
+                from decimal import Decimal
+                from apps.events.models import Event
+
+                tz = pytz.timezone('Asia/Almaty')
+                naive_dt = datetime.strptime(datetime_str, '%d.%m.%Y %H:%M')
+                dt_obj = timezone.make_aware(naive_dt, timezone=tz)
+
+                price = Decimal(price_val) if price_val is not None else None
+
+                event = Event(
+                    title=title,
+                    description=description,
+                    date_time=dt_obj,
+                    format=format_val,
+                    price=price
+                )
+
+                if file_id:
+                    downloaded = _download_telegram_photo(file_id, token)
+                    if downloaded:
+                        filename, content_file = downloaded
+                        event.image.save(filename, content_file, save=False)
+                    else:
+                        _tg_post('answerCallbackQuery', {
+                            'callback_query_id': callback_id,
+                            'text': 'Ошибка скачивания фото. Мероприятие не создано.',
+                            'show_alert': True,
+                        }, token)
+                        _tg_post('editMessageText', {
+                            'chat_id': chat_id,
+                            'message_id': message_id,
+                            'text': '❌ Ошибка при скачивании обложки мероприятия с серверов Telegram. Мероприятие не было создано.',
+                        }, token)
+                        _tg_post('sendMessage', {
+                            'chat_id': chat_id,
+                            'text': 'Пожалуйста, попробуйте создать мероприятие еще раз.',
+                            'reply_markup': _get_manager_keyboard()
+                        }, token)
+                        return JsonResponse({'ok': True})
+                else:
+                    _tg_post('answerCallbackQuery', {
+                        'callback_query_id': callback_id,
+                        'text': 'Отсутствует обложка. Мероприятие не создано.',
+                        'show_alert': True,
+                    }, token)
+                    _tg_post('editMessageText', {
+                        'chat_id': chat_id,
+                        'message_id': message_id,
+                        'text': '❌ Ошибка: отсутствует обложка мероприятия. Мероприятие не было создано.',
+                    }, token)
+                    _tg_post('sendMessage', {
+                        'chat_id': chat_id,
+                        'text': 'Пожалуйста, попробуйте создать мероприятие еще раз.',
+                        'reply_markup': _get_manager_keyboard()
+                    }, token)
+                    return JsonResponse({'ok': True})
+
+                event.save()
+
+                format_label = 'Открытое' if format_val == 'open' else 'Закрытое'
+                price_label = f"{price} KZT" if price is not None else 'Вход свободный'
+                _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Мероприятие успешно создано!'}, token)
+                _tg_post('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': message_id,
+                    'text': f"✅ <b>Мероприятие успешно опубликовано!</b>\n\n<b>Заголовок:</b> {html.escape(title)}\n<b>Дата и время:</b> {datetime_str}\n<b>Формат:</b> {format_label}\n<b>Вход:</b> {price_label}",
+                    'parse_mode': 'HTML',
+                }, token)
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Создание мероприятия завершено.',
+                    'reply_markup': _get_manager_keyboard()
+                }, token)
                 return JsonResponse({'ok': True})
 
         # Обработка подтверждения/отмены бронирования
@@ -328,7 +583,8 @@ class TelegramWebhookView(View):
 
     def handle_message(self, request, message, token):
         chat_id = message.get('chat', {}).get('id')
-        text = message.get('text', '').strip()
+        text = message.get('text') or ''
+        text = text.strip()
 
         if not chat_id:
             return JsonResponse({'ok': True})
@@ -349,16 +605,13 @@ class TelegramWebhookView(View):
             if is_authorized:
                 _tg_post('sendMessage', {
                     'chat_id': chat_id,
-                    'text': 'Приветствуем! Вы успешно авторизованы как менеджер.\n\nВы можете запустить рассылку push-уведомлений, нажав на кнопку ниже или отправив команду /sendpush.',
-                    'reply_markup': {
-                        'keyboard': [[{'text': '📢 Отправить пуш'}]],
-                        'resize_keyboard': True,
-                    }
+                    'text': 'Приветствуем! Вы успешно авторизованы как менеджер.\n\nВы можете запустить рассылку push-уведомлений, создавать новости и мероприятия, нажав на соответствующие кнопки ниже.',
+                    'reply_markup': _get_manager_keyboard()
                 }, token)
             else:
                 _tg_post('sendMessage', {
                     'chat_id': chat_id,
-                    'text': f'Приветствуем!\n\nВаш Telegram ID: <code>{chat_id}</code>\n\nУ вас пока нет прав на управление рассылками. Скопируйте этот ID и передайте администратору для привязки в панели управления Django.',
+                    'text': f'Приветствуем!\n\nВаш Telegram ID: <code>{chat_id}</code>\n\nУ вас пока нет прав на управление. Скопируйте этот ID и передайте администратору для привязки в панели управления Django.',
                     'parse_mode': 'HTML',
                 }, token)
             return JsonResponse({'ok': True})
@@ -378,11 +631,8 @@ class TelegramWebhookView(View):
             cache.delete(cache_key)
             _tg_post('sendMessage', {
                 'chat_id': chat_id,
-                'text': 'Создание рассылки отменено.',
-                'reply_markup': {
-                    'keyboard': [[{'text': '📢 Отправить пуш'}]],
-                    'resize_keyboard': True,
-                }
+                'text': 'Действие отменено.',
+                'reply_markup': _get_manager_keyboard()
             }, token)
             return JsonResponse({'ok': True})
 
@@ -403,7 +653,35 @@ class TelegramWebhookView(View):
             }, token)
             return JsonResponse({'ok': True})
 
-        # Ожидание ввода заголовка
+        # Запуск создания новости (/createnews или кнопка "📰 Создать новость")
+        if text in ('/createnews', '📰 Создать новость'):
+            cache.set(cache_key, {'state': 'waiting_for_news_title', 'data': {}}, timeout=600)
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': 'Шаг 1 из 3: Введите <b>заголовок</b> для новости:',
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        # Запуск создания мероприятия (/createevent или кнопка "📅 Создать мероприятие")
+        if text in ('/createevent', '📅 Создать мероприятие'):
+            cache.set(cache_key, {'state': 'waiting_for_event_title', 'data': {}}, timeout=600)
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': 'Шаг 1 из 7: Введите <b>заголовок</b> для мероприятия:',
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        # --- Состояния создания Push ---
         if state == 'waiting_for_title':
             if not text:
                 _tg_post('sendMessage', {
@@ -424,7 +702,6 @@ class TelegramWebhookView(View):
             }, token)
             return JsonResponse({'ok': True})
 
-        # Ожидание ввода текста пуша
         elif state == 'waiting_for_body':
             if not text:
                 _tg_post('sendMessage', {
@@ -449,6 +726,281 @@ class TelegramWebhookView(View):
             }, token)
             return JsonResponse({'ok': True})
 
+        # --- Состояния создания Новости ---
+        elif state == 'waiting_for_news_title':
+            if not text:
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Заголовок новости не может быть пустым. Пожалуйста, введите заголовок:'
+                }, token)
+                return JsonResponse({'ok': True})
+
+            cache.set(cache_key, {'state': 'waiting_for_news_content', 'data': {'title': text}}, timeout=600)
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': f'Заголовок: "<b>{html.escape(text)}</b>"\n\nШаг 2 из 3: Введите <b>текст</b> новости:',
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        elif state == 'waiting_for_news_content':
+            if not text:
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Текст новости не может быть пустым. Пожалуйста, введите текст:'
+                }, token)
+                return JsonResponse({'ok': True})
+
+            title = state_data['data']['title']
+            cache.set(cache_key, {'state': 'waiting_for_news_image', 'data': {'title': title, 'content': text}}, timeout=600)
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': (
+                    "⚠️ <b>Важно:</b> Загруженное фото новости в будущем можно будет изменить или удалить только через панель управления (админку) Django.\n\n"
+                    "Пожалуйста, перед отправкой подготовьте изображение с соотношением сторон <b>16:9</b> (например, 1920x1080) для идеального отображения в мобильном приложении.\n\n"
+                    "Шаг 3 из 3: Отправьте изображение новости (или нажмите кнопку «⏭ Пропустить»):"
+                ),
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '⏭ Пропустить'}], [{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        elif state == 'waiting_for_news_image':
+            photo = message.get('photo')
+            title = state_data['data']['title']
+            content = state_data['data']['content']
+
+            if photo:
+                file_id = photo[-1]['file_id']
+                cache.set(cache_key, {'state': 'waiting_for_news_confirmation', 'data': {'title': title, 'content': content, 'file_id': file_id}}, timeout=600)
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': f"<b>Предпросмотр новости:</b>\n\n<b>Заголовок:</b> {html.escape(title)}\n<b>Текст:</b> {html.escape(content)}\n<b>Фото:</b> Прикреплено 16:9\n\nОпубликовать новость?",
+                    'parse_mode': 'HTML',
+                    'reply_markup': {
+                        'inline_keyboard': [[
+                            {'text': '✅ Опубликовать', 'callback_data': 'news:confirm'},
+                            {'text': '❌ Отменить', 'callback_data': 'news:cancel'}
+                        ]]
+                    }
+                }, token)
+                return JsonResponse({'ok': True})
+
+            elif text in ('⏭ Пропустить', '/skip'):
+                cache.set(cache_key, {'state': 'waiting_for_news_confirmation', 'data': {'title': title, 'content': content, 'file_id': None}}, timeout=600)
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': f"<b>Предпросмотр новости:</b>\n\n<b>Заголовок:</b> {html.escape(title)}\n<b>Текст:</b> {html.escape(content)}\n<b>Фото:</b> Отсутствует\n\nОпубликовать новость?",
+                    'parse_mode': 'HTML',
+                    'reply_markup': {
+                        'inline_keyboard': [[
+                            {'text': '✅ Опубликовать', 'callback_data': 'news:confirm'},
+                            {'text': '❌ Отменить', 'callback_data': 'news:cancel'}
+                        ]]
+                    }
+                }, token)
+                return JsonResponse({'ok': True})
+
+            else:
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Пожалуйста, отправьте изображение новости (фото) или нажмите «⏭ Пропустить»:'
+                }, token)
+                return JsonResponse({'ok': True})
+
+        # --- Состояния создания Мероприятия ---
+        elif state == 'waiting_for_event_title':
+            if not text:
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Название мероприятия не может быть пустым. Пожалуйста, введите название:'
+                }, token)
+                return JsonResponse({'ok': True})
+
+            cache.set(cache_key, {'state': 'waiting_for_event_description', 'data': {'title': text}}, timeout=600)
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': f'Название: "<b>{html.escape(text)}</b>"\n\nШаг 2 из 7: Введите <b>описание</b> мероприятия:',
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        elif state == 'waiting_for_event_description':
+            if not text:
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Описание мероприятия не может быть пустым. Пожалуйста, введите описание:'
+                }, token)
+                return JsonResponse({'ok': True})
+
+            title = state_data['data']['title']
+            cache.set(cache_key, {'state': 'waiting_for_event_datetime', 'data': {'title': title, 'description': text}}, timeout=600)
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': 'Шаг 3 из 7: Введите <b>дату и время</b> проведения мероприятия в формате `ДД.ММ.ГГГГ ЧЧ:ММ` (например, `25.05.2026 19:00`):',
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        elif state == 'waiting_for_event_datetime':
+            from datetime import datetime
+            from django.utils import timezone
+            import pytz
+
+            try:
+                naive_dt = datetime.strptime(text, '%d.%m.%Y %H:%M')
+                tz = pytz.timezone('Asia/Almaty')
+                timezone.make_aware(naive_dt, timezone=tz)
+            except ValueError:
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': '❌ Неверный формат даты и времени. Пожалуйста, введите дату в формате `ДД.ММ.ГГГГ ЧЧ:ММ` (например, `25.05.2026 19:00`):',
+                    'parse_mode': 'HTML'
+                }, token)
+                return JsonResponse({'ok': True})
+
+            title = state_data['data']['title']
+            description = state_data['data']['description']
+            cache.set(cache_key, {'state': 'waiting_for_event_format', 'data': {'title': title, 'description': description, 'datetime': text}}, timeout=600)
+
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': 'Шаг 4 из 7: Выберите <b>формат</b> мероприятия:',
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'inline_keyboard': [[
+                        {'text': '🔓 Открытое', 'callback_data': 'event_format:open'},
+                        {'text': '🔒 Закрытое', 'callback_data': 'event_format:closed'}
+                    ]]
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        elif state == 'waiting_for_event_format':
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': 'Пожалуйста, выберите формат мероприятия с помощью кнопок под сообщением или нажмите «❌ Отмена» для отмены:'
+            }, token)
+            return JsonResponse({'ok': True})
+
+        elif state == 'waiting_for_event_price':
+            from decimal import Decimal, InvalidOperation
+
+            title = state_data['data']['title']
+            description = state_data['data']['description']
+            datetime_str = state_data['data']['datetime']
+            format_val = state_data['data']['format']
+
+            price = None
+            if text not in ('🆓 Вход свободный', '/skip'):
+                try:
+                    price_str = text.replace(',', '.')
+                    price = Decimal(price_str)
+                    if price < 0:
+                        raise InvalidOperation()
+                except (InvalidOperation, ValueError):
+                    _tg_post('sendMessage', {
+                        'chat_id': chat_id,
+                        'text': '❌ Некорректная цена. Пожалуйста, введите положительное число или нажмите «🆓 Вход свободный»:'
+                    }, token)
+                    return JsonResponse({'ok': True})
+
+            # Сохраняем цену как строку или None для кэша
+            price_val = str(price) if price is not None else None
+            cache.set(cache_key, {
+                'state': 'waiting_for_event_image',
+                'data': {
+                    'title': title,
+                    'description': description,
+                    'datetime': datetime_str,
+                    'format': format_val,
+                    'price': price_val
+                }
+            }, timeout=600)
+
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': (
+                    "⚠️ <b>Важно:</b> Обложка является обязательной для мероприятия. Изменить или удалить её позже можно будет только через панель управления (админку) Django.\n\n"
+                    "Пожалуйста, перед отправкой подготовьте изображение с соотношением сторон <b>16:9</b> (например, 1920x1080) для идеального отображения в мобильном приложении.\n\n"
+                    "Шаг 6 из 7: Отправьте изображение обложки (фото):"
+                ),
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        elif state == 'waiting_for_event_image':
+            photo = message.get('photo')
+            if not photo:
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': 'Пожалуйста, отправьте изображение обложки (фото). Обложка обязательна для мероприятия:'
+                }, token)
+                return JsonResponse({'ok': True})
+
+            file_id = photo[-1]['file_id']
+            title = state_data['data']['title']
+            description = state_data['data']['description']
+            datetime_str = state_data['data']['datetime']
+            format_val = state_data['data']['format']
+            price_val = state_data['data']['price']
+
+            cache.set(cache_key, {
+                'state': 'waiting_for_event_confirmation',
+                'data': {
+                    'title': title,
+                    'description': description,
+                    'datetime': datetime_str,
+                    'format': format_val,
+                    'price': price_val,
+                    'file_id': file_id
+                }
+            }, timeout=600)
+
+            format_label = 'Открытое' if format_val == 'open' else 'Закрытое'
+            price_label = f"{price_val} KZT" if price_val is not None else 'Вход свободный'
+
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
+                'text': (
+                    f"<b>Предпросмотр мероприятия:</b>\n\n"
+                    f"<b>Заголовок:</b> {html.escape(title)}\n"
+                    f"<b>Описание:</b> {html.escape(description)}\n"
+                    f"<b>Дата и время:</b> {datetime_str}\n"
+                    f"<b>Формат:</b> {format_label}\n"
+                    f"<b>Цена входа:</b> {price_label}\n"
+                    f"<b>Обложка:</b> Прикреплена 16:9\n\n"
+                    f"Опубликовать мероприятие?"
+                ),
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'inline_keyboard': [[
+                        {'text': '✅ Создать', 'callback_data': 'event:confirm'},
+                        {'text': '❌ Отменить', 'callback_data': 'event:cancel'}
+                    ]]
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
         # Неизвестный ввод вне состояний
         else:
             _tg_post('sendMessage', {
@@ -457,3 +1009,4 @@ class TelegramWebhookView(View):
             }, token)
 
         return JsonResponse({'ok': True})
+

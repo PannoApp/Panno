@@ -1634,3 +1634,344 @@ class TelegramWebhookFSMTest(TestCase):
         self.assertEqual(len(edited_calls), 1)
         self.assertIn('Рассылка успешно запущена (fallback)', edited_calls[0]['text'])
 
+    def _post_message_with_photo(self, chat_id, photo_list, text=''):
+        payload = {
+            'message': {
+                'message_id': 99,
+                'chat': {'id': chat_id},
+                'text': text,
+                'photo': photo_list
+            }
+        }
+        return self.client.post(_WEBHOOK_URL, json.dumps(payload), content_type='application/json')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views.requests.get')
+    @patch('apps.bookings.views.requests.post')
+    @patch('apps.bookings.views._tg_post')
+    def test_news_creation_flow_with_image_success(self, mock_tg, mock_post, mock_get):
+        # Mock requests.post for getFile
+        mock_post_resp = MagicMock()
+        mock_post_resp.ok = True
+        mock_post_resp.json.return_value = {
+            'ok': True,
+            'result': {
+                'file_path': 'photos/file_99.jpg'
+            }
+        }
+        mock_post.return_value = mock_post_resp
+
+        # Mock requests.get for file download
+        mock_get_resp = MagicMock()
+        mock_get_resp.ok = True
+        mock_get_resp.content = b'mocked image data'
+        mock_get.return_value = mock_get_resp
+
+        # 1. Start news FSM
+        self._post_message(111222, '📰 Создать новость')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_news_title')
+
+        # 2. Send Title
+        self._post_message(111222, 'Sample News Title')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_news_content')
+
+        # 3. Send Content
+        self._post_message(111222, 'Sample News Content')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_news_image')
+
+        # 4. Send Photo
+        photo_payload = [{'file_id': 'photo_123', 'file_size': 1000}]
+        self._post_message_with_photo(111222, photo_payload)
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_news_confirmation')
+
+        # 5. Confirm
+        self._post_callback(111222, 'news:confirm')
+
+        # Verify state is cleared
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+
+        # Verify news is created in DB
+        from apps.events.models import News
+        news = News.objects.get(title='Sample News Title')
+        self.assertEqual(news.content, 'Sample News Content')
+        self.assertTrue(news.image.name.endswith('photo_123.jpg'))
+        self.assertEqual(news.image.read(), b'mocked image data')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_news_creation_flow_skip_image_success(self, mock_tg):
+        # 1. Start news FSM
+        self._post_message(111222, '📰 Создать новость')
+        # 2. Send Title
+        self._post_message(111222, 'Sample Title 2')
+        # 3. Send Content
+        self._post_message(111222, 'Sample Content 2')
+        # 4. Skip Photo
+        self._post_message(111222, '⏭ Пропустить')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_news_confirmation')
+        # 5. Confirm
+        self._post_callback(111222, 'news:confirm')
+
+        # Verify state is cleared
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+
+        # Verify news is created in DB without image
+        from apps.events.models import News
+        news = News.objects.get(title='Sample Title 2')
+        self.assertEqual(news.content, 'Sample Content 2')
+        self.assertFalse(news.image)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_news_creation_flow_cancel(self, mock_tg):
+        self._post_message(111222, '📰 Создать новость')
+        self._post_message(111222, 'Sample Title 3')
+        self._post_message(111222, '❌ Отмена')
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_news_creation_flow_callback_cancel(self, mock_tg):
+        self._post_message(111222, '📰 Создать новость')
+        self._post_message(111222, 'Sample Title 4')
+        self._post_message(111222, 'Sample Content 4')
+        self._post_message(111222, '⏭ Пропустить')
+        self._post_callback(111222, 'news:cancel')
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+        # Verify news was NOT created
+        from apps.events.models import News
+        self.assertFalse(News.objects.filter(title='Sample Title 4').exists())
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_news_creation_flow_invalid_image_step(self, mock_tg):
+        self._post_message(111222, '📰 Создать новость')
+        self._post_message(111222, 'Sample Title 5')
+        self._post_message(111222, 'Sample Content 5')
+        # Send random text instead of photo or Skip
+        self._post_message(111222, 'Random text')
+        # State should still be waiting_for_news_image
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_news_image')
+        # Check bot asked for image again
+        last_call = mock_tg.call_args_list[-1][0][1]
+        self.assertIn('отправьте изображение новости', last_call['text'])
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views.requests.get')
+    @patch('apps.bookings.views.requests.post')
+    @patch('apps.bookings.views._tg_post')
+    def test_event_creation_flow_success(self, mock_tg, mock_post, mock_get):
+        # Mock requests.post for getFile
+        mock_post_resp = MagicMock()
+        mock_post_resp.ok = True
+        mock_post_resp.json.return_value = {
+            'ok': True,
+            'result': {
+                'file_path': 'photos/event_99.jpg'
+            }
+        }
+        mock_post.return_value = mock_post_resp
+
+        # Mock requests.get for file download
+        mock_get_resp = MagicMock()
+        mock_get_resp.ok = True
+        mock_get_resp.content = b'event image content'
+        mock_get.return_value = mock_get_resp
+
+        # 1. Start event FSM
+        self._post_message(111222, '📅 Создать мероприятие')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_title')
+
+        # 2. Send Title
+        self._post_message(111222, 'Mega Event')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_description')
+
+        # 3. Send Description
+        self._post_message(111222, 'Mega Description')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_datetime')
+
+        # 4. Send DateTime (Valid)
+        self._post_message(111222, '25.05.2026 19:00')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_format')
+
+        # 5. Choose Format (via callback)
+        self._post_callback(111222, 'event_format:open')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_price')
+        self.assertEqual(cache.get('tg_fsm:111222')['data']['format'], 'open')
+
+        # 6. Send Price
+        self._post_message(111222, '1500')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_image')
+        self.assertEqual(cache.get('tg_fsm:111222')['data']['price'], '1500')
+
+        # 7. Send Cover Photo
+        photo_payload = [{'file_id': 'cover_123', 'file_size': 2000}]
+        self._post_message_with_photo(111222, photo_payload)
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_confirmation')
+
+        # 8. Confirm
+        self._post_callback(111222, 'event:confirm')
+
+        # Verify state is cleared
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+
+        # Verify event is created in DB
+        from apps.events.models import Event
+        event = Event.objects.get(title='Mega Event')
+        self.assertEqual(event.description, 'Mega Description')
+        self.assertEqual(event.format, 'open')
+        self.assertEqual(str(event.price), '1500.00')
+        self.assertTrue(event.image.name.endswith('cover_123.jpg'))
+        self.assertEqual(event.image.read(), b'event image content')
+
+        # Verify date_time is localized correct in Almaty timezone
+        import pytz
+        from datetime import datetime
+        from django.utils import timezone
+        tz = pytz.timezone('Asia/Almaty')
+        expected_dt = timezone.make_aware(datetime(2026, 5, 25, 19, 0), tz)
+        self.assertEqual(event.date_time, expected_dt)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views.requests.get')
+    @patch('apps.bookings.views.requests.post')
+    @patch('apps.bookings.views._tg_post')
+    def test_event_creation_flow_free_entry(self, mock_tg, mock_post, mock_get):
+        # Mock requests
+        mock_post_resp = MagicMock()
+        mock_post_resp.ok = True
+        mock_post_resp.json.return_value = {'ok': True, 'result': {'file_path': 'photos/event_99.jpg'}}
+        mock_post.return_value = mock_post_resp
+        mock_get_resp = MagicMock()
+        mock_get_resp.ok = True
+        mock_get_resp.content = b'free event cover'
+        mock_get.return_value = mock_get_resp
+
+        # 1. Start event FSM
+        self._post_message(111222, '📅 Создать мероприятие')
+        self._post_message(111222, 'Free Concert')
+        self._post_message(111222, 'No cost description')
+        self._post_message(111222, '25.05.2026 21:00')
+        self._post_callback(111222, 'event_format:closed')
+        # Send free entry
+        self._post_message(111222, '🆓 Вход свободный')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_image')
+        self.assertIsNone(cache.get('tg_fsm:111222')['data']['price'])
+
+        # Send photo
+        self._post_message_with_photo(111222, [{'file_id': 'cover_free', 'file_size': 2000}])
+        # Confirm
+        self._post_callback(111222, 'event:confirm')
+
+        # Verify DB
+        from apps.events.models import Event
+        event = Event.objects.get(title='Free Concert')
+        self.assertEqual(event.format, 'closed')
+        self.assertIsNone(event.price)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_event_creation_flow_invalid_datetime(self, mock_tg):
+        self._post_message(111222, '📅 Создать мероприятие')
+        self._post_message(111222, 'Event Invalid DT')
+        self._post_message(111222, 'Desc')
+        
+        # Send incorrect datetime format
+        self._post_message(111222, '25/05/2026 19:00')
+        # State should still be waiting_for_event_datetime
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_datetime')
+        last_call = mock_tg.call_args_list[-1][0][1]
+        self.assertIn('Неверный формат даты и времени', last_call['text'])
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_event_creation_flow_invalid_format_step(self, mock_tg):
+        self._post_message(111222, '📅 Создать мероприятие')
+        self._post_message(111222, 'Event Invalid Format')
+        self._post_message(111222, 'Desc')
+        self._post_message(111222, '25.05.2026 19:00')
+        
+        # Send text instead of callback query
+        self._post_message(111222, 'Some text format')
+        # State should still be waiting_for_event_format
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_format')
+        last_call = mock_tg.call_args_list[-1][0][1]
+        self.assertIn('выберите формат мероприятия с помощью кнопок', last_call['text'])
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_event_creation_flow_invalid_price(self, mock_tg):
+        self._post_message(111222, '📅 Создать мероприятие')
+        self._post_message(111222, 'Event Invalid Price')
+        self._post_message(111222, 'Desc')
+        self._post_message(111222, '25.05.2026 19:00')
+        self._post_callback(111222, 'event_format:open')
+        
+        # Send invalid price
+        self._post_message(111222, 'not-a-number')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_price')
+        last_call = mock_tg.call_args_list[-1][0][1]
+        self.assertIn('Некорректная цена', last_call['text'])
+
+        # Send negative price
+        self._post_message(111222, '-150')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_price')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_event_creation_flow_missing_image(self, mock_tg):
+        self._post_message(111222, '📅 Создать мероприятие')
+        self._post_message(111222, 'Event Missing Image')
+        self._post_message(111222, 'Desc')
+        self._post_message(111222, '25.05.2026 19:00')
+        self._post_callback(111222, 'event_format:open')
+        self._post_message(111222, '🆓 Вход свободный')
+        
+        # Try to send text instead of photo
+        self._post_message(111222, '⏭ Пропустить')  # Skip is not allowed for events
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_image')
+        last_call = mock_tg.call_args_list[-1][0][1]
+        self.assertIn('Обложка обязательна', last_call['text'])
+
+        # Try confirming without image (manually set state to confirmation but no file_id)
+        cache.set('tg_fsm:111222', {
+            'state': 'waiting_for_event_confirmation',
+            'data': {
+                'title': 'Event Missing Image',
+                'description': 'Desc',
+                'datetime': '25.05.2026 19:00',
+                'format': 'open',
+                'price': None,
+                'file_id': None
+            }
+        })
+        self._post_callback(111222, 'event:confirm')
+        # Check that it warns about missing cover and deletes cache/fails creation
+        from apps.events.models import Event
+        self.assertFalse(Event.objects.filter(title='Event Missing Image').exists())
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views.requests.post')
+    @patch('apps.bookings.views._tg_post')
+    def test_event_creation_flow_failed_image_download(self, mock_tg, mock_post):
+        # Mock requests.post to return not ok
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+        mock_post.return_value = mock_resp
+
+        self._post_message(111222, '📅 Создать мероприятие')
+        self._post_message(111222, 'Failed Download Event')
+        self._post_message(111222, 'Desc')
+        self._post_message(111222, '25.05.2026 19:00')
+        self._post_callback(111222, 'event_format:open')
+        self._post_message(111222, '🆓 Вход свободный')
+        self._post_message_with_photo(111222, [{'file_id': 'bad_cover', 'file_size': 2000}])
+        self._post_callback(111222, 'event:confirm')
+
+        # Verify Event is not created
+        from apps.events.models import Event
+        self.assertFalse(Event.objects.filter(title='Failed Download Event').exists())
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+
+
