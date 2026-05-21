@@ -185,7 +185,7 @@ class _RootShellState extends State<RootShell> {
         children: [
           HomeScreen(onNavigate: _navigate),
           MenuScreen(isTabActive: _currentIndex == 1),
-          const InteriorScreen(),
+          InteriorScreen(isTabActive: _currentIndex == 2),
           const EventsScreen(),
           const ProfileScreen(),
         ],

@@ -10,13 +10,13 @@ def validate_hero_image(image):
     - формат JPEG или PNG
     - минимальное разрешение 800 × 450 px
     - соотношение сторон от 1.5:1 до 2.4:1 (ландшафт, близко к 16:9)
-    - размер файла не более 5 МБ
+    - размер файла не более 10 МБ
     """
     # Размер файла
-    max_bytes = 5 * 1024 * 1024
+    max_bytes = 10 * 1024 * 1024
     if hasattr(image, 'size') and image.size > max_bytes:
         raise ValidationError(
-            f'Файл слишком большой ({image.size // (1024*1024)} МБ). Максимум — 5 МБ.'
+            f'Файл слишком большой ({image.size // (1024*1024)} МБ). Максимум — 10 МБ.'
         )
 
     # Формат
@@ -211,7 +211,7 @@ class HeroSlide(models.Model):
         "Изображение",
         upload_to='core/hero/',
         validators=[validate_hero_image],
-        help_text="JPEG или PNG, горизонтальное, минимум 800×450 px, не более 5 МБ.",
+        help_text="JPEG или PNG, горизонтальное, минимум 800×450 px, не более 10 МБ.",
     )
     order = models.PositiveIntegerField("Порядок", default=0)
 
