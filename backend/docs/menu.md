@@ -2,6 +2,16 @@
 
 Отвечает за хранение и отдачу меню ресторана: категории, блюда, теги, аллергены.
 
+## Локальный демо-контент
+
+После `migrate` на чистой БД:
+
+```bash
+docker compose exec backend python manage.py seed_demo_content --force
+```
+
+Создаёт категории, 10 блюд с фото и описаниями (`apps/menu/seed_data/images/`), фото интерьера и hero-слайды (`apps/core/seed_data/interior/`). Повтор без `--force` пропускает, если меню уже есть.
+
 ## Структура данных
 
 ```

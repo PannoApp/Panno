@@ -68,29 +68,39 @@ const kMenuCategories = [
 class HeroPathFooterAction {
   const HeroPathFooterAction({
     required this.label,
+    required this.subtitle,
     required this.totemAsset,
+    required this.accentColor,
     required this.tabIndex,
     this.openMenuBrowseAll = false,
   });
 
   final String label;
+  /// Короткая подпись шага (шёпот под заголовком).
+  final String subtitle;
   final String totemAsset;
+  final Color accentColor;
   /// Вкладка [RootShell] после действия.
   final int tabIndex;
   /// true: полное меню (лента), затем переход на вкладку меню.
   final bool openMenuBrowseAll;
 }
 
+/// Продолжение пути под карточками этапов — не дублирует тотемы навбара и карточек выше.
 const kHeroPathFooterActions = [
   HeroPathFooterAction(
     label: 'Меню ресторана',
+    subtitle: 'Вся кухня',
     totemAsset: 'assets/images/zerno.svg',
+    accentColor: PiligrimColors.steppe,
     tabIndex: 1,
     openMenuBrowseAll: true,
   ),
   HeroPathFooterAction(
     label: 'Как добраться',
-    totemAsset: 'assets/images/stone.svg',
+    subtitle: 'Маршрут',
+    totemAsset: 'assets/images/splash_path (1).svg',
+    accentColor: PiligrimColors.water,
     tabIndex: 4,
   ),
 ];
