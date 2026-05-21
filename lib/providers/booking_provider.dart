@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../core/dio_errors.dart';
 import '../data/models/api_booking.dart';
@@ -10,6 +11,7 @@ class BookingProvider extends ChangeNotifier {
       : _repository = repository ?? BookingRepository();
 
   final BookingRepository _repository;
+  String? _idempotencyKey;
 
   // Черновик формы (выбранные пользователем значения до отправки)
   String? selectedZone = 'Главный зал';
@@ -56,8 +58,15 @@ class BookingProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
 
+    // Генерируем Idempotency-Key для текущей отправки, если его еще нет.
+    // Это гарантирует защиту от дубликатов при сетевых повторах (retry).
+    _idempotencyKey ??= const Uuid().v4();
+
     try {
-      await _repository.createBooking(req);
+      await _repository.createBooking(
+        req,
+        idempotencyKey: _idempotencyKey!,
+      );
       isSuccess = true;
       _resetForm();
     } catch (e) {
@@ -97,5 +106,6 @@ class BookingProvider extends ChangeNotifier {
     guests = 2;
     visitDate = null;
     visitTime = null;
+    _idempotencyKey = null;
   }
 }

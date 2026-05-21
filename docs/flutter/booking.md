@@ -120,7 +120,7 @@ static const zones = ['Главный зал', 'Терраса', 'Приват']
 
 ## Idempotency-Key
 
-Файл: [lib/data/repositories/booking_repository.dart](../../lib/data/repositories/booking_repository.dart)
+Файлы: [lib/providers/booking_provider.dart](../../lib/providers/booking_provider.dart) и [lib/data/repositories/booking_repository.dart](../../lib/data/repositories/booking_repository.dart)
 
 ### Зачем нужен
 
@@ -128,21 +128,21 @@ static const zones = ['Главный зал', 'Терраса', 'Приват']
 
 ### Где генерируется
 
-Ключ генерируется непосредственно перед каждым HTTP-запросом в `BookingRepository.createBooking()`:
+Ключ генерируется один раз при первой попытке отправки формы в `BookingProvider.submitBooking()` и сохраняется в состоянии провайдера:
 
 ```dart
-static const _uuid = Uuid();   // пакет uuid
+_idempotencyKey ??= const Uuid().v4();
 
-await _dio.post<Map<String, dynamic>>(
-  '/bookings/',
-  data: req.toJson(),
-  options: Options(
-    headers: {'Idempotency-Key': _uuid.v4()},
-  ),
-);
+try {
+  await _repository.createBooking(
+    req,
+    idempotencyKey: _idempotencyKey!,
+  );
+  // ...
+}
 ```
 
-Каждый вызов `createBooking` получает новый UUID v4. Это означает, что **защита от дублей работает только в рамках одной попытки** (retry на уровне сети). Если пользователь нажимает кнопку повторно — генерируется новый ключ, и это считается новым запросом.
+Это означает, что **защита от дублей работает при всех сетевых повторах (retries)** для одной и той же заполненной формы. Если пользователь нажимает кнопку повторно (например, после ошибки таймаута) — используется тот же сохранённый ключ, и бекенд возвращает статус исходной операции. Ключ сбрасывается (`_idempotencyKey = null`) только после успешной отправки заявки или при принудительном сбросе формы.
 
 ---
 

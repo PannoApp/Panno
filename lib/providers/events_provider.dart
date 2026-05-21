@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../core/dio_errors.dart';
 import '../data/api_event_display.dart';
@@ -29,6 +30,7 @@ class EventsProvider extends ChangeNotifier {
   String? newsError;
   String? reserveError;
 
+  String? _reservationIdempotencyKey;
   bool _usedMockFallback = false;
 
   List<ApiEventPhoto> _photoReport = const [];
@@ -118,11 +120,17 @@ class EventsProvider extends ChangeNotifier {
     reserveError = null;
     notifyListeners();
 
+    // Генерируем Idempotency-Key для защиты от дублей при сетевых повторах
+    _reservationIdempotencyKey ??= const Uuid().v4();
+
     try {
       await _repository.createReservation(
         eventId: eventId,
         guestsCount: guestsCount,
+        idempotencyKey: _reservationIdempotencyKey!,
       );
+      // При успешном бронировании очищаем ключ
+      _reservationIdempotencyKey = null;
     } catch (e) {
       reserveError = dioErrorMessage(e);
       rethrow;

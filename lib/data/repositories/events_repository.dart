@@ -1,6 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:uuid/uuid.dart';
-
 import '../events_news_data.dart';
 import '../models/api_event.dart';
 import '../models/api_event_photo.dart';
@@ -11,7 +9,6 @@ class EventsRepository {
   EventsRepository({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
 
   final Dio _dio;
-  static const _uuid = Uuid();
 
   Future<List<ApiEvent>> fetchUpcoming({int page = 1}) async {
     final response = await _dio.get<Map<String, dynamic>>(
@@ -58,7 +55,9 @@ class EventsRepository {
   Future<void> createReservation({
     required int eventId,
     required int guestsCount,
+    required String idempotencyKey,
   }) async {
+    // Получаем Idempotency-Key извне, чтобы он сохранялся при сетевых повторах (retries)
     await _dio.post<Map<String, dynamic>>(
       '/events/reservations/create/',
       data: {
@@ -66,7 +65,7 @@ class EventsRepository {
         'guests_count': guestsCount,
       },
       options: Options(
-        headers: {'Idempotency-Key': _uuid.v4()},
+        headers: {'Idempotency-Key': idempotencyKey},
       ),
     );
   }

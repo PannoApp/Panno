@@ -11,7 +11,7 @@
 | GET | `/events/<id>/photo-report/` | Фотоотчёт прошедшего события (плоский массив, без авторизации) |
 
 Тело записи: `{ "event": <id>, "guests_count": <int> }`.  
-Заголовок: `Idempotency-Key` (UUID) — защита от дублей.
+Заголовок: `Idempotency-Key` (UUID) — защита от дублей. Генерируется один раз в `EventsProvider` при первой попытке записи и сохраняется для защиты от дубликатов при сетевых повторах (retries) одной и той же формы.
 
 Поля события: `date_time`, `image`, `format` (`open` / `closed`), `price`, `is_past`, `has_photo_report`.  
 Поля фото: `id`, `image` (URL), `order`.

@@ -48,19 +48,52 @@ void main() {
     });
 
     test('reserveEvent calls repository', () async {
-      when(() => repository.createReservation(eventId: 3, guestsCount: 2))
+      when(() => repository.createReservation(eventId: 3, guestsCount: 2, idempotencyKey: any(named: 'idempotencyKey')))
           .thenAnswer((_) async {});
 
       final provider = EventsProvider(repository: repository);
       await provider.reserveEvent(3, 2);
 
-      verify(() => repository.createReservation(eventId: 3, guestsCount: 2))
+      verify(() => repository.createReservation(eventId: 3, guestsCount: 2, idempotencyKey: any(named: 'idempotencyKey')))
           .called(1);
       expect(provider.reserveError, isNull);
     });
 
+    test('reserveEvent сохраняет Idempotency-Key при ошибке и сбрасывает при успехе', () async {
+      final provider = EventsProvider(repository: repository);
+
+      // 1. Первая попытка падает
+      when(() => repository.createReservation(eventId: 1, guestsCount: 1, idempotencyKey: any(named: 'idempotencyKey')))
+          .thenThrow(Exception('conflict'));
+
+      await expectLater(provider.reserveEvent(1, 1), throwsA(isA<Exception>()));
+
+      final verification1 = verify(() => repository.createReservation(eventId: 1, guestsCount: 1, idempotencyKey: captureAny(named: 'idempotencyKey')));
+      final firstKey = verification1.captured.single as String;
+
+      // 2. Вторая попытка успешная
+      when(() => repository.createReservation(eventId: 1, guestsCount: 1, idempotencyKey: any(named: 'idempotencyKey')))
+          .thenAnswer((_) async {});
+
+      await provider.reserveEvent(1, 1);
+
+      final verification2 = verify(() => repository.createReservation(eventId: 1, guestsCount: 1, idempotencyKey: captureAny(named: 'idempotencyKey')));
+      final secondKey = verification2.captured.single as String;
+
+      // Ключ должен сохраниться
+      expect(firstKey, equals(secondKey));
+
+      // 3. Третья попытка (новая форма)
+      await provider.reserveEvent(1, 1);
+      final verification3 = verify(() => repository.createReservation(eventId: 1, guestsCount: 1, idempotencyKey: captureAny(named: 'idempotencyKey')));
+      final thirdKey = verification3.captured.single as String;
+
+      // Ключ должен быть новым
+      expect(thirdKey, isNot(equals(firstKey)));
+    });
+
     test('reserveEvent sets reserveError on failure', () async {
-      when(() => repository.createReservation(eventId: 1, guestsCount: 1))
+      when(() => repository.createReservation(eventId: 1, guestsCount: 1, idempotencyKey: any(named: 'idempotencyKey')))
           .thenThrow(Exception('conflict'));
 
       final provider = EventsProvider(repository: repository);
