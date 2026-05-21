@@ -193,6 +193,7 @@ class _BookingScreenState extends State<BookingScreen> {
             child: PiligrimBackground(
               textureOpacity: 0.45,
               vignetteIntensity: 0.25,
+              cinematic: true,
             ),
           ),
           SafeArea(

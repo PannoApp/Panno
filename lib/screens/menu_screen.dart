@@ -123,7 +123,7 @@ class _MenuHeader extends StatelessWidget {
                 Text(
                   'МЕНЮ',
                   style: PiligrimTextStyles.caption.copyWith(
-                    color: PiligrimColors.water.withValues(alpha: 0.6),
+                    color: PiligrimColors.steppe.withValues(alpha: 0.7),
                     letterSpacing: 3.0,
                     fontSize: 10,
                   ),
@@ -203,7 +203,7 @@ class _ModeTab extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: active
-              ? PiligrimColors.water.withValues(alpha: 0.2)
+              ? PiligrimColors.steppe.withValues(alpha: 0.15)
               : Colors.transparent,
           borderRadius: radius,
         ),
@@ -215,7 +215,7 @@ class _ModeTab extends StatelessWidget {
               height: 13,
               colorFilter: ColorFilter.mode(
                 active
-                    ? PiligrimColors.water
+                    ? PiligrimColors.steppe
                     : PiligrimColors.sky.withValues(alpha: 0.3),
                 BlendMode.srcIn,
               ),
@@ -226,7 +226,7 @@ class _ModeTab extends StatelessWidget {
               style: PiligrimTextStyles.caption.copyWith(
                 fontSize: 11,
                 color: active
-                    ? PiligrimColors.water
+                    ? PiligrimColors.steppe
                     : PiligrimColors.sky.withValues(alpha: 0.35),
                 fontWeight: active ? FontWeight.w700 : FontWeight.w300,
               ),
@@ -266,7 +266,7 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
     // Пока блюда загружаются — показываем индикатор
     if (menuProvider.isLoadingFeed && dishes.isEmpty) {
       return const Center(
-        child: CircularProgressIndicator(color: PiligrimColors.water),
+        child: CircularProgressIndicator(color: PiligrimColors.steppe),
       );
     }
 
@@ -459,7 +459,7 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
         if (menuProvider.isLoading && filtered.isEmpty)
           const SliverFillRemaining(
             child: Center(
-              child: CircularProgressIndicator(color: PiligrimColors.water),
+              child: CircularProgressIndicator(color: PiligrimColors.steppe),
             ),
           )
         else if (menuProvider.error != null && filtered.isEmpty)
@@ -495,15 +495,12 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            padding: const EdgeInsets.only(bottom: 16),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
-                (_, i) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _ClassicDishCard(
-                    dish: filtered[i],
-                    animationDelay: Duration(milliseconds: i * 50),
-                  ),
+                (_, i) => _ClassicDishCard(
+                  dish: filtered[i],
+                  animationDelay: Duration(milliseconds: i * 50),
                 ),
                 childCount: filtered.length,
               ),
@@ -517,7 +514,7 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: CircularProgressIndicator(
-                  color: PiligrimColors.water,
+                  color: PiligrimColors.steppe,
                   strokeWidth: 2,
                 ),
               ),
@@ -542,11 +539,13 @@ class _SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 44,
+      height: 46,
       decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: PiligrimColors.divider),
+        color: PiligrimColors.earth,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: PiligrimColors.steppe.withValues(alpha: 0.2),
+        ),
       ),
       child: Row(
         children: [
@@ -556,7 +555,7 @@ class _SearchBar extends StatelessWidget {
             width: 16,
             height: 16,
             colorFilter: ColorFilter.mode(
-              PiligrimColors.sky.withValues(alpha: 0.3),
+              PiligrimColors.steppe.withValues(alpha: 0.45),
               BlendMode.srcIn,
             ),
           ),
@@ -567,7 +566,7 @@ class _SearchBar extends StatelessWidget {
               onChanged: onChanged,
               style: PiligrimTextStyles.body.copyWith(
                 fontSize: 14,
-                color: PiligrimColors.sky,
+                color: PiligrimColors.nomadCream,
               ),
               decoration: InputDecoration(
                 hintText: 'Найти блюдо...',
@@ -578,7 +577,7 @@ class _SearchBar extends StatelessWidget {
                 border: InputBorder.none,
                 isDense: true,
               ),
-              cursorColor: PiligrimColors.water,
+              cursorColor: PiligrimColors.steppe,
             ),
           ),
         ],
@@ -649,18 +648,18 @@ class _CategoryTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return PiligrimTap(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
         duration: 200.ms,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: active
-              ? PiligrimColors.water.withValues(alpha: 0.18)
-              : PiligrimColors.earthDeep,
-          borderRadius: BorderRadius.circular(8),
+              ? PiligrimColors.steppe.withValues(alpha: 0.14)
+              : PiligrimColors.earth,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: active
-                ? PiligrimColors.water.withValues(alpha: 0.5)
+                ? PiligrimColors.steppe.withValues(alpha: 0.5)
                 : PiligrimColors.divider,
           ),
         ),
@@ -669,7 +668,7 @@ class _CategoryTab extends StatelessWidget {
           style: PiligrimTextStyles.caption.copyWith(
             fontSize: 12,
             color: active
-                ? PiligrimColors.water
+                ? PiligrimColors.steppe
                 : PiligrimColors.sky.withValues(alpha: 0.45),
             fontWeight: active ? FontWeight.w700 : FontWeight.w300,
           ),
@@ -775,7 +774,7 @@ class _ClassicDishCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PiligrimTap(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.zero,
       onTap: () => showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -783,107 +782,143 @@ class _ClassicDishCard extends StatelessWidget {
         builder: (_) => _DishDetailSheet(dish: dish),
       ),
       child: Container(
-        decoration: BoxDecoration(
-          color: PiligrimColors.earthDeep,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: PiligrimColors.divider),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+        color: PiligrimColors.earth,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // [1] Фото — full-width Stack с градиентом и ценой
+            Stack(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 220,
+                  child: dish.imageUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: dish.imageUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => const _ClassicThumbnailFallback(),
+                          errorWidget: (_, __, ___) => const _ClassicThumbnailFallback(),
+                        )
+                      : const _ClassicThumbnailFallback(),
+                ),
+                // Градиент снизу — глубже, теплее
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xE81C1510)],
+                        stops: [0.4, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                // Цена — pill с рамкой внизу слева
+                Positioned(
+                  bottom: 14,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC1C1510),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: PiligrimColors.steppe.withValues(alpha: 0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
+                      style: const TextStyle(
+                        fontFamily: PiligrimFonts.museoSans,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: PiligrimColors.steppe,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Row(
-            children: [
-              // Thumbnail: сетевое изображение или gradient-заглушка
-              SizedBox(
-                width: 110,
-                height: 110,
-                child: dish.imageUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: dish.imageUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => const _ClassicThumbnailFallback(),
-                        errorWidget: (_, __, ___) =>
-                            const _ClassicThumbnailFallback(),
-                      )
-                    : const _ClassicThumbnailFallback(),
-              ),
 
-              // Информация о блюде
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Название
-                      Text(
-                        dish.name,
-                        style: PiligrimTextStyles.heading.copyWith(
-                          fontSize: 15,
-                          color: PiligrimColors.sky,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // Описание
-                      Text(
-                        dish.description.replaceAll('\n', ' '),
-                        style: PiligrimTextStyles.caption.copyWith(
-                          fontSize: 11.5,
-                          color: PiligrimColors.sky.withValues(alpha: 0.45),
-                          height: 1.5,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      // Теги + цена
-                      Row(
-                        children: [
-                          ...dish.tags.take(2).map(
-                                (tag) {
-                                  final style = tagStyleFor(tag.name);
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 5),
-                                    child: SvgPicture.asset(
-                                      style.iconAsset,
-                                      width: 14,
-                                      height: 14,
-                                      colorFilter: ColorFilter.mode(
-                                        style.color.withValues(alpha: 0.7),
-                                        BlendMode.srcIn,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                          const Spacer(),
-                          Text(
-                            '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
-                            style: PiligrimTextStyles.button.copyWith(
-                              color: PiligrimColors.steppe,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+            // [2] Текстовый блок с левым медным акцентом
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: PiligrimColors.earth,
+                border: Border(
+                  left: BorderSide(
+                    color: PiligrimColors.steppe.withValues(alpha: 0.55),
+                    width: 3,
                   ),
                 ),
               ),
-            ],
-          ),
+              padding: const EdgeInsets.fromLTRB(14, 13, 16, 15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dish.name,
+                    style: PiligrimTextStyles.heading.copyWith(
+                      fontSize: 17,
+                      color: PiligrimColors.nomadCream,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    dish.description.replaceAll('\n', ' '),
+                    style: PiligrimTextStyles.caption.copyWith(
+                      fontSize: 12,
+                      color: PiligrimColors.sky.withValues(alpha: 0.45),
+                      height: 1.5,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (dish.tags.isNotEmpty) ...[
+                    const SizedBox(height: 9),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      children: dish.tags.take(3).map((tag) {
+                        final style = tagStyleFor(tag.name);
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SvgPicture.asset(
+                              style.iconAsset,
+                              width: 11,
+                              height: 11,
+                              colorFilter: ColorFilter.mode(
+                                style.color.withValues(alpha: 0.7),
+                                BlendMode.srcIn,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              tag.name,
+                              style: PiligrimTextStyles.micro.copyWith(
+                                color: style.color.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Разделитель между карточками
+            Container(
+              height: 1,
+              color: PiligrimColors.divider,
+            ),
+          ],
         ),
       ),
     )
@@ -900,14 +935,14 @@ class _ClassicThumbnailFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: PiligrimColors.earthDeep,
+      color: PiligrimColors.earth,
       child: Center(
         child: SvgPicture.asset(
           'assets/images/bird_totem (1).svg',
           width: 44,
           height: 44,
           colorFilter: ColorFilter.mode(
-            PiligrimColors.water.withValues(alpha: 0.1),
+            PiligrimColors.steppe.withValues(alpha: 0.12),
             BlendMode.srcIn,
           ),
         ),
@@ -931,106 +966,169 @@ class _DishDetailSheet extends StatelessWidget {
       minChildSize: 0.4,
       builder: (_, controller) => Container(
         decoration: const BoxDecoration(
-          color: PiligrimColors.earthDeep,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          color: PiligrimColors.earth,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           children: [
-            // Handle
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 38,
-              height: 3,
-              decoration: BoxDecoration(
-                color: PiligrimColors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            // Превью блюда
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: DishThumbnail(
-                  imageUrl: dish.imageUrl,
-                  fallback: const _ClassicThumbnailFallback(),
-                  height: 160,
+            // [1] Фото — полная ширина
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  child: SizedBox(
+                    height: 280,
+                    width: double.infinity,
+                    child: dish.imageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: dish.imageUrl!,
+                            fit: BoxFit.cover,
+                          )
+                        : const _ClassicThumbnailFallback(),
+                  ),
                 ),
-              ),
+                // Градиент снизу фото
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xF01C1510)],
+                        stops: [0.35, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                // Handle вверху по центру
+                Positioned(
+                  top: 12,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      width: 38,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+                // Цена — pill внизу слева
+                Positioned(
+                  bottom: 16,
+                  left: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC1C1510),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: PiligrimColors.steppe.withValues(alpha: 0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
+                      style: const TextStyle(
+                        fontFamily: PiligrimFonts.museoSans,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: PiligrimColors.steppe,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
 
-            // Контент
+            // [2] Контент
             Expanded(
               child: ListView(
                 controller: controller,
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
                 children: [
                   // Название
                   Text(
                     dish.name,
                     style: PiligrimTextStyles.title.copyWith(
-                      color: PiligrimColors.sky,
-                      fontSize: 22,
+                      fontSize: 24,
+                      color: PiligrimColors.nomadCream,
+                      letterSpacing: 0.2,
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 6),
 
-                  // Вес + цена
-                  Row(
-                    children: [
-                      DishInfoChip(
-                        label: dish.weight,
-                        icon: 'assets/images/stone.svg',
+                  // Вес — просто текст
+                  if (dish.weight.isNotEmpty)
+                    Text(
+                      '${dish.weight} г',
+                      style: PiligrimTextStyles.caption.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.4),
+                        fontSize: 12,
                       ),
-                      const SizedBox(width: 8),
-                      DishInfoChip(
-                        label: '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
-                        icon: 'assets/images/zerno.svg',
-                        accent: true,
-                      ),
-                    ],
-                  ),
+                    ),
 
                   const SizedBox(height: 20),
 
+                  const Divider(color: PiligrimColors.divider, height: 1),
+
+                  const SizedBox(height: 20),
+
+                  // Описание
+                  Text(
+                    dish.description.replaceAll('\n', ' '),
+                    style: PiligrimTextStyles.body.copyWith(
+                      color: PiligrimColors.sky.withValues(alpha: 0.75),
+                      fontSize: 14,
+                      height: 1.7,
+                    ),
+                  ),
+
+                  // История
+                  if (dish.story.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text('ИСТОРИЯ', style: PiligrimTextStyles.sectionLabel),
+                    const SizedBox(height: 8),
+                    Text(
+                      dish.story,
+                      style: PiligrimTextStyles.body.copyWith(
+                        color: PiligrimColors.steppe.withValues(alpha: 0.8),
+                        fontSize: 13,
+                        height: 1.7,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+
+                  // Аллергены
+                  if (dish.allergens.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    Text('АЛЛЕРГЕНЫ', style: PiligrimTextStyles.sectionLabel),
+                    const SizedBox(height: 8),
+                    Text(
+                      dish.allergens.join(' · '),
+                      style: PiligrimTextStyles.caption.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+
                   // Теги
                   if (dish.tags.isNotEmpty) ...[
+                    const SizedBox(height: 24),
                     Wrap(
                       spacing: 7,
                       runSpacing: 6,
                       children: dish.tags.map((t) => DishCardTagChip(tag: t)).toList(),
                     ),
-                    const SizedBox(height: 20),
                   ],
-
-                  // О блюде
-                  DishDetailSection(
-                    title: 'О блюде',
-                    icon: 'assets/images/spiral.svg',
-                    content: dish.description.replaceAll('\n', ' '),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // История
-                  DishDetailSection(
-                    title: 'История',
-                    icon: 'assets/images/cobyz.svg',
-                    content: dish.story,
-                    accent: true,
-                  ),
-
-                  if (dish.allergens.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    DishDetailSection(
-                      title: 'Аллергены',
-                      icon: 'assets/images/luk.svg',
-                      content: dish.allergens.join(' · '),
-                    ),
-                  ],
-
                 ],
               ),
             ),

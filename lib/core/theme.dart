@@ -6,13 +6,13 @@ import 'package:flutter/material.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 abstract final class PiligrimColors {
   /// Қара жер — Чёрная земля — основной тёмный фон
-  static const Color earth = Color(0xFF3D3A38);
+  static const Color earth = Color(0xFF1C1814);
 
   /// Қара жер (глубокий) — фон навбара, более тёмный слой
-  static const Color earthDeep = Color(0xFF2A2826);
+  static const Color earthDeep = Color(0xFF141210);
 
   /// Қара жер (тёплый) — утеплённый базовый фон для «Живого очага»
-  static const Color earthWarm = Color(0xFF45403C);
+  static const Color earthWarm = Color(0xFF252018);
 
   /// Мөлдір су — Прозрачная вода — главный акцентный цвет
   static const Color water = Color(0xFF7BA5B8);
@@ -180,8 +180,8 @@ final ThemeData piligrimTheme = ThemeData(
   hoverColor: PiligrimColors.clear,
   colorScheme: const ColorScheme.dark(
     surface: PiligrimColors.earth,
-    primary: PiligrimColors.water,
-    secondary: PiligrimColors.steppe,
+    primary: PiligrimColors.steppe,
+    secondary: PiligrimColors.ember,
     error: PiligrimColors.fruit,
     onSurface: PiligrimColors.textLight,
     onPrimary: PiligrimColors.textLight,
@@ -224,8 +224,8 @@ final ThemeData piligrimTheme = ThemeData(
   ),
   outlinedButtonTheme: OutlinedButtonThemeData(
     style: OutlinedButton.styleFrom(
-      foregroundColor: PiligrimColors.water,
-      side: const BorderSide(color: PiligrimColors.water, width: 1.0),
+      foregroundColor: PiligrimColors.steppe,
+      side: const BorderSide(color: PiligrimColors.steppe, width: 1.0),
       textStyle: PiligrimTextStyles.button,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),

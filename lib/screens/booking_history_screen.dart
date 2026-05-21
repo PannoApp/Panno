@@ -42,6 +42,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
             child: PiligrimBackground(
               textureOpacity: 0.45,
               vignetteIntensity: 0.25,
+              cinematic: true,
             ),
           ),
           Consumer<BookingProvider>(

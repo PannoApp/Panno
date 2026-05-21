@@ -87,3 +87,8 @@ backend/.env
 
 # Claude
 CLAUDE.MD
+
+# Локальные материалы / ТЗ — не в git
+brand/Piligrim_brandbook_1,Piligrim_brandbook_2,Piligrim_brandbook_3/
+brand/TZ Piligrim App.md
+.cursor/rules/TZ Piligrim App.mdc

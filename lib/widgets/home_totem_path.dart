@@ -8,6 +8,35 @@ import '../core/home_data.dart';
 import '../providers/menu_provider.dart';
 import 'piligrim_tap.dart';
 
+/// Общая рамка узла пути (карточка этапа или камень продолжения).
+BoxDecoration _pathNodeDecoration({
+  required bool emphasized,
+  required Color accentColor,
+}) {
+  return BoxDecoration(
+    borderRadius: BorderRadius.circular(16),
+    color: emphasized
+        ? PiligrimColors.sky.withValues(alpha: 0.03)
+        : PiligrimColors.clear,
+    border: Border.all(
+      width: emphasized ? 0.65 : 0.5,
+      color: emphasized
+          ? accentColor.withValues(alpha: 0.22)
+          : PiligrimColors.sky.withValues(alpha: 0.055),
+    ),
+    boxShadow: emphasized
+        ? [
+            BoxShadow(
+              color: accentColor.withValues(alpha: 0.10),
+              blurRadius: 18,
+              spreadRadius: -6,
+              offset: const Offset(0, 4),
+            ),
+          ]
+        : null,
+  );
+}
+
 class HomeTotemPathRow extends StatefulWidget {
   const HomeTotemPathRow({super.key, this.onNavigate});
   final ValueChanged<int>? onNavigate;
@@ -38,7 +67,7 @@ class _HomeTotemPathRowState extends State<HomeTotemPathRow> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 36),
@@ -94,27 +123,9 @@ class _HomeTotemPathRowState extends State<HomeTotemPathRow> {
                   width: 118,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    color: selected
-                        ? PiligrimColors.sky.withValues(alpha: 0.03)
-                        : PiligrimColors.clear,
-                    border: Border.all(
-                      width: selected ? 0.65 : 0.5,
-                      color: selected
-                          ? cat.accentColor.withValues(alpha: 0.22)
-                          : PiligrimColors.sky.withValues(alpha: 0.055),
-                    ),
-                    boxShadow: selected
-                        ? [
-                            BoxShadow(
-                              color: cat.accentColor.withValues(alpha: 0.10),
-                              blurRadius: 18,
-                              spreadRadius: -6,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : null,
+                  decoration: _pathNodeDecoration(
+                    emphasized: selected,
+                    accentColor: cat.accentColor,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -180,27 +191,111 @@ class _HomeTotemPathRowState extends State<HomeTotemPathRow> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
+          padding: const EdgeInsets.fromLTRB(36, 22, 36, 0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (var i = 0; i < kHeroPathFooterActions.length; i++) ...[
-                if (i > 0) const SizedBox(height: 4),
-                _HeroPathFooterRow(
-                  action: kHeroPathFooterActions[i],
-                  onNavigate: widget.onNavigate,
-                  delay: Duration(milliseconds: 280 + 70 * i),
+              const _HeroPathTrail(),
+              const SizedBox(height: 18),
+              Text(
+                'ДАЛЬШЕ ПО ПУТИ',
+                style: PiligrimTextStyles.sectionLabel.copyWith(
+                  fontSize: 9,
+                  letterSpacing: 2.2,
+                  color: PiligrimColors.sky.withValues(alpha: 0.38),
                 ),
-              ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < kHeroPathFooterActions.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 12),
+                    Expanded(
+                      child: _HeroPathWaystone(
+                        action: kHeroPathFooterActions[i],
+                        onNavigate: widget.onNavigate,
+                        delay: Duration(milliseconds: 300 + 80 * i),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
-        ),
+        ).animate(delay: 200.ms).fadeIn(duration: 520.ms, curve: Curves.easeOut),
       ],
     );
   }
 }
 
-class _HeroPathFooterRow extends StatelessWidget {
-  const _HeroPathFooterRow({
+/// Нить между этапами и продолжением пути.
+class _HeroPathTrail extends StatelessWidget {
+  const _HeroPathTrail();
+
+  @override
+  Widget build(BuildContext context) {
+    final line = PiligrimColors.sky.withValues(alpha: 0.10);
+    final node = PiligrimColors.water.withValues(alpha: 0.35);
+
+    return SizedBox(
+      height: 28,
+      child: Row(
+        children: [
+          Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Container(
+                width: 0.5,
+                height: 14,
+                color: line,
+              ),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: node, width: 0.75),
+                ),
+              ),
+            ],
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Container(
+                height: 0.5,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      line,
+                      PiligrimColors.water.withValues(alpha: 0.22),
+                      PiligrimColors.steppe.withValues(alpha: 0.18),
+                      line,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Container(
+            width: 5,
+            height: 5,
+            margin: const EdgeInsets.only(bottom: 0),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: PiligrimColors.steppe.withValues(alpha: 0.22),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroPathWaystone extends StatelessWidget {
+  const _HeroPathWaystone({
     required this.action,
     required this.onNavigate,
     required this.delay,
@@ -223,39 +318,50 @@ class _HeroPathFooterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PiligrimTap(
-      scaleDown: 0.98,
+      scaleDown: 0.97,
+      releaseDuration: const Duration(milliseconds: 280),
       onTap: () => _onTap(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 18, 14, 16),
+        decoration: _pathNodeDecoration(
+          emphasized: false,
+          accentColor: action.accentColor,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             SvgPicture.asset(
               action.totemAsset,
               width: 22,
               height: 22,
               colorFilter: ColorFilter.mode(
-                PiligrimColors.water.withValues(alpha: 0.72),
+                action.accentColor.withValues(alpha: 0.88),
                 BlendMode.srcIn,
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                action.label,
-                style: PiligrimTextStyles.body.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w300,
-                  color: PiligrimColors.sky.withValues(alpha: 0.82),
-                  letterSpacing: 0.25,
-                  height: 1.25,
-                ),
+            const SizedBox(height: 12),
+            Text(
+              action.label.toUpperCase(),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: PiligrimTextStyles.caption.copyWith(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.35,
+                height: 1.3,
+                color: PiligrimColors.sky.withValues(alpha: 0.9),
               ),
             ),
+            const SizedBox(height: 5),
             Text(
-              '→',
+              action.subtitle,
+              textAlign: TextAlign.center,
               style: PiligrimTextStyles.caption.copyWith(
-                fontSize: 13,
-                color: PiligrimColors.sky.withValues(alpha: 0.38),
+                fontSize: 11,
+                fontWeight: FontWeight.w300,
+                height: 1.3,
+                letterSpacing: 0.15,
+                color: PiligrimColors.sky.withValues(alpha: 0.48),
               ),
             ),
           ],
@@ -263,6 +369,6 @@ class _HeroPathFooterRow extends StatelessWidget {
       ),
     )
         .animate(delay: delay)
-        .fadeIn(duration: 480.ms, curve: Curves.easeOut);
+        .fadeIn(duration: 500.ms, curve: Curves.easeOut);
   }
 }
