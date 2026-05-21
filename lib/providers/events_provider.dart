@@ -46,7 +46,12 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       upcoming = upcomingApiSorted(await _repository.fetchUpcoming());
-      _usedMockFallback = false;
+      if (upcoming.isEmpty) {
+        upcoming = upcomingApiSorted(mockEventsAsApi());
+        _usedMockFallback = true;
+      } else {
+        _usedMockFallback = false;
+      }
     } catch (e) {
       upcomingError = dioErrorMessage(e);
       upcoming = upcomingApiSorted(mockEventsAsApi());
@@ -65,6 +70,10 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       archived = pastApiSorted(await _repository.fetchArchived());
+      if (archived.isEmpty) {
+        archived = pastApiSorted(mockEventsAsApi());
+        _usedMockFallback = true;
+      }
     } catch (e) {
       archivedError = dioErrorMessage(e);
       archived = pastApiSorted(mockEventsAsApi());
@@ -83,9 +92,14 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       news = await _repository.fetchNews();
+      if (news.isEmpty) {
+        news = List.unmodifiable(mockNewsPosts());
+        _usedMockFallback = true;
+      }
     } catch (e) {
       newsError = dioErrorMessage(e);
       news = List.unmodifiable(mockNewsPosts());
+      _usedMockFallback = true;
     } finally {
       isLoadingNews = false;
       notifyListeners();
@@ -107,8 +121,11 @@ class EventsProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _photoReport = await _repository.fetchPhotoReport(eventId);
+      if (_photoReport.isEmpty) {
+        _photoReport = mockPhotoReportAsApi(eventId);
+      }
     } catch (_) {
-      _photoReport = const [];
+      _photoReport = mockPhotoReportAsApi(eventId);
     } finally {
       isLoadingPhotoReport = false;
       notifyListeners();

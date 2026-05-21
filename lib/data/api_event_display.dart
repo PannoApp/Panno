@@ -1,6 +1,7 @@
 import '../core/interior_assets.dart';
 import 'events_news_data.dart';
 import 'models/api_event.dart';
+import 'models/api_event_photo.dart';
 
 extension ApiEventDisplay on ApiEvent {
   String get formatLabelRu => switch (format) {
@@ -45,4 +46,13 @@ List<ApiEvent> pastApiSorted(List<ApiEvent> events) {
   final list = events.where((e) => e.isPast).toList();
   list.sort((a, b) => b.startsAt.compareTo(a.startsAt));
   return list;
+}
+
+/// Демо-фотоотчёт для архивных мероприятий (офлайн / пустой API).
+List<ApiEventPhoto> mockPhotoReportAsApi(int eventId) {
+  final assets = mockPhotoReportAssetUrls(eventId);
+  return [
+    for (var i = 0; i < assets.length; i++)
+      ApiEventPhoto(id: eventId * 10 + i, imageUrl: assets[i], order: i),
+  ];
 }

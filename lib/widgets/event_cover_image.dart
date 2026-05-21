@@ -3,6 +3,51 @@ import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
 
+/// Сетевой URL (http/https) или путь к asset (`assets/...`).
+bool piligrimImageIsNetwork(String path) =>
+    path.startsWith('http://') || path.startsWith('https://');
+
+/// Кадр из CDN или локального asset — для новостей и фотоотчётов.
+class PiligrimNetworkOrAssetImage extends StatelessWidget {
+  const PiligrimNetworkOrAssetImage({
+    super.key,
+    required this.source,
+    this.fit = BoxFit.cover,
+    this.width,
+    this.height,
+    this.memCacheWidth,
+  });
+
+  final String source;
+  final BoxFit fit;
+  final double? width;
+  final double? height;
+  final int? memCacheWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    if (piligrimImageIsNetwork(source)) {
+      return CachedNetworkImage(
+        imageUrl: source,
+        width: width,
+        height: height,
+        fit: fit,
+        memCacheWidth: memCacheWidth,
+        placeholder: (_, __) => const ColoredBox(color: PiligrimColors.earthDeep),
+        errorWidget: (_, __, ___) => const ColoredBox(color: PiligrimColors.earthDeep),
+      );
+    }
+    return Image.asset(
+      source,
+      width: width,
+      height: height,
+      fit: fit,
+      errorBuilder: (_, __, ___) =>
+          const ColoredBox(color: PiligrimColors.earthDeep),
+    );
+  }
+}
+
 /// Обложка мероприятия: CDN или локальный fallback.
 class EventCoverImage extends StatelessWidget {
   const EventCoverImage({

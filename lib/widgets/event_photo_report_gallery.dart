@@ -1,8 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../core/theme.dart';
 import '../data/models/api_event_photo.dart';
+import 'event_cover_image.dart';
 
 class EventPhotoReportGallery extends StatefulWidget {
   const EventPhotoReportGallery({super.key, required this.photos});
@@ -28,10 +28,12 @@ class _EventPhotoReportGalleryState extends State<EventPhotoReportGallery> {
     for (final offset in [-1, 1]) {
       final i = index + offset;
       if (i >= 0 && i < widget.photos.length) {
-        precacheImage(
-          CachedNetworkImageProvider(widget.photos[i].imageUrl),
-          context,
-        );
+        final src = widget.photos[i].imageUrl;
+        if (piligrimImageIsNetwork(src)) {
+          precacheImage(CachedNetworkImageProvider(src), context);
+        } else {
+          precacheImage(AssetImage(src), context);
+        }
       }
     }
   }
@@ -52,20 +54,10 @@ class _EventPhotoReportGalleryState extends State<EventPhotoReportGallery> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: CachedNetworkImage(
-                imageUrl: photo.imageUrl,
+              child: PiligrimNetworkOrAssetImage(
+                source: photo.imageUrl,
                 fit: BoxFit.cover,
                 memCacheWidth: 800,
-                placeholder: (context, url) => const ColoredBox(
-                  color: PiligrimColors.earthDeep,
-                ),
-                errorWidget: (context, url, error) => const ColoredBox(
-                  color: PiligrimColors.earthDeep,
-                  child: Center(
-                    child: Icon(Icons.broken_image_outlined,
-                        color: PiligrimColors.divider),
-                  ),
-                ),
               ),
             ),
           );

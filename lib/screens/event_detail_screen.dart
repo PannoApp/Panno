@@ -147,26 +147,79 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      formatDateTimeRu(event.startsAt),
-                      style: PiligrimTextStyles.body.copyWith(
-                        color: PiligrimColors.water,
-                        fontSize: 14,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: PiligrimColors.water,
+                            borderRadius: BorderRadius.circular(2.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: PiligrimColors.water
+                                    .withValues(alpha: 0.55),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          formatDateTimeRu(event.startsAt),
+                          style: PiligrimTextStyles.body.copyWith(
+                            color: PiligrimColors.water,
+                            fontSize: 14,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     _MetaChip(
                       label: '${event.formatLabelRu} мероприятие',
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      _priceLine(),
-                      style: PiligrimTextStyles.caption.copyWith(
-                        color: PiligrimColors.steppe.withValues(alpha: 0.85),
-                        fontSize: 13,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color:
+                                PiligrimColors.steppe.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _priceLine(),
+                            style: PiligrimTextStyles.caption.copyWith(
+                              color: PiligrimColors.steppe
+                                  .withValues(alpha: 0.85),
+                              fontSize: 13,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
+                    // Тонкая steppe→transparent hairline — единый штрих с section headers
+                    Container(
+                      height: 1,
+                      width: 56,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            PiligrimColors.steppe.withValues(alpha: 0.45),
+                            PiligrimColors.steppe.withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Text(
                       event.description,
                       style: PiligrimTextStyles.body.copyWith(
@@ -215,35 +268,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                child: SizedBox(
-                  height: 52,
-                  child: PiligrimTap(
-                    onTap: () async {
-                      if (!await guardAuth(context)) return;
-                      if (!context.mounted) return;
-                      await showEventSignupSheet(
-                        context,
-                        eventId: event.id,
-                        eventTitle: event.title,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: PiligrimColors.water,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'ЗАПИСАТЬСЯ',
-                          style: PiligrimTextStyles.button.copyWith(
-                            fontSize: 15,
-                            letterSpacing: 1.4,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                child: _EventSignupCta(
+                  onTap: () async {
+                    if (!await guardAuth(context)) return;
+                    if (!context.mounted) return;
+                    await showEventSignupSheet(
+                      context,
+                      eventId: event.id,
+                      eventTitle: event.title,
+                    );
+                  },
                 ),
               ),
             ),
@@ -260,18 +294,119 @@ class _MetaChip extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: PiligrimColors.earth,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: PiligrimColors.divider),
+          color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: PiligrimColors.steppe.withValues(alpha: 0.55),
+            width: 0.8,
+          ),
         ),
-        child: Text(
-          label,
-          style: PiligrimTextStyles.caption.copyWith(
-            color: PiligrimColors.sky.withValues(alpha: 0.9),
-            fontSize: 12,
-            letterSpacing: 0.5,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: PiligrimColors.steppe.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: PiligrimColors.steppe.withValues(alpha: 0.4),
+                    blurRadius: 5,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: PiligrimTextStyles.caption.copyWith(
+                color: PiligrimColors.sky.withValues(alpha: 0.92),
+                fontSize: 12,
+                letterSpacing: 0.6,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Главный CTA «ЗАПИСАТЬСЯ» — water gradient + rim-highlight + water-tinted shadow.
+// По мотиву EmberCta, но в холодном water-цвете (сервисное действие, не финальное).
+class _EventSignupCta extends StatelessWidget {
+  const _EventSignupCta({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 54,
+      child: PiligrimTap(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        scaleDown: 0.965,
+        releaseDuration: const Duration(milliseconds: 320),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                PiligrimColors.water,
+                PiligrimColors.waterMuted,
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: PiligrimColors.shadow.withValues(alpha: 0.28),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+              BoxShadow(
+                color: PiligrimColors.water.withValues(alpha: 0.25),
+                blurRadius: 16,
+                spreadRadius: 0.5,
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Center(
+                child: Text(
+                  'ЗАПИСАТЬСЯ',
+                  style: PiligrimTextStyles.button.copyWith(
+                    fontSize: 14.5,
+                    letterSpacing: 1.6,
+                    color: PiligrimColors.sky,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 18,
+                right: 18,
+                child: Container(
+                  height: 0.75,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(1),
+                    gradient: LinearGradient(
+                      colors: [
+                        PiligrimColors.sky.withValues(alpha: 0.0),
+                        PiligrimColors.sky.withValues(alpha: 0.22),
+                        PiligrimColors.sky.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

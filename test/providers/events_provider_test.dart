@@ -37,6 +37,16 @@ void main() {
       expect(provider.upcomingError, isNull);
     });
 
+    test('loadUpcoming uses demo when API returns empty list', () async {
+      when(() => repository.fetchUpcoming()).thenAnswer((_) async => []);
+
+      final provider = EventsProvider(repository: repository);
+      await provider.loadUpcoming();
+
+      expect(provider.upcoming.length, greaterThan(3));
+      expect(provider.usedMockFallback, isTrue);
+    });
+
     test('loadUpcoming falls back to mocks on error', () async {
       when(() => repository.fetchUpcoming()).thenThrow(Exception('offline'));
 
@@ -128,11 +138,23 @@ void main() {
       expect(provider.isLoadingPhotoReport, isFalse);
     });
 
-    test('loadPhotoReport sets empty list on network error', () async {
-      when(() => repository.fetchPhotoReport(any())).thenThrow(Exception('offline'));
+    test('loadPhotoReport uses demo assets for archive mock event', () async {
+      when(() => repository.fetchPhotoReport(201))
+          .thenThrow(Exception('offline'));
 
       final provider = EventsProvider(repository: repository);
-      await provider.loadPhotoReport(1);
+      await provider.loadPhotoReport(201);
+
+      expect(provider.photoReport, isNotEmpty);
+      expect(provider.isLoadingPhotoReport, isFalse);
+    });
+
+    test('loadPhotoReport sets empty list when no demo for event', () async {
+      when(() => repository.fetchPhotoReport(999))
+          .thenThrow(Exception('offline'));
+
+      final provider = EventsProvider(repository: repository);
+      await provider.loadPhotoReport(999);
 
       expect(provider.photoReport, isEmpty);
       expect(provider.isLoadingPhotoReport, isFalse);

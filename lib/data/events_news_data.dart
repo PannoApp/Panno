@@ -110,70 +110,129 @@ DateTime _anchorToday() {
 
 List<PiligrimEvent> buildMockEvents() {
   final t0 = _anchorToday();
+  final covers = PiligrimInteriorAssets.allInteriorPngs;
   return [
+    // ── Ближайшие (афиша) ──
     PiligrimEvent(
-      id: 'e1',
+      id: '101',
       title: 'Вечер живой кобыза',
       description:
-          'Импровизация на степных мотивах и дегустация блюд из печи. Пространство «АУА» — ивент-спейс Piligrim (piligrim_design_spec.md). Количество мест ограничено; запись не является покупкой билета — ресторан перезвонит для подтверждения.',
-      startsAt: t0.add(const Duration(days: 3, hours: 19)),
+          'Импровизация на степных мотивах и дегустация блюд из печи. Пространство «АУА» — ивент-спейс Piligrim. Запись — заявка: ресторан перезвонит для подтверждения.',
+      startsAt: t0.add(const Duration(days: 2, hours: 19)),
       format: EventAccessFormat.open,
-      coverAssetPath: PiligrimInteriorAssets.allInteriorPngs[0],
+      coverAssetPath: covers[0],
       priceFromRub: null,
     ),
     PiligrimEvent(
-      id: 'e2',
+      id: '102',
       title: 'Закрытый ужин с шефом',
       description:
-          'Сезонное меню из путешествия по Центральной Азии, вино и рассказ о традициях. Закрытый формат — список героев согласуется заранее.',
-      startsAt: t0.add(const Duration(days: 8, hours: 19, minutes: 30)),
+          'Сезонное меню путешествия по Центральной Азии, вино и рассказ проводника о традициях. Закрытый формат — список гостей согласуется заранее.',
+      startsAt: t0.add(const Duration(days: 6, hours: 19, minutes: 30)),
       format: EventAccessFormat.closed,
-      coverAssetPath: PiligrimInteriorAssets.allInteriorPngs[1],
+      coverAssetPath: covers[1],
       priceFromRub: 18500,
     ),
     PiligrimEvent(
-      id: 'e3',
+      id: '103',
       title: 'Мастер-класс: тесто и очаг',
       description:
-          'Работа с тестом в стиле кочевой кухни, выпечка на открытом огне. Подходит героям с любым опытом.',
-      startsAt: t0.add(const Duration(days: 14, hours: 16)),
+          'Работа с тестом в духе кочевой кухни, выпечка на открытом огне. Подходит героям с любым опытом — проводник ведёт шаг за шагом.',
+      startsAt: t0.add(const Duration(days: 10, hours: 16)),
       format: EventAccessFormat.open,
-      coverAssetPath: PiligrimInteriorAssets.allInteriorPngs[2],
+      coverAssetPath: covers[2],
       priceFromRub: 4500,
     ),
     PiligrimEvent(
-      id: 'e4',
+      id: '104',
+      title: 'Дегустация степных трав',
+      description:
+          'Пять настоев и закусок к дымным блюдам кухни. Короткий ритуал знакомства с меню сезона — без спешки, за общим столом.',
+      startsAt: t0.add(const Duration(days: 13, hours: 18)),
+      format: EventAccessFormat.open,
+      coverAssetPath: covers[0],
+      priceFromRub: 6500,
+    ),
+    PiligrimEvent(
+      id: '105',
       title: 'Ночь длинных столов',
       description:
-          'Совместный стол на террасе, свечи и меню на выбор проводника. Тёплая атмосфера без спешки.',
-      startsAt: t0.add(const Duration(days: 21, hours: 20)),
+          'Совместный стол на террасе: свечи, меню на выбор проводника, живая музыка в полутоне. Тёплый вечер без дедлайна.',
+      startsAt: t0.add(const Duration(days: 18, hours: 20)),
       format: EventAccessFormat.open,
-      coverAssetPath: PiligrimInteriorAssets.allInteriorPngs[0],
+      coverAssetPath: covers[1],
       priceFromRub: null,
     ),
     PiligrimEvent(
-      id: 'p1',
+      id: '106',
+      title: 'Джаз у очага',
+      description:
+          'Квартет, авторские закуски и коктейли с дымком саксаула. Открытый формат — можно прийти парой или небольшой компанией.',
+      startsAt: t0.add(const Duration(days: 24, hours: 21)),
+      format: EventAccessFormat.open,
+      coverAssetPath: covers[2],
+      priceFromRub: 9000,
+    ),
+    // ── Архив (прошедшие + фотоотчёты) ──
+    PiligrimEvent(
+      id: '201',
       title: 'Весеннее равноденствие — ужин',
       description:
-          'Праздничное меню из зелени степи и ранних овощей. Фотоотчёт доступен ниже.',
-      startsAt: t0.subtract(const Duration(days: 12, hours: 4)),
+          'Праздничное меню из зелени степи и ранних овощей. Вечер завершён — ниже доступен фотоотчёт.',
+      startsAt: t0.subtract(const Duration(days: 9, hours: 4)),
       format: EventAccessFormat.open,
-      coverAssetPath: PiligrimInteriorAssets.allInteriorPngs[1],
+      coverAssetPath: covers[1],
       priceFromRub: 12000,
       isPast: true,
       hasPhotoReport: true,
     ),
     PiligrimEvent(
-      id: 'p2',
+      id: '202',
+      title: 'Путь первого огня',
+      description:
+          'Ритуал зажжения очага и ужин из блюд, приготовленных на углях. Архивный вечер с фотоотчётом для тех, кто не успел на пути.',
+      startsAt: t0.subtract(const Duration(days: 22, hours: 3)),
+      format: EventAccessFormat.open,
+      coverAssetPath: covers[2],
+      priceFromRub: 9800,
+      isPast: true,
+      hasPhotoReport: true,
+    ),
+    PiligrimEvent(
+      id: '203',
+      title: 'Закрытый вечер сомелье',
+      description:
+          'Шесть позиций винной карты и pairing от кухни. Закрытый формат — событие в архиве, фотоотчёт сохранён.',
+      startsAt: t0.subtract(const Duration(days: 38, hours: 2)),
+      format: EventAccessFormat.closed,
+      coverAssetPath: covers[0],
+      priceFromRub: 15000,
+      isPast: true,
+      hasPhotoReport: true,
+    ),
+    PiligrimEvent(
+      id: '204',
       title: 'Дегустация вин Кавказа',
       description:
-          'Пять позиций и закуски от кухни. Событие завершено.',
-      startsAt: t0.subtract(const Duration(days: 45, hours: 2)),
+          'Пять позиций и закуски от кухни. Событие завершено — в карточке доступен фотоотчёт вечера.',
+      startsAt: t0.subtract(const Duration(days: 52, hours: 2)),
       format: EventAccessFormat.closed,
-      coverAssetPath: PiligrimInteriorAssets.allInteriorPngs[2],
+      coverAssetPath: covers[1],
       priceFromRub: null,
       isPast: true,
       hasPhotoReport: true,
+    ),
+    PiligrimEvent(
+      id: '205',
+      title: 'Банкет «Длинная нить»',
+      description:
+          'Корпоративный ужин в главном зале: общий стол, живая подача, финальный десерт у очага. Архив без онлайн-продажи — только память пути.',
+      startsAt: t0.subtract(const Duration(days: 74, hours: 5)),
+      format: EventAccessFormat.closed,
+      coverAssetPath: covers[2],
+      priceFromRub: null,
+      isPast: true,
+      hasPhotoReport: false,
     ),
   ];
 }
@@ -192,27 +251,66 @@ List<PiligrimEvent> pastEventsSorted(List<PiligrimEvent> all) {
 
 List<PiligrimNewsPost> mockNewsPosts() {
   final t0 = _anchorToday();
+  final covers = PiligrimInteriorAssets.allInteriorPngs;
   return [
     PiligrimNewsPost(
-      id: 'n1',
+      id: '301',
       title: 'Сезонное меню обновлено',
       body:
-          'В путь добавили блюда с дымком очага и новые гарниры из зелени. Проводники расскажут историю каждой позиции за столом.',
-      publishedAt: t0.subtract(const Duration(days: 2)),
+          'В путь добавили блюда с дымком очага и гарниры из ранней зелени. Проводники расскажут историю каждой позиции — без спешки, за столом.',
+      publishedAt: t0.subtract(const Duration(days: 1)),
+      imageUrl: covers[0],
     ),
     PiligrimNewsPost(
-      id: 'n2',
+      id: '302',
       title: 'Винная карта: новый раздел',
       body:
-          'Расширили подборку амберных и оранжевых вин — к степным и дымным вкусам кухни.',
-      publishedAt: t0.subtract(const Duration(days: 6)),
+          'Расширили подборку амберных и оранжевых вин. Подобрали пары к степным и дымным вкусам кухни — спросите проводника за ужином.',
+      publishedAt: t0.subtract(const Duration(days: 4)),
+      imageUrl: covers[1],
     ),
     PiligrimNewsPost(
-      id: 'n3',
-      title: 'Герой кухни',
+      id: '303',
+      title: 'Герой кухни на две недели',
       body:
-          'На две недели к нам присоединился шеф из Алматинской школы — в меню появились лимитированные блюда.',
-      publishedAt: t0.subtract(const Duration(days: 18)),
+          'К нам присоединился шеф из Алматинской школы. В меню — лимитированные блюда; количество порций ограничено.',
+      publishedAt: t0.subtract(const Duration(days: 9)),
+      imageUrl: covers[2],
     ),
+    PiligrimNewsPost(
+      id: '304',
+      title: 'Пространство «АУА» для частных вечеров',
+      body:
+          'Ивент-спейс принимает закрытые ужины и камерные концерты. Оставьте заявку — менеджер свяжется и предложит сценарий вечера.',
+      publishedAt: t0.subtract(const Duration(days: 14)),
+      imageUrl: covers[0],
+    ),
+    PiligrimNewsPost(
+      id: '305',
+      title: 'Часы работы в праздничные дни',
+      body:
+          'Режим обновлён: вечерние слоты бронирования расширены, дневной зал открыт с 12:00. Актуальное расписание — на главной и в профиле.',
+      publishedAt: t0.subtract(const Duration(days: 21)),
+    ),
+    PiligrimNewsPost(
+      id: '306',
+      title: 'Welcome-ритуал у входа',
+      body:
+          'Новый тёплый напиток при встрече — лёгкий, безалкогольный, с нотами степных трав. Первый глоток пути, пока готовится ваш стол.',
+      publishedAt: t0.subtract(const Duration(days: 28)),
+      imageUrl: covers[1],
+    ),
+  ];
+}
+
+/// Локальные кадры фотоотчёта для демо-событий (когда API недоступен).
+List<String> mockPhotoReportAssetUrls(int eventId) {
+  final past = buildMockEvents().where((e) => e.isPast && e.hasPhotoReport);
+  final match = past.where((e) => int.tryParse(e.id) == eventId);
+  if (match.isEmpty) return const [];
+  final cover = match.first.coverAssetPath;
+  return [
+    cover,
+    ...PiligrimInteriorAssets.galleryExtrasExcluding(cover),
   ];
 }

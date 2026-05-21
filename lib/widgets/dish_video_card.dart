@@ -5,10 +5,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../core/theme.dart';
 import '../data/models/api_dish.dart';
+import '../providers/menu_provider.dart';
 import 'dish_elements.dart';
 
 // Дефолтные цвета кинематографического фона (используются когда нет видео и нет imageUrl)
@@ -192,18 +194,19 @@ class _DishVideoCardState extends State<DishVideoCard>
               ),
             ),
 
-            // ── 4. Нижний градиент — плавный переход в earthDeep ─
+            // ── 4. Нижний градиент — многоступенчатый, без видимой «полосы» ─
             const Positioned(
               bottom: 0, left: 0, right: 0,
-              height: 340,
+              height: 360,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: [0.0, 0.4, 0.72, 1.0],
+                    stops: [0.0, 0.28, 0.55, 0.78, 1.0],
                     colors: [
                       Colors.transparent,
+                      Color(0x552A2826),
                       Color(0xBB2A2826),
                       Color(0xEE2A2826),
                       Color(0xFF2A2826),
@@ -278,7 +281,14 @@ class _DishVideoCardState extends State<DishVideoCard>
               ),
             ),
 
-            // ── 6. Кнопка звука ───────────────────────────────────
+            // ── 6. Pill-badge категории сверху-слева (под status bar)
+            Positioned(
+              top: topInset + 60,
+              left: 20,
+              child: _VideoCategoryBadge(categoryId: widget.dish.category),
+            ),
+
+            // ── 7. Кнопка звука ───────────────────────────────────
             if (videoReady)
               Positioned(
                 top: topInset + 58,
@@ -286,7 +296,7 @@ class _DishVideoCardState extends State<DishVideoCard>
                 child: _MuteButton(isMuted: _isMuted, onToggle: _toggleMute),
               ),
 
-            // ── 7. Хинт свайпа ────────────────────────────────────
+            // ── 8. Хинт свайпа ────────────────────────────────────
             if (widget.isActive)
               Positioned(
                 left: 24,
@@ -301,6 +311,49 @@ class _DishVideoCardState extends State<DishVideoCard>
         ),
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pill-badge категории на видео-карточке.
+// Имя берётся из MenuProvider по id блюда (без новых полей в модели).
+// Если категорий ещё нет в провайдере — badge скрыт.
+// ─────────────────────────────────────────────────────────────────────────────
+class _VideoCategoryBadge extends StatelessWidget {
+  const _VideoCategoryBadge({required this.categoryId});
+
+  final int categoryId;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = context.select<MenuProvider, String?>((p) {
+      for (final c in p.categories) {
+        if (c.id == categoryId) return c.name;
+      }
+      return null;
+    });
+    if (name == null || name.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: PiligrimColors.water.withValues(alpha: 0.4),
+          width: 0.7,
+        ),
+      ),
+      child: Text(
+        name.toUpperCase(),
+        style: PiligrimTextStyles.micro.copyWith(
+          color: PiligrimColors.sky.withValues(alpha: 0.92),
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.6,
+        ),
+      ),
+    ).animate().fadeIn(delay: 300.ms, duration: 500.ms);
   }
 }
 

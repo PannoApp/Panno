@@ -1,7 +1,9 @@
 // Афиша и новости — ТЗ: лента мероприятий (ближайшие первыми), карточка, запись, архив, новости
 // Визуал и тон: piligrim_design_spec.md (§6 карточки, §8 герой, §9 мероприятия / «АУА»)
+// Design plan: Phase 4 — water-pill switcher, steppe-hairline section heads, badge-driven event cards.
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../core/interior_assets.dart';
@@ -12,7 +14,8 @@ import '../data/models/api_event.dart';
 import '../providers/core_info_provider.dart';
 import '../providers/events_provider.dart';
 import '../widgets/error_view.dart';
-import '../widgets/event_cover_image.dart';
+import '../widgets/event_cover_image.dart'
+    show EventCoverImage, PiligrimNetworkOrAssetImage;
 import '../widgets/piligrim_background.dart';
 import 'event_detail_screen.dart';
 import '../widgets/piligrim_tap.dart';
@@ -59,57 +62,29 @@ class _EventsScreenState extends State<EventsScreen> {
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       20,
-                      MediaQuery.of(context).padding.top + 12,
+                      MediaQuery.of(context).padding.top + 14,
                       20,
                       12,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            SvgPicture.asset(
-                              'assets/images/tree_totem (1).svg',
-                              width: 36,
-                              height: 36,
-                              colorFilter: const ColorFilter.mode(
-                                PiligrimColors.steppe,
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'АФИША И НОВОСТИ',
-                                    style: PiligrimTextStyles.title.copyWith(
-                                      fontSize: 20,
-                                      letterSpacing: 2,
-                                      color: PiligrimColors.sky,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Лента мероприятий и вестей заведения',
-                                    style: PiligrimTextStyles.caption.copyWith(
-                                      fontSize: 12,
-                                      color: PiligrimColors.sky.withValues(alpha: 0.45),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        const _AfichaTitleBlock(),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Лента мероприятий и вестей заведения',
+                          style: PiligrimTextStyles.caption.copyWith(
+                            fontSize: 11.5,
+                            letterSpacing: 0.4,
+                            color: PiligrimColors.sky.withValues(alpha: 0.45),
+                          ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
                         _SegmentedAficha(
                           value: _view,
                           onChanged: (v) => setState(() => _view = v),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 18),
                         Builder(builder: (context) {
                           // Берём URL-слайды из CoreInfo; если ещё не загружены — фоллбэк на локальные PNG
                           final coreInfo = context.watch<CoreInfoProvider>().coreInfo;
@@ -129,87 +104,70 @@ class _EventsScreenState extends State<EventsScreen> {
                 ),
                 if (_view == _AfichaView.events) ...[
                   if (events.isLoadingUpcoming && upcoming.isEmpty)
-                    const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: PiligrimColors.water,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      ),
-                    ),
+                    const SliverToBoxAdapter(child: _EventsLoadingSkeleton()),
                   if (events.upcomingError != null && upcoming.isEmpty)
                     SliverErrorView(
                       message: events.upcomingError!,
                       onRetry: () => context.read<EventsProvider>().retry(),
                     ),
                   if (events.usedMockFallback && upcoming.isNotEmpty)
+                    const SliverToBoxAdapter(child: _OfflineHint()),
+                  const SliverToBoxAdapter(
+                    child: _AfichaSectionHeader(label: 'БЛИЖАЙШИЕ СОБЫТИЯ'),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 6)),
+                  if (!events.isLoadingUpcoming &&
+                      events.upcomingError == null &&
+                      upcoming.isEmpty)
+                    const SliverToBoxAdapter(
+                      child: _AfichaEmpty(
+                        totem: 'assets/images/tree_totem (1).svg',
+                        title: 'Пока нет ближайших событий',
+                        hint: 'Новые маршруты появятся скоро',
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                            final e = upcoming[i];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: _EventListCard(
+                                event: e,
+                                coverFallbackIndex: i,
+                                onOpen: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => EventDetailScreen(
+                                        event: e,
+                                        coverFallbackIndex: i,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                          childCount: upcoming.length,
+                        ),
+                      ),
+                    ),
+                  if (past.isNotEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                        child: Text(
-                          'Офлайн-режим: показаны демо-события',
-                          style: PiligrimTextStyles.caption.copyWith(
-                            fontSize: 11,
-                            color: PiligrimColors.steppe.withValues(alpha: 0.7),
-                          ),
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                        child: _ArchiveHeader(
+                          expanded: _archiveOpen,
+                          count: past.length,
+                          onToggle: () =>
+                              setState(() => _archiveOpen = !_archiveOpen),
                         ),
                       ),
                     ),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverToBoxAdapter(
-                      child: Text(
-                        'БЛИЖАЙШИЕ СОБЫТИЯ',
-                        style: PiligrimTextStyles.caption.copyWith(
-                          letterSpacing: 1.6,
-                          color: PiligrimColors.steppe.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 10)),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) {
-                          final e = upcoming[i];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 14),
-                            child: _EventListCard(
-                              event: e,
-                              coverFallbackIndex: i,
-                              onOpen: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => EventDetailScreen(
-                                      event: e,
-                                      coverFallbackIndex: i,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                        childCount: upcoming.length,
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                      child: _ArchiveHeader(
-                        expanded: _archiveOpen,
-                        count: past.length,
-                        onToggle: () => setState(() => _archiveOpen = !_archiveOpen),
-                      ),
-                    ),
-                  ),
-                  if (_archiveOpen)
+                  if (past.isNotEmpty && _archiveOpen)
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       sliver: SliverList(
@@ -217,7 +175,9 @@ class _EventsScreenState extends State<EventsScreen> {
                           (context, i) {
                             final e = past[i];
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
+                              padding: EdgeInsets.only(
+                                bottom: i < past.length - 1 ? 12 : 0,
+                              ),
                               child: _PastEventCard(
                                 event: e,
                                 coverFallbackIndex: i,
@@ -239,34 +199,36 @@ class _EventsScreenState extends State<EventsScreen> {
                       ),
                     ),
                 ] else ...[
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverToBoxAdapter(
-                      child: Text(
-                        'НОВОСТИ РЕСТОРАНА',
-                        style: PiligrimTextStyles.caption.copyWith(
-                          letterSpacing: 1.6,
-                          color: PiligrimColors.steppe.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ),
+                  const SliverToBoxAdapter(
+                    child: _AfichaSectionHeader(label: 'НОВОСТИ РЕСТОРАНА'),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 10)),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) {
-                          final n = news[i];
+                  const SliverToBoxAdapter(child: SizedBox(height: 6)),
+                  if (events.isLoadingNews && news.isEmpty)
+                    const SliverToBoxAdapter(child: _NewsLoadingSkeleton())
+                  else if (news.isEmpty)
+                    const SliverToBoxAdapter(
+                      child: _AfichaEmpty(
+                        totem: 'assets/images/spiral.svg',
+                        title: 'Пока нет новостей',
+                        hint: 'Загляните позже — ритм заведения меняется',
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                            final n = news[i];
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 14),
                             child: _NewsCard(post: n),
                           );
-                        },
-                        childCount: news.length,
+                          },
+                          childCount: news.length,
+                        ),
                       ),
                     ),
-                  ),
                 ],
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
@@ -279,7 +241,56 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 }
 
-// Переключатель вкладок «Афиша» / «Новости» в верхней части экрана
+// Заглавный блок «АФИША» — тотем + caps + steppe-hairline.
+// Единый штрих с MenuScreen — «нить пути» по бренду.
+class _AfichaTitleBlock extends StatelessWidget {
+  const _AfichaTitleBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SvgPicture.asset(
+          'assets/images/tree_totem (1).svg',
+          width: 18,
+          height: 18,
+          colorFilter: ColorFilter.mode(
+            PiligrimColors.steppe.withValues(alpha: 0.6),
+            BlendMode.srcIn,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          'АФИША',
+          style: PiligrimTextStyles.caption.copyWith(
+            color: PiligrimColors.steppe.withValues(alpha: 0.78),
+            letterSpacing: 3.0,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: 56,
+          height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                PiligrimColors.steppe.withValues(alpha: 0.55),
+                PiligrimColors.steppe.withValues(alpha: 0.0),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Переключатель вкладок «Афиша» / «Новости» — sliding water-pill (как ModeSwitcher в Menu).
+// Активная вкладка: water glow + tinted background; неактивная: sky @ 0.45.
 class _SegmentedAficha extends StatelessWidget {
   const _SegmentedAficha({
     required this.value,
@@ -289,29 +300,201 @@ class _SegmentedAficha extends StatelessWidget {
   final _AfichaView value;
   final ValueChanged<_AfichaView> onChanged;
 
+  static const double _height = 44;
+  static const double _radius = 22;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: PiligrimColors.earth.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: PiligrimColors.divider),
+    final isEvents = value == _AfichaView.events;
+
+    return SizedBox(
+      height: _height,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              // Фон-«дорожка» — earthDeep
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: PiligrimColors.earthDeep.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(_radius),
+                    border: Border.all(color: PiligrimColors.divider),
+                  ),
+                ),
+              ),
+              // Скользящий water-индикатор (половина ширины)
+              AnimatedAlign(
+                duration: 280.ms,
+                curve: Curves.easeOutCubic,
+                alignment: isEvents
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                child: Container(
+                  width: constraints.maxWidth / 2,
+                  height: _height,
+                  decoration: BoxDecoration(
+                    color: PiligrimColors.water.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(_radius),
+                    border: Border.all(
+                      color: PiligrimColors.water.withValues(alpha: 0.5),
+                      width: 0.8,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: PiligrimColors.water.withValues(alpha: 0.18),
+                        blurRadius: 14,
+                        spreadRadius: 0.5,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Сами таб-кнопки с иконками
+              Row(
+                children: [
+                  Expanded(
+                    child: _AfichaTabLabel(
+                      label: 'Афиша',
+                      icon: 'assets/images/tree_totem (1).svg',
+                      active: isEvents,
+                      onTap: () => onChanged(_AfichaView.events),
+                    ),
+                  ),
+                  Expanded(
+                    child: _AfichaTabLabel(
+                      label: 'Новости',
+                      icon: 'assets/images/spiral.svg',
+                      active: !isEvents,
+                      onTap: () => onChanged(_AfichaView.news),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
+    );
+  }
+}
+
+class _AfichaTabLabel extends StatelessWidget {
+  const _AfichaTabLabel({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final String icon;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color = active
+        ? PiligrimColors.water
+        : PiligrimColors.sky.withValues(alpha: 0.45);
+
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(_SegmentedAficha._radius),
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              icon,
+              width: 14,
+              height: 14,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+            ),
+            const SizedBox(width: 8),
+            AnimatedDefaultTextStyle(
+              duration: 220.ms,
+              curve: Curves.easeOut,
+              style: PiligrimTextStyles.caption.copyWith(
+                fontSize: 13,
+                color: color,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w300,
+                letterSpacing: active ? 0.6 : 0.4,
+              ),
+              child: Text(label),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Универсальный section-header «нить пути»: caps + steppe → transparent hairline.
+class _AfichaSectionHeader extends StatelessWidget {
+  const _AfichaSectionHeader({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: _SegButton(
-              label: 'Афиша',
-              active: value == _AfichaView.events,
-              onTap: () => onChanged(_AfichaView.events),
+          Text(
+            label,
+            style: PiligrimTextStyles.sectionLabel.copyWith(
+              color: PiligrimColors.steppe.withValues(alpha: 0.82),
+              letterSpacing: 2.5,
+              fontSize: 11,
             ),
           ),
+          const SizedBox(width: 12),
           Expanded(
-            child: _SegButton(
-              label: 'Новости',
-              active: value == _AfichaView.news,
-              onTap: () => onChanged(_AfichaView.news),
+            child: Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    PiligrimColors.steppe.withValues(alpha: 0.45),
+                    PiligrimColors.steppe.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Подсказка офлайн-режима — компактный steppe-tinted dot + надпись.
+class _OfflineHint extends StatelessWidget {
+  const _OfflineHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: PiligrimColors.steppe.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Офлайн-режим · показаны демо-события',
+            style: PiligrimTextStyles.caption.copyWith(
+              fontSize: 11,
+              letterSpacing: 0.4,
+              color: PiligrimColors.steppe.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -460,35 +643,57 @@ class _AfishaHeroState extends State<_AfishaHero> {
             },
           ),
         ),
-        const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: total > 0 ? (idx + 1) / total : 0,
-                  minHeight: 3,
-                  backgroundColor: PiligrimColors.sky.withValues(alpha: 0.12),
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    PiligrimColors.water.withValues(alpha: 0.85),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '$total кадров пространства · ${idx + 1} из $total',
-                style: PiligrimTextStyles.caption.copyWith(
-                  fontSize: 11,
-                  letterSpacing: 0.6,
-                  color: PiligrimColors.sky.withValues(alpha: 0.45),
-                ),
-              ),
-            ],
+        const SizedBox(height: 14),
+        _HeroDotsIndicator(count: total, current: idx),
+        const SizedBox(height: 8),
+        Text(
+          'Кадр ${idx + 1} из $total',
+          style: PiligrimTextStyles.micro.copyWith(
+            fontSize: 10.5,
+            letterSpacing: 1.4,
+            color: PiligrimColors.sky.withValues(alpha: 0.40),
           ),
         ),
       ],
+    );
+  }
+}
+
+// Точечный индикатор слайдера hero — активная точка water (растянута), остальные sky @0.18.
+class _HeroDotsIndicator extends StatelessWidget {
+  const _HeroDotsIndicator({required this.count, required this.current});
+  final int count;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return const SizedBox.shrink();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(count, (i) {
+        final active = i == current;
+        return AnimatedContainer(
+          duration: 260.ms,
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: active ? 22 : 6,
+          height: 4,
+          decoration: BoxDecoration(
+            color: active
+                ? PiligrimColors.water.withValues(alpha: 0.85)
+                : PiligrimColors.sky.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(3),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: PiligrimColors.water.withValues(alpha: 0.30),
+                      blurRadius: 8,
+                    ),
+                  ]
+                : null,
+          ),
+        );
+      }),
     );
   }
 }
@@ -533,18 +738,13 @@ class _HeroSlide extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 1.0, end: active ? 1.04 : 1.0),
-                duration: const Duration(seconds: 12),
-                curve: Curves.easeInOut,
-                builder: (context, value, child) =>
-                    Transform.scale(scale: value, child: child),
-                // Сетевой URL (из API) — CachedNetworkImage; локальный asset (fallback) — Image.asset
+              Transform.scale(
+                scale: active ? 1.04 : 1.0,
+                alignment: Alignment.center,
                 child: item.imageAsset.startsWith('http')
                     ? CachedNetworkImage(
                         imageUrl: item.imageAsset,
                         fit: BoxFit.cover,
-                        // Ограничиваем размер декодирования: слайдер ~194px, 2x DPR → 800px достаточно
                         memCacheWidth: 800,
                         memCacheHeight: 500,
                         fadeInDuration: const Duration(milliseconds: 180),
@@ -578,18 +778,22 @@ class _HeroSlide extends StatelessWidget {
                 top: 12,
                 right: 12,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: PiligrimColors.earthDeep.withValues(alpha: 0.78),
+                    color: PiligrimColors.earthDeep.withValues(alpha: 0.62),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: PiligrimColors.steppe.withValues(alpha: 0.7)),
+                    border: Border.all(
+                      color: PiligrimColors.water.withValues(alpha: 0.4),
+                      width: 0.8,
+                    ),
                   ),
                   child: Text(
                     item.chip,
                     style: PiligrimTextStyles.caption.copyWith(
-                      color: PiligrimColors.steppe,
-                      letterSpacing: 0.8,
-                      fontSize: 10,
+                      color: PiligrimColors.sky.withValues(alpha: 0.92),
+                      letterSpacing: 1.0,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -631,23 +835,36 @@ class _HeroSlide extends StatelessWidget {
                     const SizedBox(height: 10),
                     PiligrimTap(
                       onTap: onTap,
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(10),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                         decoration: BoxDecoration(
                           color: PiligrimColors.steppe.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: PiligrimColors.steppe.withValues(alpha: 0.55),
                           ),
                         ),
-                        child: Text(
-                          item.cta,
-                          style: PiligrimTextStyles.button.copyWith(
-                            color: PiligrimColors.sky,
-                            fontSize: 11.5,
-                            letterSpacing: 0.6,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              item.cta.toUpperCase(),
+                              style: PiligrimTextStyles.button.copyWith(
+                                color: PiligrimColors.sky,
+                                fontSize: 11,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '→',
+                              style: PiligrimTextStyles.caption.copyWith(
+                                color: PiligrimColors.sky.withValues(alpha: 0.7),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -682,52 +899,9 @@ class _HeroItem {
   final String chip;
 }
 
-// Кнопка-сегмент внутри переключателя вкладок
-class _SegButton extends StatelessWidget {
-  const _SegButton({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: active
-              ? PiligrimColors.water.withValues(alpha: 0.35)
-              : PiligrimColors.clear,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(
-            color: active
-                ? PiligrimColors.water.withValues(alpha: 0.5)
-                : PiligrimColors.clear,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: PiligrimTextStyles.button.copyWith(
-            fontSize: 13,
-            letterSpacing: 0.8,
-            color: active ? PiligrimColors.sky : PiligrimColors.sky.withValues(alpha: 0.45),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Карточка одного предстоящего мероприятия в списке (обложка + дата + описание)
+// Карточка одного предстоящего мероприятия в списке.
+// Дизайн: обложка с water-pill даты (top-left) и format-badge (bottom-right),
+// steppe-left-accent-line, многоступенчатый gradient, sky-heading + water-date.
 class _EventListCard extends StatelessWidget {
   const _EventListCard({
     required this.event,
@@ -739,115 +913,292 @@ class _EventListCard extends StatelessWidget {
   final int coverFallbackIndex;
   final VoidCallback onOpen;
 
-  String _subtitle() {
-    final fmt = event.formatLabelRu.toLowerCase();
-    final price = event.priceFrom != null
-        ? ' · от ${'${event.priceFrom}'.replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸'
-        : '';
-    return '$fmt$price';
+  String _priceLine() {
+    if (event.priceFrom == null) return 'Стоимость уточняется';
+    final formatted = '${event.priceFrom}'.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]} ',
+    );
+    return 'от $formatted ₸';
+  }
+
+  String _dateBadgeText() {
+    final d = event.startsAt;
+    final m = const [
+      'ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН',
+      'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК',
+    ][d.month - 1];
+    final hh = d.hour.toString().padLeft(2, '0');
+    final mm = d.minute.toString().padLeft(2, '0');
+    return '${d.day} $m · $hh:$mm';
   }
 
   @override
   Widget build(BuildContext context) {
+    final isOpen = event.format == ApiEventFormat.open;
     return PiligrimTap(
       onTap: onOpen,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-          decoration: BoxDecoration(
-            color: PiligrimColors.earth.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: PiligrimColors.divider),
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        decoration: BoxDecoration(
+          color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: PiligrimColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: PiligrimColors.shadow.withValues(alpha: 0.18),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  width: 96,
-                  height: 112,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      EventCoverImage(
-                        imageUrl: event.coverUrl,
-                        fallbackAsset: event.fallbackCoverAsset(coverFallbackIndex),
+              // Steppe-left-accent-line — без IntrinsicHeight (стабильно в SliverList).
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 2.5,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        PiligrimColors.steppe.withValues(alpha: 0.55),
+                        PiligrimColors.steppe.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14.5, 12, 12, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                      // Обложка с badge'ами и кинематографичным gradient
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          width: 100,
+                          height: 124,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              EventCoverImage(
+                                imageUrl: event.coverUrl,
+                                fallbackAsset:
+                                    event.fallbackCoverAsset(coverFallbackIndex),
+                              ),
+                              // Многоступенчатый gradient для читаемости badge'ей
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      PiligrimColors.earthDeep
+                                          .withValues(alpha: 0.55),
+                                      PiligrimColors.earthDeep
+                                          .withValues(alpha: 0.0),
+                                      PiligrimColors.earthDeep
+                                          .withValues(alpha: 0.3),
+                                      PiligrimColors.earthDeep
+                                          .withValues(alpha: 0.85),
+                                    ],
+                                    stops: const [0.0, 0.32, 0.65, 1.0],
+                                  ),
+                                ),
+                              ),
+                              // Water-pill даты (top-left)
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                right: 8,
+                                child: _DateBadge(text: _dateBadgeText()),
+                              ),
+                              // Format-badge (bottom-right) — Открытое/Закрытое
+                              Positioned(
+                                left: 8,
+                                right: 8,
+                                bottom: 8,
+                                child: _FormatBadge(isOpen: isOpen),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        height: 48,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                PiligrimColors.earth.withValues(alpha: 0.0),
-                                PiligrimColors.earth.withValues(alpha: 0.75),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              event.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: PiligrimTextStyles.heading.copyWith(
+                                fontSize: 16.5,
+                                height: 1.25,
+                                color: PiligrimColors.sky,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              formatDateTimeRu(event.startsAt),
+                              style: PiligrimTextStyles.caption.copyWith(
+                                color: PiligrimColors.water
+                                    .withValues(alpha: 0.95),
+                                fontSize: 12,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // Стоимость со steppe-dot префиксом
+                            Row(
+                              children: [
+                                Container(
+                                  width: 4,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: PiligrimColors.steppe
+                                        .withValues(alpha: 0.78),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _priceLine(),
+                                    style: PiligrimTextStyles.caption.copyWith(
+                                      fontSize: 11.5,
+                                      letterSpacing: 0.3,
+                                      color: PiligrimColors.steppe
+                                          .withValues(alpha: 0.78),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Text(
+                              event.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: PiligrimTextStyles.body.copyWith(
+                                fontSize: 13,
+                                height: 1.45,
+                                color: PiligrimColors.sky
+                                    .withValues(alpha: 0.62),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: PiligrimTextStyles.heading.copyWith(
-                        fontSize: 16,
-                        color: PiligrimColors.sky,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      formatDateTimeRu(event.startsAt),
-                      style: PiligrimTextStyles.caption.copyWith(
-                        color: PiligrimColors.water,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _subtitle(),
-                      style: PiligrimTextStyles.caption.copyWith(
-                        fontSize: 11,
-                        color: PiligrimColors.steppe.withValues(alpha: 0.75),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      event.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: PiligrimTextStyles.body.copyWith(
-                        fontSize: 13,
-                        height: 1.45,
-                        color: PiligrimColors.sky.withValues(alpha: 0.65),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
     );
   }
 }
 
-// Заголовок-аккордеон для раскрытия архива прошедших мероприятий
+// Water-pill даты на обложке мероприятия.
+class _DateBadge extends StatelessWidget {
+  const _DateBadge({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: PiligrimColors.earthDeep.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: PiligrimColors.water.withValues(alpha: 0.4),
+          width: 0.8,
+        ),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.fade,
+        softWrap: false,
+        textAlign: TextAlign.center,
+        style: PiligrimTextStyles.micro.copyWith(
+          color: PiligrimColors.sky.withValues(alpha: 0.92),
+          letterSpacing: 0.6,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+// Format-badge на обложке: Открытое (water-tint) / Закрытое (steppe-tint).
+class _FormatBadge extends StatelessWidget {
+  const _FormatBadge({required this.isOpen});
+  final bool isOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isOpen
+        ? PiligrimColors.water.withValues(alpha: 0.45)
+        : PiligrimColors.steppe.withValues(alpha: 0.55);
+    final label = isOpen ? 'ОТКРЫТОЕ' : 'ЗАКРЫТОЕ';
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: PiligrimColors.earthDeep.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accent, width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.fade,
+              softWrap: false,
+              style: PiligrimTextStyles.micro.copyWith(
+                color: PiligrimColors.sky.withValues(alpha: 0.85),
+                letterSpacing: 0.8,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Аккордеон архива прошедших — water-totem, steppe-hairline, плавный chevron.
 class _ArchiveHeader extends StatelessWidget {
   const _ArchiveHeader({
     required this.expanded,
@@ -864,61 +1215,100 @@ class _ArchiveHeader extends StatelessWidget {
     return PiligrimTap(
       onTap: onToggle,
       borderRadius: BorderRadius.circular(12),
-      child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            color: PiligrimColors.earth.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: PiligrimColors.divider),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: expanded
+              ? PiligrimColors.earthDeep.withValues(alpha: 0.55)
+              : PiligrimColors.earth.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: expanded
+                ? PiligrimColors.water.withValues(alpha: 0.28)
+                : PiligrimColors.divider,
+            width: 0.8,
           ),
-          child: Row(
-            children: [
-              SvgPicture.asset(
-                'assets/images/wheel_totem (1).svg',
-                width: 22,
-                height: 22,
-                colorFilter: ColorFilter.mode(
-                  PiligrimColors.sky.withValues(alpha: 0.5),
-                  BlendMode.srcIn,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/images/wheel_totem (1).svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(
+                    PiligrimColors.water.withValues(alpha: 0.55),
+                    BlendMode.srcIn,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'АРХИВ ПРОШЕДШИХ',
-                      style: PiligrimTextStyles.caption.copyWith(
-                        letterSpacing: 1.4,
-                        color: PiligrimColors.sky.withValues(alpha: 0.85),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'АРХИВ ПРОШЕДШИХ',
+                        style: PiligrimTextStyles.caption.copyWith(
+                          letterSpacing: 1.6,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: PiligrimColors.sky.withValues(alpha: 0.85),
+                        ),
                       ),
-                    ),
-                    Text(
-                      '$count мероприятий · фотоотчёты по метке',
-                      style: PiligrimTextStyles.caption.copyWith(
-                        fontSize: 11,
-                        color: PiligrimColors.sky.withValues(alpha: 0.4),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$count мероприятий · фотоотчёты по метке',
+                        style: PiligrimTextStyles.caption.copyWith(
+                          fontSize: 11,
+                          letterSpacing: 0.3,
+                          color: PiligrimColors.sky.withValues(alpha: 0.45),
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: expanded ? 0.125 : 0,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  child: Text(
+                    '+',
+                    style: PiligrimTextStyles.title.copyWith(
+                      fontSize: 22,
+                      height: 1.0,
+                      color: PiligrimColors.water.withValues(alpha: 0.95),
                     ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Тонкая steppe-hairline — единый штрих с section headers
+            Container(
+              height: 1,
+              width: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    PiligrimColors.steppe.withValues(alpha: 0.45),
+                    PiligrimColors.steppe.withValues(alpha: 0.0),
                   ],
                 ),
               ),
-              Text(
-                expanded ? '−' : '+',
-                style: PiligrimTextStyles.title.copyWith(
-                  fontSize: 20,
-                  color: PiligrimColors.water,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
     );
   }
 }
 
-// Карточка прошедшего мероприятия (название, дата)
+// Карточка прошедшего мероприятия — тонкая matte-вуаль на обложке,
+// «Фотоотчёт» chip (water-tint) если доступен фотоотчёт.
 class _PastEventCard extends StatelessWidget {
   const _PastEventCard({
     required this.event,
@@ -937,22 +1327,34 @@ class _PastEventCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: PiligrimColors.earth.withValues(alpha: 0.55),
+          color: PiligrimColors.earthDeep.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: PiligrimColors.divider),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: SizedBox(
-                width: 80,
-                height: 96,
-                child: EventCoverImage(
-                  imageUrl: event.coverUrl,
-                  fallbackAsset: event.fallbackCoverAsset(coverFallbackIndex),
+                width: 76,
+                height: 92,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    EventCoverImage(
+                      imageUrl: event.coverUrl,
+                      fallbackAsset:
+                          event.fallbackCoverAsset(coverFallbackIndex),
+                    ),
+                    // Тонкая matte-вуаль для «архивного» ощущения
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: PiligrimColors.earth.withValues(alpha: 0.22),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -966,18 +1368,25 @@ class _PastEventCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: PiligrimTextStyles.body.copyWith(
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: PiligrimColors.sky.withValues(alpha: 0.75),
+                      height: 1.3,
+                      color: PiligrimColors.sky.withValues(alpha: 0.78),
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     formatShortDateRu(event.startsAt),
                     style: PiligrimTextStyles.caption.copyWith(
-                      color: PiligrimColors.sky.withValues(alpha: 0.35),
-                      fontSize: 12,
+                      color: PiligrimColors.sky.withValues(alpha: 0.38),
+                      fontSize: 11.5,
+                      letterSpacing: 0.3,
                     ),
                   ),
+                  if (event.hasPhotoReport) ...[
+                    const SizedBox(height: 8),
+                    _PhotoReportChip(),
+                  ],
                 ],
               ),
             ),
@@ -988,7 +1397,49 @@ class _PastEventCard extends StatelessWidget {
   }
 }
 
-// Карточка новости ресторана (заголовок, дата, текст)
+// Micro-chip «Фотоотчёт» для архивной карточки — water-tinted dot + caps.
+class _PhotoReportChip extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: PiligrimColors.water.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: PiligrimColors.water.withValues(alpha: 0.30),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              color: PiligrimColors.water.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'ФОТООТЧЁТ',
+            style: PiligrimTextStyles.micro.copyWith(
+              color: PiligrimColors.water.withValues(alpha: 0.85),
+              letterSpacing: 0.8,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Карточка новости — steppe-accent line, steppe-dot перед title,
+// тонкий sky-divider между датой и body.
 class _NewsCard extends StatelessWidget {
   const _NewsCard({required this.post});
   final PiligrimNewsPost post;
@@ -997,53 +1448,276 @@ class _NewsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: PiligrimColors.earth.withValues(alpha: 0.55),
+        color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: PiligrimColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: PiligrimColors.shadow.withValues(alpha: 0.16),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (post.imageUrl != null) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: CachedNetworkImage(
-                imageUrl: post.imageUrl!,
-                width: double.infinity,
-                height: 180,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 1.5,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      PiligrimColors.steppe.withValues(alpha: 0.55),
+                      PiligrimColors.steppe.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+              child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (post.imageUrl != null &&
+                          post.imageUrl!.isNotEmpty) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Stack(
+                            children: [
+                              PiligrimNetworkOrAssetImage(
+                                source: post.imageUrl!,
+                                width: double.infinity,
+                                height: 180,
+                                fit: BoxFit.cover,
+                              ),
+                              // Лёгкий gradient bottom-overlay для глубины
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                height: 60,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        PiligrimColors.earthDeep
+                                            .withValues(alpha: 0.0),
+                                        PiligrimColors.earthDeep
+                                            .withValues(alpha: 0.55),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      // Title со steppe-dot префиксом
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 9, right: 8),
+                            child: Container(
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: PiligrimColors.steppe
+                                    .withValues(alpha: 0.78),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              post.title,
+                              style: PiligrimTextStyles.heading.copyWith(
+                                fontSize: 17,
+                                height: 1.3,
+                                color: PiligrimColors.sky,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Дата + mini hairline-divider
+                      Row(
+                        children: [
+                          Text(
+                            formatShortDateRu(post.publishedAt),
+                            style: PiligrimTextStyles.caption.copyWith(
+                              color: PiligrimColors.water
+                                  .withValues(alpha: 0.85),
+                              fontSize: 12,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 20,
+                            height: 1,
+                            color: PiligrimColors.sky.withValues(alpha: 0.10),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        post.body,
+                        style: PiligrimTextStyles.body.copyWith(
+                          fontSize: 14,
+                          height: 1.6,
+                          color: PiligrimColors.sky.withValues(alpha: 0.88),
+                        ),
+                      ),
+                    ],
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Пустое состояние — тотем + caption + подсказка.
+// Совпадает по тону с _ClassicEmptyState из MenuScreen.
+class _AfichaEmpty extends StatelessWidget {
+  const _AfichaEmpty({
+    required this.totem,
+    required this.title,
+    required this.hint,
+  });
+
+  final String totem;
+  final String title;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      child: Column(
+        children: [
+          SvgPicture.asset(
+            totem,
+            width: 44,
+            height: 44,
+            colorFilter: ColorFilter.mode(
+              PiligrimColors.steppe.withValues(alpha: 0.22),
+              BlendMode.srcIn,
+            ),
+          )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .fadeIn(duration: 800.ms)
+              .then()
+              .scale(
+                begin: const Offset(1, 1),
+                end: const Offset(1.04, 1.04),
+                duration: 2600.ms,
+              ),
+          const SizedBox(height: 16),
           Text(
-            post.title,
-            style: PiligrimTextStyles.heading.copyWith(
-              fontSize: 17,
-              color: PiligrimColors.sky,
+            title,
+            textAlign: TextAlign.center,
+            style: PiligrimTextStyles.body.copyWith(
+              color: PiligrimColors.sky.withValues(alpha: 0.45),
+              letterSpacing: 0.4,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            formatShortDateRu(post.publishedAt),
+            hint,
+            textAlign: TextAlign.center,
             style: PiligrimTextStyles.caption.copyWith(
-              color: PiligrimColors.water.withValues(alpha: 0.85),
+              color: PiligrimColors.sky.withValues(alpha: 0.30),
               fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            post.body,
-            style: PiligrimTextStyles.body.copyWith(
-              fontSize: 14,
-              height: 1.6,
-              color: PiligrimColors.sky.withValues(alpha: 0.88),
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+// Skeleton для загрузки — 2 placeholder-карточки с breathing-animation.
+// Создаёт ощущение готовящегося контента вместо «голого» spinner'а.
+class _EventsLoadingSkeleton extends StatelessWidget {
+  const _EventsLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          for (var i = 0; i < 2; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _SkeletonRow(height: 124, delayMs: i * 120),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NewsLoadingSkeleton extends StatelessWidget {
+  const _NewsLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          for (var i = 0; i < 2; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _SkeletonRow(height: 110, delayMs: i * 120),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonRow extends StatelessWidget {
+  const _SkeletonRow({required this.height, this.delayMs = 0});
+  final double height;
+  final int delayMs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: PiligrimColors.divider),
+      ),
+    )
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .fadeIn(duration: 600.ms, delay: delayMs.ms)
+        .then()
+        .fade(
+          begin: 1.0,
+          end: 0.55,
+          duration: 1400.ms,
+          curve: Curves.easeInOut,
+        );
   }
 }
