@@ -32,6 +32,8 @@ class MenuProvider extends ChangeNotifier {
   int _page = 1;
   int? activeCategoryId;
   String searchQuery = '';
+  final List<int> activeTagIds = [];
+  List<ApiTag> _allSeenTags = [];
 
   // ── Состояние видео-ленты (cursor pagination) ──────────────────────────────
 
@@ -59,6 +61,9 @@ class MenuProvider extends ChangeNotifier {
 
   // Уникальные теги из всех загруженных блюд — для динамических фильтр-чипов.
   List<ApiTag> get availableTags {
+    if (activeTagIds.isNotEmpty && _allSeenTags.isNotEmpty) {
+      return _allSeenTags;
+    }
     final seen = <int>{};
     final result = <ApiTag>[];
     for (final dish in dishes) {
@@ -124,10 +129,25 @@ class MenuProvider extends ChangeNotifier {
     try {
       final result = await _repository.fetchDishes(
         categoryId: activeCategoryId,
+        tagIds: activeTagIds.isEmpty ? null : activeTagIds,
         search: searchQuery.isEmpty ? null : searchQuery,
         page: _page,
       );
       dishes = [...dishes, ...result.dishes];
+
+      // Обновляем список всех виденных тегов только когда фильтр пуст,
+      // чтобы чипы не исчезали при активации фильтрации.
+      if (activeTagIds.isEmpty) {
+        final seen = <int>{};
+        final resultTags = <ApiTag>[];
+        for (final dish in dishes) {
+          for (final tag in dish.tags) {
+            if (seen.add(tag.id)) resultTags.add(tag);
+          }
+        }
+        _allSeenTags = resultTags;
+      }
+
       hasMore = result.hasMore;
       _page++;
     } catch (e) {
@@ -207,6 +227,23 @@ class MenuProvider extends ChangeNotifier {
   void setCategory(int? id) {
     if (activeCategoryId == id) return;
     activeCategoryId = id;
+    activeTagIds.clear();
+    _allSeenTags.clear();
+    loadDishes(refresh: true);
+  }
+
+  void toggleTag(int tagId) {
+    if (activeTagIds.contains(tagId)) {
+      activeTagIds.remove(tagId);
+    } else {
+      activeTagIds.add(tagId);
+    }
+    loadDishes(refresh: true);
+  }
+
+  void clearTags() {
+    if (activeTagIds.isEmpty) return;
+    activeTagIds.clear();
     loadDishes(refresh: true);
   }
 

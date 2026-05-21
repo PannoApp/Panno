@@ -126,7 +126,7 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Количество гостей',
+                  'Количество героев',
                   style: PiligrimTextStyles.caption.copyWith(
                     color: PiligrimColors.sky.withValues(alpha: 0.7),
                   ),

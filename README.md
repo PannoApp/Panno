@@ -161,7 +161,7 @@ DJANGO_SETTINGS_MODULE=config.settings.test python manage.py test apps
 - **Навигация:** `IndexedStack` для вкладок, именованные маршруты для деталей.
 - **State management:** `InheritedNotifier` (`AmbientPresetScope`) для темы окружения; `SharedPreferences` для персистентности.
 - **HTTP:** `dio` с JWT-интерцептором и auto-refresh; токены хранятся в `flutter_secure_storage`.
-- **Push:** `firebase_messaging` — FCM-токен передаётся на бэкенд через `/api/v1/notifications/devices/register/`.
+- **Push:** `firebase_messaging` — FCM-токен передаётся на бэкенд через `/api/v1/notifications/device/register/`.
 - **Видео:** `video_player` для ленты блюд.
 - **Типографика:** MuseoSans 300/700 (только эти веса загружены из assets).
 - **Ориентация:** только портретная (заблокировано в `main.dart`).

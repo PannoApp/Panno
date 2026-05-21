@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/auth_guard.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
@@ -13,6 +14,7 @@ import '../providers/core_info_provider.dart';
 import '../widgets/ember_cta.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_tap.dart';
+import 'booking_success_screen.dart';
 
 // Форматирует TimeOfDay в строку HH:MM:SS для Django TimeField.
 String bookingTimeForApi(TimeOfDay time) {
@@ -44,7 +46,6 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime _visitDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _visitTime = const TimeOfDay(hour: 19, minute: 30);
   String? _selectedZone = 'Главный зал';
-  bool _submitted = false;
 
   // API-значения зон соответствуют backend enum: main/terrace/private
   static const _zones = ['Главный зал', 'Терраса', 'Приват'];
@@ -154,7 +155,33 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!mounted) return;
 
     if (booking.isSuccess) {
-      setState(() => _submitted = true);
+      final dateText = _dateLabel;
+      final timeText = _timeLabel;
+      final count = int.parse(_guestsCtrl.text);
+      final zoneText = _selectedZone;
+      final depositRequired =
+          context.read<CoreInfoProvider>().coreInfo?.bookingDepositRequired ?? false;
+
+      // Очищаем форму
+      _nameCtrl.clear();
+      _commentCtrl.clear();
+      setState(() {
+        _selectedZone = null;
+        _visitDate = DateTime.now().add(const Duration(days: 1));
+        _visitTime = const TimeOfDay(hour: 19, minute: 0);
+      });
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => BookingSuccessScreen(
+            date: dateText,
+            time: timeText,
+            heroesCount: count,
+            zone: zoneText,
+            depositRequired: depositRequired,
+          ),
+        ),
+      );
     } else if (booking.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -383,20 +410,55 @@ class _BookingScreenState extends State<BookingScreen> {
                                   color: PiligrimColors.steppe.withValues(alpha: 0.45),
                                 ),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Icon(
-                                    Icons.info_outline_rounded,
-                                    color: PiligrimColors.steppe,
-                                    size: 18,
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline_rounded,
+                                        color: PiligrimColors.steppe,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          context.watch<CoreInfoProvider>().coreInfo?.bookingDepositNote
+                                              ?? 'Для выбранного стола может потребоваться депозит. Уточните у менеджера.',
+                                          style: PiligrimTextStyles.caption.copyWith(
+                                            color: PiligrimColors.sky.withValues(alpha: 0.85),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      context.watch<CoreInfoProvider>().coreInfo?.bookingDepositNote
-                                          ?? 'Для выбранного стола может потребоваться депозит. Уточните у менеджера.',
-                                      style: PiligrimTextStyles.caption.copyWith(
-                                        color: PiligrimColors.sky.withValues(alpha: 0.85),
+                                  const SizedBox(height: 10),
+                                  PiligrimTap(
+                                    onTap: () async {
+                                      final phone = context.read<CoreInfoProvider>().coreInfo?.phone ?? '';
+                                      if (phone.isNotEmpty) {
+                                        final uri = Uri.parse('tel:$phone');
+                                        if (await canLaunchUrl(uri)) {
+                                          await launchUrl(uri);
+                                        }
+                                      }
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: PiligrimColors.steppe.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: PiligrimColors.steppe),
+                                      ),
+                                      child: Text(
+                                        'ПОЗВОНИТЬ МЕНЕДЖЕРУ',
+                                        style: PiligrimTextStyles.button.copyWith(
+                                          fontSize: 12,
+                                          color: PiligrimColors.steppe,
+                                          letterSpacing: 1.0,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -433,17 +495,6 @@ class _BookingScreenState extends State<BookingScreen> {
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 320),
-                    child: _submitted
-                        ? _FlowCard(
-                            visitDate: _dateLabel,
-                            visitTime: _timeLabel,
-                            depositRequired: depositRequired,
-                          )
-                        : const SizedBox.shrink(),
                   ),
                 ],
               ),
@@ -606,52 +657,3 @@ class _DateTimeChip extends StatelessWidget {
   }
 }
 
-// Карточка «Сценарий после отправки» — пошагово объясняет, что произойдёт после заявки
-class _FlowCard extends StatelessWidget {
-  const _FlowCard({
-    required this.visitDate,
-    required this.visitTime,
-    required this.depositRequired,
-  });
-
-  final String visitDate;
-  final String visitTime;
-  final bool depositRequired;
-
-  @override
-  Widget build(BuildContext context) {
-    final pushes = <String>[
-      'Заявка принята, мы свяжемся с вами в течение 15 минут.',
-      'После подтверждения менеджером: бронь подтверждена на $visitDate, $visitTime.',
-      'Напоминание за 1-2 часа до визита.',
-    ];
-    if (depositRequired) {
-      pushes.add('Для выбранного стола нужен депозит — менеджер направит вас на звонок.');
-    }
-
-    return _LuxCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Сценарий после отправки',
-            style: PiligrimTextStyles.heading.copyWith(color: PiligrimColors.steppe),
-          ),
-          const SizedBox(height: 8),
-          ...pushes.map(
-            (line) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                '• $line',
-                style: PiligrimTextStyles.body.copyWith(
-                  color: PiligrimColors.sky.withValues(alpha: 0.87),
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

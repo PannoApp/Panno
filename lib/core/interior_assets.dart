@@ -3,9 +3,9 @@ import 'package:flutter/widgets.dart';
 
 abstract final class PiligrimInteriorAssets {
   static const List<String> triptychInteriorAmbient = [
-    'assets/images/interior_hero_21.png',
-    'assets/images/interior_hero_12.png',
-    'assets/images/interior_hero_13.png',
+    'assets/images/interior_hero_1.png',
+    'assets/images/interior_hero_2.png',
+    'assets/images/interior_hero_3.png',
   ];
 
   /// Главный hero — те же кадры, что и глобальный триптих (визуальная непрерывность).
@@ -27,10 +27,10 @@ abstract final class PiligrimInteriorAssets {
     return h.round().clamp(900, 2200);
   }
 
-  /// Все интерьерные PNG (`interior_hero_1` … `interior_hero_21`) — афиша, бронь, обложки.
+  /// Все интерьерные PNG (`interior_hero_1` … `interior_hero_3`) — афиша, бронь, обложки.
   static final List<String> allInteriorPngs = List<String>.unmodifiable(
     List.generate(
-      21,
+      3,
       (i) => 'assets/images/interior_hero_${i + 1}.png',
     ),
   );

@@ -371,8 +371,6 @@ class _ClassicMenuSection extends StatefulWidget {
 }
 
 class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
-  // Активные теги-фильтры хранятся по id (стабильный ключ из API)
-  final Set<int> _activeTagIds = {};
   final TextEditingController _searchCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
 
@@ -401,19 +399,11 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
     super.dispose();
   }
 
-  // Клиентская фильтрация по тегам (category и search — серверная)
-  List<ApiDish> _applyTagFilter(List<ApiDish> dishes) {
-    if (_activeTagIds.isEmpty) return dishes;
-    return dishes
-        .where((d) => _activeTagIds.every((id) => d.tags.any((t) => t.id == id)))
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final menuProvider = context.watch<MenuProvider>();
     final top = MediaQuery.paddingOf(context).top;
-    final filtered = _applyTagFilter(menuProvider.dishes);
+    final filtered = menuProvider.dishes;
 
     return CustomScrollView(
       controller: _scrollCtrl,
@@ -442,18 +432,12 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
           ),
         ),
 
-        // Фильтры по тегам (клиентские, динамические из API)
+        // Фильтры по тегам (динамические из API, серверная фильтрация)
         SliverToBoxAdapter(
           child: _FilterChips(
             tags: menuProvider.availableTags,
-            activeIds: _activeTagIds,
-            onToggle: (tag) => setState(() {
-              if (_activeTagIds.contains(tag.id)) {
-                _activeTagIds.remove(tag.id);
-              } else {
-                _activeTagIds.add(tag.id);
-              }
-            }),
+            activeIds: menuProvider.activeTagIds,
+            onToggle: (tag) => menuProvider.toggleTag(tag.id),
           ),
         ),
 
@@ -696,7 +680,7 @@ class _FilterChips extends StatelessWidget {
   });
 
   final List<ApiTag> tags;
-  final Set<int> activeIds;
+  final Iterable<int> activeIds;
   final ValueChanged<ApiTag> onToggle;
 
   @override

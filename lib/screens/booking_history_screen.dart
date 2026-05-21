@@ -196,7 +196,7 @@ class _BookingCard extends StatelessWidget {
             const SizedBox(height: 6),
             _DetailRow(
               icon: 'assets/images/shaman.svg',
-              text: '${booking.guestsCount} гостей',
+              text: _formatHeroesCount(booking.guestsCount),
             ),
             if (booking.zone != null) ...[
               const SizedBox(height: 6),
@@ -372,6 +372,18 @@ class _EmptyState extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(delay: 200.ms, duration: 500.ms);
+  }
+}
+
+String _formatHeroesCount(int count) {
+  final mod10 = count % 10;
+  final mod100 = count % 100;
+  if (mod10 == 1 && mod100 != 11) {
+    return '$count герой';
+  } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+    return '$count героя';
+  } else {
+    return '$count героев';
   }
 }
 
