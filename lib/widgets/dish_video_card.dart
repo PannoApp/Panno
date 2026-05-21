@@ -281,8 +281,8 @@ class _DishVideoCardState extends State<DishVideoCard>
             // ── 6. Кнопка звука ───────────────────────────────────
             if (videoReady)
               Positioned(
-                top: topInset + 12,
-                right: 16,
+                top: topInset + 58,
+                right: 20,
                 child: _MuteButton(isMuted: _isMuted, onToggle: _toggleMute),
               ),
 
