@@ -777,9 +777,8 @@ class _ClassicDishCard extends StatelessWidget {
             // [1] Фото — full-width Stack с градиентом и ценой
             Stack(
               children: [
-                SizedBox(
-                  width: double.infinity,
-                  height: 220,
+                AspectRatio(
+                  aspectRatio: 16 / 9,
                   child: dish.imageUrl != null
                       ? CachedNetworkImage(
                           imageUrl: dish.imageUrl!,
@@ -964,9 +963,8 @@ class _DishDetailSheet extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  child: SizedBox(
-                    height: 280,
-                    width: double.infinity,
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
                     child: dish.imageUrl != null
                         ? CachedNetworkImage(
                             imageUrl: dish.imageUrl!,

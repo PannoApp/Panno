@@ -261,26 +261,26 @@ class DishThumbnail extends StatelessWidget {
     super.key,
     required this.imageUrl,
     required this.fallback,
-    this.height = 180,
+    this.aspectRatio = 16 / 9,
   });
 
   final String? imageUrl;
   final Widget fallback;
-  final double height;
+  final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrl == null || imageUrl!.isEmpty) return SizedBox(height: height, child: fallback);
-
-    return SizedBox(
-      height: height,
-      child: CachedNetworkImage(
-        imageUrl: imageUrl!,
-        fit: BoxFit.cover,
-        // При загрузке и при ошибке показываем кинематографический фон
-        placeholder: (_, __) => fallback,
-        errorWidget: (_, __, ___) => fallback,
-      ),
+    return AspectRatio(
+      aspectRatio: aspectRatio,
+      child: imageUrl == null || imageUrl!.isEmpty
+          ? fallback
+          : CachedNetworkImage(
+              imageUrl: imageUrl!,
+              fit: BoxFit.cover,
+              // При загрузке и при ошибке показываем кинематографический фон
+              placeholder: (_, __) => fallback,
+              errorWidget: (_, __, ___) => fallback,
+            ),
     );
   }
 }

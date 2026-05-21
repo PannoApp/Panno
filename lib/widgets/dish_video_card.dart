@@ -484,7 +484,6 @@ class _DishDetailSheet extends StatelessWidget {
                     DishThumbnail(
                       imageUrl: dish.imageUrl,
                       fallback: fallbackBg,
-                      height: 180,
                     ),
                     // Декоративный тотем поверх превью
                     Positioned.fill(
