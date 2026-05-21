@@ -7,8 +7,8 @@ from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParamete
 from drf_spectacular.types import OpenApiTypes
 from utils.idempotency import IdempotencyMixin
 from utils.pagination import StandardPagination
-from .models import Event, News, EventReservation
-from .serializers import EventSerializer, NewsSerializer, EventReservationSerializer
+from .models import Event, News, EventReservation, EventPhotoReport
+from .serializers import EventSerializer, NewsSerializer, EventReservationSerializer, EventPhotoReportSerializer
 
 # Предстоящие/прошедшие события зависят от текущего времени — короткий TTL,
 # чтобы список обновлялся автоматически когда событие «наступает».
@@ -187,3 +187,32 @@ class UserEventReservationsListView(generics.ListAPIView):
         if getattr(self, 'swagger_fake_view', False):
             return EventReservation.objects.none()
         return EventReservation.objects.filter(user=self.request.user).select_related('event')
+
+
+@extend_schema(
+    tags=['Events'],
+    summary='Фотоотчёт прошедшего мероприятия',
+    description=(
+        'Возвращает список фотографий фотоотчёта для указанного мероприятия. '
+        'Доступно только для прошедших событий (date_time в прошлом). '
+        'Если мероприятие ещё не прошло или фотоотчёт не загружен — возвращается пустой список.'
+    ),
+    parameters=[
+        OpenApiParameter(
+            name='event_id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.PATH,
+            description='ID мероприятия',
+        ),
+    ],
+    responses={200: EventPhotoReportSerializer(many=True)},
+)
+class EventPhotoReportListView(generics.ListAPIView):
+    serializer_class = EventPhotoReportSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return EventPhotoReport.objects.filter(
+            event_id=self.kwargs['event_id'],
+            event__date_time__lt=timezone.now(),
+        )

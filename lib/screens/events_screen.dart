@@ -217,7 +217,20 @@ class _EventsScreenState extends State<EventsScreen> {
                             final e = past[i];
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
-                              child: _PastEventCard(event: e),
+                              child: _PastEventCard(
+                                event: e,
+                                coverFallbackIndex: i,
+                                onOpen: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => EventDetailScreen(
+                                        event: e,
+                                        coverFallbackIndex: i,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                             );
                           },
                           childCount: past.length,
@@ -906,37 +919,69 @@ class _ArchiveHeader extends StatelessWidget {
 
 // Карточка прошедшего мероприятия (название, дата)
 class _PastEventCard extends StatelessWidget {
-  const _PastEventCard({required this.event});
+  const _PastEventCard({
+    required this.event,
+    required this.coverFallbackIndex,
+    required this.onOpen,
+  });
 
   final ApiEvent event;
+  final int coverFallbackIndex;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: PiligrimColors.divider),
-      ),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            event.title,
-            style: PiligrimTextStyles.body.copyWith(
-              fontWeight: FontWeight.w700,
-              color: PiligrimColors.sky.withValues(alpha: 0.75),
+    return PiligrimTap(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: PiligrimColors.earth.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: PiligrimColors.divider),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 80,
+                height: 96,
+                child: EventCoverImage(
+                  imageUrl: event.coverUrl,
+                  fallbackAsset: event.fallbackCoverAsset(coverFallbackIndex),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            formatShortDateRu(event.startsAt),
-            style: PiligrimTextStyles.caption.copyWith(
-              color: PiligrimColors.sky.withValues(alpha: 0.35),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: PiligrimTextStyles.body.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: PiligrimColors.sky.withValues(alpha: 0.75),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    formatShortDateRu(event.startsAt),
+                    style: PiligrimTextStyles.caption.copyWith(
+                      color: PiligrimColors.sky.withValues(alpha: 0.35),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -4,7 +4,8 @@ from .views import (
     ArchivedEventsListView,
     NewsListView,
     EventReservationCreateView,
-    UserEventReservationsListView
+    UserEventReservationsListView,
+    EventPhotoReportListView,
 )
 
 app_name = 'events'
@@ -19,4 +20,7 @@ urlpatterns = [
 
     path('reservations/create/', EventReservationCreateView.as_view(), name='reservation-create'),
     path('reservations/my/', UserEventReservationsListView.as_view(), name='reservation-list'),
+
+    # Фотоотчёт прошедшего мероприятия
+    path('<int:event_id>/photo-report/', EventPhotoReportListView.as_view(), name='event-photo-report'),
 ]

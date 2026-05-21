@@ -4,6 +4,7 @@ import '../core/dio_errors.dart';
 import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
 import '../data/models/api_event.dart';
+import '../data/models/api_event_photo.dart';
 import '../data/repositories/events_repository.dart';
 
 /// Афиша, архив и новости с API + fallback на моки.
@@ -21,6 +22,7 @@ class EventsProvider extends ChangeNotifier {
   bool isLoadingArchived = false;
   bool isLoadingNews = false;
   bool isReserving = false;
+  bool isLoadingPhotoReport = false;
 
   String? upcomingError;
   String? archivedError;
@@ -28,6 +30,9 @@ class EventsProvider extends ChangeNotifier {
   String? reserveError;
 
   bool _usedMockFallback = false;
+
+  List<ApiEventPhoto> _photoReport = const [];
+  List<ApiEventPhoto> get photoReport => List.unmodifiable(_photoReport);
 
   bool get usedMockFallback => _usedMockFallback;
 
@@ -94,6 +99,19 @@ class EventsProvider extends ChangeNotifier {
   }
 
   Future<void> retry() => load();
+
+  Future<void> loadPhotoReport(int eventId) async {
+    isLoadingPhotoReport = true;
+    notifyListeners();
+    try {
+      _photoReport = await _repository.fetchPhotoReport(eventId);
+    } catch (_) {
+      _photoReport = const [];
+    } finally {
+      isLoadingPhotoReport = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> reserveEvent(int eventId, int guestsCount) async {
     isReserving = true;

@@ -10,8 +10,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase, APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Event, News, EventReservation
-from .serializers import EventReservationSerializer, EventReservationStaffSerializer
+from .models import Event, News, EventReservation, EventPhotoReport
+from .serializers import EventReservationSerializer, EventReservationStaffSerializer, EventSerializer
 
 User = get_user_model()
 
@@ -445,6 +445,111 @@ class EventsCacheTest(APITestCase):
         response = self.client.get('/api/v1/events/upcoming/')
         titles = [e['title'] for e in response.data['results']]
         self.assertIn('Срочное мероприятие', titles)
+
+
+# ---------------------------------------------------------------------------
+# EventPhotoReport — модель
+# ---------------------------------------------------------------------------
+
+class EventPhotoReportModelTest(TestCase):
+    def test_str_contains_event_title(self):
+        event = make_past_event(title='Джазовый вечер')
+        photo = EventPhotoReport.objects.create(event=event, image=make_image())
+        self.assertIn('Джазовый вечер', str(photo))
+
+    def test_default_ordering_by_order_then_uploaded(self):
+        event = make_past_event()
+        EventPhotoReport.objects.create(event=event, image=make_image('a.png'), order=2)
+        EventPhotoReport.objects.create(event=event, image=make_image('b.png'), order=0)
+        EventPhotoReport.objects.create(event=event, image=make_image('c.png'), order=1)
+        orders = list(EventPhotoReport.objects.filter(event=event).values_list('order', flat=True))
+        self.assertEqual(orders, [0, 1, 2])
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/events/<id>/photo-report/
+# ---------------------------------------------------------------------------
+
+class EventPhotoReportListViewTest(APITestCase):
+    URL = '/api/v1/events/{event_id}/photo-report/'
+
+    def test_returns_photos_for_past_event(self):
+        event = make_past_event(title='Прошедшее')
+        EventPhotoReport.objects.create(event=event, image=make_image())
+        EventPhotoReport.objects.create(event=event, image=make_image())
+        response = self.client.get(self.URL.format(event_id=event.pk))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
+    def test_returns_empty_for_future_event(self):
+        event = make_event(title='Будущее', days_offset=5)
+        EventPhotoReport.objects.create(event=event, image=make_image())
+        response = self.client.get(self.URL.format(event_id=event.pk))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+    def test_returns_empty_when_no_photos(self):
+        event = make_past_event()
+        response = self.client.get(self.URL.format(event_id=event.pk))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+    def test_returns_empty_for_nonexistent_event(self):
+        response = self.client.get(self.URL.format(event_id=99999))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+    def test_public_access_no_auth_required(self):
+        event = make_past_event()
+        response = self.client.get(self.URL.format(event_id=event.pk))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_photos_ordered_by_order_field(self):
+        event = make_past_event()
+        EventPhotoReport.objects.create(event=event, image=make_image('z.png'), order=3)
+        EventPhotoReport.objects.create(event=event, image=make_image('a.png'), order=1)
+        EventPhotoReport.objects.create(event=event, image=make_image('b.png'), order=2)
+        response = self.client.get(self.URL.format(event_id=event.pk))
+        orders = [p['order'] for p in response.data]
+        self.assertEqual(orders, [1, 2, 3])
+
+    def test_response_contains_expected_fields(self):
+        event = make_past_event()
+        EventPhotoReport.objects.create(event=event, image=make_image())
+        response = self.client.get(self.URL.format(event_id=event.pk))
+        photo = response.data[0]
+        self.assertIn('id', photo)
+        self.assertIn('image', photo)
+        self.assertIn('order', photo)
+
+
+# ---------------------------------------------------------------------------
+# EventSerializer — has_photo_report
+# ---------------------------------------------------------------------------
+
+class EventSerializerHasPhotoReportTest(TestCase):
+    def test_has_photo_report_false_when_no_photos(self):
+        event = make_past_event()
+        data = EventSerializer(event).data
+        self.assertFalse(data['has_photo_report'])
+
+    def test_has_photo_report_true_when_photos_exist(self):
+        event = make_past_event()
+        EventPhotoReport.objects.create(event=event, image=make_image())
+        data = EventSerializer(event).data
+        self.assertTrue(data['has_photo_report'])
+
+    def test_upcoming_event_has_photo_report_false(self):
+        event = make_event(days_offset=3)
+        data = EventSerializer(event).data
+        self.assertFalse(data['has_photo_report'])
+
+    def test_has_photo_report_included_in_archived_list(self):
+        event = make_past_event(title='С фото')
+        EventPhotoReport.objects.create(event=event, image=make_image())
+        response = self.client.get('/api/v1/events/archived/')
+        result = next(e for e in response.data['results'] if e['title'] == 'С фото')
+        self.assertTrue(result['has_photo_report'])
 
 
 class NewsCacheTest(APITestCase):

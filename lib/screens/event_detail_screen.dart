@@ -1,17 +1,20 @@
 // Детальная карточка мероприятия — ТЗ: обложка, название, дата/время, описание, формат, цена, «Записаться»
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../data/api_event_display.dart';
 import '../data/events_news_data.dart' show formatDateTimeRu;
 import '../data/models/api_event.dart';
+import '../providers/events_provider.dart';
 import '../widgets/event_cover_image.dart';
+import '../widgets/event_photo_report_gallery.dart';
 import '../widgets/event_signup_sheet.dart';
 import '../widgets/piligrim_background.dart';
 import '../core/auth_guard.dart';
 import '../widgets/piligrim_tap.dart';
 
-class EventDetailScreen extends StatelessWidget {
+class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({
     super.key,
     required this.event,
@@ -21,17 +24,36 @@ class EventDetailScreen extends StatelessWidget {
   final ApiEvent event;
   final int coverFallbackIndex;
 
+  @override
+  State<EventDetailScreen> createState() => _EventDetailScreenState();
+}
+
+class _EventDetailScreenState extends State<EventDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.event.isPast) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<EventsProvider>().loadPhotoReport(widget.event.id);
+      });
+    }
+  }
+
   String _priceLine() {
-    if (event.priceFrom == null) {
+    if (widget.event.priceFrom == null) {
       return 'Стоимость уточняется при записи';
     }
-    final formatted = '${event.priceFrom}'.replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ');
+    final formatted = '${widget.event.priceFrom}'.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]} ',
+    );
     return 'Вход: от $formatted ₸';
   }
 
   @override
   Widget build(BuildContext context) {
-    final fallback = event.fallbackCoverAsset(coverFallbackIndex);
+    final event = widget.event;
+    final fallback = event.fallbackCoverAsset(widget.coverFallbackIndex);
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
@@ -151,6 +173,35 @@ class EventDetailScreen extends StatelessWidget {
                         height: 1.65,
                       ),
                     ),
+                    if (event.isPast) ...[
+                      const SizedBox(height: 32),
+                      Consumer<EventsProvider>(
+                        builder: (_, provider, __) {
+                          if (provider.isLoadingPhotoReport) {
+                            return const _PhotoReportSkeleton();
+                          }
+                          if (provider.photoReport.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Фотоотчёт',
+                                style: PiligrimTextStyles.title.copyWith(
+                                  color: PiligrimColors.sky,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              EventPhotoReportGallery(
+                                photos: provider.photoReport,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                   ]),
                 ),
               ),
@@ -223,6 +274,35 @@ class _MetaChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PhotoReportSkeleton extends StatelessWidget {
+  const _PhotoReportSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 100,
+          height: 20,
+          decoration: BoxDecoration(
+            color: PiligrimColors.earthDeep,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: const SizedBox(
+            height: 220,
+            child: ColoredBox(color: PiligrimColors.earthDeep),
+          ),
+        ),
+      ],
     );
   }
 }

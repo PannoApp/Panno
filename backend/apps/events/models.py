@@ -128,3 +128,35 @@ class EventReservation(models.Model):
     def __str__(self):
         # Если у юзера нет имени, будет выводиться его email/телефон
         return f"Запись: {self.user} на {self.event.title}"
+
+
+class EventPhotoReport(models.Model):
+    """
+    Фотоотчёт прошедшего мероприятия.
+    """
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name='photo_reports',
+        verbose_name='Мероприятие',
+    )
+    image = models.ImageField(
+        upload_to='events/reports/',
+        verbose_name='Фотография',
+    )
+    order = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name='Порядок отображения',
+    )
+    uploaded_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата загрузки',
+    )
+
+    class Meta:
+        verbose_name = 'Фото отчёта'
+        verbose_name_plural = 'Фотоотчёты мероприятий'
+        ordering = ['order', 'uploaded_at']
+
+    def __str__(self):
+        return f"Фото #{self.pk} для «{self.event.title}»"

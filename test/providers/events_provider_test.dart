@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:piligrim/data/events_news_data.dart';
 import 'package:piligrim/data/models/api_event.dart';
+import 'package:piligrim/data/models/api_event_photo.dart';
 import 'package:piligrim/data/repositories/events_repository.dart';
 import 'package:piligrim/providers/events_provider.dart';
 
@@ -77,6 +78,43 @@ void main() {
       await provider.loadNews();
 
       expect(provider.news.length, mockNewsPosts().length);
+    });
+
+    test('loadPhotoReport sets photoReport on success', () async {
+      final photos = [
+        const ApiEventPhoto(id: 1, imageUrl: 'https://cdn/r1.jpg', order: 0),
+        const ApiEventPhoto(id: 2, imageUrl: 'https://cdn/r2.jpg', order: 1),
+      ];
+      when(() => repository.fetchPhotoReport(5)).thenAnswer((_) async => photos);
+
+      final provider = EventsProvider(repository: repository);
+      await provider.loadPhotoReport(5);
+
+      expect(provider.photoReport, hasLength(2));
+      expect(provider.photoReport.first.imageUrl, 'https://cdn/r1.jpg');
+      expect(provider.isLoadingPhotoReport, isFalse);
+    });
+
+    test('loadPhotoReport sets empty list on network error', () async {
+      when(() => repository.fetchPhotoReport(any())).thenThrow(Exception('offline'));
+
+      final provider = EventsProvider(repository: repository);
+      await provider.loadPhotoReport(1);
+
+      expect(provider.photoReport, isEmpty);
+      expect(provider.isLoadingPhotoReport, isFalse);
+    });
+
+    test('loadPhotoReport flips isLoadingPhotoReport during fetch', () async {
+      when(() => repository.fetchPhotoReport(any()))
+          .thenAnswer((_) async => <ApiEventPhoto>[]);
+
+      final provider = EventsProvider(repository: repository);
+      final loadFuture = provider.loadPhotoReport(1);
+
+      expect(provider.isLoadingPhotoReport, isTrue);
+      await loadFuture;
+      expect(provider.isLoadingPhotoReport, isFalse);
     });
   });
 }

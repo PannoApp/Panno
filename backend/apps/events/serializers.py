@@ -1,10 +1,22 @@
 from rest_framework import serializers
-from .models import Event, News, EventReservation
+from .models import Event, News, EventReservation, EventPhotoReport
+
+
+class EventPhotoReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventPhotoReport
+        fields = ('id', 'image', 'order')
+
 
 class EventSerializer(serializers.ModelSerializer):
     """
     Сериализатор для модели мероприятий.
     """
+    has_photo_report = serializers.SerializerMethodField()
+
+    def get_has_photo_report(self, obj):
+        return obj.photo_reports.exists()
+
     class Meta:
         model = Event
         fields = (
@@ -16,7 +28,8 @@ class EventSerializer(serializers.ModelSerializer):
             'format',
             'price',
             'is_active',
-            'created_at'
+            'created_at',
+            'has_photo_report',
         )
 
 class NewsSerializer(serializers.ModelSerializer):

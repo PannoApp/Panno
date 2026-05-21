@@ -1,13 +1,14 @@
 # Модуль: events
 
-Отвечает за мероприятия (афиша), новости ресторана и запись пользователей на мероприятия.
+Отвечает за мероприятия (афиша), новости ресторана, запись пользователей на мероприятия и фотоотчёты прошедших событий.
 
 ## Структура данных
 
 ```
 Event (Мероприятие)
-    └── EventReservation (Запись на мероприятие)
-            └── User (Пользователь)
+    ├── EventReservation (Запись на мероприятие)
+    │       └── User (Пользователь)
+    └── EventPhotoReport (Фото фотоотчёта)
 
 News (Новость) — независимая сущность
 ```
@@ -144,6 +145,42 @@ News (Новость) — независимая сущность
 
 **Ответ 200:** список объектов той же схемы, что у POST-ответа выше.
 
+---
+
+### GET /api/v1/events/{event_id}/photo-report/
+
+Фотоотчёт прошедшего мероприятия — список фотографий, загруженных после события.
+
+**Авторизация:** не нужна
+
+**Параметры пути:** `event_id` — ID мероприятия
+
+**Ответ 200:**
+```json
+[
+  {
+    "id": 1,
+    "image": "https://cdn.example.com/media/events/reports/img1.jpg",
+    "order": 0
+  },
+  {
+    "id": 2,
+    "image": "https://cdn.example.com/media/events/reports/img2.jpg",
+    "order": 1
+  }
+]
+```
+
+**Пустой список** возвращается в двух случаях:
+- Мероприятие ещё не прошло (`date_time` в будущем)
+- Фотоотчёт не загружен или `event_id` не существует
+
+Ответ — плоский массив (не пагинированный), результаты отсортированы по полю `order`, затем по дате загрузки.
+
+Фотографии загружаются через Django-админку: страница мероприятия → inline-секция «Фотоотчёт».
+
+**Интеграция с EventSerializer:** поле `has_photo_report` в ответах `/upcoming/` и `/archived/` возвращает `true`, если для мероприятия уже есть хотя бы одно фото. Flutter-клиент использует это поле чтобы решить, отображать ли секцию фотоотчёта без лишнего запроса.
+
 ## Модели
 
 ### Event
@@ -159,6 +196,19 @@ News (Новость) — независимая сущность
 | `price` | decimal | Цена входа в тенге (необязательное, `null` = вход свободный) |
 | `is_active` | bool | Скрытые мероприятия (`false`) не попадают в API |
 | `created_at` | datetime | Дата создания записи |
+| `has_photo_report` | bool | `true` если к мероприятию загружен хотя бы один фотоотчёт (вычисляемое поле) |
+
+### EventPhotoReport
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | int | Первичный ключ |
+| `event` | FK → Event | Мероприятие (CASCADE при удалении) |
+| `image` | image | Фотография (upload_to: `events/reports/`, хранилище совпадает с `Event.image`) |
+| `order` | int | Порядок отображения в галерее (по умолчанию 0) |
+| `uploaded_at` | datetime | Дата загрузки (auto) |
+
+Результаты сортируются по `order ASC`, затем `uploaded_at ASC`. Управление исключительно через Django-админку (inline в `EventAdmin`).
 
 ### News
 
@@ -205,9 +255,11 @@ News (Новость) — независимая сущность
 
 ```
 apps/events/
-├── models.py       # Event, News, EventReservation
-├── serializers.py  # EventSerializer, NewsSerializer, EventReservationSerializer, EventReservationStaffSerializer
-├── views.py        # 5 view-классов
+├── models.py       # Event, News, EventReservation, EventPhotoReport
+├── serializers.py  # EventSerializer (+has_photo_report), NewsSerializer,
+│                   # EventReservationSerializer, EventReservationStaffSerializer,
+│                   # EventPhotoReportSerializer
+├── views.py        # 6 view-классов (+ EventPhotoReportListView)
 ├── signals.py      # push при создании EventReservation
 ├── apps.py         # подключение signals в ready()
 └── urls.py         # Маршруты /api/v1/events/...
