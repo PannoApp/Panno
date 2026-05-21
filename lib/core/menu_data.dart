@@ -23,12 +23,12 @@ const kDefaultTagStyle = TagStyle(
 // Реестр стилей по отображаемому имени тега (без учёта регистра).
 // Имена должны совпадать с тем, что задаёт администратор в бекенде.
 const _kTagStyles = <String, TagStyle>{
-  'острое':           TagStyle(iconAsset: 'assets/images/luk.svg',              color: Color(0xFFD4774A)),
-  'вегетарианское':   TagStyle(iconAsset: 'assets/images/zerno.svg',            color: Color(0xFF7BAD7E)),
-  'алкоголь':         TagStyle(iconAsset: 'assets/images/cobyz.svg',            color: Color(0xFF8B6A9F)),
+  'острое':           TagStyle(iconAsset: 'assets/images/luk.svg',              color: PiligrimColors.tagSpicy),
+  'вегетарианское':   TagStyle(iconAsset: 'assets/images/zerno.svg',            color: PiligrimColors.tagVegetarian),
+  'алкоголь':         TagStyle(iconAsset: 'assets/images/cobyz.svg',            color: PiligrimColors.tagAlcohol),
   'без глютена':      TagStyle(iconAsset: 'assets/images/stone.svg',            color: PiligrimColors.water),
   'авторское':        TagStyle(iconAsset: 'assets/images/star_totem (1).svg',   color: PiligrimColors.steppe),
-  'халяль':           TagStyle(iconAsset: 'assets/images/moon_totem (1).svg',   color: Color(0xFF7BA5A0)),
+  'халяль':           TagStyle(iconAsset: 'assets/images/moon_totem (1).svg',   color: PiligrimColors.tagHalal),
 };
 
 // Возвращает стиль по имени тега. Неизвестный тег → kDefaultTagStyle.

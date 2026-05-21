@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import '../core/theme.dart';
 import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/home_cinematic_ambient.dart';
@@ -91,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : core.workingHoursDisplay;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1B19),
+      backgroundColor: PiligrimColors.earthSurface,
       extendBodyBehindAppBar: true,
       extendBody: true,
       body: Stack(

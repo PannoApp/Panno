@@ -61,7 +61,7 @@ class _HomeStatusLineState extends State<HomeStatusLine>
   Widget build(BuildContext context) {
     final open = _open;
     final dotColor =
-        open ? PiligrimColors.water : PiligrimColors.sky.withValues(alpha: 0.2);
+        open ? PiligrimColors.water : PiligrimColors.fruit.withValues(alpha: 0.55);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -94,10 +94,11 @@ class _HomeStatusLineState extends State<HomeStatusLine>
             open ? 'Открыто' : 'Закрыто',
             style: PiligrimTextStyles.body.copyWith(
               color: open
-                  ? PiligrimColors.water.withValues(alpha: 0.7)
-                  : PiligrimColors.sky.withValues(alpha: 0.3),
+                  ? PiligrimColors.water.withValues(alpha: 0.75)
+                  : PiligrimColors.fruit.withValues(alpha: 0.65),
               fontSize: 13,
               fontWeight: FontWeight.w300,
+              letterSpacing: 0.2,
             ),
           ),
           const SizedBox(width: 8),

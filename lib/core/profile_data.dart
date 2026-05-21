@@ -1,6 +1,7 @@
 // Данные экрана Профиль / Контакты — отделены от UI
 // Согласно ТЗ раздел 4.5 и brand concept «Герой»
 import 'package:flutter/material.dart';
+import 'theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Герой приложения
@@ -70,19 +71,19 @@ const kMessengers = [
   Messenger(
     label: 'WhatsApp',
     url: 'https://wa.me/77000000000',
-    color: Color(0xFFC4956A),
+    color: PiligrimColors.steppe,
     totemAsset: 'assets/images/luk.svg',
   ),
   Messenger(
     label: 'Telegram',
     url: 'https://t.me/piligrim_astana',
-    color: Color(0xFFC4956A),
+    color: PiligrimColors.steppe,
     totemAsset: 'assets/images/cobyz.svg',
   ),
   Messenger(
     label: 'Instagram',
     url: 'https://instagram.com/piligrim.astana',
-    color: Color(0xFFC4956A),
+    color: PiligrimColors.steppe,
     totemAsset: 'assets/images/zerno.svg',
   ),
 ];

@@ -91,7 +91,7 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
     );
 
     final tapChild = PiligrimTap(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       onTap: widget.onTap,
       scaleDown: 0.965,
       releaseDuration: const Duration(milliseconds: 320),
@@ -108,9 +108,9 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
           final glowOpacity = (0.10 + flicker * 0.04).clamp(0.07, 0.16);
 
           return Container(
-            height: widget.small ? 44 : 50,
+            height: widget.small ? 44 : 56,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -121,9 +121,9 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: PiligrimColors.shadow.withValues(alpha: 0.28),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: PiligrimColors.shadow.withValues(alpha: 0.30),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
                 ),
                 BoxShadow(
                   color: PiligrimColors.ember.withValues(alpha: glowOpacity),
@@ -133,7 +133,30 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
                 ),
               ],
             ),
-            child: child,
+            child: Stack(
+              children: [
+                child!,
+                // Тонкий rim-highlight вдоль верхнего края — ощущение объёма
+                Positioned(
+                  top: 0,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    height: 0.75,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(1),
+                      gradient: LinearGradient(
+                        colors: [
+                          PiligrimColors.sky.withValues(alpha: 0.0),
+                          PiligrimColors.sky.withValues(alpha: 0.20),
+                          PiligrimColors.sky.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
         },
         child: paddedRow,

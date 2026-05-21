@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../core/interior_assets.dart';
+import '../core/theme.dart';
 
 class CrossfadingHeroInterior extends StatefulWidget {
   const CrossfadingHeroInterior({
@@ -81,8 +82,8 @@ class _CrossfadingHeroInteriorState extends State<CrossfadingHeroInterior>
           alignment: const Alignment(0.0, 0.14),
           memCacheWidth: widget.cacheWidth,
           memCacheHeight: widget.cacheHeight,
-          placeholder: (_, __) => const ColoredBox(color: Color(0xFF1E1B19)),
-          errorWidget: (_, __, ___) => const ColoredBox(color: Color(0xFF1E1B19)),
+          placeholder: (_, __) => const ColoredBox(color: PiligrimColors.earthSurface),
+          errorWidget: (_, __, ___) => const ColoredBox(color: PiligrimColors.earthSurface),
         );
       }
       return Image.asset(

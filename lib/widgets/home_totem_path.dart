@@ -16,21 +16,21 @@ BoxDecoration _pathNodeDecoration({
   return BoxDecoration(
     borderRadius: BorderRadius.circular(16),
     color: emphasized
-        ? PiligrimColors.sky.withValues(alpha: 0.03)
+        ? PiligrimColors.sky.withValues(alpha: 0.055)
         : PiligrimColors.clear,
     border: Border.all(
-      width: emphasized ? 0.65 : 0.5,
+      width: emphasized ? 0.75 : 0.5,
       color: emphasized
-          ? accentColor.withValues(alpha: 0.22)
+          ? accentColor.withValues(alpha: 0.38)
           : PiligrimColors.sky.withValues(alpha: 0.055),
     ),
     boxShadow: emphasized
         ? [
             BoxShadow(
-              color: accentColor.withValues(alpha: 0.10),
-              blurRadius: 18,
-              spreadRadius: -6,
-              offset: const Offset(0, 4),
+              color: accentColor.withValues(alpha: 0.14),
+              blurRadius: 22,
+              spreadRadius: -4,
+              offset: const Offset(0, 5),
             ),
           ]
         : null,

@@ -53,10 +53,28 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Разделитель между hero-фото и текстовым блоком
+          Container(
+            margin: const EdgeInsets.only(bottom: 28),
+            height: 0.5,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  PiligrimColors.sky.withValues(alpha: 0.0),
+                  PiligrimColors.sky.withValues(alpha: 0.10),
+                  PiligrimColors.sky.withValues(alpha: 0.10),
+                  PiligrimColors.sky.withValues(alpha: 0.0),
+                ],
+                stops: const [0.0, 0.2, 0.8, 1.0],
+              ),
+            ),
+          )
+              .animate()
+              .fadeIn(delay: 300.ms, duration: 900.ms, curve: Curves.easeOut),
           SvgPicture.asset(
             'assets/images/piligrim.svg',
             height: 28,
@@ -106,9 +124,10 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
             kModernNomadConcept,
             style: PiligrimTextStyles.body.copyWith(
               fontSize: 12.5,
-              height: 1.5,
+              height: 1.55,
               fontWeight: FontWeight.w300,
-              color: PiligrimColors.sky.withValues(alpha: 0.82),
+              letterSpacing: 0.35,
+              color: PiligrimColors.sky.withValues(alpha: 0.72),
             ),
           )
               .animate()

@@ -59,6 +59,36 @@ abstract final class PiligrimColors {
 
   /// Базовый цвет тени (вместо Colors.black)
   static const Color shadow = Color(0xFF000000);
+
+  // ─── Scaffold / оверлей ───
+
+  /// Чуть теплее earth — scaffold-фон под параллакс-слоями
+  static const Color earthSurface = Color(0xFF1E1B19);
+
+  // ─── Навигационный бар ───
+
+  /// Нижняя навбар — основной фон
+  static const Color navBarBase = Color(0xFF211D1A);
+
+  /// Нижняя навбар — верхний край градиента (чуть светлее)
+  static const Color navBarTop = Color(0xFF2A2521);
+
+  /// Нижняя навбар — верхняя кромка (тонкая светлая линия)
+  static const Color navBarRim = Color(0x14F2EDE4);
+
+  // ─── Теги меню (семантические цвета, согласованы с бекендом) ───
+
+  /// Острое блюдо
+  static const Color tagSpicy = Color(0xFFD4774A);
+
+  /// Вегетарианское
+  static const Color tagVegetarian = Color(0xFF7BAD7E);
+
+  /// Содержит алкоголь
+  static const Color tagAlcohol = Color(0xFF8B6A9F);
+
+  /// Халяль
+  static const Color tagHalal = Color(0xFF7BA5A0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -241,6 +271,42 @@ final ThemeData piligrimTheme = ThemeData(
     elevation: 0,
   ),
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ОТСТУПЫ — базовая сетка 8px, 8×N
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class PiligrimSpacing {
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+  static const double xxl = 48;
+  /// Горизонтальный padding секций
+  static const double section = 24;
+  /// Вертикальный gap между карточками
+  static const double cardGap = 16;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// СКРУГЛЕНИЯ — мягкая геометрия согласно design spec
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class PiligrimRadius {
+  static const double sm = 8;
+  static const double md = 12;
+  static const double card = 14;
+  static const double lg = 20;
+
+  static const Radius smR = Radius.circular(sm);
+  static const Radius mdR = Radius.circular(md);
+  static const Radius cardR = Radius.circular(card);
+  static const Radius lgR = Radius.circular(lg);
+
+  static const BorderRadius smAll = BorderRadius.all(smR);
+  static const BorderRadius mdAll = BorderRadius.all(mdR);
+  static const BorderRadius cardAll = BorderRadius.all(cardR);
+  static const BorderRadius lgAll = BorderRadius.all(lgR);
+}
 
 // Текущая версия приложения — сравнивается с minVersion/latestVersion из API
 const String kAppVersion = '1.0.0';
