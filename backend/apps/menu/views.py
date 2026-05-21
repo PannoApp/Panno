@@ -6,14 +6,15 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
-from .models import Dish, Category
-from .serializers import DishSerializer, CategorySerializer
+from .models import Dish, Category, Tag
+from .serializers import DishSerializer, CategorySerializer, TagSerializer
 from utils.pagination import VideoFeedPagination, VideoCursorPagination
 from utils.cache import safe_cache_get, safe_cache_set
 from .filters import DishFilter
 
-# TTL кэша категорий (меняются редко) и страниц блюд (меняются чаще)
+# TTL кэша (категории и теги меняются редко, блюда чаще)
 _CACHE_CATEGORIES = 3600
+_CACHE_TAGS       = 3600
 _CACHE_DISHES     = 300
 
 
@@ -36,6 +37,24 @@ class CategoryListView(generics.ListAPIView):
             categories = list(Category.objects.all().order_by('order'))
             safe_cache_set('menu_categories', categories, timeout=_CACHE_CATEGORIES)
         return categories
+
+
+@extend_schema(
+    tags=['Menu'],
+    summary='Список тегов меню',
+    description='Возвращает все теги блюд, отсортированные по имени.',
+    responses={200: TagSerializer(many=True)},
+)
+class TagListView(generics.ListAPIView):
+    serializer_class = TagSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        tags = safe_cache_get('menu_tags')
+        if tags is None:
+            tags = list(Tag.objects.all().order_by('name'))
+            safe_cache_set('menu_tags', tags, timeout=_CACHE_TAGS)
+        return tags
 
 
 @extend_schema(

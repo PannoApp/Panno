@@ -35,6 +35,9 @@ class MenuProvider extends ChangeNotifier {
   final List<int> activeTagIds = [];
   List<ApiTag> _allSeenTags = [];
 
+  // Все теги с сервера (загружаются один раз при инициализации меню).
+  List<ApiTag> allTags = const [];
+
   // ── Состояние видео-ленты (cursor pagination) ──────────────────────────────
 
   List<ApiDish> feedDishes = const [];
@@ -59,11 +62,10 @@ class MenuProvider extends ChangeNotifier {
   MenuViewMode get mode => _mode;
   bool get loaded => _loaded;
 
-  // Уникальные теги из всех загруженных блюд — для динамических фильтр-чипов.
+  // Теги для фильтр-чипов: серверный список если загружен, иначе производный из блюд.
   List<ApiTag> get availableTags {
-    if (activeTagIds.isNotEmpty && _allSeenTags.isNotEmpty) {
-      return _allSeenTags;
-    }
+    if (allTags.isNotEmpty) return allTags;
+    if (activeTagIds.isNotEmpty && _allSeenTags.isNotEmpty) return _allSeenTags;
     final seen = <int>{};
     final result = <ApiTag>[];
     for (final dish in dishes) {
@@ -87,6 +89,7 @@ class MenuProvider extends ChangeNotifier {
 
     await Future.wait([
       loadCategories(),
+      loadTags(),
       loadDishes(refresh: true),
       loadFeed(refresh: true),
     ]);
@@ -99,6 +102,15 @@ class MenuProvider extends ChangeNotifier {
       categories = await _repository.fetchCategories();
     } catch (_) {
       categories = const [];
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadTags() async {
+    try {
+      allTags = await _repository.fetchTags();
+    } catch (_) {
+      allTags = const [];
     }
     notifyListeners();
   }

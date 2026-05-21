@@ -1,9 +1,10 @@
-// MenuRepository — HTTP-запросы к API меню (/menu/categories/, /menu/dishes/)
+// MenuRepository — HTTP-запросы к API меню (/menu/categories/, /menu/tags/, /menu/dishes/)
 // Паттерн аналогичен EventsRepository: DioClient.instance.dio по умолчанию.
 import 'package:dio/dio.dart';
 
 import '../models/api_category.dart';
 import '../models/api_dish.dart';
+import '../models/api_tag.dart';
 import '../paginated_response.dart';
 import '../services/api_client.dart';
 
@@ -12,13 +13,26 @@ class MenuRepository {
 
   final Dio _dio;
 
-  // Загружает список категорий меню.
+  // Загружает список категорий меню. Эндпоинт возвращает плоский массив (без пагинации).
   Future<List<ApiCategory>> fetchCategories() async {
-    final response = await _dio.get<Map<String, dynamic>>('/menu/categories/');
-    return PaginatedResponse.parse(
-      response.data ?? {},
-      ApiCategory.fromJson,
-    ).results;
+    final response = await _dio.get<List<dynamic>>('/menu/categories/');
+    final list = response.data;
+    if (list == null) return const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ApiCategory.fromJson)
+        .toList(growable: false);
+  }
+
+  // Загружает все теги меню. Эндпоинт возвращает плоский массив (без пагинации).
+  Future<List<ApiTag>> fetchTags() async {
+    final response = await _dio.get<List<dynamic>>('/menu/tags/');
+    final list = response.data;
+    if (list == null) return const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ApiTag.fromJson)
+        .toList(growable: false);
   }
 
   // Загружает страницу блюд с опциональными фильтрами.
