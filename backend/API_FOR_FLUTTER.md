@@ -354,7 +354,6 @@ Navigator.of(context).push(
         "order": 1
       }
     ],
-    "hero_video_url": "https://cdn.example.com/media/core/hero.mp4",
     "tour_link": "https://...",
     "twogis_link": "https://2gis.kz/...",
     "google_maps_link": "https://maps.google.com/?q=...",
@@ -373,7 +372,6 @@ Navigator.of(context).push(
 | `is_open_now` | `true` / `false` — вычисляется по `working_hours` в реальном времени (часовой пояс Asia/Almaty) |
 | `concept_description` | Краткое описание концепции ресторана (для главного экрана). Пустая строка если не заполнено. |
 | `hero_slides` | Массив изображений-слайдов для главного экрана (может быть пустым списком `[]`). Каждый объект содержит `id`, `image` (URL) и `order`. |
-| `hero_video_url` | URL заглавного видео (YouTube, CDN). Пустая строка если не задано. |
 | `phone` | Телефон ресторана |
 | `whatsapp` | WhatsApp-контакт (ссылка или номер) |
 | `telegram` | Telegram (username или ссылка) |

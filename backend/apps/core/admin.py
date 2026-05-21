@@ -53,7 +53,7 @@ class RestaurantInfoAdmin(ModelAdmin):
             'fields': ('twogis_link', 'google_maps_link', 'yandex_maps_link', 'tour_link'),
         }),
         ('Контент главной', {
-            'fields': ('concept_description', 'hero_video_url'),
+            'fields': ('concept_description',),
         }),
         ('Бронирование', {
             'fields': ('booking_deposit_required', 'booking_deposit_note'),

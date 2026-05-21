@@ -80,7 +80,6 @@ class CoreInfo {
     required this.phone,
     required this.socialLinks,
     required this.heroSlides,
-    this.heroVideoUrl,
     required this.bookingDepositRequired,
     this.bookingDepositNote,
     required this.visitRules,
@@ -101,7 +100,6 @@ class CoreInfo {
   final String phone;
   final List<SocialLink> socialLinks;
   final List<InteriorSlide> heroSlides;
-  final String? heroVideoUrl;
   final bool bookingDepositRequired;
   final String? bookingDepositNote;
   final List<VisitRuleItem> visitRules;
@@ -133,7 +131,6 @@ class CoreInfo {
       phone: parseString(json['phone'], field: 'phone'),
       socialLinks: _parseSocialLinks(json),
       heroSlides: _parseHeroSlides(json['hero_slides'] ?? json['heroSlides']),
-      heroVideoUrl: parseStringOrNull(json['hero_video_url'] ?? json['heroVideoUrl']),
       bookingDepositRequired: parseBool(
         json['booking_deposit_required'] ?? json['bookingDepositRequired'],
       ),
@@ -171,7 +168,6 @@ class CoreInfo {
         'phone': phone,
         'social_links': socialLinks.map((e) => e.toJson()).toList(),
         'hero_slides': heroSlides.map((e) => e.toJson()).toList(),
-        if (heroVideoUrl != null) 'hero_video_url': heroVideoUrl,
         'booking_deposit_required': bookingDepositRequired,
         if (bookingDepositNote != null) 'booking_deposit_note': bookingDepositNote,
         'visit_rules': visitRules.map((e) => e.toJson()).toList(),

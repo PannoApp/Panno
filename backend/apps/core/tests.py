@@ -181,22 +181,11 @@ class RestaurantInfoHeroFieldsTest(APITestCase):
         self.assertIn('hero_slides', response.data)
         self.assertEqual(response.data['hero_slides'], [])
 
-    def test_hero_video_url_defaults_to_empty_string(self):
-        response = self.client.get('/api/v1/core/info/')
-        self.assertIn('hero_video_url', response.data)
-        self.assertEqual(response.data['hero_video_url'], '')
-
     def test_concept_description_reflects_saved_value(self):
         self.info.concept_description = 'Modern Nomad — кухня кочевников'
         self.info.save()
         response = self.client.get('/api/v1/core/info/')
         self.assertEqual(response.data['concept_description'], 'Modern Nomad — кухня кочевников')
-
-    def test_hero_video_url_reflects_saved_value(self):
-        self.info.hero_video_url = 'https://cdn.example.com/hero.mp4'
-        self.info.save()
-        response = self.client.get('/api/v1/core/info/')
-        self.assertEqual(response.data['hero_video_url'], 'https://cdn.example.com/hero.mp4')
 
 
 # ---------------------------------------------------------------------------

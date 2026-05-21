@@ -31,7 +31,6 @@ class RestaurantInfoSerializer(serializers.ModelSerializer):
             'instagram',
             'concept_description',
             'hero_slides',
-            'hero_video_url',
             'visit_rules',
             'privacy_policy',
             'terms_of_service',

@@ -37,14 +37,13 @@
       "order": 0
     }
   ],
-  "hero_video_url": "https://cdn.example.com/media/core/hero.mp4",
   "visit_rules": "Дресс-код: smart casual. Дети до 12 лет...",
   "privacy_policy": "Настоящая политика...",
   "terms_of_service": "Пользуясь приложением..."
 }
 ```
 
-Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram`, `hero_video_url`, `concept_description` могут быть пустой строкой, если не заполнены в админке. `hero_slides` возвращает пустой список `[]`, если изображения не загружены.
+Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram`, `concept_description` могут быть пустой строкой, если не заполнены в админке. `hero_slides` возвращает пустой список `[]`, если изображения не загружены.
 
 ## Модель RestaurantInfo
 
@@ -63,7 +62,6 @@
 | `instagram` | string | Ссылка/никнейм Instagram |
 | `concept_description` | text | Краткое описание концепции ресторана (главный экран приложения) |
 | `hero_slides` | array | Список изображений-слайдов для главного экрана |
-| `hero_video_url` | URL | Ссылка на заглавное видео (YouTube, CDN и т.п.; пустая строка если не задана) |
 | `visit_rules` | text | Правила посещения ресторана |
 | `privacy_policy` | text | Политика обработки персональных данных |
 | `terms_of_service` | text | Пользовательское соглашение |

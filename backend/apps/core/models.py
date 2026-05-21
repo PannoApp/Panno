@@ -99,7 +99,6 @@ class RestaurantInfo(models.Model):
     instagram = models.CharField("Instagram", max_length=100, blank=True)
 
     concept_description = models.TextField("Описание концепции", blank=True, default='')
-    hero_video_url = models.URLField("URL заглавного видео", max_length=500, blank=True, default='')
 
     visit_rules = models.TextField("Правила посещения", blank=True)
     privacy_policy = models.TextField("Политика обработки ПД", blank=True)
