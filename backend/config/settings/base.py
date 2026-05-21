@@ -76,7 +76,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [], # Позже можно добавить os.path.join(BASE_DIR, 'templates')
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -448,9 +448,11 @@ JAZZMIN_SETTINGS = {
     "topmenu_links": [
         {"name": "Сайт",     "url": "/",          "new_window": True},
         {"name": "API Docs", "url": "/api/docs/", "new_window": True},
+        {"name": "Выйти",    "url": "/admin/logout/", "new_window": False},
     ],
     "usermenu_links": [
         {"name": "API Docs", "url": "/api/docs/", "new_window": True},
+        {"name": "Выйти",    "url": "/admin/logout/", "new_window": False},
     ],
 }
 
@@ -484,3 +486,6 @@ JAZZMIN_UI_TWEAKS = {
         "success":   "btn-success",
     },
 }
+
+LOGIN_REDIRECT_URL = '/admin/'
+

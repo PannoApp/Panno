@@ -29,3 +29,10 @@ class BulkPushSerializer(serializers.Serializer):
     registered_after = serializers.DateField(required=False, help_text="Только пользователи, зарегистрированные после даты (YYYY-MM-DD)")
     # Сегмент по геолокации: Flutter сохраняет город пользователя через PATCH /api/v1/users/profile/
     city = serializers.CharField(required=False, max_length=100, help_text="Только пользователи с указанным городом (по полю city на профиле)")
+
+
+class SendPushViaBotSerializer(serializers.Serializer):
+    manager_telegram_id = serializers.CharField(max_length=100)
+    title = serializers.CharField(max_length=255)
+    body = serializers.CharField()
+

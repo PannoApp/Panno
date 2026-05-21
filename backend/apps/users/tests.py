@@ -810,3 +810,27 @@ class PasswordValidatorsAbsentTest(TestCase):
             user.has_usable_password(),
             msg='create_user должен вызывать set_unusable_password() — пароли не используются.',
         )
+
+
+class CustomAdminLogoutTest(TestCase):
+    """
+    Проверяет, что GET и POST запросы к /admin/logout/
+    вызывают выход из системы и перенаправляют на страницу логина.
+    """
+
+    def setUp(self):
+        self.admin = User.objects.create_user(phone='+77009999999', is_staff=True, role='admin')
+
+    def test_admin_logout_via_get_redirects_and_logs_out(self):
+        # Логинимся
+        self.client.force_login(self.admin)
+
+        # Выполняем GET-запрос к logout
+        response = self.client.get('/admin/logout/')
+        # Ожидаем редирект (302) на /admin/ или /admin/login/
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url == '/admin/' or response.url.startswith('/admin/login/'))
+
+        # Проверяем, что пользователь разлогинен
+        self.assertNotIn('_auth_user_id', self.client.session)
+

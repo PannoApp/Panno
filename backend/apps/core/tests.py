@@ -194,6 +194,7 @@ class RestaurantInfoHeroFieldsTest(APITestCase):
 
 class AppVersionViewTest(APITestCase):
     def setUp(self):
+        AppVersion.objects.all().delete()
         AppVersion.objects.create(
             platform='ios',
             min_version='1.0.0',

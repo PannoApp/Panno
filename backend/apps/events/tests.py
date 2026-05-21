@@ -420,7 +420,7 @@ class EventsCacheTest(APITestCase):
         """Второй запрос к /upcoming/ попадает в кэш."""
         r1 = self.client.get('/api/v1/events/upcoming/')
         v  = self._version('upcoming')
-        self.assertIsNotNone(cache.get(f'events_upcoming:{v}:'))
+        self.assertIsNotNone(cache.get(f'events_upcoming:{v}:testserver:'))
         r2 = self.client.get('/api/v1/events/upcoming/')
         self.assertEqual(r1.data, r2.data)
 
@@ -566,7 +566,7 @@ class NewsCacheTest(APITestCase):
         News.objects.create(title='Новость 1', content='Текст')
         r1 = self.client.get('/api/v1/events/news/')
         v  = cache.get('events_news_cache_version', 1)
-        self.assertIsNotNone(cache.get(f'events_news:{v}:'))
+        self.assertIsNotNone(cache.get(f'events_news:{v}:testserver:'))
         r2 = self.client.get('/api/v1/events/news/')
         self.assertEqual(r1.data, r2.data)
 

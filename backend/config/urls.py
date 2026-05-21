@@ -12,7 +12,15 @@ def _cached_media(request, path):
     response['Cache-Control'] = 'public, max-age=86400'
     return response
 
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+
+def custom_admin_logout(request):
+    logout(request)
+    return redirect('admin:index')
+
 urlpatterns = [
+    path('admin/logout/', custom_admin_logout, name='admin_logout_override'),
     path('admin/', admin.site.urls),
     path('api/v1/', include([
         # Обновление access-токена по refresh — без повторного SMS-флоу

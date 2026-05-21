@@ -1462,3 +1462,175 @@ class TelegramWebhookAlreadyProcessedTest(TestCase):
         self._post(_cbq_payload('cancel', self.booking.pk))
         answer = next(c for c in mock_tg.call_args_list if c[0][0] == 'answerCallbackQuery')
         self.assertIn('Подтверждено', answer[0][1]['text'])
+
+
+# ---------------------------------------------------------------------------
+# Telegram Webhook FSM and Manager Authorization Tests
+# ---------------------------------------------------------------------------
+
+class TelegramWebhookFSMTest(TestCase):
+    def setUp(self):
+        cache.clear()
+        # Create an authorized manager (role=content_manager, telegram_id)
+        self.manager = User.objects.create_user(phone='+77009999990', role='content_manager', telegram_id='111222')
+        # Create an unauthorized manager (role=hall_manager, telegram_id)
+        self.hall_manager = User.objects.create_user(phone='+77009999991', role='hall_manager', telegram_id='222333')
+        # Create a regular user with telegram_id
+        self.regular = User.objects.create_user(phone='+77009999992', role='', telegram_id='333444')
+
+    def tearDown(self):
+        cache.clear()
+
+    def _post_message(self, chat_id, text):
+        payload = {
+            'message': {
+                'message_id': 99,
+                'chat': {'id': chat_id},
+                'text': text
+            }
+        }
+        return self.client.post(_WEBHOOK_URL, json.dumps(payload), content_type='application/json')
+
+    def _post_callback(self, chat_id, data):
+        payload = {
+            'callback_query': {
+                'id': 'cbq_fsm_id',
+                'data': data,
+                'message': {
+                    'message_id': 99,
+                    'chat': {'id': chat_id},
+                }
+            }
+        }
+        return self.client.post(_WEBHOOK_URL, json.dumps(payload), content_type='application/json')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_start_command_for_authorized_manager(self, mock_tg):
+        self._post_message(111222, '/start')
+        # Check that we sent a greeting message with keyboard button "📢 Отправить пуш"
+        calls = [c[0][1] for c in mock_tg.call_args_list if c[0][0] == 'sendMessage']
+        self.assertEqual(len(calls), 1)
+        self.assertIn('авторизованы как менеджер', calls[0]['text'])
+        self.assertEqual(calls[0]['reply_markup']['keyboard'][0][0]['text'], '📢 Отправить пуш')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_start_command_for_unauthorized_user(self, mock_tg):
+        self._post_message(999888, '/start')
+        calls = [c[0][1] for c in mock_tg.call_args_list if c[0][0] == 'sendMessage']
+        self.assertEqual(len(calls), 1)
+        self.assertIn('передайте администратору', calls[0]['text'])
+        self.assertIn('999888', calls[0]['text'])
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_sendpush_command_starts_fsm(self, mock_tg):
+        self._post_message(111222, '📢 Отправить пуш')
+        # Check cache state is waiting_for_title
+        state = cache.get('tg_fsm:111222')
+        self.assertIsNotNone(state)
+        self.assertEqual(state['state'], 'waiting_for_title')
+
+        # Check bot asked for title
+        calls = [c[0][1] for c in mock_tg.call_args_list if c[0][0] == 'sendMessage']
+        self.assertEqual(len(calls), 1)
+        self.assertIn('Введите <b>заголовок</b>', calls[0]['text'])
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_unauthorized_role_cannot_start_fsm(self, mock_tg):
+        # regular user tries to send push command
+        self._post_message(333444, '📢 Отправить пуш')
+        state = cache.get('tg_fsm:333444')
+        self.assertIsNone(state)
+
+        # hall manager tries to send push command
+        self._post_message(222333, '📢 Отправить пуш')
+        state = cache.get('tg_fsm:222333')
+        self.assertIsNone(state)
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    def test_fsm_complete_flow_and_cancel_via_button(self, mock_tg):
+        # 1. Start FSM
+        self._post_message(111222, '📢 Отправить пуш')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_title')
+
+        # 2. Send Title
+        self._post_message(111222, 'My Campaign Title')
+        state = cache.get('tg_fsm:111222')
+        self.assertEqual(state['state'], 'waiting_for_body')
+        self.assertEqual(state['data']['title'], 'My Campaign Title')
+
+        # 3. Send Body
+        self._post_message(111222, 'My Campaign Body')
+        state = cache.get('tg_fsm:111222')
+        self.assertEqual(state['state'], 'waiting_for_confirmation')
+        self.assertEqual(state['data']['body'], 'My Campaign Body')
+
+        # 4. Cancel
+        self._post_message(111222, '❌ Отмена')
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    @patch('apps.bookings.views.requests.post')
+    def test_fsm_confirm_callback_triggers_campaign(self, mock_http_post, mock_tg):
+        # 1. Manually set state to waiting_for_confirmation
+        cache.set('tg_fsm:111222', {
+            'state': 'waiting_for_confirmation',
+            'data': {'title': 'Bulk Title', 'body': 'Bulk Body'}
+        }, timeout=600)
+
+        # Mock API view response for loopback HTTP request
+        mock_resp = MagicMock()
+        mock_resp.status_code = 202
+        mock_http_post.return_value = mock_resp
+
+        # 2. Post callback
+        self._post_callback(111222, 'bulk_push:confirm')
+
+        # State should be cleared
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+        # editMessageText and sendMessage should be called
+        edited_calls = [c[0][1] for c in mock_tg.call_args_list if c[0][0] == 'editMessageText']
+        self.assertEqual(len(edited_calls), 1)
+        self.assertIn('Рассылка успешно запущена', edited_calls[0]['text'])
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
+    @patch('apps.bookings.views.requests.post')
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_fsm_confirm_callback_fallback_logic(self, mock_bulk_push, mock_http_post, mock_tg):
+        # 1. Manually set state to waiting_for_confirmation
+        cache.set('tg_fsm:111222', {
+            'state': 'waiting_for_confirmation',
+            'data': {'title': 'Fallback Title', 'body': 'Fallback Body'}
+        }, timeout=600)
+
+        # Mock API view response to fail (500) to trigger fallback
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        mock_http_post.return_value = mock_resp
+
+        # Add target user device so direct logic works
+        target_user = User.objects.create_user(phone='+77009999993')
+        from apps.notifications.models import UserDevice
+        UserDevice.objects.create(user=target_user, fcm_token='fallback_token')
+
+        # 2. Post callback
+        self._post_callback(111222, 'bulk_push:confirm')
+
+        # State should be cleared
+        self.assertIsNone(cache.get('tg_fsm:111222'))
+        # Celery task should be queued directly via Python fallback
+        mock_bulk_push.delay.assert_called_once()
+        _, kwargs = mock_bulk_push.delay.call_args
+        self.assertEqual(kwargs['title'], 'Fallback Title')
+        self.assertEqual(kwargs['body'], 'Fallback Body')
+
+        edited_calls = [c[0][1] for c in mock_tg.call_args_list if c[0][0] == 'editMessageText']
+        self.assertEqual(len(edited_calls), 1)
+        self.assertIn('Рассылка успешно запущена (fallback)', edited_calls[0]['text'])
+
