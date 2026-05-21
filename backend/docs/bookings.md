@@ -298,6 +298,14 @@ apps/bookings/
 - Нет ограничения на бронирование в прошлом — валидацию дат при необходимости нужно добавить в сериализатор.
 - Менеджер зала не может изменить поле `user` у брони — оно read-only в `TableBookingStaffSerializer`.
 
+## Flutter-интеграция
+
+Поля депозита (`booking_deposit_required`, `booking_deposit_note`) хранятся в модели `RestaurantInfo` и возвращаются через `GET /api/v1/core/info/` (см. [`docs/core.md`](core.md)). Сам модуль `bookings` депозит не хранит и не обрабатывает.
+
+Флаттер-клиент до открытия формы загружает `CoreInfo` и при `booking_deposit_required = true` показывает баннер с текстом `booking_deposit_note` и кнопкой звонка менеджеру (`tel:` ссылка на `phone`).
+
+После успешного `POST /api/v1/bookings/` клиент переходит на `BookingSuccessScreen`, передавая данные заявки и признак `depositRequired` — этот экран уже не обращается к API.
+
 ## Идемпотентность
 
 `POST /api/v1/bookings/` требует заголовок `Idempotency-Key` со значением UUID v4, сгенерированным клиентом перед отправкой.

@@ -22,6 +22,7 @@ class BookingSuccessScreen extends StatelessWidget {
   final String? zone;
   final bool depositRequired;
 
+  // Склонение по русским правилам: герой / героя / героев
   String _formatHeroesCount(int count) {
     final mod10 = count % 10;
     final mod100 = count % 100;
@@ -220,9 +221,9 @@ class BookingSuccessScreen extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // pushReplacement — экран формы убирается из стека, история встаёт на его место
                       PiligrimTap(
                         onTap: () {
-                          // Переход в историю бронирований
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute<void>(
                               builder: (_) => const BookingHistoryScreen(),
@@ -247,9 +248,9 @@ class BookingSuccessScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
+                      // popUntil — возврат к корневому маршруту (RootShell / IndexedStack)
                       PiligrimTap(
                         onTap: () {
-                          // Вернуться на главную
                           Navigator.of(context).popUntil((route) => route.isFirst);
                         },
                         borderRadius: BorderRadius.circular(10),
@@ -287,6 +288,7 @@ class BookingSuccessScreen extends StatelessWidget {
   }
 }
 
+// Строка детали с иконкой-тотемом, подписью и значением (дата, кол-во героев, зал)
 class _DetailRow extends StatelessWidget {
   const _DetailRow({
     required this.icon,

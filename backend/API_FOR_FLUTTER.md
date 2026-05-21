@@ -254,14 +254,44 @@ if (nextUrl != null) {
 - **Push-напоминания:** За 1–2 часа до визита пользователь получает push-напоминание о брони (сервисное, отключить нельзя).
 
 ### 3.1.1 Логика депозита
-Перед открытием формы бронирования запроси `GET /api/v1/core/info/` и проверь:
+
+`CoreInfo` (загружается при старте через `GET /api/v1/core/info/`) содержит:
+- `bookingDepositRequired` — признак необходимости депозита
+- `bookingDepositNote` — текст для отображения (может быть пустым)
+- `phone` — номер заведения для кнопки звонка
+
+Баннер отображается **внутри формы** бронирования (не как отдельный диалог), между полем «Комментарий» и кнопкой отправки:
+
 ```dart
-if (info.bookingDepositRequired) {
-  // Показать баннер/диалог с текстом info.bookingDepositNote
-  // и кнопкой «Позвонить менеджеру» (tel: ссылка на info.phone)
+if (coreInfo.bookingDepositRequired) {
+  // Показать контейнер с текстом coreInfo.bookingDepositNote
+  // и кнопкой «ПОЗВОНИТЬ МЕНЕДЖЕРУ»
+  final uri = Uri.parse('tel:${coreInfo.phone}');
+  if (await canLaunchUrl(uri)) await launchUrl(uri);
 }
 ```
-Оплата депозита через приложение не принимается — только перенаправление на звонок.
+
+Оплата депозита через приложение не принимается — только переадресация на звонок менеджеру.
+
+### 3.1.2 Экран успеха после отправки заявки
+
+После успешного `POST /api/v1/bookings/` форма очищается и происходит `Navigator.push` на `BookingSuccessScreen`:
+
+```dart
+Navigator.of(context).push(
+  MaterialPageRoute(
+    builder: (_) => BookingSuccessScreen(
+      date: dateText,         // «ДД.ММ.ГГГГ»
+      time: timeText,         // «ЧЧ:ММ»
+      heroesCount: count,
+      zone: zoneText,         // читаемое название или null
+      depositRequired: coreInfo.bookingDepositRequired,
+    ),
+  ),
+);
+```
+
+С экрана успеха пользователь может перейти в историю броней («МОИ БРОНИРОВАНИЯ») или на главную («НА ГЛАВНУЮ»).
 
 ### 3.2 Моя история броней
 `GET /api/v1/bookings/`

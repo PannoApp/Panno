@@ -433,6 +433,92 @@ class TableBookingPhoneAPITest(APITestCase):
 
 
 # ---------------------------------------------------------------------------
+# Поле zone — сериализатор
+# ---------------------------------------------------------------------------
+
+class TableBookingZoneTest(TestCase):
+    """Проверяет, что сериализатор принимает допустимые зоны и отклоняет недопустимые."""
+
+    def _data(self, **overrides):
+        data = {
+            'guest_name': 'Алихан',
+            'phone': '+77001234567',
+            'date': '2026-06-15',
+            'time': '19:30:00',
+            'guests_count': 4,
+        }
+        data.update(overrides)
+        return data
+
+    def test_zone_main_is_valid(self):
+        s = TableBookingSerializer(data=self._data(zone='main'))
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_zone_terrace_is_valid(self):
+        s = TableBookingSerializer(data=self._data(zone='terrace'))
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_zone_private_is_valid(self):
+        s = TableBookingSerializer(data=self._data(zone='private'))
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_zone_invalid_value_rejected(self):
+        # 'rooftop' не входит в choices — сериализатор должен вернуть ошибку
+        s = TableBookingSerializer(data=self._data(zone='rooftop'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('zone', s.errors)
+
+    def test_zone_omitted_is_valid(self):
+        # zone — необязательное поле
+        s = TableBookingSerializer(data=self._data())
+        self.assertTrue(s.is_valid(), s.errors)
+
+
+# ---------------------------------------------------------------------------
+# Поле zone — API
+# ---------------------------------------------------------------------------
+
+class TableBookingZoneAPITest(APITestCase):
+    """Проверяет поле zone через API: возврат в ответе и валидация значения."""
+
+    def setUp(self):
+        self.user = make_user('+77015000001')
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    def test_create_booking_with_zone_returns_zone_in_response(self):
+        payload = {
+            'guest_name': 'Зонный тест',
+            'phone': '+77001234567',
+            'date': '2026-07-01',
+            'time': '19:00:00',
+            'guests_count': 2,
+            'zone': 'terrace',
+        }
+        resp = self.client.post(
+            '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['zone'], 'terrace')
+
+    def test_create_booking_invalid_zone_returns_400(self):
+        # Недопустимое значение зоны должно возвращать 400
+        payload = {
+            'guest_name': 'Зонный тест',
+            'phone': '+77001234567',
+            'date': '2026-07-01',
+            'time': '19:00:00',
+            'guests_count': 2,
+            'zone': 'rooftop',
+        }
+        resp = self.client.post(
+            '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('zone', resp.data)
+
+
+# ---------------------------------------------------------------------------
 # Idempotency — POST /api/v1/bookings/
 # ---------------------------------------------------------------------------
 
