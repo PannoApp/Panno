@@ -70,16 +70,16 @@ class _EventsScreenState extends State<EventsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const _AfichaTitleBlock(),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Text(
                           'Лента мероприятий и вестей заведения',
                           style: PiligrimTextStyles.caption.copyWith(
-                            fontSize: 11.5,
+                            fontSize: 12,
                             letterSpacing: 0.4,
                             color: PiligrimColors.sky.withValues(alpha: 0.45),
                           ),
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 16),
                         _SegmentedAficha(
                           value: _view,
                           onChanged: (v) => setState(() => _view = v),
@@ -115,7 +115,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   const SliverToBoxAdapter(
                     child: _AfichaSectionHeader(label: 'БЛИЖАЙШИЕ СОБЫТИЯ'),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 6)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
                   if (!events.isLoadingUpcoming &&
                       events.upcomingError == null &&
                       upcoming.isEmpty)
@@ -202,7 +202,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   const SliverToBoxAdapter(
                     child: _AfichaSectionHeader(label: 'НОВОСТИ РЕСТОРАНА'),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 6)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
                   if (events.isLoadingNews && news.isEmpty)
                     const SliverToBoxAdapter(child: _NewsLoadingSkeleton())
                   else if (news.isEmpty)
@@ -261,7 +261,7 @@ class _AfichaTitleBlock extends StatelessWidget {
             BlendMode.srcIn,
           ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 4),
         Text(
           'АФИША',
           style: PiligrimTextStyles.caption.copyWith(
@@ -649,7 +649,7 @@ class _AfishaHeroState extends State<_AfishaHero> {
         Text(
           'Кадр ${idx + 1} из $total',
           style: PiligrimTextStyles.micro.copyWith(
-            fontSize: 10.5,
+            fontSize: 10,
             letterSpacing: 1.4,
             color: PiligrimColors.sky.withValues(alpha: 0.40),
           ),
@@ -792,7 +792,7 @@ class _HeroSlide extends StatelessWidget {
                     style: PiligrimTextStyles.caption.copyWith(
                       color: PiligrimColors.sky.withValues(alpha: 0.92),
                       letterSpacing: 1.0,
-                      fontSize: 9.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -829,7 +829,7 @@ class _HeroSlide extends StatelessWidget {
                       item.subtitle,
                       style: PiligrimTextStyles.caption.copyWith(
                         color: PiligrimColors.sky.withValues(alpha: 0.78),
-                        fontSize: 11.5,
+                        fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -1044,7 +1044,7 @@ class _EventListCard extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: PiligrimTextStyles.heading.copyWith(
-                                fontSize: 16.5,
+                                fontSize: 16,
                                 height: 1.25,
                                 color: PiligrimColors.sky,
                               ),
@@ -1077,7 +1077,7 @@ class _EventListCard extends StatelessWidget {
                                   child: Text(
                                     _priceLine(),
                                     style: PiligrimTextStyles.caption.copyWith(
-                                      fontSize: 11.5,
+                                      fontSize: 12,
                                       letterSpacing: 0.3,
                                       color: PiligrimColors.steppe
                                           .withValues(alpha: 0.78),
@@ -1187,7 +1187,7 @@ class _FormatBadge extends StatelessWidget {
               style: PiligrimTextStyles.micro.copyWith(
                 color: PiligrimColors.sky.withValues(alpha: 0.85),
                 letterSpacing: 0.8,
-                fontSize: 8.5,
+                fontSize: 9,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1379,7 +1379,7 @@ class _PastEventCard extends StatelessWidget {
                     formatShortDateRu(event.startsAt),
                     style: PiligrimTextStyles.caption.copyWith(
                       color: PiligrimColors.sky.withValues(alpha: 0.38),
-                      fontSize: 11.5,
+                      fontSize: 12,
                       letterSpacing: 0.3,
                     ),
                   ),

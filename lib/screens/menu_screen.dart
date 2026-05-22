@@ -227,16 +227,14 @@ class _ModeSwitcher extends StatelessWidget {
             children: [
               Expanded(
                 child: _ModeTabLabel(
-                  label: 'Путь',
-                  icon: 'assets/images/bird_totem (1).svg',
+                  label: 'Видео',
                   active: isFeed,
                   onTap: () => onChanged(MenuViewMode.feed),
                 ),
               ),
               Expanded(
                 child: _ModeTabLabel(
-                  label: 'Свиток',
-                  icon: 'assets/images/spiral.svg',
+                  label: 'Фото',
                   active: !isFeed,
                   onTap: () => onChanged(MenuViewMode.classic),
                 ),
@@ -253,13 +251,11 @@ class _ModeSwitcher extends StatelessWidget {
 class _ModeTabLabel extends StatelessWidget {
   const _ModeTabLabel({
     required this.label,
-    required this.icon,
     required this.active,
     required this.onTap,
   });
 
   final String label;
-  final String icon;
   final bool active;
   final VoidCallback onTap;
 
@@ -273,28 +269,16 @@ class _ModeTabLabel extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(_ModeSwitcher._radius),
       child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(
-              icon,
-              width: 13,
-              height: 13,
-              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-            ),
-            const SizedBox(width: 6),
-            AnimatedDefaultTextStyle(
-              duration: 220.ms,
-              curve: Curves.easeOut,
-              style: PiligrimTextStyles.caption.copyWith(
-                fontSize: 11.5,
-                color: color,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w300,
-                letterSpacing: active ? 0.6 : 0.4,
-              ),
-              child: Text(label),
-            ),
-          ],
+        child: AnimatedDefaultTextStyle(
+          duration: 220.ms,
+          curve: Curves.easeOut,
+          style: PiligrimTextStyles.caption.copyWith(
+            fontSize: 11.5,
+            color: color,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w300,
+            letterSpacing: active ? 0.6 : 0.4,
+          ),
+          child: Text(label),
         ),
       ),
     );
@@ -1002,35 +986,17 @@ class _FilterChips extends StatelessWidget {
                   width: isActive ? 0.9 : 0.5,
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SvgPicture.asset(
-                    style.iconAsset,
-                    width: 12,
-                    height: 12,
-                    colorFilter: ColorFilter.mode(
-                      isActive
-                          ? style.color
-                          : PiligrimColors.sky.withValues(alpha: 0.35),
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  AnimatedDefaultTextStyle(
-                    duration: 200.ms,
-                    style: PiligrimTextStyles.caption.copyWith(
-                      fontSize: 11.5,
-                      color: isActive
-                          ? style.color
-                          : PiligrimColors.sky.withValues(alpha: 0.45),
-                      fontWeight:
-                          isActive ? FontWeight.w700 : FontWeight.w300,
-                      letterSpacing: isActive ? 0.45 : 0.2,
-                    ),
-                    child: Text(tag.name),
-                  ),
-                ],
+              child: AnimatedDefaultTextStyle(
+                duration: 200.ms,
+                style: PiligrimTextStyles.caption.copyWith(
+                  fontSize: 11.5,
+                  color: isActive
+                      ? style.color
+                      : PiligrimColors.sky.withValues(alpha: 0.45),
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w300,
+                  letterSpacing: isActive ? 0.45 : 0.2,
+                ),
+                child: Text(tag.name),
               ),
             ),
           );

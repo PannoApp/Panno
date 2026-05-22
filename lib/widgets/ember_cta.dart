@@ -73,9 +73,9 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
             widget.label,
             style: PiligrimTextStyles.button.copyWith(
               color: PiligrimColors.sky,
-              fontSize: widget.small ? 12.5 : 13.5,
+              fontSize: widget.small ? 12.0 : 13.0,
               letterSpacing: 0.45,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const Spacer(),

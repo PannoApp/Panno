@@ -4,8 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../core/theme.dart';
 import 'piligrim_tap.dart';
 
-const Color _kNavBase     = PiligrimColors.navBarBase;
-const Color _kNavTop      = PiligrimColors.navBarTop;
+const Color _kNavBase     = PiligrimColors.earthDeep;
+const Color _kNavTop      = Color(0xFF171411);
 const Color _kNavActive   = PiligrimColors.water;
 const Color _kNavInactive = PiligrimColors.navInactive;
 const Color _kNavRimTop   = PiligrimColors.navBarRim;
@@ -31,23 +31,18 @@ class PiligrimNavBar extends StatelessWidget {
     _NavItem(label: 'Профиль',  asset: 'assets/images/shaman.svg'),
   ];
 
-  static const double _topRadius = 19;
-
   @override
   Widget build(BuildContext context) {
     return Material(
       color: _kNavBase,
       child: DecoratedBox(
         decoration: const BoxDecoration(
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(_topRadius),
-          ),
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
               _kNavTop,
-              Color(0xF6211D1A),
+              Color(0xFF120F0D),
               _kNavBase,
             ],
             stops: [0.0, 0.35, 1.0],

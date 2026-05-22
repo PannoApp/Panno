@@ -439,13 +439,13 @@ class _StatsRow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         _StatCard(
           value: '${user.eventsCount}',
           label: 'Мероприятия',
           delay: 80.ms,
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         _StatCard(
           value: user.journeyStartLabel ?? '—',
           label: 'С нами',
@@ -506,7 +506,7 @@ class _StatCard extends StatelessWidget {
                   color: PiligrimColors.steppe,
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
               Text(
                 label,
                 style: PiligrimTextStyles.caption.copyWith(fontSize: 10),
@@ -643,7 +643,7 @@ class _NotifRow extends StatelessWidget {
             ),
           ),
           // Брендовый toggle
-          GestureDetector(
+          PiligrimTap(
             onTap: onChanged != null ? () => onChanged!(!isOn) : null,
             child: AnimatedContainer(
               duration: 250.ms,
@@ -667,7 +667,7 @@ class _NotifRow extends StatelessWidget {
                 alignment:
                     isOn ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
-                  margin: const EdgeInsets.all(3),
+                  margin: const EdgeInsets.all(4),
                   width: 16,
                   height: 16,
                   decoration: BoxDecoration(
@@ -1023,7 +1023,7 @@ class _HoursCardState extends State<_HoursCard>
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
                   hoursText,
                   style: PiligrimTextStyles.caption,
@@ -1264,7 +1264,7 @@ class _LogoutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BrandCard(
       child: PiligrimTap(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(PiligrimRadius.md),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1346,7 +1346,7 @@ class _BrandCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: PiligrimColors.earth,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(PiligrimRadius.md),
         border: Border.all(
           color: PiligrimColors.steppe.withValues(alpha: 0.12),
         ),
@@ -1359,7 +1359,7 @@ class _BrandCard extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(PiligrimRadius.md),
         child: child,
       ),
     );

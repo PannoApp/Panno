@@ -95,7 +95,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1B19),
+      backgroundColor: PiligrimColors.earthWarm,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

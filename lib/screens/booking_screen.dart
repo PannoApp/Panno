@@ -39,7 +39,7 @@ class BookingScreen extends StatefulWidget {
 class _BookingScreenState extends State<BookingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController(text: '+7 777 777 77 77');
+  final _phoneCtrl = TextEditingController();
   final _commentCtrl = TextEditingController();
   final _guestsCtrl = TextEditingController(text: '2');
 
@@ -316,7 +316,7 @@ class _BookingScreenState extends State<BookingScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           const _FieldLabel('Номер телефона'),
                           _PiligrimInput(
                             controller: _phoneCtrl,
@@ -330,7 +330,7 @@ class _BookingScreenState extends State<BookingScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           Row(
                             children: [
                               Expanded(
@@ -340,7 +340,7 @@ class _BookingScreenState extends State<BookingScreen> {
                                   onTap: _pickDate,
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: _DateTimeChip(
                                   label: 'Время',
@@ -350,7 +350,7 @@ class _BookingScreenState extends State<BookingScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           const _FieldLabel('Количество героев'),
                           _PiligrimInput(
                             controller: _guestsCtrl,
@@ -364,12 +364,17 @@ class _BookingScreenState extends State<BookingScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           const _FieldLabel('Зона / зал (опционально)'),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _zones
+                          Theme(
+                            data: Theme.of(context).copyWith(
+                              splashFactory: NoSplash.splashFactory,
+                              highlightColor: Colors.transparent,
+                            ),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _zones
                                 .map(
                                   (zone) => ChoiceChip(
                                     label: Text(zone),
@@ -391,8 +396,9 @@ class _BookingScreenState extends State<BookingScreen> {
                                   ),
                                 )
                                 .toList(),
+                            ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           const _FieldLabel('Комментарий'),
                           _PiligrimInput(
                             controller: _commentCtrl,
@@ -400,7 +406,7 @@ class _BookingScreenState extends State<BookingScreen> {
                             maxLines: 4,
                           ),
                           if (depositRequired) ...[
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 16),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 12),
@@ -421,7 +427,7 @@ class _BookingScreenState extends State<BookingScreen> {
                                         color: PiligrimColors.steppe,
                                         size: 18,
                                       ),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
                                           context.watch<CoreInfoProvider>().coreInfo?.bookingDepositNote
@@ -467,7 +473,7 @@ class _BookingScreenState extends State<BookingScreen> {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 16),
                           EmberGlow(
                             radius: 12,
                             child: booking.isSubmitting
@@ -517,7 +523,7 @@ class _LuxCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(PiligrimRadius.card),
         color: PiligrimColors.earthDeep.withValues(alpha: 0.88),
         border: Border.all(color: PiligrimColors.sky.withValues(alpha: 0.12)),
         boxShadow: [
