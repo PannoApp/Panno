@@ -114,3 +114,9 @@ CLAUDE.md
 firebase-credentials.json
 
 docs/technical_debt.md
+
+# Seed-видео блюд (большие бинарники, не для git)
+apps/menu/seed_data/videos/*.mp4
+apps/menu/seed_data/videos/*.mov
+apps/menu/seed_data/videos/*.webm
+!apps/menu/seed_data/videos/README.md

@@ -6,12 +6,16 @@ import '../screens/booking_screen.dart';
 import 'ember_cta.dart';
 
 class HomeActionBlock extends StatelessWidget {
-  const HomeActionBlock({super.key});
+  const HomeActionBlock({super.key, this.bottomPadding = 0});
+
+  /// Доп. нижний отступ — обычно `MediaQuery.padding.bottom` от Scaffold с
+  /// `extendBody: true`. Без него EmberCta «уплывает» под прозрачный navbar.
+  final double bottomPadding;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 8),
       child: EmberCta(
         label: 'Забронировать стол',
         onTap: () async {

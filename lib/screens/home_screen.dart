@@ -147,13 +147,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               // Контент на PiligrimBackground — без ColoredBox / серой плашки.
-              const SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    RepaintBoundary(child: HomeHeroIntroBlock()),
-                    RepaintBoundary(child: HomeActionBlock()),
-                  ],
+              SliverToBoxAdapter(
+                child: Builder(
+                  builder: (ctx) {
+                    final bottomInset = MediaQuery.paddingOf(ctx).bottom;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const RepaintBoundary(child: HomeHeroIntroBlock()),
+                        RepaintBoundary(
+                          child: HomeActionBlock(bottomPadding: bottomInset),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 40)),

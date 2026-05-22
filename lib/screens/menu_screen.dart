@@ -327,14 +327,7 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
     }
 
     if (dishes.isEmpty) {
-      return Center(
-        child: Text(
-          'Меню скоро появится',
-          style: PiligrimTextStyles.body.copyWith(
-            color: PiligrimColors.sky.withValues(alpha: 0.3),
-          ),
-        ),
-      );
+      return const _FeedEmptyState();
     }
 
     return Stack(
@@ -377,28 +370,52 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
   }
 }
 
-// Точки прокрутки сбоку — показывают, на каком блюде сейчас находится гость
+// Умные точки прокрутки — максимум 7 виртуальных, current всегда в центре.
+// При count <= 7 рисует все точки; при > 7 — виртуальный слайдинг-вид.
 class _VerticalProgressDots extends StatelessWidget {
   const _VerticalProgressDots({required this.count, required this.current});
   final int count;
   final int current;
 
+  static const int _maxDots = 7;
+  static const int _halfWindow = _maxDots ~/ 2;
+
   @override
   Widget build(BuildContext context) {
+    if (count <= 1) return const SizedBox.shrink();
+
+    final visibleCount = count.clamp(0, _maxDots);
+    // Смещение окна: держим current в центре насколько возможно
+    final windowStart = (count <= _maxDots)
+        ? 0
+        : (current - _halfWindow).clamp(0, count - _maxDots);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: List.generate(count, (i) {
-        final active = i == current;
+      children: List.generate(visibleCount, (i) {
+        final realIndex = windowStart + i;
+        final active = realIndex == current;
+        // Точки на краях окна чуть прозрачнее для эффекта fade-out
+        final isEdge = count > _maxDots && (i == 0 || i == visibleCount - 1);
         return AnimatedContainer(
-          duration: 200.ms,
+          duration: 220.ms,
+          curve: Curves.easeOut,
           margin: const EdgeInsets.symmetric(vertical: 2),
-          width: 3,
+          width: 2.5,
           height: active ? 18 : 5,
           decoration: BoxDecoration(
             color: active
                 ? PiligrimColors.steppe
-                : PiligrimColors.sky.withValues(alpha: 0.2),
+                : PiligrimColors.sky.withValues(alpha: isEdge ? 0.1 : 0.15),
             borderRadius: BorderRadius.circular(2),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: PiligrimColors.steppe.withValues(alpha: 0.4),
+                      blurRadius: 6,
+                    ),
+                  ]
+                : null,
           ),
         );
       }),
@@ -497,11 +514,7 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
         const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
         if (menuProvider.isLoading && dishes.isEmpty)
-          const SliverFillRemaining(
-            child: Center(
-              child: CircularProgressIndicator(color: PiligrimColors.steppe),
-            ),
-          )
+          const SliverToBoxAdapter(child: _ClassicMenuSkeleton())
         else if (menuProvider.error != null && dishes.isEmpty)
           SliverErrorView(
             message: menuProvider.error!,
@@ -531,6 +544,12 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
                 ),
               ),
             ),
+          ),
+
+        // Маркер конца списка — «путь изучен»
+        if (!menuProvider.hasMore && dishes.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _EndOfListMarker(count: dishes.length),
           ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -690,6 +709,205 @@ class _ClassicEmptyState extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(duration: 500.ms);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Маркер конца списка — spiral тотем + «N блюд · путь изучен».
+// ─────────────────────────────────────────────────────────────────────────────
+class _EndOfListMarker extends StatelessWidget {
+  const _EndOfListMarker({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SvgPicture.asset(
+            'assets/images/spiral.svg',
+            width: 22,
+            height: 22,
+            colorFilter: ColorFilter.mode(
+              PiligrimColors.steppe.withValues(alpha: 0.18),
+              BlendMode.srcIn,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '$count блюд · путь изучен',
+            style: PiligrimTextStyles.micro.copyWith(
+              color: PiligrimColors.sky.withValues(alpha: 0.28),
+              letterSpacing: 1.4,
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 800.ms, curve: Curves.easeOut);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skeleton-заглушка классического меню — 3 placeholder-карточки с breathing.
+// Заменяет одинокий spinner при первой загрузке данных.
+// ─────────────────────────────────────────────────────────────────────────────
+class _ClassicMenuSkeleton extends StatelessWidget {
+  const _ClassicMenuSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(3, (i) => _SkeletonCard(delay: Duration(milliseconds: i * 180))),
+    );
+  }
+}
+
+class _SkeletonCard extends StatelessWidget {
+  const _SkeletonCard({required this.delay});
+  final Duration delay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: PiligrimColors.earthWarm,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: PiligrimColors.divider, width: 0.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Изображение-заглушка
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Container(color: PiligrimColors.earthDeep),
+              ),
+              // Текстовый блок-заглушка
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Заголовок
+                    Container(
+                      height: 17,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: PiligrimColors.divider,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Описание строка 1
+                    Container(
+                      height: 12,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: PiligrimColors.divider,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    // Описание строка 2 (короче)
+                    Container(
+                      height: 12,
+                      width: MediaQuery.sizeOf(context).width * 0.55,
+                      decoration: BoxDecoration(
+                        color: PiligrimColors.divider,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    )
+        .animate(delay: delay, onPlay: (c) => c.repeat(reverse: true))
+        .custom(
+          duration: 1200.ms,
+          curve: Curves.easeInOut,
+          builder: (_, value, child) => Opacity(opacity: 0.4 + value * 0.5, child: child),
+        );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Пустое состояние видео-ленты — атмосфера бренда, тотем + кинематограф.
+// ─────────────────────────────────────────────────────────────────────────────
+class _FeedEmptyState extends StatelessWidget {
+  const _FeedEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Кинематографический фон — тёплое тёмное зарево
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment(0, 0.15),
+              radius: 0.85,
+              colors: [
+                Color(0xFF2E1A10),
+                PiligrimColors.earth,
+              ],
+            ),
+          ),
+        ),
+        // Содержимое по центру
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(
+                'assets/images/bird_totem (1).svg',
+                width: 64,
+                height: 64,
+                colorFilter: ColorFilter.mode(
+                  PiligrimColors.steppe.withValues(alpha: 0.3),
+                  BlendMode.srcIn,
+                ),
+              )
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .fadeIn(duration: 800.ms)
+                  .then()
+                  .scale(
+                    begin: const Offset(1, 1),
+                    end: const Offset(1.04, 1.04),
+                    duration: 2800.ms,
+                    curve: Curves.easeInOut,
+                  ),
+              const SizedBox(height: 24),
+              Text(
+                'Путь ожидает',
+                style: PiligrimTextStyles.title.copyWith(
+                  color: PiligrimColors.nomadCream.withValues(alpha: 0.45),
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Блюда скоро появятся',
+                style: PiligrimTextStyles.caption.copyWith(
+                  color: PiligrimColors.sky.withValues(alpha: 0.3),
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ).animate().fadeIn(duration: 600.ms);
   }
 }
 
@@ -1029,173 +1247,197 @@ class _ClassicDishCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PiligrimTap(
-      borderRadius: BorderRadius.zero,
-      onTap: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => _DishDetailSheet(dish: dish),
-      ),
-      child: Container(
-        color: PiligrimColors.earth,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // [1] Фото — full-width Stack с многоступенчатым градиентом и UI-overlay.
-            Stack(
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: dish.imageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: dish.imageUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => const _ClassicThumbnailFallback(),
-                          errorWidget: (_, __, ___) => const _ClassicThumbnailFallback(),
-                        )
-                      : const _ClassicThumbnailFallback(),
-                ),
-                // Многоступенчатый bottom gradient — гарантирует читаемость цены/категории.
-                const Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Color(0x331C1510),
-                          Color(0xCC1C1510),
-                          Color(0xF21C1510),
-                        ],
-                        stops: [0.0, 0.45, 0.82, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-                // Pill-badge категории — caps, тёплая прозрачная подложка.
-                if (categoryName != null && categoryName!.isNotEmpty)
-                  Positioned(
-                    top: 14,
-                    left: 16,
-                    child: _CategoryPillBadge(name: categoryName!),
-                  ),
-                // Цена — premium pill внизу слева, тёплая steppe-обводка.
-                Positioned(
-                  bottom: 14,
-                  left: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xD61C1510),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: PiligrimColors.steppe.withValues(alpha: 0.55),
-                        width: 0.9,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: PiligrimColors.shadow.withValues(alpha: 0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      '${_formatPrice(dish.price)} ₸',
-                      style: const TextStyle(
-                        fontFamily: PiligrimFonts.museoSans,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: PiligrimColors.steppe,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: PiligrimTap(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _DishDetailSheet(dish: dish),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            decoration: BoxDecoration(
+              color: PiligrimColors.earthWarm,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: PiligrimColors.divider, width: 0.5),
+              boxShadow: [
+                BoxShadow(
+                  color: PiligrimColors.shadow.withValues(alpha: 0.22),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-
-            // [2] Текстовый блок с левым медным акцентом
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: PiligrimColors.earth,
-                border: Border(
-                  left: BorderSide(
-                    color: PiligrimColors.steppe.withValues(alpha: 0.55),
-                    width: 3,
-                  ),
-                ),
-              ),
-              padding: const EdgeInsets.fromLTRB(14, 13, 16, 15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    dish.name,
-                    style: PiligrimTextStyles.heading.copyWith(
-                      fontSize: 17,
-                      color: PiligrimColors.nomadCream,
-                      letterSpacing: 0.1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // [1] Фото — full-width Stack с многоступенчатым градиентом и UI-overlay.
+                Stack(
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: dish.imageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: dish.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => const _ClassicThumbnailFallback(),
+                              errorWidget: (_, __, ___) => const _ClassicThumbnailFallback(),
+                            )
+                          : const _ClassicThumbnailFallback(),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    dish.description.replaceAll('\n', ' '),
-                    style: PiligrimTextStyles.caption.copyWith(
-                      fontSize: 12,
-                      color: PiligrimColors.sky.withValues(alpha: 0.45),
-                      height: 1.5,
+                    // Верхний виньет — приглушает яркие фотографии и даёт атмосферность.
+                    const Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0x501C1510), Colors.transparent],
+                            stops: [0.0, 0.55],
+                          ),
+                        ),
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (dish.tags.isNotEmpty) ...[
-                    const SizedBox(height: 9),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 4,
-                      children: dish.tags.take(3).map((tag) {
-                        final style = tagStyleFor(tag.name);
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SvgPicture.asset(
-                              style.iconAsset,
-                              width: 11,
-                              height: 11,
-                              colorFilter: ColorFilter.mode(
-                                style.color.withValues(alpha: 0.7),
-                                BlendMode.srcIn,
-                              ),
+                    // Многоступенчатый bottom gradient — гарантирует читаемость цены/категории.
+                    const Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Color(0x441C1510),
+                              Color(0xD41C1510),
+                              Color(0xF61C1510),
+                            ],
+                            stops: [0.0, 0.40, 0.80, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Pill-badge категории — caps, тёплая прозрачная подложка.
+                    if (categoryName != null && categoryName!.isNotEmpty)
+                      Positioned(
+                        top: 14,
+                        left: 16,
+                        child: _CategoryPillBadge(name: categoryName!),
+                      ),
+                    // Цена — premium pill внизу слева, тёплая steppe-обводка + ember-glow (огонь по ТЗ).
+                    Positioned(
+                      bottom: 14,
+                      left: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xD61C1510),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: PiligrimColors.steppe.withValues(alpha: 0.58),
+                            width: 0.9,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: PiligrimColors.steppe.withValues(alpha: 0.28),
+                              blurRadius: 14,
+                              spreadRadius: 0,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              tag.name,
-                              style: PiligrimTextStyles.micro.copyWith(
-                                color: style.color.withValues(alpha: 0.7),
-                              ),
+                            BoxShadow(
+                              color: PiligrimColors.shadow.withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
                           ],
-                        );
-                      }).toList(),
+                        ),
+                        child: Text(
+                          '${_formatPrice(dish.price)} ₸',
+                          style: const TextStyle(
+                            fontFamily: PiligrimFonts.museoSans,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: PiligrimColors.steppe,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                ],
-              ),
-            ),
+                ),
 
-            // Разделитель между карточками
-            Container(
-              height: 1,
-              color: PiligrimColors.divider,
+                // [2] Текстовый блок — steppe left-accent + pill tag badges.
+                Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      color: PiligrimColors.earthWarm,
+                      padding: const EdgeInsets.fromLTRB(20, 13, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            dish.name,
+                            style: PiligrimTextStyles.heading.copyWith(
+                              fontSize: 17,
+                              color: PiligrimColors.nomadCream,
+                              letterSpacing: 0.1,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            dish.description.replaceAll('\n', ' '),
+                            style: PiligrimTextStyles.caption.copyWith(
+                              fontSize: 12.5,
+                              color: PiligrimColors.sky.withValues(alpha: 0.55),
+                              height: 1.5,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (dish.tags.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: dish.tags
+                                  .take(3)
+                                  .map((t) => DishCardTagChip(tag: t))
+                                  .toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    // Steppe left-accent — «нить пути», фирменный штрих карточки.
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 2.5,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              PiligrimColors.steppe.withValues(alpha: 0.55),
+                              PiligrimColors.steppe.withValues(alpha: 0.0),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     )
@@ -1244,14 +1486,14 @@ class _ClassicThumbnailFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: PiligrimColors.earth,
+      color: PiligrimColors.earthWarm,
       child: Center(
         child: SvgPicture.asset(
           'assets/images/bird_totem (1).svg',
           width: 44,
           height: 44,
           colorFilter: ColorFilter.mode(
-            PiligrimColors.steppe.withValues(alpha: 0.12),
+            PiligrimColors.steppe.withValues(alpha: 0.18),
             BlendMode.srcIn,
           ),
         ),
@@ -1267,8 +1509,15 @@ class _DishDetailSheet extends StatelessWidget {
   const _DishDetailSheet({required this.dish});
   final ApiDish dish;
 
+  String _formatPrice(int price) =>
+      price.toString().replaceAllMapped(
+            RegExp(r'(\d)(?=(\d{3})+$)'),
+            (m) => '${m[1]} ',
+          );
+
   @override
   Widget build(BuildContext context) {
+    final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
     return DraggableScrollableSheet(
       initialChildSize: 0.88,
       maxChildSize: 0.95,
@@ -1280,13 +1529,13 @@ class _DishDetailSheet extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // [1] Фото — полная ширина
+            // [1] Фото — 4:3 hero-образ
             Stack(
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                   child: AspectRatio(
-                    aspectRatio: 16 / 9,
+                    aspectRatio: 4 / 3,
                     child: dish.imageUrl != null
                         ? CachedNetworkImage(
                             imageUrl: dish.imageUrl!,
@@ -1295,7 +1544,7 @@ class _DishDetailSheet extends StatelessWidget {
                         : const _ClassicThumbnailFallback(),
                   ),
                 ),
-                // Градиент снизу фото
+                // Верхний виньет — тонирует яркие фото, делает handle читаемым.
                 const Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -1303,52 +1552,106 @@ class _DishDetailSheet extends StatelessWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xF01C1510)],
-                        stops: [0.35, 1.0],
+                        colors: [Color(0x701C1510), Colors.transparent],
+                        stops: [0.0, 0.45],
                       ),
                     ),
                   ),
                 ),
-                // Handle вверху по центру
+                // Многоступенчатый bottom gradient
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Color(0x441C1510),
+                          Color(0xD01C1510),
+                          Color(0xF61C1510),
+                        ],
+                        stops: [0.0, 0.38, 0.78, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                // Handle — чуть крупнее, sky-тинт для читаемости на тёмном.
                 Positioned(
                   top: 12,
                   left: 0,
                   right: 0,
                   child: Center(
                     child: Container(
-                      width: 38,
-                      height: 3,
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.25),
+                        color: PiligrimColors.sky.withValues(alpha: 0.28),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
                 ),
-                // Цена — pill внизу слева
+                // Цена + вес — pills внизу слева
                 Positioned(
                   bottom: 16,
                   left: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xCC1C1510),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: PiligrimColors.steppe.withValues(alpha: 0.5),
-                        width: 1,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Цена — ember-glow как в классической карточке.
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xCC1C1510),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: PiligrimColors.steppe.withValues(alpha: 0.58),
+                            width: 0.9,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: PiligrimColors.steppe.withValues(alpha: 0.28),
+                              blurRadius: 14,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          '${_formatPrice(dish.price)} ₸',
+                          style: const TextStyle(
+                            fontFamily: PiligrimFonts.museoSans,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: PiligrimColors.steppe,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
-                      style: const TextStyle(
-                        fontFamily: PiligrimFonts.museoSans,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: PiligrimColors.steppe,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                      // Вес — вторичный pill
+                      if (dish.weight.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: PiligrimColors.earthDeep.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: PiligrimColors.divider,
+                              width: 0.7,
+                            ),
+                          ),
+                          child: Text(
+                            '${dish.weight} г',
+                            style: PiligrimTextStyles.caption.copyWith(
+                              fontSize: 12,
+                              color: PiligrimColors.sky.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -1358,7 +1661,7 @@ class _DishDetailSheet extends StatelessWidget {
             Expanded(
               child: ListView(
                 controller: controller,
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
+                padding: EdgeInsets.fromLTRB(24, 20, 24, bottomPad + 48),
                 children: [
                   // Название
                   Text(
@@ -1370,21 +1673,20 @@ class _DishDetailSheet extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 6),
-
-                  // Вес — просто текст
-                  if (dish.weight.isNotEmpty)
-                    Text(
-                      '${dish.weight} г',
-                      style: PiligrimTextStyles.caption.copyWith(
-                        color: PiligrimColors.sky.withValues(alpha: 0.4),
-                        fontSize: 12,
-                      ),
-                    ),
-
                   const SizedBox(height: 20),
 
-                  const Divider(color: PiligrimColors.divider, height: 1),
+                  // steppe-hairline разделитель
+                  Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          PiligrimColors.steppe.withValues(alpha: 0.35),
+                          PiligrimColors.steppe.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
 
                   const SizedBox(height: 20),
 
@@ -1392,7 +1694,7 @@ class _DishDetailSheet extends StatelessWidget {
                   Text(
                     dish.description.replaceAll('\n', ' '),
                     style: PiligrimTextStyles.body.copyWith(
-                      color: PiligrimColors.sky.withValues(alpha: 0.75),
+                      color: PiligrimColors.sky.withValues(alpha: 0.78),
                       fontSize: 14,
                       height: 1.7,
                     ),
@@ -1400,13 +1702,27 @@ class _DishDetailSheet extends StatelessWidget {
 
                   // История
                   if (dish.story.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Text('ИСТОРИЯ', style: PiligrimTextStyles.sectionLabel),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        SvgPicture.asset(
+                          'assets/images/spiral.svg',
+                          width: 10,
+                          height: 10,
+                          colorFilter: ColorFilter.mode(
+                            PiligrimColors.steppe.withValues(alpha: 0.5),
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('ИСТОРИЯ', style: PiligrimTextStyles.sectionLabel),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
                     Text(
                       dish.story,
                       style: PiligrimTextStyles.body.copyWith(
-                        color: PiligrimColors.steppe.withValues(alpha: 0.8),
+                        color: PiligrimColors.steppe.withValues(alpha: 0.82),
                         fontSize: 13,
                         height: 1.7,
                         fontStyle: FontStyle.italic,
@@ -1414,17 +1730,48 @@ class _DishDetailSheet extends StatelessWidget {
                     ),
                   ],
 
-                  // Аллергены
+                  // Аллергены — полные pill-чипы, water-тинт для лёгкого акцента.
                   if (dish.allergens.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Text('АЛЛЕРГЕНЫ', style: PiligrimTextStyles.sectionLabel),
-                    const SizedBox(height: 8),
-                    Text(
-                      dish.allergens.join(' · '),
-                      style: PiligrimTextStyles.caption.copyWith(
-                        color: PiligrimColors.sky.withValues(alpha: 0.5),
-                        fontSize: 12,
+                    const SizedBox(height: 28),
+                    // steppe-hairline перед секцией (единый штрих с другими разделителями)
+                    Container(
+                      height: 1,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            PiligrimColors.steppe.withValues(alpha: 0.25),
+                            PiligrimColors.steppe.withValues(alpha: 0.0),
+                          ],
+                        ),
                       ),
+                    ),
+                    Text('АЛЛЕРГЕНЫ', style: PiligrimTextStyles.sectionLabel),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: dish.allergens.map((allergen) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: PiligrimColors.water.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: PiligrimColors.water.withValues(alpha: 0.25),
+                              width: 0.7,
+                            ),
+                          ),
+                          child: Text(
+                            allergen,
+                            style: PiligrimTextStyles.caption.copyWith(
+                              fontSize: 11.5,
+                              color: PiligrimColors.sky.withValues(alpha: 0.6),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
 
