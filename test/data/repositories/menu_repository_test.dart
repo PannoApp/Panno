@@ -45,10 +45,9 @@ void main() {
     });
 
     test('fetchCategories() парсит список ApiCategory', () async {
-      adapter.enqueue(200, {
-        'results': [_categoryJson(id: 1, name: 'Основной путь')],
-        'next': null,
-      });
+      adapter.enqueue(200, [
+        _categoryJson(id: 1, name: 'Основной путь'),
+      ]);
 
       final categories = await repository.fetchCategories();
       expect(categories, hasLength(1));

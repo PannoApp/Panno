@@ -25,7 +25,8 @@ class EventReservationAdmin(ModelAdmin):
     list_display = ('event', 'guest_name', 'guest_phone', 'guests_count', 'created_at')
     list_filter = ('event',)
     search_fields = ('user__phone', 'user__first_name', 'user__last_name', 'event__title')
-    readonly_fields = ('created_at',)
+    readonly_fields = ('guest_name', 'guest_phone', 'created_at')
+    fields = ('event', 'user', 'guest_name', 'guest_phone', 'guests_count', 'created_at')
 
     @admin.display(description='Имя гостя')
     def guest_name(self, obj):

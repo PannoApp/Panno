@@ -585,3 +585,21 @@ class NewsCacheTest(APITestCase):
         response = self.client.get('/api/v1/events/news/')
         titles = [n['title'] for n in response.data['results']]
         self.assertIn('Только что добавили', titles)
+
+
+# ---------------------------------------------------------------------------
+# Admin config tests
+# ---------------------------------------------------------------------------
+
+class EventReservationAdminTest(TestCase):
+    def test_admin_config_has_guest_fields(self):
+        from django.contrib.admin.sites import AdminSite
+        from .admin import EventReservationAdmin
+        
+        site = AdminSite()
+        admin_instance = EventReservationAdmin(EventReservation, site)
+        
+        self.assertIn('guest_name', admin_instance.readonly_fields)
+        self.assertIn('guest_phone', admin_instance.readonly_fields)
+        self.assertIn('guest_name', admin_instance.fields)
+        self.assertIn('guest_phone', admin_instance.fields)

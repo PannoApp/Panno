@@ -511,14 +511,9 @@ class _StatCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: PiligrimColors.earth,
           borderRadius: BorderRadius.circular(14),
-          border: Border(
-            top: BorderSide(
-              color: PiligrimColors.steppe.withValues(alpha: 0.4),
-              width: 2,
-            ),
-            left: BorderSide(color: PiligrimColors.steppe.withValues(alpha: 0.1)),
-            right: BorderSide(color: PiligrimColors.steppe.withValues(alpha: 0.1)),
-            bottom: BorderSide(color: PiligrimColors.steppe.withValues(alpha: 0.1)),
+          border: Border.all(
+            color: PiligrimColors.steppe.withValues(alpha: 0.15),
+            width: 1.0,
           ),
           boxShadow: [
             BoxShadow(

@@ -69,7 +69,7 @@ void main() {
 
     test('createReservation sends event, guests and idempotency key', () async {
       adapter.enqueue(201, {'id': 99});
-      await repository.createReservation(eventId: 7, guestsCount: 2);
+      await repository.createReservation(eventId: 7, guestsCount: 2, idempotencyKey: 'test-key');
 
       expect(adapter.captured, hasLength(1));
       final req = adapter.captured.single;

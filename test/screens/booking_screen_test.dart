@@ -157,7 +157,7 @@ void main() {
     testWidgets('При успешном submitBooking() → success state отображается',
         (tester) async {
       auth.currentUser = _sampleProfile();
-      when(() => mockRepo.createBooking(any())).thenAnswer((_) async {});
+      when(() => mockRepo.createBooking(any(), idempotencyKey: any(named: 'idempotencyKey'))).thenAnswer((_) async {});
 
       await tester.pumpWidget(buildApp());
       await settle(tester); // postFrameCallback заполняет имя + телефон

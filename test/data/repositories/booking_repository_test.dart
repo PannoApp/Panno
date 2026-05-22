@@ -39,7 +39,7 @@ void main() {
 
     test('createBooking() отправляет POST с Idempotency-Key заголовком', () async {
       adapter.enqueue(201, _bookingJson(1));
-      await repository.createBooking(_req);
+      await repository.createBooking(_req, idempotencyKey: 'test-key');
 
       expect(adapter.captured, hasLength(1));
       final req = adapter.captured.single;
@@ -50,7 +50,7 @@ void main() {
 
     test('createBooking() body содержит корректные поля из BookingRequest', () async {
       adapter.enqueue(201, _bookingJson(1));
-      await repository.createBooking(_req);
+      await repository.createBooking(_req, idempotencyKey: 'test-key');
 
       final body = adapter.captured.single.data as Map<String, dynamic>;
       expect(body['guest_name'], 'Айдар');
@@ -63,7 +63,7 @@ void main() {
 
     test('createBooking() бросает исключение при 400 (validation error)', () async {
       adapter.enqueue(400, {'detail': 'Invalid date'});
-      expect(repository.createBooking(_req), throwsA(isA<DioException>()));
+      expect(repository.createBooking(_req, idempotencyKey: 'test-key'), throwsA(isA<DioException>()));
     });
 
     test('fetchHistory() возвращает список ApiBooking', () async {
