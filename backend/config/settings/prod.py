@@ -1,35 +1,32 @@
 from .base import *
-from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
 
 DEBUG = False
 
-SIMPLE_JWT = {
-    **SIMPLE_JWT,
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
-}
-
 # Парсим строку из .env (например, "127.0.0.1,example.com") в список
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
+
+# Разрешаем только конкретные источники (Flutter-приложение, веб-клиент)
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 
 # ==========================================
 # Безопасность
 # ==========================================
-# Рекомендуется раскомментировать эти строки, когда прикрутишь SSL (HTTPS) на сервере
-# SECURE_SSL_REDIRECT = True
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
 
-# Заголовки безопасности — не требуют SSL, безопасны на HTTP тоже
-SECURE_CONTENT_TYPE_NOSNIFF = True     # Запрещает браузеру угадывать MIME-тип
-SECURE_BROWSER_XSS_FILTER = True       # Включает XSS-фильтр в старых браузерах
-X_FRAME_OPTIONS = 'DENY'               # Запрещает вставку страниц в <iframe>
+# Включить после настройки HTTPS на сервере:
+# SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
 # ==========================================
 # Проверка обязательных переменных окружения в production
 # ==========================================
-# В debug-режиме все переменные могут быть пустыми (удобно для локальной разработки).
-# В production отсутствие этих значений — признак ошибочного деплоя.
 _REQUIRED_VARS = {
     'SMS_PROVIDER_URL': SMS_PROVIDER_URL,
     'SMS_LOGIN': SMS_LOGIN,
@@ -37,6 +34,7 @@ _REQUIRED_VARS = {
     'FIREBASE_CREDENTIALS_PATH': FIREBASE_CREDENTIALS_PATH,
     'TELEGRAM_BOT_TOKEN': TELEGRAM_BOT_TOKEN,
     'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID,
+    'TELEGRAM_WEBHOOK_SECRET': TELEGRAM_WEBHOOK_SECRET,
 }
 _missing = [name for name, val in _REQUIRED_VARS.items() if not val]
 if _missing:

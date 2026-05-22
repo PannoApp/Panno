@@ -64,8 +64,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
-
 from corsheaders.defaults import default_headers
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'idempotency-key',
@@ -177,10 +175,10 @@ if USE_S3:
     # URL для медиа-файлов
     if AWS_S3_CUSTOM_DOMAIN:
         MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    elif AWS_S3_ENDPOINT_URL:
+        MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/'
     else:
-        # Если эндпоинт указан (MinIO), используем его, иначе стандартный S3 URL
-        base_url = AWS_S3_ENDPOINT_URL.replace('http://minio', 'http://localhost') if AWS_S3_ENDPOINT_URL else f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
-        MEDIA_URL = f'{base_url}/media/'
+        MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/media/'
 
 else:
     # Локальное хранилище (если S3 не настроен)
@@ -342,11 +340,11 @@ CELERY_TASK_ROUTES = {
 # ==========================================
 
 # Максимум маркетинговых пушей на пользователя в неделю (category != None)
-PUSH_WEEKLY_LIMIT = int(os.getenv('PUSH_WEEKLY_LIMIT', 3))
+PUSH_WEEKLY_LIMIT = env.int('PUSH_WEEKLY_LIMIT', default=3)
 
 # Разрешённое окно отправки маркетинговых пушей (часы, локальное время сервера)
-PUSH_ALLOWED_HOUR_START = int(os.getenv('PUSH_ALLOWED_HOUR_START', 9))
-PUSH_ALLOWED_HOUR_END   = int(os.getenv('PUSH_ALLOWED_HOUR_END', 21))
+PUSH_ALLOWED_HOUR_START = env.int('PUSH_ALLOWED_HOUR_START', default=9)
+PUSH_ALLOWED_HOUR_END   = env.int('PUSH_ALLOWED_HOUR_END', default=21)
 
 # ==========================================
 # Логирование
