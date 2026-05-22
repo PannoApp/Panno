@@ -325,7 +325,7 @@ class _SplashScreenState extends State<SplashScreen>
         width: 48,
         height: 48,
         colorFilter: const ColorFilter.mode(
-          PiligrimColors.water,
+          PiligrimColors.sky,
           BlendMode.srcIn,
         ),
       ),
@@ -353,7 +353,7 @@ class _SplashScreenState extends State<SplashScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              PiligrimColors.water,
+              PiligrimColors.steppe,
               PiligrimColors.divider,
             ],
           ),
@@ -393,7 +393,7 @@ class _SplashScreenState extends State<SplashScreen>
           Text(
             'дәстүрдің дәмі',
             style: PiligrimTextStyles.caption.copyWith(
-              color: PiligrimColors.water,
+              color: PiligrimColors.steppe.withValues(alpha: 0.90),
               letterSpacing: 2.5,
               fontSize: 11,
             ),

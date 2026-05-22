@@ -134,6 +134,7 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
               ],
             ),
             child: Stack(
+              alignment: Alignment.center,
               children: [
                 child!,
                 // Тонкий rim-highlight вдоль верхнего края — ощущение объёма

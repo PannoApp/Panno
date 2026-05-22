@@ -4,7 +4,7 @@
 // ТЗ §4.1 (brand/TZ Piligrim App.md): hero и/или видео-визуал, концепция Modern Nomad,
 // бронь (Ember CTA), меню и маршрут под блоком «Путь героя», анонс события, часы и статус.
 //
-// Виджеты: home_hero_section, home_cinematic_ambient, home_totem_path,
+// Виджеты: home_hero_section, home_cinematic_ambient,
 //   home_action_block, home_event_block, home_status_line
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -16,7 +16,6 @@ import '../widgets/piligrim_background.dart';
 import '../widgets/home_cinematic_ambient.dart';
 import '../widgets/home_hero_section.dart';
 import '../widgets/home_hero_intro_block.dart';
-import '../widgets/home_totem_path.dart';
 import '../widgets/home_action_block.dart';
 import '../widgets/home_event_block.dart';
 import '../widgets/home_status_line.dart';
@@ -85,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final core = context.watch<CoreInfoProvider>();
     final size = MediaQuery.sizeOf(context);
     final heroHeight =
-        (size.height * 0.58).clamp(310.0, size.height * 0.62);
+        (size.height * 0.58).clamp(310.0, size.height * 0.62).roundToDouble();
     final heroUrls = core.heroImageUrls;
     final hoursLine = core.workingHoursNote?.isNotEmpty == true
         ? '${core.workingHoursDisplay} · ${core.workingHoursNote}'
@@ -160,12 +159,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 40)),
-              SliverToBoxAdapter(
-                child: RepaintBoundary(
-                  child: HomeTotemPathRow(onNavigate: widget.onNavigate),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 48)),
               SliverToBoxAdapter(
                 child: RepaintBoundary(
                   child: HomeEventBlock(onNavigate: widget.onNavigate),

@@ -57,24 +57,7 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Разделитель между hero-фото и текстовым блоком
-          Container(
-            margin: const EdgeInsets.only(bottom: 28),
-            height: 0.5,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  PiligrimColors.sky.withValues(alpha: 0.0),
-                  PiligrimColors.sky.withValues(alpha: 0.10),
-                  PiligrimColors.sky.withValues(alpha: 0.10),
-                  PiligrimColors.sky.withValues(alpha: 0.0),
-                ],
-                stops: const [0.0, 0.2, 0.8, 1.0],
-              ),
-            ),
-          )
-              .animate()
-              .fadeIn(delay: 300.ms, duration: 900.ms, curve: Curves.easeOut),
+          const SizedBox(height: 28),
           SvgPicture.asset(
             'assets/images/piligrim.svg',
             height: 28,
