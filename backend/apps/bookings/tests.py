@@ -266,6 +266,12 @@ class SendBookingRemindersTaskTest(TestCase):
     Window: time >= 15:00 and time <= 16:00.
     """
 
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
     def _mock_timezone(self, mock_tz, hour=14, minute=0, today=None):
         fixed_date = today or dt_date(2026, 5, 12)
         mock_dt = MagicMock()
@@ -354,6 +360,55 @@ class SendBookingRemindersTaskTest(TestCase):
         result = send_booking_reminders()
         self.assertEqual(result, 0)
         mock_push.delay.assert_not_called()
+
+    @patch('apps.bookings.tasks.timezone')
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_midnight_crossing_reminders(self, mock_push, mock_tz):
+        today = dt_date(2026, 5, 12)
+        tomorrow = dt_date(2026, 5, 13)
+
+        mock_now_dt = MagicMock()
+        mock_now_dt.date.return_value = today
+        mock_now_dt.time.return_value = dt_time(22, 30)
+
+        mock_start_dt = MagicMock()
+        mock_start_dt.date.return_value = today
+        mock_start_dt.time.return_value = dt_time(23, 30)
+
+        mock_end_dt = MagicMock()
+        mock_end_dt.date.return_value = tomorrow
+        mock_end_dt.time.return_value = dt_time(0, 30)
+
+        def mock_add(dt, delta):
+            if delta.total_seconds() == 3600:
+                return mock_start_dt
+            elif delta.total_seconds() == 7200:
+                return mock_end_dt
+            return mock_now_dt
+
+        mock_now_dt.__add__ = mock_add
+
+        mock_tz.now.return_value = MagicMock()
+        mock_tz.localtime.return_value = mock_now_dt
+
+        user1 = make_user('+77009999994')
+        user2 = make_user('+77009999995')
+
+        TableBooking.objects.create(
+            user=user1, guest_name='Сегодня в конце дня', date=today,
+            time='23:45:00', guests_count=2, status='confirmed',
+        )
+
+        TableBooking.objects.create(
+            user=user2, guest_name='Завтра в начале дня', date=tomorrow,
+            time='00:15:00', guests_count=2, status='confirmed',
+        )
+
+        mock_push.delay.reset_mock()
+        from apps.bookings.tasks import send_booking_reminders
+        result = send_booking_reminders()
+        self.assertEqual(result, 2)
+        self.assertEqual(mock_push.delay.call_count, 2)
 
 
 # ---------------------------------------------------------------------------
@@ -852,7 +907,10 @@ class TelegramNotificationTaskTest(TestCase):
     @patch('apps.bookings.tasks.requests.post')
     def test_propagates_http_error_for_celery_retry(self, mock_post):
         from requests import HTTPError
-        mock_post.return_value = MagicMock(raise_for_status=MagicMock(side_effect=HTTPError('500')))
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+        mock_resp.raise_for_status.side_effect = HTTPError('500')
+        mock_post.return_value = mock_resp
         from apps.bookings.tasks import send_telegram_notification
         with self.assertRaises(HTTPError):
             send_telegram_notification(self.booking.pk)

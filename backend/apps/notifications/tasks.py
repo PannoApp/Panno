@@ -90,14 +90,17 @@ def send_push_notification(user_id, title, body, data=None, category=None, campa
         # --- Недельный лимит ---
         week_num = timezone.now().isocalendar()[1]
         week_key = f"push_weekly:{user_id}:{week_num}"
-        count = cache.get(week_key, 0)
-        if count >= settings.PUSH_WEEKLY_LIMIT:
-            logger.info(
-                "Push skipped: weekly limit reached user=%s week=%s count=%s",
-                user_id, week_num, count,
-            )
-            return
-        cache.set(week_key, count + 1, timeout=7 * 24 * 3600)
+        try:
+            cache.add(week_key, 0, timeout=7 * 24 * 3600)
+            new_count = cache.incr(week_key)
+            if new_count > settings.PUSH_WEEKLY_LIMIT:
+                logger.info(
+                    "Push skipped: weekly limit reached user=%s week=%s count=%s",
+                    user_id, week_num, new_count - 1,
+                )
+                return
+        except Exception:
+            logger.warning("Redis cache error during push limit check, skipping enforcement")
 
     # 1. Собираем все токены пользователя
     devices = UserDevice.objects.filter(user_id=user_id)

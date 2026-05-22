@@ -308,6 +308,16 @@ class VerifySMSViewTest(APITestCase):
         # Second attempt with same OTP should succeed (we re-set OTP above)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_inactive_user_returns_403(self):
+        User.objects.create_user(phone=self.PHONE, is_active=False)
+        cache.set(f'otp_{self.PHONE}', self.OTP, 180)
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
+            'phone': self.PHONE, 'otp': self.OTP,
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('error', response.data)
+        self.assertEqual(response.data['error'], 'Ваш аккаунт заблокирован.')
+
 
 # ---------------------------------------------------------------------------
 # GET/PATCH /api/users/profile/

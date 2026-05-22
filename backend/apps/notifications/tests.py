@@ -458,19 +458,20 @@ class PushWeeklyLimitTest(TestCase):
     @patch('apps.notifications.tasks.cache')
     @patch('apps.notifications.tasks.messaging')
     def test_push_within_limit_is_sent(self, mock_msg, mock_cache):
-        mock_cache.get.return_value = 0
+        mock_cache.incr.return_value = 1
         mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
         from apps.notifications.tasks import send_push_notification
         send_push_notification(self.user.pk, 'T', 'B', category='events')
         mock_msg.send_each_for_multicast.assert_called_once()
-        mock_cache.set.assert_called_once()
+        mock_cache.add.assert_called_once()
+        mock_cache.incr.assert_called_once()
 
     @patch('apps.notifications.tasks.cache')
     @patch('apps.notifications.tasks.messaging')
     def test_push_over_limit_is_skipped(self, mock_msg, mock_cache):
-        mock_cache.get.return_value = 3  # already at limit
+        mock_cache.incr.return_value = 4  # already at limit
         from apps.notifications.tasks import send_push_notification
         send_push_notification(self.user.pk, 'T', 'B', category='events')
         mock_msg.send_each_for_multicast.assert_not_called()
@@ -478,7 +479,6 @@ class PushWeeklyLimitTest(TestCase):
     @patch('apps.notifications.tasks.cache')
     @patch('apps.notifications.tasks.messaging')
     def test_service_push_ignores_limit(self, mock_msg, mock_cache):
-        mock_cache.get.return_value = 99  # way over limit
         mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
@@ -486,7 +486,7 @@ class PushWeeklyLimitTest(TestCase):
         # category=None → service push, no limit check
         send_push_notification(self.user.pk, 'T', 'B', category=None)
         mock_msg.send_each_for_multicast.assert_called_once()
-        mock_cache.get.assert_not_called()
+        mock_cache.incr.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +511,7 @@ class PushTimeWindowTest(TestCase):
     def test_push_within_window_is_sent(self, mock_tz, mock_msg, mock_cache):
         mock_tz.localtime.return_value = self._make_local_dt(10)
         mock_tz.now.return_value = self._make_local_dt(10)
-        mock_cache.get.return_value = 0
+        mock_cache.incr.return_value = 1
         mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )

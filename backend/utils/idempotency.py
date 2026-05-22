@@ -58,13 +58,30 @@ class IdempotencyMixin:
 
         try:
             response = super().create(request, *args, **kwargs)
-        except Exception:
-            cache.delete(cache_key)
-            raise
+        except Exception as exc:
+            try:
+                response = self.handle_exception(exc)
+            except Exception:
+                cache.delete(cache_key)
+                raise
 
-        cache.set(
-            cache_key,
-            {"status_code": response.status_code, "data": response.data},
-            IDEMPOTENCY_TTL,
-        )
+            if response.status_code < 500:
+                cache.set(
+                    cache_key,
+                    {"status_code": response.status_code, "data": response.data},
+                    IDEMPOTENCY_TTL,
+                )
+                return response
+            else:
+                cache.delete(cache_key)
+                raise
+
+        if response.status_code < 500:
+            cache.set(
+                cache_key,
+                {"status_code": response.status_code, "data": response.data},
+                IDEMPOTENCY_TTL,
+            )
+        else:
+            cache.delete(cache_key)
         return response

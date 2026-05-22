@@ -6,6 +6,8 @@ from django.dispatch import receiver
 from .models import Event, EventReservation, News
 from utils.cache import safe_cache_get, safe_cache_set
 
+from django.utils import timezone
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +38,8 @@ def notify_on_reservation_created(sender, instance, created, **kwargs):
 
     event = instance.event
     title = "Вы записаны на мероприятие"
-    body = f"{event.title} — {event.date_time.strftime('%d.%m.%Y %H:%M')}"
+    local_dt = timezone.localtime(event.date_time)
+    body = f"{event.title} — {local_dt.strftime('%d.%m.%Y %H:%M')}"
 
     from apps.notifications.tasks import send_push_notification
     try:

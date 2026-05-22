@@ -6,6 +6,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from datetime import timedelta
+from django.db.models import Q
+from utils.cache import safe_cache_add
 
 logger = logging.getLogger(__name__)
 
@@ -44,16 +46,20 @@ def _build_booking_html(b, status_label=None):
     return '\n'.join(lines)
 
 
-def _tg_post(method, payload, token):
-    """Отправляет запрос к Telegram Bot API. Логирует ошибки, не бросает исключений."""
+def _tg_post(method, payload, token, raise_on_error=False):
+    """Отправляет запрос к Telegram Bot API. Логирует ошибки, не бросает исключений (если raise_on_error=False)."""
     url = f"https://api.telegram.org/bot{token}/{method}"
     try:
         resp = requests.post(url, json=payload, timeout=10)
         if not resp.ok:
             logger.error("Telegram %s error: status=%s body=%s", method, resp.status_code, resp.text)
+            if raise_on_error:
+                resp.raise_for_status()
         return resp
     except Exception:
         logger.exception("Telegram %s request failed", method)
+        if raise_on_error:
+            raise
         return None
 
 
@@ -88,14 +94,12 @@ def send_telegram_notification(booking_id):
         ]]
     }
 
-    resp = _tg_post('sendMessage', {
+    _tg_post('sendMessage', {
         'chat_id': chat_id,
         'text': text,
         'parse_mode': 'HTML',
         'reply_markup': reply_markup,
-    }, token)
-    if resp is not None:
-        resp.raise_for_status()
+    }, token, raise_on_error=True)
     logger.info("Telegram notification sent: booking=%s", booking_id)
 
 
@@ -128,20 +132,30 @@ def send_booking_reminders():
     window_start = now + timedelta(hours=1)
     window_end = now + timedelta(hours=2)
 
+    if window_start.date() == window_end.date():
+        time_filter = Q(
+            date=window_start.date(),
+            time__gte=window_start.time(),
+            time__lte=window_end.time()
+        )
+    else:
+        time_filter = (
+            Q(date=window_start.date(), time__gte=window_start.time()) |
+            Q(date=window_end.date(), time__lte=window_end.time())
+        )
+
     bookings = TableBooking.objects.filter(
+        time_filter,
         status='confirmed',
         user__isnull=False,
-        date=now.date(),
-        time__gte=window_start.time(),
-        time__lte=window_end.time(),
     ).select_related('user')
 
     count = 0
     for booking in bookings:
-        # cache.add() атомарен: устанавливает ключ только если его нет.
+        # safe_cache_add() атомарен: устанавливает ключ только если его нет.
         # Возвращает False — бронь уже обработана в предыдущем запуске Beat.
         cache_key = f'reminder_sent:{booking.pk}'
-        if not cache.add(cache_key, True, timeout=10800):  # TTL = 3 часа
+        if not safe_cache_add(cache_key, True, timeout=10800):  # TTL = 3 часа
             continue
 
         send_push_notification.delay(

@@ -109,6 +109,7 @@ class RestaurantInfoIsOpenNowTest(TestCase):
     def _mock_local_time(self, hour, minute):
         mock_dt = MagicMock()
         mock_dt.time.return_value = dt_time(hour, minute)
+        mock_dt.weekday.return_value = 0
         return mock_dt
 
     def test_returns_none_when_working_hours_empty(self):
@@ -160,6 +161,46 @@ class RestaurantInfoIsOpenNowTest(TestCase):
         mock_localtime.return_value = self._mock_local_time(10, 0)
         info = self._make_info('Пн–Вс: 20:00–02:00')
         self.assertFalse(info.is_open_now)
+
+    def _mock_local_time_with_weekday(self, weekday, hour, minute):
+        mock_dt = MagicMock()
+        mock_dt.time.return_value = dt_time(hour, minute)
+        mock_dt.weekday.return_value = weekday
+        return mock_dt
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_multi_range_working_hours(self, mock_now, mock_localtime):
+        info = self._make_info('Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00')
+        
+        # Friday (4) at 23:30 (should be closed)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(4, 23, 30)
+        self.assertFalse(info.is_open_now)
+        
+        # Saturday (5) at 23:30 (should be open)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(5, 23, 30)
+        self.assertTrue(info.is_open_now)
+        
+        # Sunday (6) at 00:30 (should be closed)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(6, 0, 30)
+        self.assertFalse(info.is_open_now)
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_multi_range_midnight_crossing(self, mock_now, mock_localtime):
+        info = self._make_info('Пн–Пт: 12:00–02:00, Сб–Вс: 12:00–04:00')
+        
+        # Saturday (5) at 01:00 (Friday's shift crosses into Saturday, should be open)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(5, 1, 0)
+        self.assertTrue(info.is_open_now)
+        
+        # Saturday (5) at 03:00 (should be closed)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(5, 3, 0)
+        self.assertFalse(info.is_open_now)
+        
+        # Sunday (6) at 03:00 (Saturday's shift crosses into Sunday, should be open)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(6, 3, 0)
+        self.assertTrue(info.is_open_now)
 
 
 # ---------------------------------------------------------------------------

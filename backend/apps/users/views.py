@@ -151,6 +151,11 @@ class VerifySMSView(APIView):
             )
 
         user, created = User.objects.get_or_create(phone=phone)
+        if not user.is_active:
+            return Response(
+                {'error': 'Ваш аккаунт заблокирован.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         refresh = RefreshToken.for_user(user)
 
         return Response({

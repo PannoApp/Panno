@@ -541,45 +541,50 @@ class TelegramWebhookView(View):
                 return JsonResponse({'ok': True})
 
         # Обработка подтверждения/отмены бронирования
-        action, booking_id_str = parts
-        try:
-            booking = TableBooking.objects.select_related('user').get(pk=int(booking_id_str))
-        except (TableBooking.DoesNotExist, ValueError):
-            _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Бронирование не найдено'}, token)
+        elif parts[0] in ('confirm', 'cancel'):
+            action = parts[0]
+            booking_id_str = parts[1]
+            try:
+                booking = TableBooking.objects.select_related('user').get(pk=int(booking_id_str))
+            except (TableBooking.DoesNotExist, ValueError):
+                _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': 'Бронирование не найдено'}, token)
+                return JsonResponse({'ok': True})
+
+            if booking.status != 'pending':
+                _tg_post('answerCallbackQuery', {
+                    'callback_query_id': callback_id,
+                    'text': f'Уже обработано: {booking.get_status_display()}',
+                    'show_alert': True,
+                }, token)
+                return JsonResponse({'ok': True})
+
+            if action == 'confirm':
+                booking.status = 'confirmed'
+                status_label = '✅ <b>Подтверждено администратором</b>'
+                answer_text = 'Бронирование подтверждено'
+            else:
+                booking.status = 'canceled'
+                status_label = '❌ <b>Отменено администратором</b>'
+                answer_text = 'Бронирование отменено'
+
+            booking.save()
+
+            _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': answer_text}, token)
+
+            if chat_id and message_id:
+                _tg_post('editMessageText', {
+                    'chat_id': chat_id,
+                    'message_id': message_id,
+                    'text': _build_booking_html(booking, status_label=status_label),
+                    'parse_mode': 'HTML',
+                    'reply_markup': {'inline_keyboard': []},
+                }, token)
+
+            logger.info("Telegram webhook: booking=%s action=%s", booking_id_str, action)
             return JsonResponse({'ok': True})
 
-        if booking.status != 'pending':
-            _tg_post('answerCallbackQuery', {
-                'callback_query_id': callback_id,
-                'text': f'Уже обработано: {booking.get_status_display()}',
-                'show_alert': True,
-            }, token)
-            return JsonResponse({'ok': True})
-
-        if action == 'confirm':
-            booking.status = 'confirmed'
-            status_label = '✅ <b>Подтверждено администратором</b>'
-            answer_text = 'Бронирование подтверждено'
         else:
-            booking.status = 'canceled'
-            status_label = '❌ <b>Отменено администратором</b>'
-            answer_text = 'Бронирование отменено'
-
-        booking.save()
-
-        _tg_post('answerCallbackQuery', {'callback_query_id': callback_id, 'text': answer_text}, token)
-
-        if chat_id and message_id:
-            _tg_post('editMessageText', {
-                'chat_id': chat_id,
-                'message_id': message_id,
-                'text': _build_booking_html(booking, status_label=status_label),
-                'parse_mode': 'HTML',
-                'reply_markup': {'inline_keyboard': []},
-            }, token)
-
-        logger.info("Telegram webhook: booking=%s action=%s", booking_id_str, action)
-        return JsonResponse({'ok': True})
+            return JsonResponse({'ok': True})
 
     def handle_message(self, request, message, token):
         chat_id = message.get('chat', {}).get('id')

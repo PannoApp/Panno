@@ -29,14 +29,18 @@ class CategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
+        return Category.objects.all().order_by('order')
+
+    def list(self, request, *args, **kwargs):
         # Категории меняются редко — кэшируем на 1 час.
         # Инвалидация через post_save/post_delete-сигнал в apps/menu/signals.py.
         # При недоступном Redis — fallback к прямому запросу в БД.
-        categories = safe_cache_get('menu_categories')
-        if categories is None:
-            categories = list(Category.objects.all().order_by('order'))
-            safe_cache_set('menu_categories', categories, timeout=_CACHE_CATEGORIES)
-        return categories
+        cached = safe_cache_get('menu_categories')
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        safe_cache_set('menu_categories', response.data, timeout=_CACHE_CATEGORIES)
+        return response
 
 
 @extend_schema(
@@ -50,11 +54,15 @@ class TagListView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        tags = safe_cache_get('menu_tags')
-        if tags is None:
-            tags = list(Tag.objects.all().order_by('name'))
-            safe_cache_set('menu_tags', tags, timeout=_CACHE_TAGS)
-        return tags
+        return Tag.objects.all().order_by('name')
+
+    def list(self, request, *args, **kwargs):
+        cached = safe_cache_get('menu_tags')
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        safe_cache_set('menu_tags', response.data, timeout=_CACHE_TAGS)
+        return response
 
 
 @extend_schema(
