@@ -284,44 +284,21 @@ class _HeroHeaderState extends State<_HeroHeader> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Аватар + имя
+                // Имя пользователя — главный типографический акцент
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Аватар — тотем шамана
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: PiligrimColors.steppe.withValues(alpha: 0.5),
-                          width: 1.5,
-                        ),
-                        color: PiligrimColors.earth,
-                        boxShadow: [
-                          BoxShadow(
-                            color: PiligrimColors.steppe.withValues(alpha: 0.25),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: SvgPicture.asset(
-                          'assets/images/shaman.svg',
-                          width: 32,
-                          height: 32,
-                          colorFilter: ColorFilter.mode(
-                            PiligrimColors.steppe.withValues(alpha: 0.9),
-                            BlendMode.srcIn,
-                          ),
-                        ),
+                    // Декоративный тотем-знак — не аватарка, просто марка
+                    SvgPicture.asset(
+                      'assets/images/shaman.svg',
+                      width: 22,
+                      height: 22,
+                      colorFilter: ColorFilter.mode(
+                        PiligrimColors.steppe.withValues(alpha: 0.55),
+                        BlendMode.srcIn,
                       ),
                     ),
-
-                    const SizedBox(width: 16),
-
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,11 +311,12 @@ class _HeroHeaderState extends State<_HeroHeader> {
                                     : widget.user.name)
                                 : 'Герой без имени',
                             style: PiligrimTextStyles.heading.copyWith(
-                              fontSize: 18,
+                              fontSize: 22,
                               color: PiligrimColors.sky,
+                              letterSpacing: 0.3,
                             ),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
                           Text(
                             authorized
                                 ? (widget.user.name.isEmpty ||
@@ -417,7 +395,7 @@ class _JourneyTag extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         border: Border.all(
-            color: PiligrimColors.steppe.withValues(alpha: 0.35)),
+            color: PiligrimColors.steppe.withValues(alpha: 0.30)),
         borderRadius: BorderRadius.circular(4),
         color: PiligrimColors.steppe.withValues(alpha: 0.07),
       ),
@@ -453,8 +431,7 @@ class _StatsRow extends StatelessWidget {
       children: [
         _StatCard(
           value: '$bookingsCount',
-          label: 'Бронирований',
-          totemAsset: 'assets/images/moon_totem (1).svg',
+          label: 'Бронирования',
           delay: 0.ms,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
@@ -465,15 +442,13 @@ class _StatsRow extends StatelessWidget {
         const SizedBox(width: 10),
         _StatCard(
           value: '${user.eventsCount}',
-          label: 'Мероприятий',
-          totemAsset: 'assets/images/tree_totem (1).svg',
+          label: 'Мероприятия',
           delay: 80.ms,
         ),
         const SizedBox(width: 10),
         _StatCard(
           value: user.journeyStartLabel ?? '—',
           label: 'С нами',
-          totemAsset: 'assets/images/star_totem (1).svg',
           delay: 160.ms,
           small: true,
         ),
@@ -487,7 +462,6 @@ class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.value,
     required this.label,
-    required this.totemAsset,
     required this.delay,
     this.small = false,
     this.onTap,
@@ -495,7 +469,6 @@ class _StatCard extends StatelessWidget {
 
   final String value;
   final String label;
-  final String totemAsset;
   final Duration delay;
   final bool small;
   final VoidCallback? onTap;
@@ -504,66 +477,48 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: PiligrimTap(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap ?? () {},
         child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        decoration: BoxDecoration(
-          color: PiligrimColors.earth,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: PiligrimColors.steppe.withValues(alpha: 0.15),
-            width: 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: PiligrimColors.shadow.withValues(alpha: 0.35),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            color: PiligrimColors.earth,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: PiligrimColors.steppe.withValues(alpha: 0.15),
+              width: 1.0,
             ),
-          ],
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              right: -6,
-              bottom: -6,
-              child: SvgPicture.asset(
-                totemAsset,
-                width: 36,
-                height: 36,
-                colorFilter: ColorFilter.mode(
-                  PiligrimColors.steppe.withValues(alpha: 0.07),
-                  BlendMode.srcIn,
+            boxShadow: [
+              BoxShadow(
+                color: PiligrimColors.shadow.withValues(alpha: 0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: PiligrimTextStyles.heading.copyWith(
+                  fontSize: small ? 14 : 20,
+                  color: PiligrimColors.steppe,
                 ),
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: PiligrimTextStyles.heading.copyWith(
-                    fontSize: small ? 14 : 20,
-                    color: PiligrimColors.steppe,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  label,
-                  style: PiligrimTextStyles.caption.copyWith(fontSize: 10),
-                ),
-              ],
-            ),
-          ],
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: PiligrimTextStyles.caption.copyWith(fontSize: 10),
+              ),
+            ],
+          ),
         ),
       ),
-      )
-          .animate(delay: delay)
-          .fadeIn(duration: 500.ms)
-          .slideY(begin: 0.06, end: 0, duration: 500.ms),
-    );
+    )
+        .animate(delay: delay)
+        .fadeIn(duration: 500.ms)
+        .slideY(begin: 0.06, end: 0, duration: 500.ms);
   }
 }
 
@@ -667,18 +622,6 @@ class _NotifRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          SvgPicture.asset(
-            category.iconAsset,
-            width: 20,
-            height: 20,
-            colorFilter: ColorFilter.mode(
-              isOn
-                  ? PiligrimColors.steppe
-                  : PiligrimColors.sky.withValues(alpha: 0.25),
-              BlendMode.srcIn,
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -751,33 +694,15 @@ class _NotifRow extends StatelessWidget {
   }
 }
 
-({Color color, String totemAsset}) _messengerStyle(String label) {
-  final lower = label.toLowerCase();
-  if (lower.contains('whatsapp')) {
-    return (color: PiligrimColors.steppe, totemAsset: 'assets/images/luk.svg');
-  }
-  if (lower.contains('telegram') || lower.contains('tg')) {
-    return (color: PiligrimColors.steppe, totemAsset: 'assets/images/cobyz.svg');
-  }
-  if (lower.contains('instagram')) {
-    return (color: PiligrimColors.steppe, totemAsset: 'assets/images/spiral.svg');
-  }
-  return (color: PiligrimColors.steppe, totemAsset: 'assets/images/splash_path (1).svg');
-}
-
 class _MessengerChip extends StatelessWidget {
   const _MessengerChip({
     required this.label,
     required this.url,
-    required this.color,
-    required this.totemAsset,
     required this.onLaunch,
   });
 
   final String label;
   final String url;
-  final Color color;
-  final String totemAsset;
   final Future<void> Function(String url) onLaunch;
 
   @override
@@ -788,16 +713,6 @@ class _MessengerChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         child: Row(
           children: [
-            SvgPicture.asset(
-              totemAsset,
-              width: 18,
-              height: 18,
-              colorFilter: ColorFilter.mode(
-                PiligrimColors.steppe.withValues(alpha: 0.75),
-                BlendMode.srcIn,
-              ),
-            ),
-            const SizedBox(width: 12),
             Text(
               label,
               style: PiligrimTextStyles.body.copyWith(
@@ -843,11 +758,11 @@ class _ContactsCard extends StatelessWidget {
     // Список карт — только те, у которых есть ссылка из CoreInfo
     final mapLinks = [
       if (coreInfo?.twogisLink != null)
-        (label: '2ГИС', url: coreInfo!.twogisLink!, asset: 'assets/images/splash_path (1).svg'),
+        (label: '2ГИС', url: coreInfo!.twogisLink!),
       if (coreInfo?.googleMapsLink != null)
-        (label: 'Google', url: coreInfo!.googleMapsLink!, asset: 'assets/images/star_totem (1).svg'),
+        (label: 'Google', url: coreInfo!.googleMapsLink!),
       if (coreInfo?.yandexMapsLink != null)
-        (label: 'Яндекс', url: coreInfo!.yandexMapsLink!, asset: 'assets/images/wheel_totem (1).svg'),
+        (label: 'Яндекс', url: coreInfo!.yandexMapsLink!),
     ];
 
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
@@ -861,30 +776,13 @@ class _ContactsCard extends StatelessWidget {
           // Адрес
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SvgPicture.asset(
-                  'assets/images/wheel_totem (1).svg',
-                  width: 18,
-                  height: 18,
-                  colorFilter: ColorFilter.mode(
-                    PiligrimColors.steppe.withValues(alpha: 0.7),
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    address,
-                    style: PiligrimTextStyles.body.copyWith(
-                      fontSize: 13,
-                      color: PiligrimColors.sky.withValues(alpha: 0.75),
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              address,
+              style: PiligrimTextStyles.body.copyWith(
+                fontSize: 13,
+                color: PiligrimColors.sky.withValues(alpha: 0.75),
+                height: 1.5,
+              ),
             ),
           ),
 
@@ -903,7 +801,7 @@ class _ContactsCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                         onTap: () => onLaunch(t.url),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
                             color: PiligrimColors.steppe.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
@@ -911,27 +809,16 @@ class _ContactsCard extends StatelessWidget {
                               color: PiligrimColors.steppe.withValues(alpha: 0.3),
                             ),
                           ),
-                          child: Column(
-                            children: [
-                              SvgPicture.asset(
-                                t.asset,
-                                width: 16,
-                                height: 16,
-                                colorFilter: const ColorFilter.mode(
-                                  PiligrimColors.steppe,
-                                  BlendMode.srcIn,
-                                ),
+                          child: Center(
+                            child: Text(
+                              t.label,
+                              style: PiligrimTextStyles.caption.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: PiligrimColors.steppe.withValues(alpha: 0.9),
+                                letterSpacing: 0.5,
                               ),
-                              const SizedBox(height: 3),
-                              Text(
-                                t.label,
-                                style: PiligrimTextStyles.caption.copyWith(
-                                  fontSize: 10,
-                                  color: PiligrimColors.steppe.withValues(alpha: 0.8),
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -950,16 +837,6 @@ class _ContactsCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  SvgPicture.asset(
-                    'assets/images/cobyz.svg',
-                    width: 18,
-                    height: 18,
-                    colorFilter: ColorFilter.mode(
-                      PiligrimColors.steppe.withValues(alpha: 0.7),
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Text(
                     phone,
                     style: PiligrimTextStyles.body.copyWith(
@@ -986,12 +863,9 @@ class _ContactsCard extends StatelessWidget {
           ...() {
             final items = (messengers != null
                 ? messengers.map((link) {
-                    final style = _messengerStyle(link.label);
                     return _MessengerChip(
                       label: link.label,
                       url: link.url,
-                      color: style.color,
-                      totemAsset: style.totemAsset,
                       onLaunch: onLaunch,
                     );
                   }).toList()
@@ -999,8 +873,6 @@ class _ContactsCard extends StatelessWidget {
                     .map((m) => _MessengerChip(
                           label: m.label,
                           url: m.url,
-                          color: m.color,
-                          totemAsset: m.totemAsset,
                           onLaunch: onLaunch,
                         ))
                     .toList());
@@ -1009,7 +881,7 @@ class _ContactsCard extends StatelessWidget {
               rows.add(items[i]);
               if (i < items.length - 1) {
                 rows.add(const Divider(
-                    height: 1, color: PiligrimColors.divider, indent: 46));
+                    height: 1, color: PiligrimColors.divider, indent: 16));
               }
             }
             return rows;
@@ -1185,18 +1057,6 @@ class _RulesCardState extends State<_RulesCard> {
                   ),
                   child: Row(
                     children: [
-                      SvgPicture.asset(
-                        rule.iconAsset,
-                        width: 18,
-                        height: 18,
-                        colorFilter: ColorFilter.mode(
-                          isOpen
-                              ? PiligrimColors.steppe
-                              : PiligrimColors.sky.withValues(alpha: 0.3),
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
                       Text(
                         rule.title,
                         style: PiligrimTextStyles.body.copyWith(
@@ -1229,7 +1089,7 @@ class _RulesCardState extends State<_RulesCard> {
                 curve: Curves.easeInOut,
                 child: isOpen
                     ? Padding(
-                        padding: const EdgeInsets.fromLTRB(46, 0, 16, 16),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: Text(
                           rule.body,
                           style: PiligrimTextStyles.body.copyWith(
@@ -1245,7 +1105,7 @@ class _RulesCardState extends State<_RulesCard> {
                 const Divider(
                   height: 1,
                   color: PiligrimColors.divider,
-                  indent: 46,
+                  indent: 16,
                 ),
             ],
           );
@@ -1358,6 +1218,7 @@ class _LogoutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return _BrandCard(
       child: PiligrimTap(
+        borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1439,7 +1300,7 @@ class _BrandCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: PiligrimColors.earth,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: PiligrimColors.steppe.withValues(alpha: 0.12),
         ),
@@ -1452,7 +1313,7 @@ class _BrandCard extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         child: child,
       ),
     );
