@@ -59,12 +59,12 @@ class Messenger {
     required this.label,
     required this.url,
     required this.color,
-    required this.totemAsset,
+    required this.iconAsset,
   });
   final String label;
   final String url;
   final Color color;
-  final String totemAsset;
+  final String iconAsset;
 }
 
 const kMessengers = [
@@ -72,19 +72,19 @@ const kMessengers = [
     label: 'WhatsApp',
     url: 'https://wa.me/77000000000',
     color: PiligrimColors.steppe,
-    totemAsset: 'assets/images/luk.svg',
+    iconAsset: 'assets/images/whatsappsvg.svg',
   ),
   Messenger(
     label: 'Telegram',
     url: 'https://t.me/piligrim_astana',
     color: PiligrimColors.steppe,
-    totemAsset: 'assets/images/cobyz.svg',
+    iconAsset: 'assets/images/telegramsvg.svg',
   ),
   Messenger(
     label: 'Instagram',
     url: 'https://instagram.com/piligrim.astana',
     color: PiligrimColors.steppe,
-    totemAsset: 'assets/images/zerno.svg',
+    iconAsset: 'assets/images/instagramsvg.svg',
   ),
 ];
 

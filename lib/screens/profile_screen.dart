@@ -694,15 +694,26 @@ class _NotifRow extends StatelessWidget {
   }
 }
 
+/// Маппинг названия мессенджера → SVG-ассет (для социальных ссылок с бэкенда)
+String _resolveMessengerIcon(String label) {
+  final l = label.toLowerCase();
+  if (l.contains('whatsapp')) return 'assets/images/whatsappsvg.svg';
+  if (l.contains('telegram')) return 'assets/images/telegramsvg.svg';
+  if (l.contains('instagram')) return 'assets/images/instagramsvg.svg';
+  return 'assets/images/shaman.svg'; // fallback
+}
+
 class _MessengerChip extends StatelessWidget {
   const _MessengerChip({
     required this.label,
     required this.url,
+    required this.iconAsset,
     required this.onLaunch,
   });
 
   final String label;
   final String url;
+  final String iconAsset;
   final Future<void> Function(String url) onLaunch;
 
   @override
@@ -713,6 +724,16 @@ class _MessengerChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         child: Row(
           children: [
+            SvgPicture.asset(
+              iconAsset,
+              width: 18,
+              height: 18,
+              colorFilter: ColorFilter.mode(
+                PiligrimColors.steppe.withValues(alpha: 0.75),
+                BlendMode.srcIn,
+              ),
+            ),
+            const SizedBox(width: 12),
             Text(
               label,
               style: PiligrimTextStyles.body.copyWith(
@@ -758,11 +779,11 @@ class _ContactsCard extends StatelessWidget {
     // Список карт — только те, у которых есть ссылка из CoreInfo
     final mapLinks = [
       if (coreInfo?.twogisLink != null)
-        (label: '2ГИС', url: coreInfo!.twogisLink!),
+        (label: '2ГИС', icon: 'assets/images/2gis.svg', url: coreInfo!.twogisLink!),
       if (coreInfo?.googleMapsLink != null)
-        (label: 'Google', url: coreInfo!.googleMapsLink!),
+        (label: 'Google', icon: 'assets/images/googlemapssvg.svg', url: coreInfo!.googleMapsLink!),
       if (coreInfo?.yandexMapsLink != null)
-        (label: 'Яндекс', url: coreInfo!.yandexMapsLink!),
+        (label: 'Яндекс', icon: 'assets/images/yandexsvg.svg', url: coreInfo!.yandexMapsLink!),
     ];
 
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
@@ -801,24 +822,37 @@ class _ContactsCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                         onTap: () => onLaunch(t.url),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: PiligrimColors.steppe.withValues(alpha: 0.1),
+                            color: PiligrimColors.steppe.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: PiligrimColors.steppe.withValues(alpha: 0.3),
+                              color: PiligrimColors.steppe.withValues(alpha: 0.25),
                             ),
                           ),
-                          child: Center(
-                            child: Text(
-                              t.label,
-                              style: PiligrimTextStyles.caption.copyWith(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: PiligrimColors.steppe.withValues(alpha: 0.9),
-                                letterSpacing: 0.5,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SvgPicture.asset(
+                                t.icon,
+                                width: 20,
+                                height: 20,
+                                colorFilter: ColorFilter.mode(
+                                  PiligrimColors.steppe.withValues(alpha: 0.85),
+                                  BlendMode.srcIn,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 6),
+                              Text(
+                                t.label,
+                                style: PiligrimTextStyles.caption.copyWith(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: PiligrimColors.steppe.withValues(alpha: 0.75),
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -834,9 +868,19 @@ class _ContactsCard extends StatelessWidget {
           PiligrimTap(
             onTap: () => onLaunch('tel:$phone'),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
               child: Row(
                 children: [
+                  SvgPicture.asset(
+                    'assets/images/phonesvg.svg',
+                    width: 18,
+                    height: 18,
+                    colorFilter: ColorFilter.mode(
+                      PiligrimColors.steppe.withValues(alpha: 0.7),
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Text(
                     phone,
                     style: PiligrimTextStyles.body.copyWith(
@@ -859,13 +903,14 @@ class _ContactsCard extends StatelessWidget {
 
           const Divider(height: 1, color: PiligrimColors.divider),
 
-          // Мессенджеры — список строк в стиле phone/address
+          // Мессенджеры — список строк с иконками
           ...() {
             final items = (messengers != null
                 ? messengers.map((link) {
                     return _MessengerChip(
                       label: link.label,
                       url: link.url,
+                      iconAsset: _resolveMessengerIcon(link.label),
                       onLaunch: onLaunch,
                     );
                   }).toList()
@@ -873,6 +918,7 @@ class _ContactsCard extends StatelessWidget {
                     .map((m) => _MessengerChip(
                           label: m.label,
                           url: m.url,
+                          iconAsset: m.iconAsset,
                           onLaunch: onLaunch,
                         ))
                     .toList());
@@ -881,7 +927,7 @@ class _ContactsCard extends StatelessWidget {
               rows.add(items[i]);
               if (i < items.length - 1) {
                 rows.add(const Divider(
-                    height: 1, color: PiligrimColors.divider, indent: 16));
+                    height: 1, color: PiligrimColors.divider, indent: 46));
               }
             }
             return rows;
