@@ -79,8 +79,7 @@ def process_dish_video(self, dish_id: int):
     except ffmpeg.Error as exc:
         # Декодируем stderr FFmpeg для диагностики в логах
         logger.error("FFmpeg error dish %s: %s", dish_id, exc.stderr.decode())
-        dish.video_status = Dish.VideoStatus.FAILED
-        dish.save(update_fields=['video_status'])
+        Dish.objects.filter(pk=dish.pk).update(video_status=Dish.VideoStatus.FAILED)
         # Повторяем задачу через 60 секунд (максимум max_retries раз)
         raise self.retry(exc=exc, countdown=60)
 
