@@ -259,6 +259,29 @@ class _DishVideoCardState extends State<DishVideoCard>
                       overflow: TextOverflow.ellipsis,
                     ),
 
+                    // Краткое описание (ТЗ 4.2: «1–2 строки»)
+                    if (widget.dish.description.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.dish.description.replaceAll('\n', ' '),
+                        style: TextStyle(
+                          fontFamily: 'MuseoSans',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w300,
+                          color: PiligrimColors.sky.withValues(alpha: 0.62),
+                          height: 1.5,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              blurRadius: 12,
+                            ),
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+
                     const SizedBox(height: 14),
 
                     // Цена + вес

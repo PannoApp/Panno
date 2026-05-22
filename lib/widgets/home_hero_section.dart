@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
 import 'piligrim_shimmer.dart';
@@ -240,42 +241,106 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
 
   @override
   Widget build(BuildContext context) {
+    final count = _slideCount;
     return SizedBox(
       height: widget.height,
       child: ClipRect(
-        child: ShaderMask(
-          shaderCallback: _photoDissolveShader,
-          blendMode: BlendMode.dstIn,
-          child: Transform.translate(
-          offset: Offset(
-            widget.tiltX * 8,
-            widget.tiltY * 6 + widget.scrollOffset * _heroImageScrollParallax,
-          ),
-          child: Transform.scale(
-            scale: _heroImageScale,
-            alignment: const Alignment(0.0, 0.32),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CrossfadingHeroInterior(
-                  assetPaths: _heroVisuals,
-                  networkUrls: _networkUrls,
-                  index: _heroVisualIndex,
-                  cacheWidth: PiligrimInteriorAssets.decodeCacheWidth(context),
-                  cacheHeight: PiligrimInteriorAssets.decodeCacheHeight(
-                    context,
-                    widget.height * 1.18,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Фото + затемнение внутри ShaderMask (dissolve снизу)
+            ShaderMask(
+              shaderCallback: _photoDissolveShader,
+              blendMode: BlendMode.dstIn,
+              child: Transform.translate(
+                offset: Offset(
+                  widget.tiltX * 8,
+                  widget.tiltY * 6 +
+                      widget.scrollOffset * _heroImageScrollParallax,
+                ),
+                child: Transform.scale(
+                  scale: _heroImageScale,
+                  alignment: const Alignment(0.0, 0.32),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CrossfadingHeroInterior(
+                        assetPaths: _heroVisuals,
+                        networkUrls: _networkUrls,
+                        index: _heroVisualIndex,
+                        cacheWidth:
+                            PiligrimInteriorAssets.decodeCacheWidth(context),
+                        cacheHeight:
+                            PiligrimInteriorAssets.decodeCacheHeight(
+                          context,
+                          widget.height * 1.18,
+                        ),
+                      ),
+                      const DecoratedBox(
+                        decoration:
+                            BoxDecoration(gradient: _warmInteriorDarken),
+                      ),
+                    ],
                   ),
                 ),
-                const DecoratedBox(
-                  decoration: BoxDecoration(gradient: _warmInteriorDarken),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+
+            // Slide indicator — поверх фото, под ShaderMask-растворением
+            if (count > 1)
+              Positioned(
+                bottom: 36,
+                left: 0,
+                right: 0,
+                child: _HeroSlideIndicator(
+                  count: count,
+                  current: _heroVisualIndex,
+                ),
+              ),
+          ],
         ),
       ),
     );
+  }
+}
+
+/// Pill-индикатор текущего слайда: неактивные — точки 4×4, активный — pill 18×4.
+class _HeroSlideIndicator extends StatelessWidget {
+  const _HeroSlideIndicator({required this.count, required this.current});
+
+  final int count;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(count, (i) {
+        final active = i == current;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: active ? 18 : 4,
+          height: 4,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(2),
+            color: active
+                ? PiligrimColors.steppe.withValues(alpha: 0.72)
+                : PiligrimColors.sky.withValues(alpha: 0.28),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: PiligrimColors.steppe.withValues(alpha: 0.35),
+                      blurRadius: 6,
+                    ),
+                  ]
+                : null,
+          ),
+        );
+      }),
+    )
+        .animate()
+        .fadeIn(delay: 700.ms, duration: 600.ms, curve: Curves.easeOut);
   }
 }

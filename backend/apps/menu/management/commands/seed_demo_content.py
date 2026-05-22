@@ -23,6 +23,7 @@ from apps.menu.models import Allergen, Category, Dish, Tag
 # backend/apps/menu/management/commands/ → menu app root
 _MENU_APP_DIR = Path(__file__).resolve().parents[2]
 _SEED_IMAGES_DIR = _MENU_APP_DIR / "seed_data" / "images"
+_SEED_VIDEOS_DIR = _MENU_APP_DIR / "seed_data" / "videos"
 _CORE_SEED_INTERIOR_DIR = _MENU_APP_DIR.parent / "core" / "seed_data" / "interior"
 # Fallback: Flutter-ассеты при запуске manage.py с хоста (вне Docker)
 _REPO_ROOT = _MENU_APP_DIR.parents[2]
@@ -44,11 +45,36 @@ def _open_seed_image(filename: str) -> File:
     return File(path.open("rb"), name=path.name)
 
 
+def _open_seed_video(filename: str) -> File | None:
+    """Возвращает File с готовым видео или None, если файла нет.
+
+    Видео уже считаются обработанными — сохраняются прямо в video_processed
+    со статусом READY, минуя Celery (т.к. это seed-данные).
+    """
+    path = _SEED_VIDEOS_DIR / filename
+    if not path.is_file():
+        return None
+    return File(path.open("rb"), name=path.name)
+
+
 def _open_interior_asset(filename: str) -> File:
     path = _interior_image_path(filename)
     if path is None:
         raise FileNotFoundError(f"Нет ассета интерьера: {filename}")
     return File(path.open("rb"), name=path.name)
+
+
+# Готовые видео для feed-ленты (TikTok-режим в приложении).
+# Ключ — name блюда из DISHES (точное совпадение). Значение — имя файла
+# в seed_data/videos/. Если файла нет на диске, блюдо сидится без видео,
+# а команда печатает предупреждение, но не падает.
+# Поддерживаемые форматы — те же, что играет video_player Flutter:
+# .mp4 (H.264/AAC) предпочтительно, .mov работает на iOS.
+DISH_VIDEOS: dict[str, str] = {
+    "Шорпа из баранины": "demo_dish.mov",
+    "Плов на казане": "demo_dish.mov",
+    "Стейк из степной говядины": "demo_dish.mov",
+}
 
 
 MENU_CATEGORIES = [
@@ -431,6 +457,23 @@ class Command(BaseCommand):
             for a in allergen_names:
                 if a in allergens:
                     dish.allergens.add(allergens[a])
+
+            # Видео для feed-ленты (если для блюда задан файл и он есть на диске).
+            video_filename = DISH_VIDEOS.get(name)
+            if video_filename:
+                video_file = _open_seed_video(video_filename)
+                if video_file is None:
+                    self.stderr.write(
+                        self.style.WARNING(
+                            f"    Нет видео {video_filename} — блюдо без feed-видео"
+                        )
+                    )
+                else:
+                    dish.video_processed.save(video_filename, video_file, save=False)
+                    dish.video_status = Dish.VideoStatus.READY
+                    dish.save(update_fields=["video_processed", "video_status"])
+                    self.stdout.write(f"    + видео: {video_filename}")
+
             self.stdout.write(f"  Блюдо: {name}")
 
         self.stdout.write(

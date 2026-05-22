@@ -57,6 +57,7 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Без hairline (flutter-dev): только воздух между hero и текстом.
           const SizedBox(height: 28),
           SvgPicture.asset(
             'assets/images/piligrim.svg',
@@ -106,11 +107,11 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
           Text(
             kModernNomadConcept,
             style: PiligrimTextStyles.body.copyWith(
-              fontSize: 12.5,
-              height: 1.55,
+              fontSize: 13.5,
+              height: 1.6,
               fontWeight: FontWeight.w300,
               letterSpacing: 0.35,
-              color: PiligrimColors.sky.withValues(alpha: 0.72),
+              color: PiligrimColors.sky.withValues(alpha: 0.78),
             ),
           )
               .animate()
