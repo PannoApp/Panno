@@ -5,90 +5,107 @@ import 'package:flutter/material.dart';
 // ЦВЕТА БРЕНДА (названы по-казахски — часть идентичности)
 // ─────────────────────────────────────────────────────────────────────────────
 abstract final class PiligrimColors {
-  /// Қара жер — Чёрная земля — основной тёмный фон
-  static const Color earth = Color(0xFF1C1814);
+  // ─── БАЗОВЫЕ ЗЕМЛИСТЫЕ ТОНА (Premium Obsidian & Clay) ───
 
-  /// Қара жер (глубокий) — фон навбара, более тёмный слой
-  static const Color earthDeep = Color(0xFF141210);
+  /// Қара жер — Чёрная земля — основной тёмный фон.
+  /// Насыщенный обсидиановый уголь с тёплым подтоном сырой земли.
+  static const Color earth = Color(0xFF15120F);
 
-  /// Қара жер (тёплый) — утеплённый базовый фон для «Живого очага»
-  static const Color earthWarm = Color(0xFF252018);
+  /// Қара жер (глубокий) — фон навбара, глубочайший слой.
+  /// Базальтовая бездна для максимального разделения слоев.
+  static const Color earthDeep = Color(0xFF0E0C0B);
 
-  /// Мөлдір су — Прозрачная вода — главный акцентный цвет
-  static const Color water = Color(0xFF7BA5B8);
+  /// Қара жер (тёплый) — утеплённый базовый фон для «Живого очага».
+  /// Оттенок обжаренной глины, создающий уютное свечение.
+  static const Color earthWarm = Color(0xFF201B18);
 
-  /// Мөлдір су (pressed) — нажатое состояние акцента
-  static const Color waterMuted = Color(0xFF5A8FA8);
+  /// Чуть теплее earth — scaffold-фон под параллакс-слоями.
+  static const Color earthSurface = Color(0xFF181513);
 
-  /// Сары дала — Жёлтая степь — тёплый второстепенный акцент
-  static const Color steppe = Color(0xFFC4956A);
+  // ─── НАВИГАЦИОННЫЙ БАР (Obsidian Layers) ───
 
-  /// Піскен жеміс — Спелый плод — красный, CTA финального действия
-  static const Color fruit = Color(0xFF8B1A1A);
+  /// Нижняя навбар — основной фон
+  static const Color navBarBase = Color(0xFF13100E);
 
-  /// Жалын — Огонь — медно-оранжевый, мотив огня на активных CTA
-  /// Согласно ТЗ: «мягкие переходы оранжевого по краю активных кнопок»
-  static const Color ember = Color(0xFFC87340);
+  /// Нижняя навбар — верхний край градиента
+  static const Color navBarTop = Color(0xFF1E1A17);
 
-  /// Жалын (тёмный) — тёмно-медный, для градиентных кнопок
-  static const Color emberDeep = Color(0xFF9A4E22);
+  /// Нижняя навбар — верхняя кромка (тонкое премиальное свечение)
+  static const Color navBarRim = Color(0x14F2ECE1);
 
-  /// Modern Nomad Premium — мягкий крем (вместо холодного белого)
-  static const Color nomadCream = Color(0xFFE0D8CC);
+  // ─── АКЦЕНТНЫЙ ГОЛУБОЙ (Glacier Turquoise) ───
+
+  /// Мөлдір су — Прозрачная вода — главный акцентный цвет.
+  /// Чистый минеральный бирюзово-голубой, ассоциирующийся с ледниками Тянь-Шаня.
+  static const Color water = Color(0xFF659FB5);
+
+  /// Мөлдір су (pressed) — нажатое состояние акцента.
+  /// Более глубокий сланцево-синий оттенок.
+  static const Color waterMuted = Color(0xFF4C7B8E);
+
+  // ─── ВТОРОСТЕПЕННЫЕ И ТЕПЛЫЕ АКЦЕНТЫ (Champagne Gold & Copper) ───
+
+  /// Сары дала — Жёлтая степь — тёплый второстепенный акцент.
+  /// Благородная матовая латунь / шампанское золото вместо блеклой охры.
+  static const Color steppe = Color(0xFFCFA073);
+
+  /// Жалын — Огонь — медно-оранжевый, мотив огня на активных CTA.
+  /// Живая светящаяся терракота для мягкого контраста.
+  static const Color ember = Color(0xFFD9793E);
+
+  /// Жалын (тёмный) — тёмно-медный, для градиентных кнопок.
+  /// Выдержанная бронза.
+  static const Color emberDeep = Color(0xFFB05D2A);
+
+  /// Піскен жеміс — Спелый плод — красный, CTA финального действия.
+  /// Глубокий гранатовый / рубиновый оттенок.
+  static const Color fruit = Color(0xFFA63434);
+
+  // ─── СВЕТЛЫЕ ТОНА И ТЕКСТ (Satin Alabaster & Silk Linen) ───
+
+  /// Modern Nomad Premium — мягкий крем (вместо холодного белого).
+  /// Шёлковый алебастр — чистый, дорогой светлый тон с едва заметным теплом.
+  static const Color nomadCream = Color(0xFFF2ECE1);
 
   /// Ақ аспан — светлый акцент на тёмном (крем luxury)
   static const Color sky = nomadCream;
 
-  /// Ақ аспан (тёплый) — чуть глубже для вторичных светлых плоскостей
-  static const Color skyWarm = Color(0xFFD4CABF);
+  /// Ақ аспан (тёплый) — чуть глубже для вторичных светлых плоскостей.
+  /// Мягкий нежный лён.
+  static const Color skyWarm = Color(0xFFDFD7CA);
 
   /// Разделители на тёмном фоне
-  static const Color divider = Color(0x24E0D8CC);
+  static const Color divider = Color(0x1FF2ECE1);
 
   /// Текст на тёмном фоне
   static const Color textLight = nomadCream;
 
-  /// Текст на светлом фоне
-  static const Color textDark = Color(0xFF3D3A38);
+  /// Текст на светлом фоне.
+  /// Глубокий кофейно-базальтовый для идеальной читаемости.
+  static const Color textDark = Color(0xFF2C2825);
 
   /// Неактивные элементы навигации
-  static const Color navInactive = Color(0x8FE0D8CC);
+  static const Color navInactive = Color(0x8FF2ECE1);
 
-  /// Прозрачный служебный цвет (вместо Colors.transparent)
+  /// Прозрачный служебный цвет
   static const Color clear = Color(0x00000000);
 
-  /// Базовый цвет тени (вместо Colors.black)
+  /// Базовый цвет тени
   static const Color shadow = Color(0xFF000000);
 
-  // ─── Scaffold / оверлей ───
-
-  /// Чуть теплее earth — scaffold-фон под параллакс-слоями
-  static const Color earthSurface = Color(0xFF1E1B19);
-
-  // ─── Навигационный бар ───
-
-  /// Нижняя навбар — основной фон
-  static const Color navBarBase = Color(0xFF211D1A);
-
-  /// Нижняя навбар — верхний край градиента (чуть светлее)
-  static const Color navBarTop = Color(0xFF2A2521);
-
-  /// Нижняя навбар — верхняя кромка (тонкая светлая линия)
-  static const Color navBarRim = Color(0x14F2EDE4);
-
-  // ─── Теги меню (семантические цвета, согласованы с бекендом) ───
+  // ─── ТЕГИ МЕНЮ (Gemstone Pastels, согласованные с бэкендом) ───
 
   /// Острое блюдо
-  static const Color tagSpicy = Color(0xFFD4774A);
+  static const Color tagSpicy = Color(0xFFD67845);
 
   /// Вегетарианское
-  static const Color tagVegetarian = Color(0xFF7BAD7E);
+  static const Color tagVegetarian = Color(0xFF72A176);
 
   /// Содержит алкоголь
-  static const Color tagAlcohol = Color(0xFF8B6A9F);
+  static const Color tagAlcohol = Color(0xFF866E99);
 
   /// Халяль
-  static const Color tagHalal = Color(0xFF7BA5A0);
+  static const Color tagHalal = Color(0xFF6A9994);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -282,8 +299,10 @@ abstract final class PiligrimSpacing {
   static const double lg = 24;
   static const double xl = 32;
   static const double xxl = 48;
+
   /// Горизонтальный padding секций
   static const double section = 24;
+
   /// Вертикальный gap между карточками
   static const double cardGap = 16;
 }
