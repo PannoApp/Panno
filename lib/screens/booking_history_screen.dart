@@ -52,9 +52,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                 color: PiligrimColors.water,
                 backgroundColor: PiligrimColors.earthDeep,
                 child: CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
+                  physics: const ClampingScrollPhysics(),
                   slivers: [
                     SliverToBoxAdapter(
                       child: SizedBox(height: top + 16),

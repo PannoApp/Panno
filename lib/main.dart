@@ -121,10 +121,19 @@ class _PiligrimAppState extends State<PiligrimApp>
           debugShowCheckedModeBanner: false,
           theme: piligrimTheme,
           home: const SplashScreen(),
+          scrollBehavior: const _ClampingScrollBehavior(),
         ),
       ),
     );
   }
+}
+
+class _ClampingScrollBehavior extends ScrollBehavior {
+  const _ClampingScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

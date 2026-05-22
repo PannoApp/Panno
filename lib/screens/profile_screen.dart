@@ -114,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               CustomScrollView(
-                physics: const BouncingScrollPhysics(),
+                physics: const ClampingScrollPhysics(),
                 clipBehavior: Clip.none,
                 slivers: [
                   SliverToBoxAdapter(

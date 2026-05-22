@@ -12,13 +12,13 @@ class EmberCta extends StatefulWidget {
   const EmberCta({
     super.key,
     required this.label,
-    required this.iconAsset,
+    this.iconAsset,
     this.onTap,
     this.small = false,
   });
 
   final String label;
-  final String iconAsset;
+  final String? iconAsset;
   final VoidCallback? onTap;
   final bool small;
 
@@ -59,16 +59,18 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
       padding: EdgeInsets.symmetric(horizontal: widget.small ? 14 : 18),
       child: Row(
         children: [
-          SvgPicture.asset(
-            widget.iconAsset,
-            width: widget.small ? 17 : 20,
-            height: widget.small ? 17 : 20,
-            colorFilter: const ColorFilter.mode(
-              PiligrimColors.sky,
-              BlendMode.srcIn,
+          if (widget.iconAsset != null) ...[
+            SvgPicture.asset(
+              widget.iconAsset!,
+              width: widget.small ? 17 : 20,
+              height: widget.small ? 17 : 20,
+              colorFilter: const ColorFilter.mode(
+                PiligrimColors.sky,
+                BlendMode.srcIn,
+              ),
             ),
-          ),
-          SizedBox(width: widget.small ? 10 : 14),
+            SizedBox(width: widget.small ? 10 : 14),
+          ],
           Text(
             widget.label,
             style: PiligrimTextStyles.button.copyWith(
@@ -82,8 +84,13 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
           Text(
             '→',
             style: PiligrimTextStyles.caption.copyWith(
-              fontSize: widget.small ? 11 : 12,
+              fontSize: widget.small ? 25 : 32,
               color: PiligrimColors.sky.withValues(alpha: 0.5),
+              height: 1.0,
+            ),
+            strutStyle: const StrutStyle(
+              forceStrutHeight: true,
+              height: 1.0,
             ),
           ),
         ],
@@ -169,8 +176,7 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
       return AnimatedBuilder(
         animation: idle,
         builder: (_, child) {
-          final breathe =
-              1.0 + 0.003 * math.sin(idle.value * math.pi * 2);
+          final breathe = 1.0 + 0.003 * math.sin(idle.value * math.pi * 2);
           return Transform.scale(
             scale: breathe,
             alignment: Alignment.center,
@@ -237,11 +243,10 @@ class _EmberGlowState extends State<EmberGlow>
             boxShadow: [
               BoxShadow(
                 color: PiligrimColors.ember.withValues(
-                  alpha: (0.15 + pulse * 0.1 * widget.intensity)
-                      .clamp(0.0, 0.35),
+                  alpha:
+                      (0.15 + pulse * 0.1 * widget.intensity).clamp(0.0, 0.35),
                 ),
-                blurRadius: (8 + pulse * 8 * widget.intensity)
-                    .clamp(4.0, 20.0),
+                blurRadius: (8 + pulse * 8 * widget.intensity).clamp(4.0, 20.0),
                 spreadRadius: 0,
               ),
             ],

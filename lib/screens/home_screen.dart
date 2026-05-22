@@ -127,9 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
           CustomScrollView(
             controller: _scrollCtrl,
             clipBehavior: Clip.none,
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
+            physics: const ClampingScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(
                 child: RepaintBoundary(

@@ -14,7 +14,6 @@ class HomeActionBlock extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
       child: EmberCta(
         label: 'Забронировать стол',
-        iconAsset: 'assets/images/moon_totem (1).svg',
         onTap: () async {
           if (!await guardAuth(context)) return;
           if (!context.mounted) return;

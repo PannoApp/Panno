@@ -159,9 +159,7 @@ class _InteriorScreenState extends State<InteriorScreen>
               SafeArea(
                 bottom: false,
                 child: CustomScrollView(
-                  physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
+                  physics: const ClampingScrollPhysics(),
                   slivers: [
                     // ── Заголовок ────────────────────────────────────────────
                     SliverToBoxAdapter(

@@ -957,27 +957,8 @@ class _EventListCard extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.hardEdge,
             children: [
-              // Steppe-left-accent-line — без IntrinsicHeight (стабильно в SliverList).
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: 2.5,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        PiligrimColors.steppe.withValues(alpha: 0.55),
-                        PiligrimColors.steppe.withValues(alpha: 0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(14.5, 12, 12, 12),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
