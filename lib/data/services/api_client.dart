@@ -18,6 +18,15 @@ class DioClient {
     defaultValue: 'https://piligrim.kz/api/v1',
   );
 
+  // Origin для сборки абсолютных media-URL из относительных путей (/media/...).
+  // Android эмулятор: http://10.0.2.2:8000
+  // iOS симулятор:    http://localhost:8000
+  // Продакшн:         https://piligrim.kz
+  static const mediaOrigin = String.fromEnvironment(
+    'MEDIA_ORIGIN',
+    defaultValue: 'https://piligrim.kz',
+  );
+
   // Подписчики слушают этот стрим, чтобы реагировать на принудительный выход.
   final StreamController<void> onUnauthenticated =
       StreamController.broadcast();

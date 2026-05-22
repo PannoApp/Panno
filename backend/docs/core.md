@@ -61,7 +61,7 @@
 | `telegram` | string | Контакт в Telegram |
 | `instagram` | string | Ссылка/никнейм Instagram |
 | `concept_description` | text | Краткое описание концепции ресторана (главный экран приложения) |
-| `hero_slides` | array | Список изображений-слайдов для главного экрана |
+| `hero_slides` | array | Список изображений-слайдов для главного экрана. Каждый слайд: `{id, image, order}`. Поле `image` — **абсолютный URL** к JPEG, автоматически обрезанному до 16:9. |
 | `visit_rules` | text | Правила посещения ресторана |
 | `privacy_policy` | text | Политика обработки персональных данных |
 | `terms_of_service` | text | Пользовательское соглашение |
@@ -104,6 +104,42 @@
 | `latest_version` | string | Последняя доступная версия — ниже этой версии показывается баннер "доступно обновление" |
 | `store_url` | URL | Ссылка на страницу приложения в App Store / Google Play |
 | `updated_at` | datetime | Дата последнего обновления записи (auto) |
+
+---
+
+## Эндпоинт
+
+### GET /api/v1/core/interior/
+
+Возвращает все фотографии интерьера, сгруппированные по зонам.
+
+**Авторизация:** не нужна
+
+**Ответ 200:**
+```json
+[
+  {
+    "id": 1,
+    "zone": "main_hall",
+    "zone_display": "Главный зал",
+    "image": "https://piligrim.kz/media/interior/main_hall_1.jpg",
+    "caption": "Главный зал, 40 мест",
+    "order": 0
+  },
+  {
+    "id": 2,
+    "zone": "bar",
+    "zone_display": "Бар",
+    "image": "https://piligrim.kz/media/interior/bar_1.jpg",
+    "caption": "",
+    "order": 0
+  }
+]
+```
+
+Результаты отсортированы по `zone ASC`, затем `order ASC`. Поле `image` — **абсолютный URL**. Фотографии интерьера не обрезаются автоматически — отображаются fullscreen с `BoxFit.contain` во Flutter. Управление исключительно через Django-админку.
+
+**Зоны (`zone`):** `main_hall`, `bar`, `private`, `terrace`, `other`.
 
 ---
 

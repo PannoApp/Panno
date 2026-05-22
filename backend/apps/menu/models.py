@@ -1,5 +1,8 @@
 from django.db import models
 
+from utils.image_processing import AutoCropImageMixin
+
+
 class Category(models.Model):
     name = models.CharField("Название", max_length=100)
     order = models.PositiveIntegerField("Порядок отображения", default=0)
@@ -32,7 +35,8 @@ class Allergen(models.Model):
     def __str__(self):
         return self.name
 
-class Dish(models.Model):
+class Dish(AutoCropImageMixin, models.Model):
+    _image_ratio = 16 / 9
     # Статусы обработки видео для видеоленты
     class VideoStatus(models.TextChoices):
         PENDING    = 'pending',    'Ожидает обработки'
@@ -53,9 +57,25 @@ class Dish(models.Model):
     tags = models.ManyToManyField(Tag, blank=True, verbose_name="Теги")
     allergens = models.ManyToManyField(Allergen, blank=True, verbose_name="Аллергены")
 
-    image = models.ImageField("Фото", upload_to="dishes/images/")
+    image = models.ImageField(
+        "Фото",
+        upload_to="dishes/images/",
+        help_text=(
+            "Любой формат и ориентация — фото автоматически обрезается до 16:9 "
+            "и конвертируется в JPEG. Рекомендуемый минимум: 1200×675 px."
+        ),
+    )
     # Оригинальное видео, загружаемое администратором
-    video = models.FileField("Видео (для ленты)", upload_to="dishes/videos/", blank=True, null=True)
+    video = models.FileField(
+        "Видео (для ленты)",
+        upload_to="dishes/videos/",
+        blank=True,
+        null=True,
+        help_text=(
+            "MP4 или MOV, вертикальное видео 9:16 (рекомендуется 720×1280). "
+            "Будет автоматически транскодировано в фоне — статус виден в поле «Статус видео»."
+        ),
+    )
     # Видео после транскодирования (заполняется Celery-задачей)
     video_processed = models.FileField(
         "Обработанное видео",

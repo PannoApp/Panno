@@ -35,7 +35,7 @@ News (Новость) — независимая сущность
       "title": "Jazz Night",
       "description": "Живая джазовая музыка и авторские коктейли",
       "date_time": "2026-06-20T20:00:00+06:00",
-      "image": "/media/events/images/jazz.jpg",
+      "image": "https://piligrim.kz/media/events/images/jazz.jpg",
       "format": "open",
       "price": null,
       "is_active": true,
@@ -78,7 +78,7 @@ News (Новость) — независимая сущность
       "id": 7,
       "title": "Новое летнее меню",
       "content": "Мы обновили меню — теперь у нас есть...",
-      "image": "/media/news/images/summer.jpg",
+      "image": "https://piligrim.kz/media/news/images/summer.jpg",
       "created_at": "2026-05-10T12:00:00+06:00"
     }
   ]
@@ -115,7 +115,7 @@ News (Новость) — независимая сущность
     "title": "Jazz Night",
     "description": "...",
     "date_time": "2026-06-20T20:00:00+06:00",
-    "image": "/media/events/images/jazz.jpg",
+    "image": "https://piligrim.kz/media/events/images/jazz.jpg",
     "format": "open",
     "price": null,
     "is_active": true,
@@ -191,7 +191,7 @@ News (Новость) — независимая сущность
 | `title` | string | Заголовок мероприятия |
 | `description` | text | Описание |
 | `date_time` | datetime | Дата и время проведения |
-| `image` | image | Обложка (обязательная) |
+| `image` | image | Обложка (обязательная). Автоматически обрезается до 16:9 и конвертируется в JPEG при загрузке. API возвращает **абсолютный URL**. |
 | `format` | string | Формат: `open` (открытое) или `closed` (закрытое). По умолчанию `open` |
 | `price` | decimal | Цена входа в тенге (необязательное, `null` = вход свободный) |
 | `is_active` | bool | Скрытые мероприятия (`false`) не попадают в API |
@@ -204,7 +204,7 @@ News (Новость) — независимая сущность
 |---|---|---|
 | `id` | int | Первичный ключ |
 | `event` | FK → Event | Мероприятие (CASCADE при удалении) |
-| `image` | image | Фотография (upload_to: `events/reports/`, хранилище совпадает с `Event.image`) |
+| `image` | image | Фотография (upload_to: `events/reports/`). Не обрезается — отображается fullscreen с `BoxFit.contain`. API возвращает **абсолютный URL**. |
 | `order` | int | Порядок отображения в галерее (по умолчанию 0) |
 | `uploaded_at` | datetime | Дата загрузки (auto) |
 
@@ -217,7 +217,7 @@ News (Новость) — независимая сущность
 | `id` | int | Первичный ключ |
 | `title` | string | Заголовок новости |
 | `content` | text | Текст новости |
-| `image` | image | Изображение (необязательное, может быть `null`) |
+| `image` | image | Изображение (необязательное, может быть `null`). Автоматически обрезается до 16:9 и конвертируется в JPEG при загрузке. API возвращает **абсолютный URL** или `null`. |
 | `created_at` | datetime | Дата публикации |
 
 ### EventReservation

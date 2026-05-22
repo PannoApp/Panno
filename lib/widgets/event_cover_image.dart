@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
+import 'piligrim_shimmer.dart';
 
 /// Сетевой URL (http/https) или путь к asset (`assets/...`).
 bool piligrimImageIsNetwork(String path) =>
@@ -33,7 +34,7 @@ class PiligrimNetworkOrAssetImage extends StatelessWidget {
         height: height,
         fit: fit,
         memCacheWidth: memCacheWidth,
-        placeholder: (_, __) => const ColoredBox(color: PiligrimColors.earthDeep),
+        placeholder: (_, __) => const PiligrimShimmer(),
         errorWidget: (_, __, ___) => const ColoredBox(color: PiligrimColors.earthDeep),
       );
     }
@@ -68,7 +69,7 @@ class EventCoverImage extends StatelessWidget {
       return CachedNetworkImage(
         imageUrl: url,
         fit: fit,
-        placeholder: (_, __) => const ColoredBox(color: PiligrimColors.earthDeep),
+        placeholder: (_, __) => const PiligrimShimmer(),
         errorWidget: (_, __, ___) => _asset(),
       );
     }

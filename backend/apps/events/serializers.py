@@ -3,6 +3,14 @@ from .models import Event, News, EventReservation, EventPhotoReport
 
 
 class EventPhotoReportSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
     class Meta:
         model = EventPhotoReport
         fields = ('id', 'image', 'order')
@@ -12,7 +20,14 @@ class EventSerializer(serializers.ModelSerializer):
     """
     Сериализатор для модели мероприятий.
     """
+    image = serializers.SerializerMethodField()
     has_photo_report = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
 
     def get_has_photo_report(self, obj):
         return obj.photo_reports.exists()
@@ -36,13 +51,21 @@ class NewsSerializer(serializers.ModelSerializer):
     """
     Сериализатор для модели новостей.
     """
+    image = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
     class Meta:
         model = News
         fields = (
-            'id', 
-            'title', 
-            'content', 
-            'image', 
+            'id',
+            'title',
+            'content',
+            'image',
             'created_at'
         )
 

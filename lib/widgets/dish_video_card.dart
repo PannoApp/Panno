@@ -2,6 +2,7 @@
 // «Каждое блюдо — отдельное приключение» (brandbook, стр. 17)
 // Блок 5: переключение на ApiDish, VideoPlayerController при наличии videoUrl.
 import 'dart:math' as math;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -44,6 +45,7 @@ class _DishVideoCardState extends State<DishVideoCard>
   late AnimationController _ambientCtrl;
   VideoPlayerController? _videoCtrl;
   bool _isMuted = true;
+  bool _videoError = false;
 
   @override
   void initState() {
@@ -53,8 +55,8 @@ class _DishVideoCardState extends State<DishVideoCard>
       duration: const Duration(seconds: 8),
     )..repeat(reverse: true);
 
-    // Инициализируем видео только если у блюда есть ссылка
-    if (widget.dish.videoUrl != null) {
+    // Запускаем видео только если оно уже обработано на сервере
+    if (widget.dish.videoUrl != null && widget.dish.videoStatus == 'ready') {
       _initVideo(widget.dish.videoUrl!);
     }
   }
@@ -77,6 +79,7 @@ class _DishVideoCardState extends State<DishVideoCard>
       if (widget.isActive) ctrl.play();
     } catch (_) {
       ctrl?.dispose();
+      if (mounted) setState(() => _videoError = true);
     }
   }
 
@@ -97,6 +100,23 @@ class _DishVideoCardState extends State<DishVideoCard>
     _ambientCtrl.dispose();
     _videoCtrl?.dispose();
     super.dispose();
+  }
+
+  Widget _buildCinematicBg() {
+    return AnimatedBuilder(
+      animation: _ambientCtrl,
+      builder: (_, __) {
+        final t = _ambientCtrl.value;
+        final glow = 0.6 +
+            0.25 * math.sin(t * math.pi * 1.7) +
+            0.15 * math.sin(t * math.pi * 3.3);
+        return _CinematicBackground(
+          colors: _kDefaultCinematicColors,
+          breathValue: t,
+          glowValue: glow,
+        );
+      },
+    );
   }
 
   void _toggleMute() {
@@ -134,7 +154,7 @@ class _DishVideoCardState extends State<DishVideoCard>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // ── 1. Видео на весь экран ────────────────────────────
+            // ── 1. Видео / фото / кинематографический фон ────────
             if (videoReady)
               ClipRect(
                 child: FittedBox(
@@ -146,21 +166,20 @@ class _DishVideoCardState extends State<DishVideoCard>
                   ),
                 ),
               )
+            else if (_videoError &&
+                widget.dish.imageUrl != null &&
+                widget.dish.imageUrl!.isNotEmpty)
+              // Видео не загрузилось — показываем статичное фото блюда
+              CachedNetworkImage(
+                imageUrl: widget.dish.imageUrl!,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                placeholder: (_, __) => _buildCinematicBg(),
+                errorWidget: (_, __, ___) => _buildCinematicBg(),
+              )
             else
-              AnimatedBuilder(
-                animation: _ambientCtrl,
-                builder: (_, __) {
-                  final t = _ambientCtrl.value;
-                  final glow = 0.6 +
-                      0.25 * math.sin(t * math.pi * 1.7) +
-                      0.15 * math.sin(t * math.pi * 3.3);
-                  return _CinematicBackground(
-                    colors: _kDefaultCinematicColors,
-                    breathValue: t,
-                    glowValue: glow,
-                  );
-                },
-              ),
+              _buildCinematicBg(),
 
             // ── 2. Верхний скрим (читаемость хэдера) ─────────────
             Positioned(

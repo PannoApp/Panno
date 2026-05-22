@@ -129,8 +129,7 @@ Category (Категория)
       "category": { "id": 1, "name": "Горячие блюда", "order": 1 },
       "tags": [{ "id": 2, "name": "Хит" }],
       "allergens": [{ "id": 1, "name": "Глютен" }],
-      "image": "/media/dishes/images/steak.jpg",
-      "video": "/media/dishes/videos/steak.mp4",
+      "image": "http://localhost:8000/media/dishes/images/steak.jpg",
       "video_url": "http://localhost:8000/media/dishes/videos/processed/dish_1_processed.mp4",
       "video_status": "ready",
       "weight": 350,
@@ -176,10 +175,10 @@ Category (Категория)
 | `category` | FK → Category | Категория блюда |
 | `tags` | M2M → Tag | Теги (может быть пустым) |
 | `allergens` | M2M → Allergen | Аллергены (может быть пустым) |
-| `image` | image | Фото блюда (обязательное) |
-| `video` | file | Оригинальное видео, загружаемое администратором (необязательное) |
-| `video_processed` | file | Транскодированное видео H.264/720×1280 (заполняется Celery, не редактируется вручную) |
-| `video_status` | enum | Статус обработки: `pending` / `processing` / `ready` / `failed` |
+| `image` | image | Фото блюда (обязательное). Автоматически обрезается до 16:9 и конвертируется в JPEG при сохранении. API возвращает **абсолютный URL**. |
+| `video` | file | Оригинальное видео, загружаемое администратором (необязательное). В API не возвращается. |
+| `video_processed` | file | Транскодированное видео H.264/720×1280 (заполняется Celery, не редактируется вручную). |
+| `video_status` | enum | Статус обработки: `pending` / `processing` / `ready` / `failed`. Flutter воспроизводит видео только при `ready`. |
 | `weight` | int | Вес порции в граммах (необязательное) |
 | `story` | text | История блюда — для расширенной карточки (необязательное) |
 | `is_active` | bool | Если `false` — блюдо скрыто из API |

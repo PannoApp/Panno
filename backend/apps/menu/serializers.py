@@ -22,8 +22,14 @@ class DishSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     allergens = AllergenSerializer(many=True, read_only=True)
 
-    # Абсолютный URL обработанного видео; None — если видео ещё не готово
+    image = serializers.SerializerMethodField()
     video_url = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
 
     def get_video_url(self, obj):
         if obj.video_processed:
@@ -36,6 +42,6 @@ class DishSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'description', 'price',
             'category', 'tags', 'allergens',
-            'image', 'video', 'video_url', 'video_status',
+            'image', 'video_url', 'video_status',
             'weight', 'story', 'is_active'
         )

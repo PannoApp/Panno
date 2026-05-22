@@ -3,6 +3,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/interior_assets.dart';
+import '../core/media_url.dart';
 import 'models/json_utils.dart';
 
 /// Формат мероприятия: открытое / закрытое (ТЗ)
@@ -70,7 +71,7 @@ class PiligrimNewsPost {
         json['created_at'] ?? json['publishedAt'],
         field: 'created_at',
       ),
-      imageUrl: parseStringOrNull(json['image'] ?? json['image_url']),
+      imageUrl: resolveMediaUrl(parseStringOrNull(json['image'] ?? json['image_url'])),
     );
   }
 }

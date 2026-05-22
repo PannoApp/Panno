@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import models
 
+from utils.image_processing import AutoCropImageMixin
+
 
 def validate_hero_image(image):
     """
@@ -246,7 +248,14 @@ class InteriorPhoto(models.Model):
     ]
 
     zone    = models.CharField("Зона", max_length=20, choices=ZONE_CHOICES, default='main_hall')
-    image   = models.ImageField("Фото", upload_to='interior/')
+    image   = models.ImageField(
+        "Фото",
+        upload_to='interior/',
+        help_text=(
+            "Фото отображается fullscreen без обрезки. "
+            "Рекомендуется горизонтальная ориентация, минимум 1200 px по ширине."
+        ),
+    )
     caption = models.CharField("Подпись (необязательно)", max_length=255, blank=True)
 
     # Порядок отображения внутри зоны — меньше = раньше
@@ -278,7 +287,8 @@ class AppVersion(models.Model):
         return f"{self.platform}: min={self.min_version}, latest={self.latest_version}"
 
 
-class HeroSlide(models.Model):
+class HeroSlide(AutoCropImageMixin, models.Model):
+    _image_ratio = 16 / 9
     """
     Слайды для заглавного экрана (карусель).
     """
@@ -292,7 +302,10 @@ class HeroSlide(models.Model):
         "Изображение",
         upload_to='core/hero/',
         validators=[validate_hero_image],
-        help_text="JPEG или PNG, горизонтальное, минимум 800×450 px, не более 10 МБ.",
+        help_text=(
+            "Любой формат и ориентация — автоматически обрезается до 16:9 "
+            "и конвертируется в JPEG. Минимум 800×450 px, не более 10 МБ."
+        ),
     )
     order = models.PositiveIntegerField("Порядок", default=0)
 

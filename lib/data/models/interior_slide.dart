@@ -1,4 +1,5 @@
 import 'json_utils.dart';
+import '../../core/media_url.dart';
 
 class InteriorSlide {
   const InteriorSlide({
@@ -43,9 +44,11 @@ class InteriorSlide {
   }
 
   static String _parseImageUrl(Map<String, dynamic> json) {
-    return parseString(
-      json['image_url'] ?? json['imageUrl'] ?? json['image'],
-      field: 'image',
+    return resolveMediaUrl(
+      parseString(
+        json['image_url'] ?? json['imageUrl'] ?? json['image'],
+        field: 'image',
+      ),
     );
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/theme.dart';
 import '../data/models/interior_slide.dart';
+import '../widgets/piligrim_shimmer.dart';
 import '../widgets/piligrim_tap.dart';
 
 /// Fullscreen-просмотрщик фотографий интерьера.
@@ -116,9 +117,8 @@ class _InteriorPhotoViewerState extends State<InteriorPhotoViewer> {
                       fit: BoxFit.contain,
                       width: double.infinity,
                       height: double.infinity,
-                      placeholder: (_, __) => const ColoredBox(
-                        color: PiligrimColors.earthDeep,
-                      ),
+                      memCacheWidth: MediaQuery.sizeOf(context).width.toInt(),
+                      placeholder: (_, __) => const PiligrimShimmer(),
                       errorWidget: (_, __, ___) => const ColoredBox(
                         color: PiligrimColors.earthDeep,
                       ),

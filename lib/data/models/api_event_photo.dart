@@ -1,4 +1,5 @@
 import 'json_utils.dart';
+import '../../core/media_url.dart';
 
 class ApiEventPhoto {
   const ApiEventPhoto({
@@ -13,7 +14,7 @@ class ApiEventPhoto {
 
   factory ApiEventPhoto.fromJson(Map<String, dynamic> json) => ApiEventPhoto(
         id: parseInt(json['id'], field: 'id'),
-        imageUrl: parseString(json['image'], field: 'image'),
+        imageUrl: resolveMediaUrl(parseString(json['image'], field: 'image')),
         order: json['order'] as int? ?? 0,
       );
 }

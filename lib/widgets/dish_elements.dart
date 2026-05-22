@@ -9,6 +9,7 @@ import '../core/theme.dart';
 import '../data/models/api_dish.dart';
 import '../data/models/api_tag.dart';
 import 'piligrim_info_section.dart';
+import 'piligrim_shimmer.dart';
 
 /// Нижний информационный блок для Reel-карточки блюда.
 class DishCardBottomInfo extends StatelessWidget {
@@ -278,7 +279,7 @@ class DishThumbnail extends StatelessWidget {
               imageUrl: imageUrl!,
               fit: BoxFit.cover,
               // При загрузке и при ошибке показываем кинематографический фон
-              placeholder: (_, __) => fallback,
+              placeholder: (_, __) => const PiligrimShimmer(),
               errorWidget: (_, __, ___) => fallback,
             ),
     );

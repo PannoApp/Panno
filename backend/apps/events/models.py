@@ -1,7 +1,11 @@
 from django.db import models
 from django.conf import settings
 
-class Event(models.Model):
+from utils.image_processing import AutoCropImageMixin
+
+
+class Event(AutoCropImageMixin, models.Model):
+    _image_ratio = 16 / 9
     """
     Модель для хранения информации о мероприятиях (Афиша).
     """
@@ -16,8 +20,12 @@ class Event(models.Model):
         verbose_name="Дата и время проведения"
     )
     image = models.ImageField(
-        upload_to="events/images/", 
-        verbose_name="Обложка"
+        upload_to="events/images/",
+        verbose_name="Обложка",
+        help_text=(
+            "Любой формат и ориентация — фото автоматически обрезается до 16:9 "
+            "и конвертируется в JPEG. Рекомендуемый минимум: 1200×675 px."
+        ),
     )
     FORMAT_CHOICES = [
         ('open', 'Открытое'),
@@ -59,7 +67,8 @@ class Event(models.Model):
         return f"{self.title} ({self.date_time})"
 
 
-class News(models.Model):
+class News(AutoCropImageMixin, models.Model):
+    _image_ratio = 16 / 9
     """
     Модель для хранения новостей заведения.
     """
@@ -71,10 +80,14 @@ class News(models.Model):
         verbose_name="Текст новости"
     )
     image = models.ImageField(
-        upload_to="news/images/", 
-        verbose_name="Изображение", 
-        null=True, 
-        blank=True
+        upload_to="news/images/",
+        verbose_name="Изображение",
+        null=True,
+        blank=True,
+        help_text=(
+            "Необязательное. Любой формат — автоматически обрезается до 16:9 "
+            "и конвертируется в JPEG. Рекомендуемый минимум: 1200×675 px."
+        ),
     )
     created_at = models.DateTimeField(
         auto_now_add=True, 
@@ -143,6 +156,10 @@ class EventPhotoReport(models.Model):
     image = models.ImageField(
         upload_to='events/reports/',
         verbose_name='Фотография',
+        help_text=(
+            "Фото отображается fullscreen без обрезки. "
+            "Рекомендуется горизонтальная ориентация, минимум 1200 px по ширине."
+        ),
     )
     order = models.PositiveSmallIntegerField(
         default=0,

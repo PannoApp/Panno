@@ -3,6 +3,14 @@ from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide
 
 
 class HeroSlideSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
     class Meta:
         model = HeroSlide
         fields = ('id', 'image', 'order')
@@ -51,8 +59,14 @@ class AppVersionSerializer(serializers.ModelSerializer):
 
 
 class InteriorPhotoSerializer(serializers.ModelSerializer):
-    # zone_display — человекочитаемое название зоны (например "Терраса" вместо "terrace")
     zone_display = serializers.CharField(source='get_zone_display', read_only=True)
+    image = serializers.SerializerMethodField()
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
 
     class Meta:
         model  = InteriorPhoto

@@ -1,5 +1,6 @@
 import 'api_tag.dart';
 import 'json_utils.dart';
+import '../../core/media_url.dart';
 
 // Извлекает id из вложенного объекта категории или напрямую из int.
 // DishSerializer возвращает category как {"id": 1, "name": "...", "order": 0}.
@@ -28,6 +29,7 @@ class ApiDish {
     required this.allergens,
     this.imageUrl,
     this.videoUrl,
+    this.videoStatus = 'pending',
     required this.weight,
     required this.story,
     required this.isActive,
@@ -42,6 +44,7 @@ class ApiDish {
   final List<String> allergens;
   final String? imageUrl;
   final String? videoUrl;
+  final String videoStatus;
   final String weight;
   final String story;
   final bool isActive;
@@ -58,11 +61,9 @@ class ApiDish {
       tags: asJsonMapList(json['tags']).map(ApiTag.fromJson).toList(growable: false),
       // allergens — тоже список объектов: [{"id": 1, "name": "глютен"}, ...]
       allergens: _parseAllergens(json['allergens']),
-      // backend поле называется 'image' (не image_url)
-      imageUrl: parseStringOrNull(json['image']),
-      // Предпочитаем video_url (H.264 720×1280, готово к стримингу),
-      // фолбэк на video — на случай старого формата ответа сервера.
+      imageUrl: resolveMediaUrl(parseStringOrNull(json['image'])),
       videoUrl: parseStringOrNull(json['video_url'] ?? json['video']),
+      videoStatus: parseString(json['video_status'] ?? json['videoStatus'] ?? 'pending', field: 'video_status'),
       weight: parseString(json['weight'] ?? '', field: 'weight'),
       story: parseString(json['story'] ?? '', field: 'story'),
       isActive: parseBool(json['is_active'] ?? json['isActive'], defaultValue: true),
