@@ -1,4 +1,3 @@
-// Горизонтальный фильтр галереи интерьера по зонам (Главный зал, Терраса, …)
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
@@ -23,16 +22,14 @@ class InteriorZoneFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 40,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         physics: const BouncingScrollPhysics(),
-        // +1 для чипа «Все»
         itemCount: zones.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          // Первый элемент — «Все зоны»
           if (i == 0) {
             return _ZoneChip(
               label: 'Все',
@@ -67,33 +64,36 @@ class _ZoneChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return PiligrimTap(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: isActive
-              ? PiligrimColors.steppe.withValues(alpha: 0.20)
-              : PiligrimColors.earthDeep,
-          borderRadius: BorderRadius.circular(8),
+              ? PiligrimColors.water.withValues(alpha: 0.16)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
-                ? PiligrimColors.steppe.withValues(alpha: 0.50)
-                : PiligrimColors.divider,
+                ? PiligrimColors.water.withValues(alpha: 0.55)
+                : PiligrimColors.sky.withValues(alpha: 0.14),
             width: 1,
           ),
         ),
-        child: Text(
-          label,
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
           style: PiligrimTextStyles.caption.copyWith(
             fontSize: 12,
+            letterSpacing: 0.3,
             color: isActive
-                ? PiligrimColors.steppe
-                : PiligrimColors.sky.withValues(alpha: 0.65),
+                ? PiligrimColors.water
+                : PiligrimColors.sky.withValues(alpha: 0.55),
             fontWeight: isActive ? FontWeight.w700 : FontWeight.w300,
           ),
+          child: Text(label),
         ),
       ),
     );

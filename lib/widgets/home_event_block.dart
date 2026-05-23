@@ -1,4 +1,5 @@
 // Превью ближайшего мероприятия на главном экране — EventsProvider + cover image.
+// Вариант А: афишный постер full-bleed, текст оверлеем, pill «Все события».
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -26,32 +27,8 @@ class HomeEventBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'БЛИЖАЙШЕЕ СОБЫТИЕ',
-                style: PiligrimTextStyles.caption.copyWith(
-                  color: PiligrimColors.steppe.withValues(alpha: 0.78),
-                  letterSpacing: 2.5,
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w300,
-                ),
-              ),
-              const Spacer(),
-              PiligrimTap(
-                onTap: () => onNavigate?.call(3),
-                child: Text(
-                  'Все события →',
-                  style: PiligrimTextStyles.caption.copyWith(
-                    color: PiligrimColors.water.withValues(alpha: 0.80),
-                    fontSize: 10,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+          _SectionHeader(onNavigate: onNavigate),
+          const SizedBox(height: 14),
           if (isLoading && event == null)
             const _EventLoadingSkeleton()
           else if (event == null)
@@ -66,6 +43,68 @@ class HomeEventBlock extends StatelessWidget {
   }
 }
 
+// ─── Хедер секции ───────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({this.onNavigate});
+  final ValueChanged<int>? onNavigate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Вертикальный акцент-штрих
+        Container(
+          width: 2,
+          height: 11,
+          decoration: BoxDecoration(
+            color: PiligrimColors.steppe.withValues(alpha: 0.65),
+            borderRadius: BorderRadius.circular(1),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'БЛИЖАЙШЕЕ СОБЫТИЕ',
+          style: PiligrimTextStyles.caption.copyWith(
+            color: PiligrimColors.steppe.withValues(alpha: 0.85),
+            letterSpacing: 2.4,
+            fontSize: 10,
+            fontWeight: FontWeight.w300,
+          ),
+        ),
+        const Spacer(),
+        // Pill «Все события →»
+        PiligrimTap(
+          onTap: () => onNavigate?.call(3),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: PiligrimColors.water.withValues(alpha: 0.38),
+                width: 0.75,
+              ),
+            ),
+            child: Text(
+              'Все события  →',
+              style: PiligrimTextStyles.caption.copyWith(
+                color: PiligrimColors.water,
+                fontSize: 10.5,
+                letterSpacing: 0.2,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Карточка-постер full-bleed ──────────────────────────────────────────────
+
 class _EventCard extends StatelessWidget {
   const _EventCard({required this.event, this.onNavigate});
 
@@ -73,8 +112,8 @@ class _EventCard extends StatelessWidget {
   final ValueChanged<int>? onNavigate;
 
   static const _months = [
-    'ЯНВАРЯ', 'ФЕВРАЛЯ', 'МАРТА', 'АПРЕЛЯ', 'МАЯ', 'ИЮНЯ',
-    'ИЮЛЯ', 'АВГУСТА', 'СЕНТЯБРЯ', 'ОКТЯБРЯ', 'НОЯБРЯ', 'ДЕКАБРЯ',
+    'ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЯ', 'ИЮН',
+    'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК',
   ];
 
   String _formatDate(DateTime dt) {
@@ -99,181 +138,285 @@ class _EventCard extends StatelessWidget {
     return PiligrimTap(
       borderRadius: BorderRadius.circular(PiligrimRadius.card),
       onTap: () => onNavigate?.call(3),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(PiligrimRadius.card),
-          color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
-          border: Border.all(
-            color: PiligrimColors.sky.withValues(alpha: 0.08),
-            width: 0.75,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(PiligrimRadius.card),
+            // На тёмном фоне shadow не виден — используем цветное свечение (glow)
+            boxShadow: [
+              BoxShadow(
+                color: PiligrimColors.steppe.withValues(alpha: 0.22),
+                blurRadius: 32,
+                spreadRadius: 2,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: PiligrimColors.ember.withValues(alpha: 0.10),
+                blurRadius: 48,
+                spreadRadius: -4,
+                offset: const Offset(0, 14),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: PiligrimColors.steppe.withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipRRect(
+          child: ClipRRect(
           borderRadius: BorderRadius.circular(PiligrimRadius.card),
-          child: Stack(
-            children: [
-              Positioned(
-                top: 0,
-                bottom: 0,
-                left: 0,
-                child: Container(
-                  width: 2,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        PiligrimColors.steppe.withValues(alpha: 0.0),
-                        PiligrimColors.steppe.withValues(alpha: 0.55),
-                        PiligrimColors.steppe.withValues(alpha: 0.55),
-                        PiligrimColors.steppe.withValues(alpha: 0.0),
-                      ],
-                      stops: const [0.0, 0.2, 0.8, 1.0],
+          child: AspectRatio(
+            aspectRatio: 1.25,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // ── 1. Фоновое изображение ──────────────────────────────
+                if (hasCover)
+                  CachedNetworkImage(
+                    imageUrl: coverUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => const _CoverPlaceholder(),
+                    errorWidget: (_, __, ___) => const _CoverPlaceholder(),
+                  )
+                else
+                  const _CoverPlaceholder(),
+
+                // ── 2. Верхний виньеточный слой (тень для читаемости даты)
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x88080604),
+                          Color(0x00000000),
+                          Color(0x00000000),
+                        ],
+                        stops: [0.0, 0.28, 1.0],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AspectRatio(
-                    aspectRatio: 2.0,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (hasCover)
-                          CachedNetworkImage(
-                            imageUrl: coverUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => const _CoverPlaceholder(),
-                            errorWidget: (_, __, ___) =>
-                                const _CoverPlaceholder(),
-                          )
-                        else
-                          const _CoverPlaceholder(),
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Color(0x00000000),
-                                Color(0x00000000),
-                                Color(0x60211D1A),
-                                Color(0xEB211D1A),
-                              ],
-                              stops: [0.0, 0.45, 0.75, 1.0],
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 10,
-                          right: 10,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: PiligrimColors.earthDeep
-                                  .withValues(alpha: 0.78),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: PiligrimColors.water
-                                    .withValues(alpha: 0.30),
-                                width: 0.5,
-                              ),
-                            ),
-                            child: Text(
-                              dateLabel,
-                              style: PiligrimTextStyles.caption.copyWith(
-                                color: PiligrimColors.steppe
-                                    .withValues(alpha: 0.95),
-                                fontSize: 9,
-                                letterSpacing: 1.4,
-                                fontWeight: FontWeight.w300,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+
+                // ── 3. Нижний градиент — основа для текста ─────────────
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x00000000),
+                          Color(0x00000000),
+                          Color(0xBB0E0B09),
+                          Color(0xF50E0B09),
+                        ],
+                        stops: [0.0, 0.38, 0.68, 1.0],
+                      ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+                ),
+
+                // ── 4. Бейдж даты — верхний правый угол ────────────────
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: _DateBadge(label: dateLabel),
+                ),
+
+                // ── 5. Текстовый оверлей снизу ──────────────────────────
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           event.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: PiligrimTextStyles.heading.copyWith(
-                            fontSize: 21,
+                            fontSize: 22,
                             color: PiligrimColors.sky,
-                            height: 1.28,
-                            letterSpacing: 0.4,
+                            height: 1.22,
+                            letterSpacing: 0.2,
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         Text(
                           event.description,
-                          maxLines: 3,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: PiligrimTextStyles.body.copyWith(
-                            color: PiligrimColors.sky.withValues(alpha: 0.68),
-                            fontSize: 13,
-                            height: 1.6,
+                          style: PiligrimTextStyles.bodySmall.copyWith(
+                            color: PiligrimColors.sky.withValues(alpha: 0.62),
+                            fontSize: 12.5,
+                            height: 1.55,
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          _formatLabel,
-                          style: PiligrimTextStyles.caption.copyWith(
-                            color: PiligrimColors.water.withValues(alpha: 0.80),
-                            fontSize: 11,
-                            letterSpacing: 0.4,
-                          ),
+                        Container(
+                          height: 0.5,
+                          color: PiligrimColors.sky.withValues(alpha: 0.15),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Text(
+                              _formatLabel,
+                              style: PiligrimTextStyles.caption.copyWith(
+                                color: PiligrimColors.water,
+                                fontSize: 11.5,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color:
+                                    PiligrimColors.water.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Подробнее',
+                                style: PiligrimTextStyles.micro.copyWith(
+                                  color: PiligrimColors.water
+                                      .withValues(alpha: 0.85),
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+// ─── Бейдж даты ──────────────────────────────────────────────────────────────
+
+class _DateBadge extends StatelessWidget {
+  const _DateBadge({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: PiligrimColors.earthDeep.withValues(alpha: 0.80),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: PiligrimColors.steppe.withValues(alpha: 0.30),
+          width: 0.75,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        style: PiligrimTextStyles.micro.copyWith(
+          color: PiligrimColors.steppe.withValues(alpha: 0.95),
+          fontSize: 10,
+          letterSpacing: 1.2,
+          fontWeight: FontWeight.w300,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Заглушка без изображения ────────────────────────────────────────────────
 
 class _CoverPlaceholder extends StatelessWidget {
   const _CoverPlaceholder();
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: PiligrimColors.earthDeep,
-      child: Center(
-        child: SvgPicture.asset(
-          'assets/images/spiral.svg',
-          width: 36,
-          colorFilter: ColorFilter.mode(
-            PiligrimColors.steppe.withValues(alpha: 0.15),
-            BlendMode.srcIn,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Атмосферный тёплый градиент — имитация свечения очага
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment(0.0, 0.2),
+              radius: 1.0,
+              colors: [
+                Color(0xFF2B1E14), // тёплый уголь
+                Color(0xFF1A1108), // глубокий тёмно-коричневый
+                Color(0xFF0E0B08), // почти чёрный
+              ],
+              stops: [0.0, 0.55, 1.0],
+            ),
           ),
         ),
-      ),
+        // Горизонтальная тёплая полоса по центру — намёк на горизонт / степь
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Colors.transparent,
+                  PiligrimColors.ember.withValues(alpha: 0.06),
+                  PiligrimColors.steppe.withValues(alpha: 0.05),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.3, 0.7, 1.0],
+              ),
+            ),
+          ),
+        ),
+        // Центральный символ
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(
+                'assets/images/spiral.svg',
+                width: 56,
+                colorFilter: ColorFilter.mode(
+                  PiligrimColors.steppe.withValues(alpha: 0.28),
+                  BlendMode.srcIn,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'МЕРОПРИЯТИЕ',
+                style: PiligrimTextStyles.micro.copyWith(
+                  color: PiligrimColors.steppe.withValues(alpha: 0.30),
+                  letterSpacing: 3.0,
+                  fontSize: 9,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
+
+// ─── Пустое состояние ────────────────────────────────────────────────────────
 
 class _EventBlockEmpty extends StatelessWidget {
   const _EventBlockEmpty();
@@ -282,7 +425,7 @@ class _EventBlockEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(PiligrimRadius.card),
         color: PiligrimColors.earthDeep.withValues(alpha: 0.40),
@@ -318,49 +461,83 @@ class _EventBlockEmpty extends StatelessWidget {
   }
 }
 
+// ─── Скелетон загрузки ───────────────────────────────────────────────────────
+
 class _EventLoadingSkeleton extends StatelessWidget {
   const _EventLoadingSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(PiligrimRadius.card),
-        color: PiligrimColors.earthDeep.withValues(alpha: 0.40),
-        border: Border.all(
-          color: PiligrimColors.sky.withValues(alpha: 0.06),
-          width: 0.75,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(PiligrimRadius.card),
+      child: AspectRatio(
+        aspectRatio: 1.25,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          AspectRatio(
-            aspectRatio: 2.0,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(PiligrimRadius.card),
-              ),
-              child: ColoredBox(
-                color: PiligrimColors.earthWarm.withValues(alpha: 0.55),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0.0, 0.2),
+                radius: 1.0,
+                colors: [
+                  Color(0xFF2B1E14),
+                  Color(0xFF1A1108),
+                  Color(0xFF0E0B08),
+                ],
+                stops: [0.0, 0.55, 1.0],
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SkeletonLine(width: 180, height: 20),
-                SizedBox(height: 10),
-                _SkeletonLine(width: double.infinity, height: 12),
-                SizedBox(height: 6),
-                _SkeletonLine(width: 140, height: 12),
-              ],
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x00000000),
+                      Color(0x00000000),
+                      Color(0xBB0E0B09),
+                      Color(0xF50E0B09),
+                    ],
+                    stops: [0.0, 0.38, 0.68, 1.0],
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+            Positioned(
+              top: 14,
+              right: 14,
+              child: Container(
+                width: 90,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: PiligrimColors.sky.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 20,
+              left: 18,
+              right: 18,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _SkeletonLine(
+                      width: 200, height: 20, opacity: 0.10),
+                  const SizedBox(height: 8),
+                  _SkeletonLine(
+                      width: double.infinity, height: 12, opacity: 0.07),
+                  const SizedBox(height: 5),
+                  _SkeletonLine(width: 140, height: 12, opacity: 0.07),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     )
         .animate(onPlay: (c) => c.repeat(reverse: true))
@@ -371,9 +548,11 @@ class _EventLoadingSkeleton extends StatelessWidget {
 }
 
 class _SkeletonLine extends StatelessWidget {
-  const _SkeletonLine({required this.width, required this.height});
+  const _SkeletonLine(
+      {required this.width, required this.height, this.opacity = 0.08});
   final double width;
   final double height;
+  final double opacity;
 
   @override
   Widget build(BuildContext context) {
@@ -381,7 +560,7 @@ class _SkeletonLine extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: PiligrimColors.sky.withValues(alpha: 0.06),
+        color: PiligrimColors.sky.withValues(alpha: opacity),
         borderRadius: BorderRadius.circular(4),
       ),
     );

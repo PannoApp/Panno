@@ -109,18 +109,19 @@ class _InteriorPhotoViewerState extends State<InteriorPhotoViewer> {
                   child: InteractiveViewer(
                     minScale: 1.0,
                     maxScale: 4.0,
-                    // При zoom > 1 пан не должен закрывать экран свайпом
                     clipBehavior: Clip.none,
                     boundaryMargin: const EdgeInsets.all(20),
-                    child: CachedNetworkImage(
-                      imageUrl: widget.slides[i].imageUrl,
-                      fit: BoxFit.contain,
-                      width: double.infinity,
-                      height: double.infinity,
-                      memCacheWidth: MediaQuery.sizeOf(context).width.toInt(),
-                      placeholder: (_, __) => const PiligrimShimmer(),
-                      errorWidget: (_, __, ___) => const ColoredBox(
-                        color: PiligrimColors.earthDeep,
+                    child: SizedBox.expand(
+                      child: CachedNetworkImage(
+                        imageUrl: widget.slides[i].imageUrl,
+                        // fitWidth — фото всегда занимает полную ширину экрана,
+                        // для portrait-кадров заполняет и высоту
+                        fit: BoxFit.fitWidth,
+                        memCacheWidth: MediaQuery.sizeOf(context).width.toInt(),
+                        placeholder: (_, __) => const PiligrimShimmer(),
+                        errorWidget: (_, __, ___) => const ColoredBox(
+                          color: PiligrimColors.earthDeep,
+                        ),
                       ),
                     ),
                   ),
