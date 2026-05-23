@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../core/theme.dart';
+import '../widgets/piligrim_loader.dart';
 
 class TourWebViewScreen extends StatefulWidget {
   const TourWebViewScreen({super.key, required this.url});
@@ -57,7 +58,14 @@ class _TourWebViewScreenState extends State<TourWebViewScreen> {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Text(
+            '×',
+            style: TextStyle(
+              fontSize: 22,
+              color: PiligrimColors.sky,
+              height: 1.0,
+            ),
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -67,12 +75,7 @@ class _TourWebViewScreenState extends State<TourWebViewScreen> {
             WebViewWidget(controller: _controller),
 
           if (_isLoading && !_hasError)
-            const Center(
-              child: CircularProgressIndicator(
-                color: PiligrimColors.water,
-                strokeWidth: 2,
-              ),
-            ),
+            const Center(child: PiligrimLoader()),
 
           if (_hasError)
             Center(

@@ -8,6 +8,7 @@ import '../data/models/api_booking.dart';
 import '../providers/booking_provider.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
+import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tap.dart';
 
 class BookingHistoryScreen extends StatefulWidget {
@@ -96,10 +97,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                     if (provider.isLoadingHistory && provider.history.isEmpty)
                       const SliverFillRemaining(
                         child: Center(
-                          child: CircularProgressIndicator(
-                            color: PiligrimColors.water,
-                            strokeWidth: 2,
-                          ),
+                          child: PiligrimLoader(),
                         ),
                       )
                     else if (provider.historyError != null && provider.history.isEmpty)

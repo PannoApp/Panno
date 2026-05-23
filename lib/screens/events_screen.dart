@@ -72,7 +72,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         const _AfichaTitleBlock(),
                         const SizedBox(height: 8),
                         Text(
-                          'Лента мероприятий и вестей заведения',
+                          'Лента мероприятий и новостей',
                           style: PiligrimTextStyles.caption.copyWith(
                             fontSize: 12,
                             letterSpacing: 0.4,
@@ -470,7 +470,7 @@ class _AfichaSectionHeader extends StatelessWidget {
   }
 }
 
-// Подсказка офлайн-режима — компактный steppe-tinted dot + надпись.
+// Тихий офлайн-маркер — едва заметная точка без текста, не ломает иммерсию.
 class _OfflineHint extends StatelessWidget {
   const _OfflineHint();
 
@@ -481,20 +481,20 @@ class _OfflineHint extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 6,
-            height: 6,
+            width: 5,
+            height: 5,
             decoration: BoxDecoration(
-              color: PiligrimColors.steppe.withValues(alpha: 0.6),
+              color: PiligrimColors.steppe.withValues(alpha: 0.35),
               borderRadius: BorderRadius.circular(3),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 7),
           Text(
-            'Офлайн-режим · показаны демо-события',
-            style: PiligrimTextStyles.caption.copyWith(
-              fontSize: 11,
-              letterSpacing: 0.4,
-              color: PiligrimColors.steppe.withValues(alpha: 0.7),
+            'демо',
+            style: PiligrimTextStyles.micro.copyWith(
+              fontSize: 9,
+              letterSpacing: 1.2,
+              color: PiligrimColors.steppe.withValues(alpha: 0.28),
             ),
           ),
         ],
@@ -646,14 +646,6 @@ class _AfishaHeroState extends State<_AfishaHero> {
         const SizedBox(height: 14),
         _HeroDotsIndicator(count: total, current: idx),
         const SizedBox(height: 8),
-        Text(
-          'Кадр ${idx + 1} из $total',
-          style: PiligrimTextStyles.micro.copyWith(
-            fontSize: 10,
-            letterSpacing: 1.4,
-            color: PiligrimColors.sky.withValues(alpha: 0.40),
-          ),
-        ),
       ],
     );
   }
