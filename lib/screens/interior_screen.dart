@@ -11,6 +11,7 @@ import '../data/models/interior_slide.dart';
 import '../providers/core_info_provider.dart';
 import '../widgets/interior_zone_filter.dart';
 import '../widgets/piligrim_background.dart';
+import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_shimmer.dart';
 import '../widgets/piligrim_tap.dart';
 import 'interior_photo_viewer.dart';
@@ -239,13 +240,8 @@ class _InteriorScreenState extends State<InteriorScreen>
                     if (core.isLoading && !useApi)
                       const SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 32),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: PiligrimColors.water,
-                              strokeWidth: 2,
-                            ),
-                          ),
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(child: PiligrimLoader()),
                         ),
                       ),
 
@@ -485,10 +481,14 @@ class _HeroPhotoBlock extends StatelessWidget {
                           width: 1,
                         ),
                       ),
-                      child: Icon(
-                        Icons.open_in_full_rounded,
-                        size: 13,
-                        color: PiligrimColors.sky.withValues(alpha: 0.75),
+                      child: Text(
+                        '↗',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: PiligrimColors.sky.withValues(alpha: 0.75),
+                          height: 1.0,
+                          fontFamily: 'MuseoSans',
+                        ),
                       ),
                     ),
                   ],
@@ -700,10 +700,14 @@ class _TourButton extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: PiligrimColors.steppe.withValues(alpha: 0.55),
+            Text(
+              '→',
+              style: TextStyle(
+                fontSize: 16,
+                color: PiligrimColors.steppe.withValues(alpha: 0.55),
+                height: 1.0,
+                fontFamily: 'MuseoSans',
+              ),
             ),
           ],
         ),

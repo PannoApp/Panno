@@ -1,6 +1,7 @@
 // Вход по телефону — SMS OTP (Auth Guard pattern).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../providers/auth_provider.dart';
@@ -107,7 +108,15 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
               Navigator.of(context).pop();
             }
           },
-          child: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          child: SvgPicture.asset(
+            'assets/images/splash_path (1).svg',
+            width: 20,
+            height: 20,
+            colorFilter: ColorFilter.mode(
+              PiligrimColors.water.withValues(alpha: 0.7),
+              BlendMode.srcIn,
+            ),
+          ),
         ),
         title: Text(
           'Начать путь',

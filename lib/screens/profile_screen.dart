@@ -1278,10 +1278,14 @@ class _LogoutButton extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Icon(
-                Icons.logout_rounded,
-                size: 16,
-                color: PiligrimColors.ember.withValues(alpha: 0.5),
+              Text(
+                '→',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: PiligrimColors.ember.withValues(alpha: 0.5),
+                  height: 1.0,
+                  fontFamily: 'MuseoSans',
+                ),
               ),
             ],
           ),

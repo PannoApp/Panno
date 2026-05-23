@@ -2,6 +2,7 @@
 // Режим 1: Видео-лента (Reels-style PageView)
 // Режим 2: Классическое меню с поиском, фильтрами и инфинит-скроллом
 // Состояние режима и данные управляются через MenuProvider (блок 5).
+import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -17,6 +18,7 @@ import '../widgets/dish_elements.dart';
 import '../widgets/dish_video_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
+import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tap.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -38,7 +40,7 @@ class _MenuScreenState extends State<MenuScreen>
     super.build(context);
     final menuProvider = context.watch<MenuProvider>();
 
-    if (!menuProvider.loaded) return const SizedBox.shrink();
+    if (!menuProvider.loaded) return const _MenuLoadingSkeleton();
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
@@ -312,11 +314,8 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
     final menuProvider = context.watch<MenuProvider>();
     final dishes = menuProvider.feedDishes;
 
-    // Пока блюда загружаются — показываем индикатор
     if (menuProvider.isLoadingFeed && dishes.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: PiligrimColors.steppe),
-      );
+      return const Center(child: PiligrimLoader(color: PiligrimColors.steppe));
     }
 
     if (menuProvider.feedError != null && dishes.isEmpty) {
@@ -537,12 +536,7 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: PiligrimColors.steppe,
-                  strokeWidth: 2,
-                ),
-              ),
+              child: Center(child: PiligrimLoader(size: 24, color: PiligrimColors.steppe)),
             ),
           ),
 
@@ -1035,10 +1029,14 @@ class _SearchBarState extends State<_SearchBar> {
                         horizontal: 12,
                         vertical: 8,
                       ),
-                      child: Icon(
-                        Icons.close_rounded,
-                        size: 16,
-                        color: PiligrimColors.sky.withValues(alpha: 0.5),
+                      child: Text(
+                        '×',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: PiligrimColors.sky.withValues(alpha: 0.5),
+                          height: 1.0,
+                          fontFamily: 'MuseoSans',
+                        ),
                       ),
                     ),
                   )
@@ -1789,6 +1787,140 @@ class _DishDetailSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Скелетон загрузки меню — пульсирующий тотем на фоне бренда
+// Показывается пока MenuProvider инициализирует режим из SharedPreferences
+// ─────────────────────────────────────────────────────────────────────────────
+class _MenuLoadingSkeleton extends StatefulWidget {
+  const _MenuLoadingSkeleton();
+
+  @override
+  State<_MenuLoadingSkeleton> createState() => _MenuLoadingSkeletonState();
+}
+
+class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+
+    return Scaffold(
+      backgroundColor: PiligrimColors.earth,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const PiligrimBackground(
+            textureOpacity: 0.45,
+            vignetteIntensity: 0.25,
+          ),
+          // Тёплое свечение снизу — огненный мотив
+          const Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 200,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Color(0x1AD9793E),
+                    Color(0x00000000),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Хедер-скелетон
+          Positioned(
+            top: top + 12,
+            left: 20,
+            right: 20,
+            child: Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/images/bird_totem (1).svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(
+                    PiligrimColors.steppe.withValues(alpha: 0.45),
+                    BlendMode.srcIn,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'МЕНЮ',
+                  style: PiligrimTextStyles.sectionLabel.copyWith(
+                    letterSpacing: 3.0,
+                    color: PiligrimColors.sky.withValues(alpha: 0.38),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Пульсирующий тотем по центру
+          Center(
+            child: AnimatedBuilder(
+              animation: _ctrl,
+              builder: (_, child) {
+                final t = _ctrl.value;
+                final pulse = 0.55 + 0.45 * math.sin(t * math.pi);
+                return Opacity(
+                  opacity: (0.35 + pulse * 0.55).clamp(0.0, 1.0),
+                  child: Transform.scale(
+                    scale: 0.82 + pulse * 0.18,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: PiligrimColors.water
+                                .withValues(alpha: pulse * 0.18),
+                            blurRadius: 24,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: child,
+                    ),
+                  ),
+                );
+              },
+              child: SvgPicture.asset(
+                'assets/images/bird_totem (1).svg',
+                width: 48,
+                height: 48,
+                colorFilter: const ColorFilter.mode(
+                  PiligrimColors.water,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

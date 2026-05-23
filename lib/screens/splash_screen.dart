@@ -498,7 +498,14 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               GestureDetector(
                 onTap: () => setState(() => _showUpdateBanner = false),
-                child: const Icon(Icons.close, size: 16, color: PiligrimColors.navInactive),
+                child: const Text(
+                  '×',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: PiligrimColors.navInactive,
+                    height: 1.0,
+                  ),
+                ),
               ),
             ],
           ),
