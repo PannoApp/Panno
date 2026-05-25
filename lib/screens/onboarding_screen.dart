@@ -8,7 +8,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
-import '../main.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/ember_cta.dart';
 import '../widgets/piligrim_background.dart';
@@ -21,28 +20,25 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
+class _OnboardingScreenState extends State<OnboardingScreen> {
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   bool _loading = false;
 
-  late final AnimationController _shimmerCtrl;
-
   @override
   void initState() {
     super.initState();
-    _shimmerCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2600),
-    )..repeat(reverse: true);
+    final user = context.read<AuthProvider>().currentUser;
+    if (user != null) {
+      _firstNameCtrl.text = user.firstName;
+      _lastNameCtrl.text = user.lastName;
+    }
   }
 
   @override
   void dispose() {
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
-    _shimmerCtrl.dispose();
     super.dispose();
   }
 
@@ -61,16 +57,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       // поля необязательны — не блокируем продолжение
     }
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const RootShell(),
-        transitionDuration: const Duration(milliseconds: 700),
-        transitionsBuilder: (_, anim, __, child) => FadeTransition(
-          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-          child: child,
-        ),
-      ),
-    );
+    Navigator.of(context).pop();
   }
 
   @override
@@ -125,8 +112,23 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Звезда-тотем + вертикальная линия пути ─────────────────
-                _PathTotem(shimmerCtrl: _shimmerCtrl),
+                // ── Логотип PILIGRIM ──────────────────────────────────────
+                SvgPicture.asset(
+                  'assets/images/piligrim.svg',
+                  height: 26,
+                  colorFilter: const ColorFilter.mode(
+                    PiligrimColors.sky,
+                    BlendMode.srcIn,
+                  ),
+                )
+                    .animate()
+                    .fadeIn(duration: 700.ms, curve: Curves.easeOut)
+                    .slideX(
+                      begin: -0.1,
+                      end: 0,
+                      duration: 700.ms,
+                      curve: Curves.easeOutCubic,
+                    ),
                 const SizedBox(height: 36),
 
                 // ── Приветствие ─────────────────────────────────────────────
@@ -212,96 +214,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Звезда-тотем + вертикальная линия пути
-// ─────────────────────────────────────────────────────────────────────────────
-class _PathTotem extends StatelessWidget {
-  const _PathTotem({required this.shimmerCtrl});
 
-  final AnimationController shimmerCtrl;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Звезда с пульсирующим свечением
-        AnimatedBuilder(
-          animation: shimmerCtrl,
-          builder: (_, child) {
-            final t = shimmerCtrl.value;
-            final pulse = 0.78 +
-                0.15 * math.sin(t * math.pi * 2.1) +
-                0.07 * math.sin(t * math.pi * 5.3);
-            return Opacity(
-              opacity: (pulse).clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: PiligrimColors.water
-                          .withValues(alpha: (0.15 + pulse * 0.08).clamp(0, 0.30)),
-                      blurRadius: 18,
-                      spreadRadius: 0,
-                    ),
-                  ],
-                ),
-                child: child,
-              ),
-            );
-          },
-          child: SvgPicture.asset(
-            'assets/images/star_totem (1).svg',
-            width: 32,
-            height: 32,
-            colorFilter: const ColorFilter.mode(
-              PiligrimColors.water,
-              BlendMode.srcIn,
-            ),
-          ),
-        )
-            .animate()
-            .fadeIn(duration: 700.ms, curve: Curves.easeOut)
-            .scale(
-              begin: const Offset(0.65, 0.65),
-              end: const Offset(1.0, 1.0),
-              duration: 700.ms,
-              curve: Curves.easeOutBack,
-            ),
-
-        // Вертикальная линия пути
-        Container(
-          width: 1,
-          height: 36,
-          margin: const EdgeInsets.only(left: 15.5),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                PiligrimColors.water,
-                PiligrimColors.divider,
-              ],
-            ),
-          ),
-        ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
-
-        // Точка
-        Container(
-          width: 4,
-          height: 4,
-          margin: const EdgeInsets.only(left: 14),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: PiligrimColors.steppe.withValues(alpha: 0.55),
-          ),
-        ).animate().fadeIn(delay: 380.ms, duration: 400.ms),
-      ],
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Брендованное поле ввода

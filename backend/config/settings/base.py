@@ -50,6 +50,9 @@ INSTALLED_APPS = [
     'apps.events.apps.EventsConfig',
     'apps.core.apps.CoreConfig',
     'apps.notifications.apps.NotificationsConfig',
+
+    # Автоудаление файлов при замене/удалении объектов (последним — требование пакета)
+    'django_cleanup.apps.CleanupConfig',
 ]
 
 MIDDLEWARE = [

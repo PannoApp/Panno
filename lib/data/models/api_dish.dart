@@ -4,7 +4,7 @@ import '../../core/media_url.dart';
 
 // Извлекает id из вложенного объекта категории или напрямую из int.
 // DishSerializer возвращает category как {"id": 1, "name": "...", "order": 0}.
-String? _parseVideoUrl(dynamic value) {
+String? _parseMediaUrl(dynamic value) {
   final raw = parseStringOrNull(value);
   if (raw == null) return null;
   final resolved = resolveMediaUrl(raw);
@@ -72,8 +72,8 @@ class ApiDish {
       tags: asJsonMapList(json['tags']).map(ApiTag.fromJson).toList(growable: false),
       // allergens — тоже список объектов: [{"id": 1, "name": "глютен"}, ...]
       allergens: _parseAllergens(json['allergens']),
-      imageUrl: resolveMediaUrl(parseStringOrNull(json['image'])),
-      videoUrl: _parseVideoUrl(json['video_url'] ?? json['video']),
+      imageUrl: _parseMediaUrl(json['image']),
+      videoUrl: _parseMediaUrl(json['video_url'] ?? json['video']),
       videoStatus: parseString(json['video_status'] ?? json['videoStatus'] ?? 'pending', field: 'video_status'),
       weight: parseString(json['weight'] ?? '', field: 'weight'),
       story: parseString(json['story'] ?? '', field: 'story'),

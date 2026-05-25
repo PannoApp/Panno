@@ -1,3 +1,4 @@
+import io
 import json
 import uuid
 from datetime import date as dt_date, time as dt_time
@@ -14,6 +15,18 @@ from .models import TableBooking
 from .serializers import TableBookingSerializer
 
 User = get_user_model()
+
+
+def _make_jpeg_bytes():
+    from PIL import Image
+    img = Image.new('RGB', (32, 18), color=(100, 150, 200))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG')
+    return buf.getvalue()
+
+
+# Valid JPEG bytes for tests that create Event/News (models with AutoCropImageMixin).
+_VALID_JPEG = _make_jpeg_bytes()
 
 
 def make_user(phone='+77001234567'):
@@ -794,6 +807,36 @@ class TelegramNotificationTaskTest(TestCase):
             zone='main',
             comment='У окна',
         )
+
+    @override_settings(**_TG_SETTINGS)
+    @patch('apps.bookings.tasks._tg_post')
+    def test_send_event_reservation_telegram_notification_success(self, mock_tg):
+        from django.utils import timezone
+        from apps.events.models import EventReservation, Event
+        from apps.bookings.tasks import send_event_reservation_telegram_notification
+        from apps.events.tests import _make_landscape_image
+
+        event = Event.objects.create(
+            title='Тест Ивент',
+            description='x',
+            date_time=timezone.now() + timezone.timedelta(days=1),
+            image=_make_landscape_image('ev_t.png'),
+            max_places=20
+        )
+        # Сбрасываем вызовы из сигнала при создании
+        reservation = EventReservation.objects.create(event=event, user=self.user, guests_count=3)
+        mock_tg.reset_mock()
+
+        send_event_reservation_telegram_notification(reservation.pk)
+
+        mock_tg.assert_called_once()
+        method, payload, token = mock_tg.call_args[0]
+        self.assertEqual(method, 'sendMessage')
+        self.assertEqual(payload['chat_id'], '-1001234567890')
+        self.assertIn('Новая запись на мероприятие', payload['text'])
+        self.assertIn('Тест Ивент', payload['text'])
+        self.assertIn('Забронировано: 3', payload['text'])
+        self.assertIn('Занято мест: 3 из 20', payload['text'])
 
     def _call(self, booking_pk=None):
         from apps.bookings.tasks import send_telegram_notification
@@ -1722,7 +1765,7 @@ class TelegramWebhookFSMTest(TestCase):
         # Mock requests.get for file download
         mock_get_resp = MagicMock()
         mock_get_resp.ok = True
-        mock_get_resp.content = b'mocked image data'
+        mock_get_resp.content = _VALID_JPEG
         mock_get.return_value = mock_get_resp
 
         # 1. Start news FSM
@@ -1753,7 +1796,7 @@ class TelegramWebhookFSMTest(TestCase):
         news = News.objects.get(title='Sample News Title')
         self.assertEqual(news.content, 'Sample News Content')
         self.assertTrue(news.image.name.endswith('photo_123.jpg'))
-        self.assertEqual(news.image.read(), b'mocked image data')
+        self.assertTrue(len(news.image.read()) > 0)
 
     @override_settings(**_TG_WEBHOOK_SETTINGS)
     @patch('apps.bookings.views._tg_post')
@@ -1833,7 +1876,7 @@ class TelegramWebhookFSMTest(TestCase):
         # Mock requests.get for file download
         mock_get_resp = MagicMock()
         mock_get_resp.ok = True
-        mock_get_resp.content = b'event image content'
+        mock_get_resp.content = _VALID_JPEG
         mock_get.return_value = mock_get_resp
 
         # 1. Start event FSM
@@ -1859,15 +1902,20 @@ class TelegramWebhookFSMTest(TestCase):
 
         # 6. Send Price
         self._post_message(111222, '1500')
-        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_image')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_max_places')
         self.assertEqual(cache.get('tg_fsm:111222')['data']['price'], '1500')
 
-        # 7. Send Cover Photo
+        # 7. Send Max Places
+        self._post_message(111222, '50')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_image')
+        self.assertEqual(cache.get('tg_fsm:111222')['data']['max_places'], 50)
+
+        # 8. Send Cover Photo
         photo_payload = [{'file_id': 'cover_123', 'file_size': 2000}]
         self._post_message_with_photo(111222, photo_payload)
         self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_confirmation')
 
-        # 8. Confirm
+        # 9. Confirm
         self._post_callback(111222, 'event:confirm')
 
         # Verify state is cleared
@@ -1879,8 +1927,9 @@ class TelegramWebhookFSMTest(TestCase):
         self.assertEqual(event.description, 'Mega Description')
         self.assertEqual(event.format, 'open')
         self.assertEqual(str(event.price), '1500.00')
+        self.assertEqual(event.max_places, 50)
         self.assertTrue(event.image.name.endswith('cover_123.jpg'))
-        self.assertEqual(event.image.read(), b'event image content')
+        self.assertTrue(len(event.image.read()) > 0)
 
         # Verify date_time is localized correct in Almaty timezone
         import pytz
@@ -1902,7 +1951,7 @@ class TelegramWebhookFSMTest(TestCase):
         mock_post.return_value = mock_post_resp
         mock_get_resp = MagicMock()
         mock_get_resp.ok = True
-        mock_get_resp.content = b'free event cover'
+        mock_get_resp.content = _VALID_JPEG
         mock_get.return_value = mock_get_resp
 
         # 1. Start event FSM
@@ -1912,9 +1961,17 @@ class TelegramWebhookFSMTest(TestCase):
         self._post_message(111222, '25.05.2026 21:00')
         self._post_callback(111222, 'event_format:closed')
         # Send free entry
+        self._post_message(111222, 'Free Entry') # any text to trigger non-skip price path as it expects "🆓 Вход свободный"
+        # Wait, the bot checks if it is '🆓 Вход свободный' or '/skip', otherwise tries to parse decimal.
+        # So we send "🆓 Вход свободный"
         self._post_message(111222, '🆓 Вход свободный')
-        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_image')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_max_places')
         self.assertIsNone(cache.get('tg_fsm:111222')['data']['price'])
+
+        # Send max places
+        self._post_message(111222, '30')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_image')
+        self.assertEqual(cache.get('tg_fsm:111222')['data']['max_places'], 30)
 
         # Send photo
         self._post_message_with_photo(111222, [{'file_id': 'cover_free', 'file_size': 2000}])
@@ -1926,6 +1983,7 @@ class TelegramWebhookFSMTest(TestCase):
         event = Event.objects.get(title='Free Concert')
         self.assertEqual(event.format, 'closed')
         self.assertIsNone(event.price)
+        self.assertEqual(event.max_places, 30)
 
     @override_settings(**_TG_WEBHOOK_SETTINGS)
     @patch('apps.bookings.views._tg_post')
@@ -1977,6 +2035,31 @@ class TelegramWebhookFSMTest(TestCase):
 
     @override_settings(**_TG_WEBHOOK_SETTINGS)
     @patch('apps.bookings.views._tg_post')
+    def test_event_creation_flow_invalid_max_places(self, mock_tg):
+        self._post_message(111222, '📅 Создать мероприятие')
+        self._post_message(111222, 'Event Invalid Places')
+        self._post_message(111222, 'Desc')
+        self._post_message(111222, '25.05.2026 19:00')
+        self._post_callback(111222, 'event_format:open')
+        self._post_message(111222, '🆓 Вход свободный')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_max_places')
+
+        # Send non-integer
+        self._post_message(111222, 'not-a-number')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_max_places')
+        last_call = mock_tg.call_args_list[-1][0][1]
+        self.assertIn('Некорректное число мест', last_call['text'])
+
+        # Send negative integer
+        self._post_message(111222, '-5')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_max_places')
+
+        # Send 0
+        self._post_message(111222, '0')
+        self.assertEqual(cache.get('tg_fsm:111222')['state'], 'waiting_for_event_max_places')
+
+    @override_settings(**_TG_WEBHOOK_SETTINGS)
+    @patch('apps.bookings.views._tg_post')
     def test_event_creation_flow_missing_image(self, mock_tg):
         self._post_message(111222, '📅 Создать мероприятие')
         self._post_message(111222, 'Event Missing Image')
@@ -1984,6 +2067,8 @@ class TelegramWebhookFSMTest(TestCase):
         self._post_message(111222, '25.05.2026 19:00')
         self._post_callback(111222, 'event_format:open')
         self._post_message(111222, '🆓 Вход свободный')
+        # Send max places to proceed to image step
+        self._post_message(111222, '50')
         
         # Try to send text instead of photo
         self._post_message(111222, '⏭ Пропустить')  # Skip is not allowed for events
@@ -2024,6 +2109,8 @@ class TelegramWebhookFSMTest(TestCase):
         self._post_message(111222, '25.05.2026 19:00')
         self._post_callback(111222, 'event_format:open')
         self._post_message(111222, '🆓 Вход свободный')
+        # Send max places to proceed to image step
+        self._post_message(111222, '50')
         self._post_message_with_photo(111222, [{'file_id': 'bad_cover', 'file_size': 2000}])
         self._post_callback(111222, 'event:confirm')
 

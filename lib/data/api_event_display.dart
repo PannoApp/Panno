@@ -20,6 +20,11 @@ extension ApiEventDisplay on ApiEvent {
 List<ApiEvent> mockEventsAsApi() {
   return buildMockEvents().map((e) {
     final id = int.tryParse(e.id) ?? 0;
+    
+    // Задаем демонстрационные лимиты мест
+    final maxPlaces = id == 102 ? 10 : (id == 103 ? 25 : 50);
+    final occupiedPlaces = id == 102 ? 10 : (id == 103 ? 23 : 12);
+
     return ApiEvent(
       id: id,
       title: e.title,
@@ -32,6 +37,8 @@ List<ApiEvent> mockEventsAsApi() {
       priceFrom: e.priceFromRub,
       isPast: e.isPast,
       hasPhotoReport: e.hasPhotoReport,
+      maxPlaces: maxPlaces,
+      occupiedPlaces: occupiedPlaces,
     );
   }).toList(growable: false);
 }

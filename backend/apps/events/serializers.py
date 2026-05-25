@@ -45,6 +45,8 @@ class EventSerializer(serializers.ModelSerializer):
             'is_active',
             'created_at',
             'has_photo_report',
+            'max_places',
+            'occupied_places',
         )
 
 class NewsSerializer(serializers.ModelSerializer):
@@ -90,12 +92,25 @@ class EventReservationSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """
-        Проверка, что пользователь не записывается на одно и то же событие дважды.
+        Проверка уникальности записи и наличия свободных мест на мероприятии.
         """
         user = self.context['request'].user
         event = data['event']
+        guests_count = data.get('guests_count', 1)
+
+        # Проверка повторной записи
         if EventReservation.objects.filter(user=user, event=event).exists():
             raise serializers.ValidationError("Вы уже записаны на это мероприятие.")
+
+        # Проверка вместимости (если установлен лимит мест)
+        if event.max_places > 0:
+            occupied = event.occupied_places
+            if occupied + guests_count > event.max_places:
+                remaining = max(0, event.max_places - occupied)
+                raise serializers.ValidationError(
+                    f"Недостаточно свободных мест. Осталось мест: {remaining}."
+                )
+
         return data
 
 

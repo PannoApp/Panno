@@ -14,6 +14,7 @@ class EventsProvider extends ChangeNotifier {
       : _repository = repository ?? EventsRepository();
 
   final EventsRepository _repository;
+  final Map<int, String> _idempotencyKeys = {};
 
   List<ApiEvent> upcoming = const [];
   List<ApiEvent> archived = const [];
@@ -30,7 +31,6 @@ class EventsProvider extends ChangeNotifier {
   String? newsError;
   String? reserveError;
 
-  String? _reservationIdempotencyKey;
   bool _usedMockFallback = false;
 
   List<ApiEventPhoto> _photoReport = const [];
@@ -137,17 +137,17 @@ class EventsProvider extends ChangeNotifier {
     reserveError = null;
     notifyListeners();
 
-    // Генерируем Idempotency-Key для защиты от дублей при сетевых повторах
-    _reservationIdempotencyKey ??= const Uuid().v4();
+    // Generates or retrieves a persistent Idempotency-Key per event reservation attempt
+    final idempotencyKey =
+        _idempotencyKeys.putIfAbsent(eventId, () => const Uuid().v4());
 
     try {
       await _repository.createReservation(
         eventId: eventId,
         guestsCount: guestsCount,
-        idempotencyKey: _reservationIdempotencyKey!,
+        idempotencyKey: idempotencyKey,
       );
-      // При успешном бронировании очищаем ключ
-      _reservationIdempotencyKey = null;
+      _idempotencyKeys.remove(eventId);
     } catch (e) {
       reserveError = dioErrorMessage(e);
       rethrow;

@@ -1,5 +1,5 @@
 // Бронирование зала — «Путь Героя к столу»
-// Выбор зоны, даты, кол-ва гостей, подтверждение. Согласно ТЗ раздел 4.4
+// Выбор зоны, даты, кол-ва героев, подтверждение. Согласно ТЗ раздел 4.4
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
