@@ -148,34 +148,26 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               // Контент на PiligrimBackground — без ColoredBox / серой плашки.
               SliverToBoxAdapter(
-                child: Builder(
-                  builder: (ctx) {
-                    final bottomInset = MediaQuery.paddingOf(ctx).bottom;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const RepaintBoundary(child: HomeHeroIntroBlock()),
-                        RepaintBoundary(
-                          child: HomeActionBlock(bottomPadding: bottomInset),
-                        ),
-                      ],
-                    );
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const RepaintBoundary(child: HomeHeroIntroBlock()),
+                    const RepaintBoundary(
+                      child: HomeActionBlock(bottomPadding: 0),
+                    ),
+                    RepaintBoundary(
+                      child: HomeStatusLine(
+                        isOpen: core.isOpenNow,
+                        hoursLabel: hoursLine,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
               SliverToBoxAdapter(
                 child: RepaintBoundary(
                   child: HomeEventBlock(onNavigate: widget.onNavigate),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 48)),
-              SliverToBoxAdapter(
-                child: RepaintBoundary(
-                  child: HomeStatusLine(
-                    isOpen: core.isOpenNow,
-                    hoursLabel: hoursLine,
-                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 120)),
