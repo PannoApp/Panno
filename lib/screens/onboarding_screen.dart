@@ -178,6 +178,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ? const _TotemPulseLoader()
                     : EmberCta(
                         label: 'НАЧАТЬ ПУТЬ',
+                        showTrailingArrow: false,
                         onTap: _onStart,
                       )
                         .animate()

@@ -164,22 +164,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     // Контакты
                     const PiligrimSectionHeader(
                       label: 'КОНТАКТЫ',
-                      icon: 'assets/images/splash_path (1).svg',
+                      icon: 'assets/images/bird_totem (1).svg',
                     ),
                     const SizedBox(height: 14),
                     _ContactsCard(
                       coreInfo: coreInfo,
                       onLaunch: _launch,
                     ),
-                    const SizedBox(height: 28),
-
-                    // Часы работы
-                    const PiligrimSectionHeader(
-                      label: 'ЧАСЫ РАБОТЫ',
-                      icon: 'assets/images/sun.svg',
-                    ),
-                    const SizedBox(height: 14),
-                    _HoursCard(),
                     const SizedBox(height: 28),
 
                     // Правила посещения
@@ -197,7 +188,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     // Выход из аккаунта
                         if (auth.isLoggedIn) ...[
-                          const SizedBox(height: 8),
                           _LogoutButton(
                             onTap: () async {
                               await context.read<AuthProvider>().logout();
@@ -959,112 +949,6 @@ class _ContactsCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOURS CARD
-// ─────────────────────────────────────────────────────────────────────────────
-class _HoursCard extends StatefulWidget {
-  @override
-  State<_HoursCard> createState() => _HoursCardState();
-}
-
-class _HoursCardState extends State<_HoursCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final core = context.watch<CoreInfoProvider>();
-    final open = core.isOpenNow;
-    if (open) {
-      if (!_pulseCtrl.isAnimating) _pulseCtrl.repeat(reverse: true);
-    } else if (_pulseCtrl.isAnimating) {
-      _pulseCtrl.stop();
-      _pulseCtrl.value = 0;
-    }
-    final hoursText = core.workingHoursNote?.isNotEmpty == true
-        ? '${core.workingHoursDisplay}\n${core.workingHoursNote}'
-        : core.workingHoursDisplay;
-    return _ProfileGlassCard(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            // Пульс
-            AnimatedBuilder(
-              animation: _pulseCtrl,
-              builder: (_, __) {
-                final dot = open ? PiligrimColors.ember : PiligrimColors.sky.withValues(alpha: 0.18);
-                return Container(
-                  width: 11,
-                  height: 11,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: dot,
-                    boxShadow: open
-                        ? [
-                            BoxShadow(
-                              color: dot.withValues(
-                                  alpha: 0.3 + _pulseCtrl.value * 0.4),
-                              blurRadius: 4 + _pulseCtrl.value * 8,
-                              spreadRadius: _pulseCtrl.value * 3,
-                            ),
-                          ]
-                        : null,
-                  ),
-                );
-              },
-            ),
-            const SizedBox(width: 14),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  open ? 'Открыто сейчас' : 'Закрыто',
-                  style: PiligrimTextStyles.body.copyWith(
-                    fontSize: 15,
-                    color: open ? PiligrimColors.ember : PiligrimColors.sky.withValues(alpha: 0.3),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hoursText,
-                  style: PiligrimTextStyles.caption,
-                ),
-              ],
-            ),
-            const Spacer(),
-            SvgPicture.asset(
-              'assets/images/sun.svg',
-              width: 28,
-              height: 28,
-              colorFilter: ColorFilter.mode(
-                PiligrimColors.steppe.withValues(alpha: open ? 0.35 : 0.07),
-                BlendMode.srcIn,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // RULES CARD — раскрываемые пункты
 // ─────────────────────────────────────────────────────────────────────────────
 class _RulesCard extends StatefulWidget {
@@ -1284,26 +1168,12 @@ class _LogoutButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          child: Row(
-            children: [
-              Text(
-                'Выйти из аккаунта',
-                style: PiligrimTextStyles.body.copyWith(
-                  fontSize: 13,
-                  color: PiligrimColors.ember.withValues(alpha: 0.85),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '→',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: PiligrimColors.ember.withValues(alpha: 0.5),
-                  height: 1.0,
-                  fontFamily: 'MuseoSans',
-                ),
-              ),
-            ],
+          child: Text(
+            'Выйти из аккаунта',
+            style: PiligrimTextStyles.body.copyWith(
+              fontSize: 13,
+              color: PiligrimColors.ember.withValues(alpha: 0.85),
+            ),
           ),
         ),
       ),
@@ -1778,7 +1648,7 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
                             label: _submitting
                                 ? 'Подождите…'
                                 : (_awaitingCode ? 'ПОДТВЕРДИТЬ' : 'ПОЛУЧИТЬ КОД'),
-                            iconAsset: 'assets/images/moon_totem (1).svg',
+                            showTrailingArrow: false,
                             onTap: _submitting
                                 ? null
                                 : (_awaitingCode ? _confirmCode : _requestCode),

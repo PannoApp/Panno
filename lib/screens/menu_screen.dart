@@ -143,10 +143,15 @@ class _ModeSwitcher extends StatelessWidget {
   static const double _height = 36;
   static const double _radius = 18;
   static const double _trackWidth = 184;
+  /// Внутренний воздух между track border и active pill (Apple-style inset).
+  static const double _pillInset = 3;
 
   @override
   Widget build(BuildContext context) {
     final isFeed = mode == MenuViewMode.feed;
+    const innerWidth = _trackWidth - _pillInset * 2;
+    const pillWidth = innerWidth / 2;
+    const pillRadius = _radius - _pillInset;
 
     return SizedBox(
       width: _trackWidth,
@@ -164,27 +169,33 @@ class _ModeSwitcher extends StatelessWidget {
             ),
           ),
           // Скользящий water-индикатор
-          AnimatedAlign(
-            duration: 280.ms,
-            curve: Curves.easeOutCubic,
-            alignment: isFeed ? Alignment.centerLeft : Alignment.centerRight,
-            child: Container(
-              width: _trackWidth / 2,
-              height: _height,
-              decoration: BoxDecoration(
-                color: PiligrimColors.water.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(_radius),
-                border: Border.all(
-                  color: PiligrimColors.water.withValues(alpha: 0.5),
-                  width: 0.8,
-                ),
-                boxShadow: [
-                  BoxShadow(
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.all(_pillInset),
+              child: AnimatedAlign(
+                duration: 280.ms,
+                curve: Curves.easeOutCubic,
+                alignment:
+                    isFeed ? Alignment.centerLeft : Alignment.centerRight,
+                child: Container(
+                  width: pillWidth,
+                  height: double.infinity,
+                  decoration: BoxDecoration(
                     color: PiligrimColors.water.withValues(alpha: 0.18),
-                    blurRadius: 12,
-                    spreadRadius: 0.5,
+                    borderRadius: BorderRadius.circular(pillRadius),
+                    border: Border.all(
+                      color: PiligrimColors.water.withValues(alpha: 0.5),
+                      width: 0.8,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: PiligrimColors.water.withValues(alpha: 0.18),
+                        blurRadius: 12,
+                        spreadRadius: 0.5,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
