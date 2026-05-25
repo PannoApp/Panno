@@ -1,6 +1,8 @@
+import io
 from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework import status
@@ -40,7 +42,7 @@ def make_dish(category, name='Блюдо', is_active=True, price='500.00'):
         description='Описание',
         price=price,
         category=category,
-        image=make_image(f'{name}.png'),
+        image=_make_landscape_image(f'{name}.png'),
         is_active=is_active,
     )
 
@@ -626,3 +628,102 @@ class ProcessDishVideoTaskTest(TestCase):
 
         self.dish.refresh_from_db()
         self.assertEqual(self.dish.video_status, Dish.VideoStatus.FAILED)
+
+
+# ---------------------------------------------------------------------------
+# File cleanup (django-cleanup)
+# ---------------------------------------------------------------------------
+
+def _make_landscape_image(name='landscape.png'):
+    """16×9 PNG для Dish (AutoCropImageMixin требует ratio >= 1.5:1)."""
+    from PIL import Image
+    img = Image.new('RGB', (16, 9), color=(128, 128, 128))
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return SimpleUploadedFile(name, buf.read(), content_type='image/png')
+
+
+class DishFileCleanupTest(TestCase):
+    """
+    django-cleanup удаляет медиафайлы блюда при замене поля или удалении объекта.
+    Покрывает image (AutoCropImageMixin), video и video_processed (FileField).
+    """
+
+    def setUp(self):
+        self.cat = make_category()
+
+    # --- Dish.image (AutoCropImageMixin) ---
+
+    def test_dish_image_old_file_deleted_on_update(self):
+        dish = Dish.objects.create(
+            name='Блюдо', description='', price='100.00',
+            category=self.cat, image=_make_landscape_image('d1.png'),
+        )
+        dish.refresh_from_db()
+        old_name = dish.image.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            dish.image = _make_landscape_image('d2.png')
+            dish.save()
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_dish_image_file_deleted_on_instance_delete(self):
+        dish = Dish.objects.create(
+            name='Блюдо', description='', price='100.00',
+            category=self.cat, image=_make_landscape_image(),
+        )
+        dish.refresh_from_db()
+        name = dish.image.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            dish.delete()
+
+        self.assertFalse(default_storage.exists(name))
+
+    # --- Dish.video (nullable FileField) ---
+
+    def test_dish_video_old_file_deleted_on_update(self):
+        dish = make_dish(self.cat)
+        dish.video = SimpleUploadedFile('v1.mp4', b'fake-video', content_type='video/mp4')
+        dish.save(update_fields=['video'])
+        old_name = dish.video.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            dish.video = SimpleUploadedFile('v2.mp4', b'fake-video-2', content_type='video/mp4')
+            dish.save(update_fields=['video'])
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_dish_video_file_deleted_on_instance_delete(self):
+        dish = make_dish(self.cat)
+        dish.video = SimpleUploadedFile('v.mp4', b'fake', content_type='video/mp4')
+        dish.save(update_fields=['video'])
+        name = dish.video.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            dish.delete()
+
+        self.assertFalse(default_storage.exists(name))
+
+    # --- Dish.video_processed (nullable FileField, обновляется Celery-задачей) ---
+
+    def test_dish_video_processed_old_file_deleted_on_update(self):
+        dish = make_dish(self.cat)
+        # Первая установка video_processed (имитация Celery-задачи)
+        dish.video_processed = SimpleUploadedFile('p1.mp4', b'proc1', content_type='video/mp4')
+        dish.save(update_fields=['video_processed', 'video_status'])
+        old_name = dish.video_processed.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        # Замена на новое обработанное видео
+        with self.captureOnCommitCallbacks(execute=True):
+            dish.video_processed = SimpleUploadedFile('p2.mp4', b'proc2', content_type='video/mp4')
+            dish.save(update_fields=['video_processed', 'video_status'])
+
+        self.assertFalse(default_storage.exists(old_name))

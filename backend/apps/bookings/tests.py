@@ -1,3 +1,4 @@
+import io
 import json
 import uuid
 from datetime import date as dt_date, time as dt_time
@@ -14,6 +15,18 @@ from .models import TableBooking
 from .serializers import TableBookingSerializer
 
 User = get_user_model()
+
+
+def _make_jpeg_bytes():
+    from PIL import Image
+    img = Image.new('RGB', (32, 18), color=(100, 150, 200))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG')
+    return buf.getvalue()
+
+
+# Valid JPEG bytes for tests that create Event/News (models with AutoCropImageMixin).
+_VALID_JPEG = _make_jpeg_bytes()
 
 
 def make_user(phone='+77001234567'):
@@ -1722,7 +1735,7 @@ class TelegramWebhookFSMTest(TestCase):
         # Mock requests.get for file download
         mock_get_resp = MagicMock()
         mock_get_resp.ok = True
-        mock_get_resp.content = b'mocked image data'
+        mock_get_resp.content = _VALID_JPEG
         mock_get.return_value = mock_get_resp
 
         # 1. Start news FSM
@@ -1753,7 +1766,7 @@ class TelegramWebhookFSMTest(TestCase):
         news = News.objects.get(title='Sample News Title')
         self.assertEqual(news.content, 'Sample News Content')
         self.assertTrue(news.image.name.endswith('photo_123.jpg'))
-        self.assertEqual(news.image.read(), b'mocked image data')
+        self.assertTrue(len(news.image.read()) > 0)
 
     @override_settings(**_TG_WEBHOOK_SETTINGS)
     @patch('apps.bookings.views._tg_post')
@@ -1833,7 +1846,7 @@ class TelegramWebhookFSMTest(TestCase):
         # Mock requests.get for file download
         mock_get_resp = MagicMock()
         mock_get_resp.ok = True
-        mock_get_resp.content = b'event image content'
+        mock_get_resp.content = _VALID_JPEG
         mock_get.return_value = mock_get_resp
 
         # 1. Start event FSM
@@ -1880,7 +1893,7 @@ class TelegramWebhookFSMTest(TestCase):
         self.assertEqual(event.format, 'open')
         self.assertEqual(str(event.price), '1500.00')
         self.assertTrue(event.image.name.endswith('cover_123.jpg'))
-        self.assertEqual(event.image.read(), b'event image content')
+        self.assertTrue(len(event.image.read()) > 0)
 
         # Verify date_time is localized correct in Almaty timezone
         import pytz
@@ -1902,7 +1915,7 @@ class TelegramWebhookFSMTest(TestCase):
         mock_post.return_value = mock_post_resp
         mock_get_resp = MagicMock()
         mock_get_resp.ok = True
-        mock_get_resp.content = b'free event cover'
+        mock_get_resp.content = _VALID_JPEG
         mock_get.return_value = mock_get_resp
 
         # 1. Start event FSM

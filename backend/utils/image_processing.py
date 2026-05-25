@@ -109,9 +109,10 @@ class AutoCropImageMixin:
 
         processed = center_crop_to_ratio(field, self._image_ratio)
 
-        dir_name, file_name = os.path.split(field.name)
-        base_name = os.path.splitext(file_name)[0]
-        new_name = os.path.join(dir_name, base_name + '.jpg')
+        base_name = os.path.splitext(os.path.basename(field.name))[0]
+        # Pass only the filename so generate_filename adds upload_to exactly once.
+        # Passing the full path (including upload_to) would double it in storage.
+        new_name = base_name + '.jpg'
 
         # Удаляем оригинал и записываем обработанный файл
         field.delete(save=False)
@@ -121,3 +122,12 @@ class AutoCropImageMixin:
         self.__class__.objects.filter(pk=self.pk).update(
             **{self._image_field: field.name}
         )
+
+        # django-cleanup's cache was set to the original filename by post_save above.
+        # The .update() call above bypasses signals, so we manually refresh the cache
+        # so that subsequent updates know which processed JPEG to delete.
+        try:
+            from django_cleanup import cleanup as _cleanup
+            _cleanup.refresh(self)
+        except ImportError:
+            pass

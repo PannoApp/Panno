@@ -128,24 +128,19 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    isLoading = true;
-    error = null;
+    // Читаем refresh-токен ДО очистки, чтобы уведомить сервер.
+    final refresh = await _tokenStorage.readRefresh();
+
+    // Немедленно очищаем локальную сессию — не ждём сервер.
+    await _tokenStorage.clearTokens();
+    currentUser = null;
+    isNewUser = false;
+    eventsCount = 0;
     notifyListeners();
 
-    try {
-      final refresh = await _tokenStorage.readRefresh();
-      if (refresh != null && refresh.isNotEmpty) {
-        await _authService.logout(refresh);
-      }
-    } catch (_) {
-      // Всегда очищаем локальную сессию.
-    } finally {
-      await _tokenStorage.clearTokens();
-      currentUser = null;
-      isNewUser = false;
-      eventsCount = 0;
-      isLoading = false;
-      notifyListeners();
+    // Уведомляем сервер в фоне — UI уже обновился.
+    if (refresh != null && refresh.isNotEmpty) {
+      _authService.logout(refresh).catchError((_) {});
     }
   }
 

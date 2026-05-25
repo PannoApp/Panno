@@ -1,8 +1,10 @@
+import io
 import uuid
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.files.storage import default_storage
 from django.test import TestCase
 from django.utils import timezone
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -34,7 +36,7 @@ def make_event(title='Тест', days_offset=1, is_active=True):
         title=title,
         description='Описание',
         date_time=dt,
-        image=make_image(),
+        image=_make_landscape_image('event.png'),
         is_active=is_active,
     )
 
@@ -45,7 +47,7 @@ def make_past_event(title='Архив'):
         title=title,
         description='Прошедшее',
         date_time=dt,
-        image=make_image(),
+        image=_make_landscape_image('past_event.png'),
         is_active=True,
     )
 
@@ -108,7 +110,7 @@ class ArchivedEventsListViewTest(APITestCase):
             title='НеактивноеПрошлое',
             description='x',
             date_time=dt,
-            image=make_image(),
+            image=_make_landscape_image(),
             is_active=False,
         )
         response = self.client.get('/api/v1/events/archived/')
@@ -603,3 +605,118 @@ class EventReservationAdminTest(TestCase):
         self.assertIn('guest_phone', admin_instance.readonly_fields)
         self.assertIn('guest_name', admin_instance.fields)
         self.assertIn('guest_phone', admin_instance.fields)
+
+
+# ---------------------------------------------------------------------------
+# File cleanup (django-cleanup)
+# ---------------------------------------------------------------------------
+
+def _make_landscape_image(name='landscape.png'):
+    """16×9 PNG для моделей с AutoCropImageMixin (ratio >= 1.5:1)."""
+    from PIL import Image
+    img = Image.new('RGB', (16, 9), color=(128, 128, 128))
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return SimpleUploadedFile(name, buf.read(), content_type='image/png')
+
+
+class EventFileCleanupTest(TestCase):
+    """
+    django-cleanup удаляет медиафайлы при замене поля или удалении объекта.
+    Покрывает Event.image, News.image (nullable), EventPhotoReport.image.
+    """
+
+    # --- Event.image (AutoCropImageMixin) ---
+
+    def test_event_image_old_file_deleted_on_update(self):
+        event = make_event(title='Ивент')
+        event.refresh_from_db()
+        old_name = event.image.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            event.image = _make_landscape_image('e2.png')
+            event.save()
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_event_image_file_deleted_on_instance_delete(self):
+        event = make_event(title='Ивент для удаления')
+        event.refresh_from_db()
+        name = event.image.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            event.delete()
+
+        self.assertFalse(default_storage.exists(name))
+
+    # --- News.image (AutoCropImageMixin, nullable) ---
+
+    def test_news_image_old_file_deleted_on_update(self):
+        from .models import News
+        news = News.objects.create(
+            title='Новость', content='Текст', image=_make_landscape_image('n1.png')
+        )
+        news.refresh_from_db()
+        old_name = news.image.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            news.image = _make_landscape_image('n2.png')
+            news.save()
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_news_image_file_deleted_on_instance_delete(self):
+        from .models import News
+        news = News.objects.create(
+            title='Новость удалённая', content='Текст', image=_make_landscape_image()
+        )
+        news.refresh_from_db()
+        name = news.image.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            news.delete()
+
+        self.assertFalse(default_storage.exists(name))
+
+    def test_news_without_image_delete_does_not_raise(self):
+        """Удаление новости без изображения не должно поднимать исключений."""
+        from .models import News
+        news = News.objects.create(title='Без фото', content='Текст')
+        with self.captureOnCommitCallbacks(execute=True):
+            news.delete()  # не должен вызвать ошибку
+
+    # --- EventPhotoReport.image (plain ImageField, без AutoCropImageMixin) ---
+
+    def test_event_photo_report_old_file_deleted_on_update(self):
+        from .models import EventPhotoReport
+        event = make_event(title='Отчёт')
+        report = EventPhotoReport.objects.create(
+            event=event, image=make_image('r1.png'), order=0
+        )
+        old_name = report.image.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            report.image = make_image('r2.png')
+            report.save()
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_event_photo_report_file_deleted_on_instance_delete(self):
+        from .models import EventPhotoReport
+        event = make_event(title='Отчёт удаление')
+        report = EventPhotoReport.objects.create(
+            event=event, image=make_image(), order=0
+        )
+        name = report.image.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            report.delete()
+
+        self.assertFalse(default_storage.exists(name))

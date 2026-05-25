@@ -8,7 +8,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
-import '../main.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/ember_cta.dart';
 import '../widgets/piligrim_background.dart';
@@ -61,16 +60,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       // поля необязательны — не блокируем продолжение
     }
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const RootShell(),
-        transitionDuration: const Duration(milliseconds: 700),
-        transitionsBuilder: (_, anim, __, child) => FadeTransition(
-          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
-          child: child,
-        ),
-      ),
-    );
+    Navigator.of(context).pop();
   }
 
   @override

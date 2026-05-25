@@ -1,12 +1,38 @@
+import io
 from datetime import time as dt_time
 from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
+from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import RestaurantInfo, AppVersion, InteriorPhoto
+from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide
+
+
+# Minimal 1×1 PNG — достаточно для полей без AutoCropImageMixin
+_PNG = (
+    b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01'
+    b'\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00'
+    b'\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18'
+    b'\xd8N\x00\x00\x00\x00IEND\xaeB`\x82'
+)
+
+
+def _make_image(name='img.png'):
+    return SimpleUploadedFile(name, _PNG, content_type='image/png')
+
+
+def _make_landscape_image(name='landscape.png'):
+    """16×9 PNG для моделей с AutoCropImageMixin (ratio >= 1.5:1)."""
+    from PIL import Image
+    img = Image.new('RGB', (16, 9), color=(128, 128, 128))
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return SimpleUploadedFile(name, buf.read(), content_type='image/png')
 
 
 # ---------------------------------------------------------------------------
@@ -871,3 +897,69 @@ class CoreRedisResilienceTest(APITestCase):
             response = self.client.get('/api/v1/core/interior/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+
+
+# ---------------------------------------------------------------------------
+# File cleanup (django-cleanup)
+# ---------------------------------------------------------------------------
+
+class CoreFileCleanupTest(TestCase):
+    """
+    django-cleanup удаляет медиафайлы из хранилища при замене поля
+    или удалении объекта.  Покрывает InteriorPhoto и HeroSlide.
+    """
+
+    # --- InteriorPhoto (plain ImageField, без AutoCropImageMixin) ---
+
+    def test_interior_photo_old_file_deleted_on_update(self):
+        photo = InteriorPhoto.objects.create(image=_make_image('a.png'), zone='main_hall')
+        old_name = photo.image.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            photo.image = _make_image('b.png')
+            photo.save()
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_interior_photo_file_deleted_on_instance_delete(self):
+        photo = InteriorPhoto.objects.create(image=_make_image(), zone='main_hall')
+        name = photo.image.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            photo.delete()
+
+        self.assertFalse(default_storage.exists(name))
+
+    # --- HeroSlide (AutoCropImageMixin: сохраняет обработанный JPEG) ---
+
+    def test_hero_slide_old_file_deleted_on_update(self):
+        info = RestaurantInfo.load()
+        slide = HeroSlide.objects.create(
+            image=_make_landscape_image('s1.png'), restaurant_info=info, order=0
+        )
+        # После AutoCropImageMixin .update() экземпляр хранит старое имя — нужен refresh
+        slide.refresh_from_db()
+        old_name = slide.image.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            slide.image = _make_landscape_image('s2.png')
+            slide.save()
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_hero_slide_file_deleted_on_instance_delete(self):
+        info = RestaurantInfo.load()
+        slide = HeroSlide.objects.create(
+            image=_make_landscape_image(), restaurant_info=info, order=0
+        )
+        slide.refresh_from_db()
+        name = slide.image.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            slide.delete()
+
+        self.assertFalse(default_storage.exists(name))

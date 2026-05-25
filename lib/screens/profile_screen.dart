@@ -2,6 +2,7 @@
 // Согласно ТЗ раздел 4.5 | Концепция «Modern Nomad»
 // Textured header · water ripple · totem decorations · brand-styled toggles
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -13,10 +14,12 @@ import '../data/models/core_info.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../providers/core_info_provider.dart';
+import '../widgets/ember_cta.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
 import 'booking_history_screen.dart';
+import 'onboarding_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -101,6 +104,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
+        if (!auth.isLoggedIn) {
+          return const _UnauthProfileView();
+        }
         final user = auth.user;
         return Scaffold(
           backgroundColor: PiligrimColors.earth,
@@ -1371,3 +1377,273 @@ class _BrandCard extends StatelessWidget {
 }
 
 // _SectionHeader заменён на PiligrimSectionHeader (lib/widgets/piligrim_section_header.dart)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNAUTH PROFILE — полноэкранный экран авторизации для неавторизованных
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _UnauthProfileView extends StatefulWidget {
+  const _UnauthProfileView();
+
+  @override
+  State<_UnauthProfileView> createState() => _UnauthProfileViewState();
+}
+
+class _UnauthProfileViewState extends State<_UnauthProfileView> {
+  final _phoneCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
+  bool _submitting = false;
+  bool _awaitingCode = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _codeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestCode() async {
+    final digits = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 11) {
+      setState(() => _error = 'Укажите номер телефона');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await context.read<AuthProvider>().sendOtp(_phoneCtrl.text.trim());
+      if (!mounted) return;
+      setState(() => _awaitingCode = true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = context.read<AuthProvider>().error ?? 'Не удалось отправить код';
+      });
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _confirmCode() async {
+    final code = _codeCtrl.text.trim();
+    if (code.length < 4) {
+      setState(() => _error = 'Введите код из SMS');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.confirmOtp(_phoneCtrl.text.trim(), code);
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    if (ok) {
+      if (auth.isNewUser) {
+        auth.clearNewUserFlag();
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      }
+      if (!mounted) return;
+      context.read<BookingProvider>().loadHistory();
+    } else {
+      setState(() => _error = auth.error ?? 'Неверный код');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+
+    return Scaffold(
+      backgroundColor: PiligrimColors.earth,
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const PiligrimBackground(
+            cinematic: true,
+            textureOpacity: 0.45,
+            vignetteIntensity: 0.25,
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 280,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    PiligrimColors.ember.withValues(alpha: 0.12),
+                    PiligrimColors.steppe.withValues(alpha: 0.04),
+                    PiligrimColors.clear,
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(28, 24, 28, bottom + 32),
+                child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // ── Логотип ──────────────────────────────────────────
+                        SvgPicture.asset(
+                          'assets/images/star_totem (1).svg',
+                          width: 28,
+                          height: 28,
+                          colorFilter: const ColorFilter.mode(
+                            PiligrimColors.sky,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 24,
+                          color: PiligrimColors.sky.withValues(alpha: 0.25),
+                        ),
+                        const SizedBox(height: 10),
+                        SvgPicture.asset(
+                          'assets/images/piligrim.svg',
+                          width: 140,
+                          colorFilter: const ColorFilter.mode(
+                            PiligrimColors.sky,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // ── Форма авторизации ─────────────────────────────────
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                          // Подпись
+                          Text(
+                            _awaitingCode
+                                ? 'Код отправлен на ${_phoneCtrl.text.trim()}'
+                                : 'Сначала нужно авторизоваться',
+                            style: PiligrimTextStyles.body.copyWith(
+                              color: PiligrimColors.sky.withValues(alpha: 0.45),
+                              fontSize: 13,
+                              height: 1.55,
+                            ),
+                          ).animate().fadeIn(duration: 400.ms),
+                          if (_error != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              _error!,
+                              style: PiligrimTextStyles.body.copyWith(
+                                fontSize: 13,
+                                color: PiligrimColors.ember,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          // Поле ввода
+                          TextField(
+                            controller: _awaitingCode ? _codeCtrl : _phoneCtrl,
+                            keyboardType: _awaitingCode
+                                ? TextInputType.number
+                                : TextInputType.phone,
+                            maxLength: _awaitingCode ? 4 : null,
+                            inputFormatters: _awaitingCode
+                                ? [FilteringTextInputFormatter.digitsOnly]
+                                : [
+                                    FilteringTextInputFormatter.allow(
+                                        RegExp(r'[\d+\s\-()]')),
+                                  ],
+                            style: PiligrimTextStyles.body.copyWith(
+                              color: PiligrimColors.sky,
+                              fontSize: 16,
+                              letterSpacing: _awaitingCode ? 4 : 0,
+                            ),
+                            cursorColor: PiligrimColors.water,
+                            decoration: InputDecoration(
+                              hintText: _awaitingCode ? '0000' : '+7 7XX XXX XX XX',
+                              hintStyle: PiligrimTextStyles.body.copyWith(
+                                color: PiligrimColors.sky.withValues(alpha: 0.30),
+                                fontSize: 15,
+                                letterSpacing: 0,
+                              ),
+                              counterText: '',
+                              filled: true,
+                              fillColor: PiligrimColors.earthDeep.withValues(alpha: 0.60),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                  color: PiligrimColors.sky.withValues(alpha: 0.12),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: PiligrimColors.water,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          // Кнопка
+                          EmberCta(
+                            label: _submitting
+                                ? 'Подождите…'
+                                : (_awaitingCode ? 'ПОДТВЕРДИТЬ' : 'ПОЛУЧИТЬ КОД'),
+                            iconAsset: 'assets/images/moon_totem (1).svg',
+                            onTap: _submitting
+                                ? null
+                                : (_awaitingCode ? _confirmCode : _requestCode),
+                          ),
+                          // Изменить номер
+                          if (_awaitingCode) ...[
+                            const SizedBox(height: 12),
+                            Center(
+                              child: PiligrimTap(
+                                onTap: () => setState(() {
+                                  _awaitingCode = false;
+                                  _codeCtrl.clear();
+                                  _error = null;
+                                }),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  child: Text(
+                                    'Изменить номер',
+                                    style: PiligrimTextStyles.caption.copyWith(
+                                      color: PiligrimColors.sky.withValues(alpha: 0.30),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
