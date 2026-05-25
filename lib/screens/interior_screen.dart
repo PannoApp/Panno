@@ -13,6 +13,7 @@ import '../widgets/interior_zone_filter.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_shimmer.dart';
+import '../widgets/piligrim_tab_editorial_mark.dart';
 import '../widgets/piligrim_tap.dart';
 import 'interior_photo_viewer.dart';
 import 'tour_webview_screen.dart';
@@ -185,31 +186,16 @@ class _InteriorScreenState extends State<InteriorScreen>
                 child: CustomScrollView(
                   physics: const ClampingScrollPhysics(),
                   slivers: [
-                    // ── Заголовок ────────────────────────────────────────────
-                    SliverToBoxAdapter(
+                    // ── Editorial mark (как MENU / EVENTS) ───────────────────
+                    const SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Пространство PILIGRIM',
-                              style: PiligrimTextStyles.heading.copyWith(
-                                fontSize: 24,
-                                color: PiligrimColors.sky,
-                                height: 1.25,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Тёплый свет, медь и дерево саксаула — атмосфера Modern Nomad.',
-                              style: PiligrimTextStyles.body.copyWith(
-                                fontSize: 13,
-                                height: 1.55,
-                                color: PiligrimColors.sky.withValues(alpha: 0.72),
-                              ),
-                            ),
-                          ],
+                        padding: EdgeInsets.fromLTRB(24, 16, 24, 8),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: PiligrimTabEditorialMark(
+                            label: 'INTERIOR',
+                            compact: true,
+                          ),
                         ),
                       ),
                     ),

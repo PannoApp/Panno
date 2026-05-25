@@ -18,6 +18,7 @@ import '../widgets/event_cover_image.dart'
     show EventCoverImage, PiligrimNetworkOrAssetImage;
 import '../widgets/piligrim_background.dart';
 import 'event_detail_screen.dart';
+import '../widgets/piligrim_tab_editorial_mark.dart';
 import '../widgets/piligrim_tap.dart';
 
 enum _AfichaView { events, news }
@@ -69,18 +70,17 @@ class _EventsScreenState extends State<EventsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Лента мероприятий и новостей',
-                          style: PiligrimTextStyles.caption.copyWith(
-                            fontSize: 12,
-                            letterSpacing: 0.4,
-                            color: PiligrimColors.sky.withValues(alpha: 0.45),
-                          ),
+                        const PiligrimTabEditorialMark(
+                          label: 'EVENTS',
+                          compact: true,
                         ),
-                        const SizedBox(height: 16),
-                        _SegmentedAficha(
-                          value: _view,
-                          onChanged: (v) => setState(() => _view = v),
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _SegmentedAficha(
+                            value: _view,
+                            onChanged: (v) => setState(() => _view = v),
+                          ),
                         ),
                         const SizedBox(height: 18),
                         Builder(builder: (context) {
@@ -237,8 +237,7 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 }
 
-// Переключатель вкладок «Афиша» / «Новости» — sliding water-pill (как ModeSwitcher в Menu).
-// Активная вкладка: water glow + tinted background; неактивная: sky @ 0.45.
+// Переключатель «Афиша» / «Новости» — тот же water-pill, что _ModeSwitcher в Menu.
 class _SegmentedAficha extends StatelessWidget {
   const _SegmentedAficha({
     required this.value,
@@ -248,80 +247,72 @@ class _SegmentedAficha extends StatelessWidget {
   final _AfichaView value;
   final ValueChanged<_AfichaView> onChanged;
 
-  static const double _height = 44;
-  static const double _radius = 22;
+  static const double _height = 36;
+  static const double _radius = 18;
+  static const double _trackWidth = 184;
 
   @override
   Widget build(BuildContext context) {
     final isEvents = value == _AfichaView.events;
 
     return SizedBox(
+      width: _trackWidth,
       height: _height,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              // Фон-«дорожка» — earthDeep
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: PiligrimColors.earthDeep.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(_radius),
-                    border: Border.all(color: PiligrimColors.divider),
-                  ),
-                ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: PiligrimColors.earthDeep.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(_radius),
+                border: Border.all(color: PiligrimColors.divider),
               ),
-              // Скользящий water-индикатор (половина ширины)
-              AnimatedAlign(
-                duration: 280.ms,
-                curve: Curves.easeOutCubic,
-                alignment: isEvents
-                    ? Alignment.centerLeft
-                    : Alignment.centerRight,
-                child: Container(
-                  width: constraints.maxWidth / 2,
-                  height: _height,
-                  decoration: BoxDecoration(
+            ),
+          ),
+          AnimatedAlign(
+            duration: 280.ms,
+            curve: Curves.easeOutCubic,
+            alignment:
+                isEvents ? Alignment.centerLeft : Alignment.centerRight,
+            child: Container(
+              width: _trackWidth / 2,
+              height: _height,
+              decoration: BoxDecoration(
+                color: PiligrimColors.water.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(_radius),
+                border: Border.all(
+                  color: PiligrimColors.water.withValues(alpha: 0.5),
+                  width: 0.8,
+                ),
+                boxShadow: [
+                  BoxShadow(
                     color: PiligrimColors.water.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(_radius),
-                    border: Border.all(
-                      color: PiligrimColors.water.withValues(alpha: 0.5),
-                      width: 0.8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: PiligrimColors.water.withValues(alpha: 0.18),
-                        blurRadius: 14,
-                        spreadRadius: 0.5,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Сами таб-кнопки с иконками
-              Row(
-                children: [
-                  Expanded(
-                    child: _AfichaTabLabel(
-                      label: 'Афиша',
-                      icon: 'assets/images/tree_totem (1).svg',
-                      active: isEvents,
-                      onTap: () => onChanged(_AfichaView.events),
-                    ),
-                  ),
-                  Expanded(
-                    child: _AfichaTabLabel(
-                      label: 'Новости',
-                      icon: 'assets/images/spiral.svg',
-                      active: !isEvents,
-                      onTap: () => onChanged(_AfichaView.news),
-                    ),
+                    blurRadius: 12,
+                    spreadRadius: 0.5,
                   ),
                 ],
               ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _AfichaTabLabel(
+                  label: 'Афиша',
+                  active: isEvents,
+                  onTap: () => onChanged(_AfichaView.events),
+                ),
+              ),
+              Expanded(
+                child: _AfichaTabLabel(
+                  label: 'Новости',
+                  active: !isEvents,
+                  onTap: () => onChanged(_AfichaView.news),
+                ),
+              ),
             ],
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -330,13 +321,11 @@ class _SegmentedAficha extends StatelessWidget {
 class _AfichaTabLabel extends StatelessWidget {
   const _AfichaTabLabel({
     required this.label,
-    required this.icon,
     required this.active,
     required this.onTap,
   });
 
   final String label;
-  final String icon;
   final bool active;
   final VoidCallback onTap;
 
@@ -350,28 +339,16 @@ class _AfichaTabLabel extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(_SegmentedAficha._radius),
       child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(
-              icon,
-              width: 14,
-              height: 14,
-              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-            ),
-            const SizedBox(width: 8),
-            AnimatedDefaultTextStyle(
-              duration: 220.ms,
-              curve: Curves.easeOut,
-              style: PiligrimTextStyles.caption.copyWith(
-                fontSize: 13,
-                color: color,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w300,
-                letterSpacing: active ? 0.6 : 0.4,
-              ),
-              child: Text(label),
-            ),
-          ],
+        child: AnimatedDefaultTextStyle(
+          duration: 220.ms,
+          curve: Curves.easeOut,
+          style: PiligrimTextStyles.caption.copyWith(
+            fontSize: 11.5,
+            color: color,
+            fontWeight: active ? FontWeight.w700 : FontWeight.w300,
+            letterSpacing: active ? 0.6 : 0.4,
+          ),
+          child: Text(label),
         ),
       ),
     );

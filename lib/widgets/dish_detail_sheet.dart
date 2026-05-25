@@ -4,13 +4,9 @@ import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:provider/provider.dart';
-
 import '../core/theme.dart';
 import '../data/models/api_dish.dart';
-import '../providers/menu_provider.dart';
 import 'dish_elements.dart';
-import 'piligrim_tap.dart';
 
 // Дефолтные цвета кинематографического фона (лента / sheet fallback).
 const kDishCinematicFallbackColors = [
@@ -343,11 +339,6 @@ class ClassicDishDetailSheet extends StatelessWidget {
   const ClassicDishDetailSheet({super.key, required this.dish});
   final ApiDish dish;
 
-  void _openVideo(BuildContext context) {
-    Navigator.pop(context);
-    context.read<MenuProvider>().openFeedAtDish(dish.id);
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
@@ -507,49 +498,6 @@ class ClassicDishDetailSheet extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 20),
-
-                  if (dish.hasReadyVideo) ...[
-                    PiligrimTap(
-                      onTap: () => _openVideo(context),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          gradient: LinearGradient(
-                            colors: [
-                              PiligrimColors.steppe.withValues(alpha: 0.18),
-                              PiligrimColors.earthDeep.withValues(alpha: 0.6),
-                            ],
-                          ),
-                          border: Border.all(
-                            color: PiligrimColors.steppe.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.play_circle_outline_rounded,
-                              color: PiligrimColors.steppe.withValues(alpha: 0.9),
-                              size: 22,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Смотреть путь вкуса',
-                              style: PiligrimTextStyles.body.copyWith(
-                                color: PiligrimColors.steppe,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
 
                   // steppe-hairline разделитель
                   Container(

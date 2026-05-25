@@ -247,7 +247,7 @@ class _HeroHeaderState extends State<_HeroHeader> {
     final authorized = widget.user.isAuthorized;
 
     return SizedBox(
-      height: 128 + top,
+      height: 152 + top,
       child: Stack(
         fit: StackFit.expand,
         clipBehavior: Clip.none,
@@ -1508,7 +1508,7 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(28, 24, 28, bottom + 32),
+                padding: EdgeInsets.fromLTRB(28, 48, 28, bottom + 32),
                 child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,

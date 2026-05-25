@@ -305,6 +305,48 @@ abstract final class PiligrimSpacing {
 
   /// Вертикальный gap между карточками
   static const double cardGap = 16;
+
+  /// Воздух под status bar на основных вкладках (кроме Профиля).
+  static const double tabContentTopInset = 16;
+
+  /// Editorial-метка в шапке меню (текст ~11px).
+  static const double tabEditorialMarkHeight = 11;
+
+  /// Зазор между меткой и переключателем «Видео / Фото».
+  static const double tabEditorialMarkGap = 8;
+
+  /// Высота оверлея шапки меню ниже safe area.
+  static const double menuHeaderExtentBelowSafeArea =
+      tabContentTopInset +
+      tabEditorialMarkHeight +
+      tabEditorialMarkGap +
+      36 +
+      14;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYOUT — safe area + единый top spacing вкладок
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class PiligrimLayout {
+  static double safeTop(BuildContext context) =>
+      MediaQuery.paddingOf(context).top;
+
+  /// Y-координата начала контента: safe area + [PiligrimSpacing.tabContentTopInset].
+  static double tabContentTop(BuildContext context) =>
+      safeTop(context) + PiligrimSpacing.tabContentTopInset;
+
+  static EdgeInsets tabContentPaddingFromLTRB(
+    BuildContext context, {
+    double left = 20,
+    double right = 20,
+    double bottom = 0,
+  }) =>
+      EdgeInsets.fromLTRB(
+        left,
+        tabContentTop(context),
+        right,
+        bottom,
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

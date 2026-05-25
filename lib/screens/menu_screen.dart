@@ -20,7 +20,7 @@ import '../widgets/dish_video_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
-import '../widgets/menu_video_highlights.dart';
+import '../widgets/piligrim_tab_editorial_mark.dart';
 import '../widgets/piligrim_tap.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -94,11 +94,14 @@ class _MenuHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.paddingOf(context).top;
-
     return ClipRect(
       child: Container(
-        padding: EdgeInsets.fromLTRB(20, top + 14, 20, 14),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          PiligrimLayout.tabContentTop(context),
+          20,
+          14,
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -110,9 +113,20 @@ class _MenuHeader extends StatelessWidget {
             stops: const [0.0, 1.0],
           ),
         ),
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: _ModeSwitcher(mode: mode, onChanged: onModeChanged),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: PiligrimTabEditorialMark(label: 'MENU', compact: true),
+            ),
+            const SizedBox(height: PiligrimSpacing.tabEditorialMarkGap),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _ModeSwitcher(mode: mode, onChanged: onModeChanged),
+            ),
+          ],
         ),
       ),
     );
@@ -431,7 +445,6 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
   @override
   Widget build(BuildContext context) {
     final menuProvider = context.watch<MenuProvider>();
-    final top = MediaQuery.paddingOf(context).top;
     final dishes = menuProvider.dishes;
 
     // Группируем по категориям только когда нет ни фильтров, ни поиска.
@@ -445,15 +458,16 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
       group: shouldGroup,
     );
 
-    final showVideoHighlights = menuProvider.searchQuery.isEmpty &&
-        menuProvider.activeTagIds.isEmpty &&
-        menuProvider.feedDishes.isNotEmpty;
-
     return CustomScrollView(
       controller: _scrollCtrl,
       physics: const ClampingScrollPhysics(),
       slivers: [
-        SliverToBoxAdapter(child: SizedBox(height: top + 64)),
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: MediaQuery.paddingOf(context).top +
+                PiligrimSpacing.menuHeaderExtentBelowSafeArea,
+          ),
+        ),
 
         SliverToBoxAdapter(
           child: Padding(
@@ -480,14 +494,6 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
             onToggle: (tag) => menuProvider.toggleTag(tag.id),
           ),
         ),
-
-        if (showVideoHighlights)
-          SliverToBoxAdapter(
-            child: MenuVideoHighlights(
-              dishes: menuProvider.feedDishes,
-              onDishTap: (d) => menuProvider.openFeedAtDish(d.id),
-            ),
-          ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
@@ -1248,8 +1254,6 @@ class _ClassicDishCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final menu = context.read<MenuProvider>();
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: PiligrimTap(
@@ -1329,14 +1333,6 @@ class _ClassicDishCard extends StatelessWidget {
                         top: 14,
                         left: 16,
                         child: _CategoryPillBadge(name: categoryName!),
-                      ),
-                    if (dish.hasReadyVideo)
-                      Positioned(
-                        top: 14,
-                        right: 14,
-                        child: _VideoPillBadge(
-                          onTap: () => menu.openFeedAtDish(dish.id),
-                        ),
                       ),
                     // Цена — premium pill внизу слева, тёплая steppe-обводка + ember-glow (огонь по ТЗ).
                     Positioned(
@@ -1460,52 +1456,6 @@ class _ClassicDishCard extends StatelessWidget {
 
 // Pill-badge категории — caps name, sky цвет, тонкий water-border.
 // Используется поверх изображения в классической карточке.
-/// Бейдж «видео» на карточке классического меню.
-class _VideoPillBadge extends StatelessWidget {
-  const _VideoPillBadge({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PiligrimTap(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: PiligrimColors.earthDeep.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: PiligrimColors.steppe.withValues(alpha: 0.5),
-            width: 0.8,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.play_arrow_rounded,
-              size: 14,
-              color: PiligrimColors.steppe.withValues(alpha: 0.9),
-            ),
-            const SizedBox(width: 2),
-            Text(
-              'ВИДЕО',
-              style: PiligrimTextStyles.micro.copyWith(
-                color: PiligrimColors.steppe.withValues(alpha: 0.9),
-                fontSize: 9,
-                letterSpacing: 1.4,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _CategoryPillBadge extends StatelessWidget {
   const _CategoryPillBadge({required this.name});
 
