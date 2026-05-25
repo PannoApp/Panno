@@ -46,7 +46,7 @@ class _InteriorScreenState extends State<InteriorScreen>
     super.initState();
     _audioPlayer = AudioPlayer();
     WidgetsBinding.instance.addObserver(this);
-    _startAmbientAudio();
+    // Аудио не запускается при открытии экрана — только при старте 3D-тура
   }
 
   Future<void> _startAmbientAudio() async {
@@ -64,8 +64,7 @@ class _InteriorScreenState extends State<InteriorScreen>
   @override
   void didUpdateWidget(InteriorScreen old) {
     super.didUpdateWidget(old);
-    // IndexedStack не вызывает dispose/initState при переключении вкладок,
-    // поэтому управляем аудио через параметр isTabActive
+    if (!_audioInitialized) return;
     if (!widget.isTabActive && old.isTabActive) {
       _audioPlayer.pause();
     } else if (widget.isTabActive && !old.isTabActive && !_isMuted) {
@@ -75,7 +74,7 @@ class _InteriorScreenState extends State<InteriorScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Пауза при сворачивании приложения в фон
+    if (!_audioInitialized) return;
     if (state == AppLifecycleState.paused) {
       _audioPlayer.pause();
     } else if (state == AppLifecycleState.resumed && !_isMuted) {
@@ -96,12 +95,29 @@ class _InteriorScreenState extends State<InteriorScreen>
     _isMuted ? _audioPlayer.pause() : _audioPlayer.resume();
   }
 
-  void _openTour(String url) {
-    Navigator.of(context).push(
+  Future<void> _openTour(String url) async {
+    // Запускаем аудио только при старте тура
+    if (!_audioInitialized) {
+      await _startAmbientAudio();
+    } else if (_isMuted) {
+      await _audioPlayer.resume();
+    }
+
+    if (!mounted) return;
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => TourWebViewScreen(url: url),
       ),
     );
+
+    // Останавливаем аудио когда тур закрыт
+    if (mounted) {
+      await _audioPlayer.stop();
+      setState(() {
+        _audioInitialized = false;
+        _isMuted = false;
+      });
+    }
   }
 
   void _openPhoto(List<InteriorSlide> slides, int index) {

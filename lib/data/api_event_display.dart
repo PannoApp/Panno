@@ -1,7 +1,5 @@
 import '../core/interior_assets.dart';
-import 'events_news_data.dart';
 import 'models/api_event.dart';
-import 'models/api_event_photo.dart';
 
 extension ApiEventDisplay on ApiEvent {
   String get formatLabelRu => switch (format) {
@@ -16,33 +14,6 @@ extension ApiEventDisplay on ApiEvent {
   }
 }
 
-/// Fallback: моковые события → [ApiEvent] для офлайн-режима.
-List<ApiEvent> mockEventsAsApi() {
-  return buildMockEvents().map((e) {
-    final id = int.tryParse(e.id) ?? 0;
-    
-    // Задаем демонстрационные лимиты мест
-    final maxPlaces = id == 102 ? 10 : (id == 103 ? 25 : 50);
-    final occupiedPlaces = id == 102 ? 10 : (id == 103 ? 23 : 12);
-
-    return ApiEvent(
-      id: id,
-      title: e.title,
-      description: e.description,
-      startsAt: e.startsAt,
-      format: e.format == EventAccessFormat.open
-          ? ApiEventFormat.open
-          : ApiEventFormat.closed,
-      coverUrl: null,
-      priceFrom: e.priceFromRub,
-      isPast: e.isPast,
-      hasPhotoReport: e.hasPhotoReport,
-      maxPlaces: maxPlaces,
-      occupiedPlaces: occupiedPlaces,
-    );
-  }).toList(growable: false);
-}
-
 List<ApiEvent> upcomingApiSorted(List<ApiEvent> events) {
   final list = events.where((e) => !e.isPast).toList();
   list.sort((a, b) => a.startsAt.compareTo(b.startsAt));
@@ -53,13 +24,4 @@ List<ApiEvent> pastApiSorted(List<ApiEvent> events) {
   final list = events.where((e) => e.isPast).toList();
   list.sort((a, b) => b.startsAt.compareTo(a.startsAt));
   return list;
-}
-
-/// Демо-фотоотчёт для архивных мероприятий (офлайн / пустой API).
-List<ApiEventPhoto> mockPhotoReportAsApi(int eventId) {
-  final assets = mockPhotoReportAssetUrls(eventId);
-  return [
-    for (var i = 0; i < assets.length; i++)
-      ApiEventPhoto(id: eventId * 10 + i, imageUrl: assets[i], order: i),
-  ];
 }

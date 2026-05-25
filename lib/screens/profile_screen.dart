@@ -445,12 +445,7 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bookingsCount =
-        context.watch<BookingProvider>().history.length;
-
-    if (bookingsCount == 0 && user.eventsCount == 0) {
-      return const SizedBox.shrink();
-    }
+    final bookingsCount = context.watch<BookingProvider>().history.length;
 
     return Row(
       children: [

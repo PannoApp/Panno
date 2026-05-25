@@ -108,8 +108,6 @@ class _EventsScreenState extends State<EventsScreen> {
                       message: events.upcomingError!,
                       onRetry: () => context.read<EventsProvider>().retry(),
                     ),
-                  if (events.usedMockFallback && upcoming.isNotEmpty)
-                    const SliverToBoxAdapter(child: _OfflineHint()),
                   const SliverToBoxAdapter(
                     child: _AfichaSectionHeader(label: 'БЛИЖАЙШИЕ СОБЫТИЯ'),
                   ),
@@ -420,38 +418,6 @@ class _AfichaSectionHeader extends StatelessWidget {
   }
 }
 
-// Тихий офлайн-маркер — едва заметная точка без текста, не ломает иммерсию.
-class _OfflineHint extends StatelessWidget {
-  const _OfflineHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Row(
-        children: [
-          Container(
-            width: 5,
-            height: 5,
-            decoration: BoxDecoration(
-              color: PiligrimColors.steppe.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(width: 7),
-          Text(
-            'демо',
-            style: PiligrimTextStyles.micro.copyWith(
-              fontSize: 9,
-              letterSpacing: 1.2,
-              color: PiligrimColors.steppe.withValues(alpha: 0.28),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // Большой слайдер с фотографиями пространства и кнопкой действия
 class _AfishaHero extends StatefulWidget {

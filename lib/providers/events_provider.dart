@@ -8,7 +8,6 @@ import '../data/models/api_event.dart';
 import '../data/models/api_event_photo.dart';
 import '../data/repositories/events_repository.dart';
 
-/// Афиша, архив и новости с API + fallback на моки.
 class EventsProvider extends ChangeNotifier {
   EventsProvider({EventsRepository? repository})
       : _repository = repository ?? EventsRepository();
@@ -31,12 +30,8 @@ class EventsProvider extends ChangeNotifier {
   String? newsError;
   String? reserveError;
 
-  bool _usedMockFallback = false;
-
   List<ApiEventPhoto> _photoReport = const [];
   List<ApiEventPhoto> get photoReport => List.unmodifiable(_photoReport);
-
-  bool get usedMockFallback => _usedMockFallback;
 
   Future<void> loadUpcoming() async {
     if (isLoadingUpcoming) return;
@@ -46,16 +41,9 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       upcoming = upcomingApiSorted(await _repository.fetchUpcoming());
-      if (upcoming.isEmpty) {
-        upcoming = upcomingApiSorted(mockEventsAsApi());
-        _usedMockFallback = true;
-      } else {
-        _usedMockFallback = false;
-      }
     } catch (e) {
       upcomingError = dioErrorMessage(e);
-      upcoming = upcomingApiSorted(mockEventsAsApi());
-      _usedMockFallback = true;
+      upcoming = const [];
     } finally {
       isLoadingUpcoming = false;
       notifyListeners();
@@ -70,14 +58,9 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       archived = pastApiSorted(await _repository.fetchArchived());
-      if (archived.isEmpty) {
-        archived = pastApiSorted(mockEventsAsApi());
-        _usedMockFallback = true;
-      }
     } catch (e) {
       archivedError = dioErrorMessage(e);
-      archived = pastApiSorted(mockEventsAsApi());
-      _usedMockFallback = true;
+      archived = const [];
     } finally {
       isLoadingArchived = false;
       notifyListeners();
@@ -92,14 +75,9 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       news = await _repository.fetchNews();
-      if (news.isEmpty) {
-        news = List.unmodifiable(mockNewsPosts());
-        _usedMockFallback = true;
-      }
     } catch (e) {
       newsError = dioErrorMessage(e);
-      news = List.unmodifiable(mockNewsPosts());
-      _usedMockFallback = true;
+      news = const [];
     } finally {
       isLoadingNews = false;
       notifyListeners();
@@ -121,11 +99,8 @@ class EventsProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _photoReport = await _repository.fetchPhotoReport(eventId);
-      if (_photoReport.isEmpty) {
-        _photoReport = mockPhotoReportAsApi(eventId);
-      }
     } catch (_) {
-      _photoReport = mockPhotoReportAsApi(eventId);
+      _photoReport = const [];
     } finally {
       isLoadingPhotoReport = false;
       notifyListeners();
@@ -137,7 +112,6 @@ class EventsProvider extends ChangeNotifier {
     reserveError = null;
     notifyListeners();
 
-    // Generates or retrieves a persistent Idempotency-Key per event reservation attempt
     final idempotencyKey =
         _idempotencyKeys.putIfAbsent(eventId, () => const Uuid().v4());
 
