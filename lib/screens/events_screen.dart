@@ -62,15 +62,13 @@ class _EventsScreenState extends State<EventsScreen> {
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       20,
-                      MediaQuery.of(context).padding.top + 14,
+                      MediaQuery.of(context).padding.top + 16,
                       20,
                       12,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _AfichaTitleBlock(),
-                        const SizedBox(height: 8),
                         Text(
                           'Лента мероприятий и новостей',
                           style: PiligrimTextStyles.caption.copyWith(
@@ -237,54 +235,6 @@ class _EventsScreenState extends State<EventsScreen> {
       ),
         );
       },
-    );
-  }
-}
-
-// Заглавный блок «АФИША» — тотем + caps + steppe-hairline.
-// Единый штрих с MenuScreen — «нить пути» по бренду.
-class _AfichaTitleBlock extends StatelessWidget {
-  const _AfichaTitleBlock();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SvgPicture.asset(
-          'assets/images/tree_totem (1).svg',
-          width: 18,
-          height: 18,
-          colorFilter: ColorFilter.mode(
-            PiligrimColors.steppe.withValues(alpha: 0.6),
-            BlendMode.srcIn,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'АФИША',
-          style: PiligrimTextStyles.caption.copyWith(
-            color: PiligrimColors.steppe.withValues(alpha: 0.78),
-            letterSpacing: 3.0,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: 56,
-          height: 1,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                PiligrimColors.steppe.withValues(alpha: 0.55),
-                PiligrimColors.steppe.withValues(alpha: 0.0),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

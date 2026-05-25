@@ -4,6 +4,13 @@ import '../../core/media_url.dart';
 
 // Извлекает id из вложенного объекта категории или напрямую из int.
 // DishSerializer возвращает category как {"id": 1, "name": "...", "order": 0}.
+String? _parseVideoUrl(dynamic value) {
+  final raw = parseStringOrNull(value);
+  if (raw == null) return null;
+  final resolved = resolveMediaUrl(raw);
+  return resolved.isEmpty ? null : resolved;
+}
+
 int _parseCategoryId(dynamic value) {
   if (value is Map) return parseInt(value['id'], field: 'category.id');
   return parseInt(value, field: 'category');
@@ -49,6 +56,10 @@ class ApiDish {
   final String story;
   final bool isActive;
 
+  /// Готовое видео для ленты «Путь» и превью в классическом меню.
+  bool get hasReadyVideo =>
+      videoUrl != null && videoUrl!.isNotEmpty && videoStatus == 'ready';
+
   factory ApiDish.fromJson(Map<String, dynamic> json) {
     return ApiDish(
       id: parseInt(json['id'], field: 'id'),
@@ -62,7 +73,7 @@ class ApiDish {
       // allergens — тоже список объектов: [{"id": 1, "name": "глютен"}, ...]
       allergens: _parseAllergens(json['allergens']),
       imageUrl: resolveMediaUrl(parseStringOrNull(json['image'])),
-      videoUrl: parseStringOrNull(json['video_url'] ?? json['video']),
+      videoUrl: _parseVideoUrl(json['video_url'] ?? json['video']),
       videoStatus: parseString(json['video_status'] ?? json['videoStatus'] ?? 'pending', field: 'video_status'),
       weight: parseString(json['weight'] ?? '', field: 'weight'),
       story: parseString(json['story'] ?? '', field: 'story'),

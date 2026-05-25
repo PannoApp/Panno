@@ -18,6 +18,9 @@ class HomeActionBlock extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 8),
       child: EmberCta(
         label: 'Забронировать стол',
+        showTrailingArrow: false,
+        labelFontSize: 15.5,
+        labelOffset: const Offset(-14, 0),
         onTap: () async {
           if (!await guardAuth(context)) return;
           if (!context.mounted) return;

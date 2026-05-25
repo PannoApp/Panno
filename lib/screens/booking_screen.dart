@@ -204,10 +204,17 @@ class _BookingScreenState extends State<BookingScreen> {
               cinematic: true,
             ),
           ),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 120),
-              child: Column(
+          Builder(
+            builder: (ctx) {
+              // viewPadding is the raw device safe-area — never consumed or zeroed
+              // by a parent Scaffold's bottomNavigationBar. Using padding.bottom
+              // risks inheriting a modified (possibly 0) value from RootShell.
+              final bottomInset = MediaQuery.viewPaddingOf(ctx).bottom;
+              return SafeArea(
+                bottom: false, // bottom handled explicitly below
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(bottom: bottomInset + 40),
+                  child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ── Шапка — редакционная типографика ──
@@ -518,10 +525,10 @@ class _BookingScreenState extends State<BookingScreen> {
                                 ),
                               ),
                             ],
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 32),
                             booking.isSubmitting
                                 ? const SizedBox(
-                                    height: 46,
+                                    height: 52,
                                     child: Center(
                                       child: PiligrimLoader(
                                         size: 22,
@@ -530,13 +537,14 @@ class _BookingScreenState extends State<BookingScreen> {
                                     ),
                                   )
                                 : _SubmitButton(onTap: _submit),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 20),
                             Text(
                               'Важно: в приложении нет онлайн-оплаты и списания депозита.',
                               style: PiligrimTextStyles.caption.copyWith(
                                 color: PiligrimColors.sky.withValues(alpha: 0.45),
                               ),
                             ),
+                            const SizedBox(height: 8),
                           ],
                         ),
                       ),
@@ -546,28 +554,9 @@ class _BookingScreenState extends State<BookingScreen> {
                 ],
               ),
             ),
-          ),
-          // Плавный fade снизу — убирает резкий обрыв контента у края экрана
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Container(
-                height: 110,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      PiligrimColors.earth.withValues(alpha: 0.0),
-                      PiligrimColors.earth.withValues(alpha: 0.92),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          );
+        },
+        ),
         ],
       ),
     );
@@ -748,64 +737,47 @@ class _ZoneButton extends StatelessWidget {
   }
 }
 
-// Кнопка отправки заявки — компактная, центрированная, авто-ширина по контенту
 class _SubmitButton extends StatelessWidget {
   const _SubmitButton({required this.onTap});
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: PiligrimTap(
-        onTap: onTap,
-        scaleDown: 0.97,
-        releaseDuration: const Duration(milliseconds: 280),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [PiligrimColors.steppe, PiligrimColors.emberDeep],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: PiligrimColors.shadow.withValues(alpha: 0.28),
-                blurRadius: 14,
-                offset: const Offset(0, 5),
-              ),
-              BoxShadow(
-                color: PiligrimColors.ember.withValues(alpha: 0.12),
-                blurRadius: 10,
-                spreadRadius: -2,
-              ),
-            ],
+    return PiligrimTap(
+      onTap: onTap,
+      scaleDown: 0.97,
+      releaseDuration: const Duration(milliseconds: 280),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 52,
+        width: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [PiligrimColors.steppe, PiligrimColors.emberDeep],
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'ОТПРАВИТЬ ЗАЯВКУ',
-                style: PiligrimTextStyles.button.copyWith(
-                  fontSize: 12,
-                  letterSpacing: 1.8,
-                  color: PiligrimColors.sky,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                '→',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: PiligrimColors.sky.withValues(alpha: 0.60),
-                  height: 1.0,
-                  fontFamily: PiligrimFonts.museoSans,
-                ),
-              ),
-            ],
+          boxShadow: [
+            BoxShadow(
+              color: PiligrimColors.shadow.withValues(alpha: 0.28),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+            BoxShadow(
+              color: PiligrimColors.ember.withValues(alpha: 0.12),
+              blurRadius: 10,
+              spreadRadius: -2,
+            ),
+          ],
+        ),
+        child: Text(
+          'ОТПРАВИТЬ ЗАЯВКУ',
+          style: PiligrimTextStyles.button.copyWith(
+            fontSize: 12,
+            letterSpacing: 1.8,
+            color: PiligrimColors.sky,
           ),
         ),
       ),

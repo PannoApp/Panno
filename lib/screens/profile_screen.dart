@@ -237,7 +237,7 @@ class _HeroHeaderState extends State<_HeroHeader> {
     final authorized = widget.user.isAuthorized;
 
     return SizedBox(
-      height: 190 + top,
+      height: 128 + top,
       child: Stack(
         fit: StackFit.expand,
         clipBehavior: Clip.none,

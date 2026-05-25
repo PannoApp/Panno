@@ -73,7 +73,12 @@ def _open_interior_asset(filename: str) -> File:
 DISH_VIDEOS: dict[str, str] = {
     "Шорпа из баранины": "demo_dish.mov",
     "Плов на казане": "demo_dish.mov",
+    "Плов с курицей": "demo_dish.mov",
+    "Лагман по-степному": "demo_dish.mov",
+    "Манты с бараниной": "demo_dish.mov",
+    "Бешбармак домашний": "demo_dish.mov",
     "Стейк из степной говядины": "demo_dish.mov",
+    "Чак-чак с мёдом": "demo_dish.mov",
 }
 
 

@@ -55,6 +55,9 @@ class MenuProvider extends ChangeNotifier {
   MenuViewMode _mode = MenuViewMode.feed;
   bool _loaded = false;
 
+  /// Индекс карточки в ленте после перехода из классического меню (см. [openFeedAtDish]).
+  int? feedStartIndex;
+
   Timer? _debounce;
 
   // ── Геттеры ────────────────────────────────────────────────────────────────
@@ -279,6 +282,23 @@ class MenuProvider extends ChangeNotifier {
       mode == MenuViewMode.classic ? 'classic' : 'feed',
     );
     notifyListeners();
+  }
+
+  /// Классическое меню → полноэкранное видео блюда в режиме «Видео».
+  Future<void> openFeedAtDish(int dishId) async {
+    await setMode(MenuViewMode.feed);
+    var idx = feedDishes.indexWhere((d) => d.id == dishId);
+    if (idx < 0) {
+      await loadFeed(refresh: true);
+      idx = feedDishes.indexWhere((d) => d.id == dishId);
+    }
+    feedStartIndex = idx >= 0 ? idx : 0;
+    notifyListeners();
+  }
+
+  void clearFeedStartIndex() {
+    if (feedStartIndex == null) return;
+    feedStartIndex = null;
   }
 
   @override

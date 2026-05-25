@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -21,8 +20,6 @@ const _kDefaultCinematicColors = [
   Color(0xFF1A0E08),
 ];
 
-// Дефолтный тотем на карточке (если у блюда нет категории в локальных данных)
-const _kDefaultTotem = 'assets/images/bird_totem (1).svg';
 
 class DishVideoCard extends StatefulWidget {
   const DishVideoCard({
@@ -299,9 +296,16 @@ class _DishVideoCardState extends State<DishVideoCard>
                           ),
                         ),
                         const SizedBox(width: 14),
-                        DishInfoChip(
-                          label: widget.dish.weight,
-                          icon: 'assets/images/stone.svg',
+                        Text(
+                          widget.dish.weight.contains('г')
+                              ? widget.dish.weight
+                              : '${widget.dish.weight} г',
+                          style: TextStyle(
+                            fontFamily: 'MuseoSans',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w300,
+                            color: PiligrimColors.sky.withValues(alpha: 0.65),
+                          ),
                         ),
                       ],
                     ),
@@ -532,15 +536,19 @@ class _CinemaPainter extends CustomPainter {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DishDetailSheet — полная карточка блюда (bottom sheet)
-// «Получение знания» (design spec раздел 9)
 // ─────────────────────────────────────────────────────────────────────────────
 class _DishDetailSheet extends StatelessWidget {
   const _DishDetailSheet({required this.dish});
   final ApiDish dish;
 
+  String get _formattedPrice =>
+      '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸';
+
+  String get _weightLabel =>
+      dish.weight.contains('г') ? dish.weight : '${dish.weight} г';
+
   @override
   Widget build(BuildContext context) {
-    // Статичный cinematic-фон для превью в детальном листе
     const fallbackBg = _CinematicBackground(
       colors: _kDefaultCinematicColors,
       breathValue: 0.5,
@@ -569,33 +577,51 @@ class _DishDetailSheet extends StatelessWidget {
               ),
             ),
 
-            // Превью блюда: сетевое изображение или cinematic gradient
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Stack(
-                  children: [
-                    DishThumbnail(
-                      imageUrl: dish.imageUrl,
-                      fallback: fallbackBg,
-                    ),
-                    // Декоративный тотем поверх превью
-                    Positioned.fill(
-                      child: Center(
-                        child: SvgPicture.asset(
-                          _kDefaultTotem,
-                          width: 80,
-                          height: 80,
-                          colorFilter: ColorFilter.mode(
-                            Colors.white.withValues(alpha: 0.12),
-                            BlendMode.srcIn,
-                          ),
+            // Полноширинное изображение с оверлеем цены и веса
+            const SizedBox(height: 16),
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  dish.imageUrl != null && dish.imageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: dish.imageUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => fallbackBg,
+                          errorWidget: (_, __, ___) => fallbackBg,
+                        )
+                      : fallbackBg,
+
+                  // Градиент снизу для читаемости бейджей
+                  const Positioned(
+                    bottom: 0, left: 0, right: 0,
+                    height: 80,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [Color(0xBF000000), Colors.transparent],
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+
+                  // Бейджи цены и веса поверх фото
+                  Positioned(
+                    bottom: 14,
+                    left: 16,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ImageBadge(text: _formattedPrice, bordered: true),
+                        const SizedBox(width: 8),
+                        _ImageBadge(text: _weightLabel),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -610,71 +636,89 @@ class _DishDetailSheet extends StatelessWidget {
                     dish.name,
                     style: PiligrimTextStyles.title.copyWith(
                       color: PiligrimColors.sky,
-                      fontSize: 22,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
 
-                  const SizedBox(height: 16),
-
-                  // Вес + цена
-                  Row(
-                    children: [
-                      DishInfoChip(
-                        label: dish.weight,
-                        icon: 'assets/images/stone.svg',
-                      ),
-                      const SizedBox(width: 8),
-                      DishInfoChip(
-                        label: '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
-                        icon: 'assets/images/zerno.svg',
-                        accent: true,
-                      ),
-                    ],
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Divider(color: PiligrimColors.divider, height: 1),
                   ),
 
-                  const SizedBox(height: 20),
+                  // Описание — без заголовка секции
+                  if (dish.description.isNotEmpty)
+                    Text(
+                      dish.description.replaceAll('\n', ' '),
+                      style: PiligrimTextStyles.body.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.75),
+                        fontSize: 15,
+                        height: 1.6,
+                      ),
+                    ),
 
-                  // Теги
+                  if (dish.story.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    DishDetailSection(
+                      title: 'История',
+                      icon: 'assets/images/cobyz.svg',
+                      content: dish.story,
+                      accent: true,
+                    ),
+                  ],
+
                   if (dish.tags.isNotEmpty) ...[
+                    const SizedBox(height: 20),
                     Wrap(
                       spacing: 7,
                       runSpacing: 6,
                       children: dish.tags.map((t) => DishCardTagChip(tag: t)).toList(),
                     ),
-                    const SizedBox(height: 20),
                   ],
 
-                  // Описание
-                  DishDetailSection(
-                    title: 'О блюде',
-                    icon: 'assets/images/spiral.svg',
-                    content: dish.description.replaceAll('\n', ' '),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // История блюда
-                  DishDetailSection(
-                    title: 'История',
-                    icon: 'assets/images/cobyz.svg',
-                    content: dish.story,
-                    accent: true,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Аллергены
-                  if (dish.allergens.isNotEmpty)
+                  if (dish.allergens.isNotEmpty) ...[
+                    const SizedBox(height: 16),
                     DishDetailSection(
                       title: 'Аллергены',
                       icon: 'assets/images/luk.svg',
                       content: dish.allergens.join(' · '),
                     ),
-
+                  ],
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Бейдж поверх изображения (цена — с рамкой, вес — без)
+class _ImageBadge extends StatelessWidget {
+  const _ImageBadge({required this.text, this.bordered = false});
+
+  final String text;
+  final bool bordered;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: bordered ? 0.55 : 0.4),
+        borderRadius: BorderRadius.circular(7),
+        border: bordered
+            ? Border.all(color: PiligrimColors.ember.withValues(alpha: 0.6))
+            : null,
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontFamily: 'MuseoSans',
+          fontSize: bordered ? 14 : 13,
+          fontWeight: bordered ? FontWeight.w700 : FontWeight.w300,
+          color: bordered ? PiligrimColors.ember : PiligrimColors.sky,
         ),
       ),
     );

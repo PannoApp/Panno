@@ -19,6 +19,7 @@ import '../widgets/dish_video_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
+import '../widgets/menu_video_highlights.dart';
 import '../widgets/piligrim_tap.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -96,7 +97,7 @@ class _MenuHeader extends StatelessWidget {
 
     return ClipRect(
       child: Container(
-        padding: EdgeInsets.fromLTRB(20, top + 12, 20, 14),
+        padding: EdgeInsets.fromLTRB(20, top + 14, 20, 14),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -108,63 +109,11 @@ class _MenuHeader extends StatelessWidget {
             stops: const [0.0, 1.0],
           ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const _MenuTitleBlock(),
-            const Spacer(),
-            _ModeSwitcher(mode: mode, onChanged: onModeChanged),
-          ],
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: _ModeSwitcher(mode: mode, onChanged: onModeChanged),
         ),
       ),
-    );
-  }
-}
-
-// Тотем + caps «МЕНЮ» + тонкая steppe-hairline (единый штрих с section headers).
-class _MenuTitleBlock extends StatelessWidget {
-  const _MenuTitleBlock();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SvgPicture.asset(
-          'assets/images/bird_totem (1).svg',
-          width: 18,
-          height: 18,
-          colorFilter: ColorFilter.mode(
-            PiligrimColors.steppe.withValues(alpha: 0.6),
-            BlendMode.srcIn,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          'МЕНЮ',
-          style: PiligrimTextStyles.caption.copyWith(
-            color: PiligrimColors.steppe.withValues(alpha: 0.78),
-            letterSpacing: 3.0,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
-        // Хайрлайн steppe → transparent — фирменный «нить пути»
-        Container(
-          width: 56,
-          height: 1,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                PiligrimColors.steppe.withValues(alpha: 0.55),
-                PiligrimColors.steppe.withValues(alpha: 0.0),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -302,6 +251,7 @@ class _VideoFeedSection extends StatefulWidget {
 class _VideoFeedSectionState extends State<_VideoFeedSection> {
   final PageController _pageCtrl = PageController();
   int _currentPage = 0;
+  int? _lastAppliedFeedStart;
 
   @override
   void dispose() {
@@ -309,10 +259,26 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
     super.dispose();
   }
 
+  void _maybeJumpToFeedStart(MenuProvider provider, int dishCount) {
+    final idx = provider.feedStartIndex;
+    if (idx == null || idx == _lastAppliedFeedStart || dishCount == 0) return;
+    _lastAppliedFeedStart = idx;
+    final target = idx.clamp(0, dishCount - 1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_pageCtrl.hasClients) {
+        _pageCtrl.jumpToPage(target);
+        setState(() => _currentPage = target);
+      }
+      provider.clearFeedStartIndex();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final menuProvider = context.watch<MenuProvider>();
     final dishes = menuProvider.feedDishes;
+    _maybeJumpToFeedStart(menuProvider, dishes.length);
 
     if (menuProvider.isLoadingFeed && dishes.isEmpty) {
       return const Center(child: PiligrimLoader(color: PiligrimColors.steppe));
@@ -478,11 +444,15 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
       group: shouldGroup,
     );
 
+    final showVideoHighlights = menuProvider.searchQuery.isEmpty &&
+        menuProvider.activeTagIds.isEmpty &&
+        menuProvider.feedDishes.isNotEmpty;
+
     return CustomScrollView(
       controller: _scrollCtrl,
       physics: const ClampingScrollPhysics(),
       slivers: [
-        SliverToBoxAdapter(child: SizedBox(height: top + 70)),
+        SliverToBoxAdapter(child: SizedBox(height: top + 64)),
 
         SliverToBoxAdapter(
           child: Padding(
@@ -509,6 +479,14 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
             onToggle: (tag) => menuProvider.toggleTag(tag.id),
           ),
         ),
+
+        if (showVideoHighlights)
+          SliverToBoxAdapter(
+            child: MenuVideoHighlights(
+              dishes: menuProvider.feedDishes,
+              onDishTap: (d) => menuProvider.openFeedAtDish(d.id),
+            ),
+          ),
 
         const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
@@ -864,7 +842,7 @@ class _FeedEmptyState extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               SvgPicture.asset(
-                'assets/images/bird_totem (1).svg',
+                'assets/images/star_totem (1).svg',
                 width: 64,
                 height: 64,
                 colorFilter: ColorFilter.mode(
@@ -891,10 +869,34 @@ class _FeedEmptyState extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Блюда скоро появятся',
+                'Видео ещё готовятся',
                 style: PiligrimTextStyles.caption.copyWith(
                   color: PiligrimColors.sky.withValues(alpha: 0.3),
                   letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              PiligrimTap(
+                onTap: () =>
+                    context.read<MenuProvider>().setMode(MenuViewMode.classic),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: PiligrimColors.water.withValues(alpha: 0.45),
+                    ),
+                    color: PiligrimColors.earthDeep.withValues(alpha: 0.5),
+                  ),
+                  child: Text(
+                    'Открыть меню с фото',
+                    style: PiligrimTextStyles.caption.copyWith(
+                      color: PiligrimColors.water.withValues(alpha: 0.85),
+                      letterSpacing: 0.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1245,6 +1247,8 @@ class _ClassicDishCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final menu = context.read<MenuProvider>();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: PiligrimTap(
@@ -1324,6 +1328,14 @@ class _ClassicDishCard extends StatelessWidget {
                         top: 14,
                         left: 16,
                         child: _CategoryPillBadge(name: categoryName!),
+                      ),
+                    if (dish.hasReadyVideo)
+                      Positioned(
+                        top: 14,
+                        right: 14,
+                        child: _VideoPillBadge(
+                          onTap: () => menu.openFeedAtDish(dish.id),
+                        ),
                       ),
                     // Цена — premium pill внизу слева, тёплая steppe-обводка + ember-glow (огонь по ТЗ).
                     Positioned(
@@ -1447,6 +1459,52 @@ class _ClassicDishCard extends StatelessWidget {
 
 // Pill-badge категории — caps name, sky цвет, тонкий water-border.
 // Используется поверх изображения в классической карточке.
+/// Бейдж «видео» на карточке классического меню.
+class _VideoPillBadge extends StatelessWidget {
+  const _VideoPillBadge({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: PiligrimColors.earthDeep.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: PiligrimColors.steppe.withValues(alpha: 0.5),
+            width: 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.play_arrow_rounded,
+              size: 14,
+              color: PiligrimColors.steppe.withValues(alpha: 0.9),
+            ),
+            const SizedBox(width: 2),
+            Text(
+              'ВИДЕО',
+              style: PiligrimTextStyles.micro.copyWith(
+                color: PiligrimColors.steppe.withValues(alpha: 0.9),
+                fontSize: 9,
+                letterSpacing: 1.4,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CategoryPillBadge extends StatelessWidget {
   const _CategoryPillBadge({required this.name});
 
@@ -1487,7 +1545,7 @@ class _ClassicThumbnailFallback extends StatelessWidget {
       color: PiligrimColors.earthWarm,
       child: Center(
         child: SvgPicture.asset(
-          'assets/images/bird_totem (1).svg',
+          'assets/images/star_totem (1).svg',
           width: 44,
           height: 44,
           colorFilter: ColorFilter.mode(
@@ -1506,6 +1564,11 @@ class _ClassicThumbnailFallback extends StatelessWidget {
 class _DishDetailSheet extends StatelessWidget {
   const _DishDetailSheet({required this.dish});
   final ApiDish dish;
+
+  void _openVideo(BuildContext context) {
+    Navigator.pop(context);
+    context.read<MenuProvider>().openFeedAtDish(dish.id);
+  }
 
   String _formatPrice(int price) =>
       price.toString().replaceAllMapped(
@@ -1672,6 +1735,49 @@ class _DishDetailSheet extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 20),
+
+                  if (dish.hasReadyVideo) ...[
+                    PiligrimTap(
+                      onTap: () => _openVideo(context),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              PiligrimColors.steppe.withValues(alpha: 0.18),
+                              PiligrimColors.earthDeep.withValues(alpha: 0.6),
+                            ],
+                          ),
+                          border: Border.all(
+                            color: PiligrimColors.steppe.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.play_circle_outline_rounded,
+                              color: PiligrimColors.steppe.withValues(alpha: 0.9),
+                              size: 22,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Смотреть путь вкуса',
+                              style: PiligrimTextStyles.body.copyWith(
+                                color: PiligrimColors.steppe,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // steppe-hairline разделитель
                   Container(
@@ -1854,33 +1960,6 @@ class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
               ),
             ),
           ),
-          // Хедер-скелетон
-          Positioned(
-            top: top + 12,
-            left: 20,
-            right: 20,
-            child: Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/images/bird_totem (1).svg',
-                  width: 22,
-                  height: 22,
-                  colorFilter: ColorFilter.mode(
-                    PiligrimColors.steppe.withValues(alpha: 0.45),
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'МЕНЮ',
-                  style: PiligrimTextStyles.sectionLabel.copyWith(
-                    letterSpacing: 3.0,
-                    color: PiligrimColors.sky.withValues(alpha: 0.38),
-                  ),
-                ),
-              ],
-            ),
-          ),
           // Пульсирующий тотем по центру
           Center(
             child: AnimatedBuilder(
@@ -1910,7 +1989,7 @@ class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
                 );
               },
               child: SvgPicture.asset(
-                'assets/images/bird_totem (1).svg',
+                'assets/images/star_totem (1).svg',
                 width: 48,
                 height: 48,
                 colorFilter: const ColorFilter.mode(

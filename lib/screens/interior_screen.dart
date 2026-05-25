@@ -176,30 +176,6 @@ class _InteriorScreenState extends State<InteriorScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'ИНТЕРЬЕР',
-                                  style: PiligrimTextStyles.sectionLabel
-                                      .copyWith(
-                                    letterSpacing: 2.8,
-                                    color: PiligrimColors.sky
-                                        .withValues(alpha: 0.55),
-                                  ),
-                                ),
-                                const Spacer(),
-                                if (_audioInitialized)
-                                  _CompactAudioButton(
-                                    isMuted: _isMuted,
-                                    onToggle: _toggleMute,
-                                  )
-                                      .animate()
-                                      .fadeIn(
-                                          delay: 400.ms, duration: 500.ms),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
                             Text(
                               'Пространство PILIGRIM',
                               style: PiligrimTextStyles.heading.copyWith(
@@ -370,6 +346,18 @@ class _InteriorScreenState extends State<InteriorScreen>
                 ),
               ),
 
+              if (_audioInitialized)
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 14,
+                  right: 24,
+                  child: _CompactAudioButton(
+                    isMuted: _isMuted,
+                    onToggle: _toggleMute,
+                  )
+                      .animate()
+                      .fadeIn(delay: 400.ms, duration: 500.ms),
+                ),
+
             ],
           ),
         );
@@ -473,6 +461,7 @@ class _HeroPhotoBlock extends StatelessWidget {
                     Container(
                       width: 28,
                       height: 28,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: PiligrimColors.sky.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
@@ -481,14 +470,10 @@ class _HeroPhotoBlock extends StatelessWidget {
                           width: 1,
                         ),
                       ),
-                      child: Text(
-                        '↗',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: PiligrimColors.sky.withValues(alpha: 0.75),
-                          height: 1.0,
-                          fontFamily: 'MuseoSans',
-                        ),
+                      child: Icon(
+                        Icons.open_in_full_rounded,
+                        size: 13,
+                        color: PiligrimColors.sky.withValues(alpha: 0.75),
                       ),
                     ),
                   ],

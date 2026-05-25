@@ -15,12 +15,18 @@ class EmberCta extends StatefulWidget {
     this.iconAsset,
     this.onTap,
     this.small = false,
+    this.showTrailingArrow = true,
+    this.labelFontSize,
+    this.labelOffset = Offset.zero,
   });
 
   final String label;
   final String? iconAsset;
   final VoidCallback? onTap;
   final bool small;
+  final bool showTrailingArrow;
+  final double? labelFontSize;
+  final Offset labelOffset;
 
   @override
   State<EmberCta> createState() => _EmberCtaState();
@@ -55,9 +61,27 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final labelSize =
+        widget.labelFontSize ?? (widget.small ? 12.0 : 13.0);
+    final label = Transform.translate(
+      offset: widget.labelOffset,
+      child: Text(
+        widget.label,
+        style: PiligrimTextStyles.button.copyWith(
+          color: PiligrimColors.sky,
+          fontSize: labelSize,
+          letterSpacing: 0.45,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+
     final paddedRow = Padding(
       padding: EdgeInsets.symmetric(horizontal: widget.small ? 14 : 18),
       child: Row(
+        mainAxisAlignment: widget.showTrailingArrow
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.center,
         children: [
           if (widget.iconAsset != null) ...[
             SvgPicture.asset(
@@ -71,28 +95,22 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
             ),
             SizedBox(width: widget.small ? 10 : 14),
           ],
-          Text(
-            widget.label,
-            style: PiligrimTextStyles.button.copyWith(
-              color: PiligrimColors.sky,
-              fontSize: widget.small ? 12.0 : 13.0,
-              letterSpacing: 0.45,
-              fontWeight: FontWeight.w700,
+          if (widget.showTrailingArrow) label else Expanded(child: Center(child: label)),
+          if (widget.showTrailingArrow) ...[
+            const Spacer(),
+            Text(
+              '→',
+              style: PiligrimTextStyles.caption.copyWith(
+                fontSize: widget.small ? 25 : 32,
+                color: PiligrimColors.sky.withValues(alpha: 0.5),
+                height: 1.0,
+              ),
+              strutStyle: const StrutStyle(
+                forceStrutHeight: true,
+                height: 1.0,
+              ),
             ),
-          ),
-          const Spacer(),
-          Text(
-            '→',
-            style: PiligrimTextStyles.caption.copyWith(
-              fontSize: widget.small ? 25 : 32,
-              color: PiligrimColors.sky.withValues(alpha: 0.5),
-              height: 1.0,
-            ),
-            strutStyle: const StrutStyle(
-              forceStrutHeight: true,
-              height: 1.0,
-            ),
-          ),
+          ],
         ],
       ),
     );

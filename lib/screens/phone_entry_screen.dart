@@ -229,7 +229,6 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                       label: _submitting
                           ? 'Подождите…'
                           : (_awaitingCode ? 'Подтвердить' : 'Получить код'),
-                      iconAsset: 'assets/images/moon_totem (1).svg',
                       onTap: _submitting
                           ? null
                           : (_awaitingCode ? _confirmCode : _requestCode),
