@@ -16,7 +16,6 @@ Keep labels/icons aligned with `PiligrimNavBar` and `test/navigation_test.dart`.
 `Navigator.push(MaterialPageRoute(...))` for detail/booking/auth/history flows.
 
 - Booking from home: Ember CTA («Забронировать стол») in `HomeActionBlock` → push `BookingScreen`, not a new tab.
-- Home «Меню ресторана» / «Как добраться»: под горизонтальными карточками в `HomeTotemPathRow`, данные `kHeroPathFooterActions` в `home_data.dart` (иконки не дублируют табы навбара).
 - Auth-gated actions: `guardAuth(context)` from `lib/core/auth_guard.dart`.
 
 ## Push notifications

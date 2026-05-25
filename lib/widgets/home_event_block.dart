@@ -518,7 +518,7 @@ class _EventLoadingSkeleton extends StatelessWidget {
                 ),
               ),
             ),
-            Positioned(
+            const Positioned(
               bottom: 20,
               left: 18,
               right: 18,
@@ -528,10 +528,10 @@ class _EventLoadingSkeleton extends StatelessWidget {
                 children: [
                   _SkeletonLine(
                       width: 200, height: 20, opacity: 0.10),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   _SkeletonLine(
                       width: double.infinity, height: 12, opacity: 0.07),
-                  const SizedBox(height: 5),
+                  SizedBox(height: 5),
                   _SkeletonLine(width: 140, height: 12, opacity: 0.07),
                 ],
               ),
