@@ -11,7 +11,6 @@ import 'package:piligrim/providers/auth_provider.dart';
 import 'package:piligrim/providers/booking_provider.dart';
 import 'package:piligrim/providers/core_info_provider.dart';
 import 'package:piligrim/screens/booking_history_screen.dart';
-import 'package:piligrim/screens/phone_entry_screen.dart';
 import 'package:piligrim/screens/profile_screen.dart';
 
 import '../support/fake_token_storage.dart';

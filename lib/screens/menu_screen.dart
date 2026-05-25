@@ -1930,8 +1930,6 @@ class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.paddingOf(context).top;
-
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
       body: Stack(
