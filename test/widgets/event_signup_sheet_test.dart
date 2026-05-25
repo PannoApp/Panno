@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:piligrim/core/theme.dart';
+import 'package:piligrim/data/models/api_event.dart';
 import 'package:piligrim/providers/events_provider.dart';
 import 'package:piligrim/widgets/event_signup_sheet.dart';
 import 'package:provider/provider.dart';
@@ -38,8 +39,16 @@ void main() {
             builder: (context) => TextButton(
               onPressed: () => showEventSignupSheet(
                 context,
-                eventId: 42,
-                eventTitle: 'Джаз',
+                event: ApiEvent(
+                  id: 42,
+                  title: 'Джаз',
+                  description: 'Джазовый вечер',
+                  startsAt: DateTime.now().add(const Duration(days: 1)),
+                  format: ApiEventFormat.open,
+                  isPast: false,
+                  maxPlaces: 10,
+                  occupiedPlaces: 0,
+                ),
               ),
               child: const Text('open'),
             ),

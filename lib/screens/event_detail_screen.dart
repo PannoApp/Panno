@@ -179,6 +179,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     _MetaChip(
                       label: '${event.formatLabelRu} мероприятие',
                     ),
+                    if (event.maxPlaces > 0) ...[
+                      const SizedBox(height: 12),
+                      _MetaChip(
+                        label: 'Места: ${event.occupiedPlaces} / ${event.maxPlaces}',
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -269,13 +275,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: _EventSignupCta(
+                  isFull: event.maxPlaces > 0 && event.occupiedPlaces >= event.maxPlaces,
                   onTap: () async {
                     if (!await guardAuth(context)) return;
                     if (!context.mounted) return;
                     await showEventSignupSheet(
                       context,
-                      eventId: event.id,
-                      eventTitle: event.title,
+                      event: event,
                     );
                   },
                 ),
@@ -340,72 +346,95 @@ class _MetaChip extends StatelessWidget {
 // Главный CTA «ЗАПИСАТЬСЯ» — water gradient + rim-highlight + water-tinted shadow.
 // По мотиву EmberCta, но в холодном water-цвете (сервисное действие, не финальное).
 class _EventSignupCta extends StatelessWidget {
-  const _EventSignupCta({required this.onTap});
-  final VoidCallback onTap;
+  const _EventSignupCta({
+    required this.onTap,
+    this.isFull = false,
+  });
+
+  final VoidCallback? onTap;
+  final bool isFull;
 
   @override
   Widget build(BuildContext context) {
+    final Color buttonColor = isFull
+        ? PiligrimColors.earthDeep.withValues(alpha: 0.8)
+        : PiligrimColors.water;
+
     return SizedBox(
       height: 54,
       child: PiligrimTap(
-        onTap: onTap,
+        onTap: isFull ? null : onTap,
         borderRadius: BorderRadius.circular(12),
-        scaleDown: 0.965,
+        scaleDown: isFull ? 1.0 : 0.965,
         releaseDuration: const Duration(milliseconds: 320),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                PiligrimColors.water,
-                PiligrimColors.waterMuted,
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: PiligrimColors.shadow.withValues(alpha: 0.28),
-                blurRadius: 14,
-                offset: const Offset(0, 5),
-              ),
-              BoxShadow(
-                color: PiligrimColors.water.withValues(alpha: 0.25),
-                blurRadius: 16,
-                spreadRadius: 0.5,
-              ),
-            ],
+            color: isFull ? buttonColor : null,
+            gradient: isFull
+                ? null
+                : const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      PiligrimColors.water,
+                      PiligrimColors.waterMuted,
+                    ],
+                  ),
+            border: isFull
+                ? Border.all(
+                    color: PiligrimColors.steppe.withValues(alpha: 0.3),
+                    width: 1,
+                  )
+                : null,
+            boxShadow: isFull
+                ? null
+                : [
+                    BoxShadow(
+                      color: PiligrimColors.shadow.withValues(alpha: 0.28),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    ),
+                    BoxShadow(
+                      color: PiligrimColors.water.withValues(alpha: 0.25),
+                      blurRadius: 16,
+                      spreadRadius: 0.5,
+                    ),
+                  ],
           ),
           child: Stack(
             children: [
               Center(
                 child: Text(
-                  'ЗАПИСАТЬСЯ',
+                  isFull ? 'МЕСТ НЕТ' : 'ЗАПИСАТЬСЯ',
                   style: PiligrimTextStyles.button.copyWith(
                     fontSize: 14.5,
                     letterSpacing: 1.6,
-                    color: PiligrimColors.sky,
+                    color: isFull
+                        ? PiligrimColors.sky.withValues(alpha: 0.4)
+                        : PiligrimColors.sky,
                   ),
                 ),
               ),
-              Positioned(
-                top: 0,
-                left: 18,
-                right: 18,
-                child: Container(
-                  height: 0.75,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(1),
-                    gradient: LinearGradient(
-                      colors: [
-                        PiligrimColors.sky.withValues(alpha: 0.0),
-                        PiligrimColors.sky.withValues(alpha: 0.22),
-                        PiligrimColors.sky.withValues(alpha: 0.0),
-                      ],
+              if (!isFull)
+                Positioned(
+                  top: 0,
+                  left: 18,
+                  right: 18,
+                  child: Container(
+                    height: 0.75,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(1),
+                      gradient: LinearGradient(
+                        colors: [
+                          PiligrimColors.sky.withValues(alpha: 0.0),
+                          PiligrimColors.sky.withValues(alpha: 0.22),
+                          PiligrimColors.sky.withValues(alpha: 0.0),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

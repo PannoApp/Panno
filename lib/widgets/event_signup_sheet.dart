@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
+import '../data/models/api_event.dart';
 import '../providers/events_provider.dart';
 import 'piligrim_tap.dart';
 
+/// Отображает модальное окно (bottom sheet) для записи на мероприятие
 Future<void> showEventSignupSheet(
   BuildContext context, {
-  required int eventId,
-  required String eventTitle,
+  required ApiEvent event,
 }) {
   final events = context.read<EventsProvider>();
   return showModalBottomSheet<void>(
@@ -18,8 +19,7 @@ Future<void> showEventSignupSheet(
     builder: (ctx) => ChangeNotifierProvider<EventsProvider>.value(
       value: events,
       child: _EventSignupSheet(
-        eventId: eventId,
-        eventTitle: eventTitle,
+        event: event,
       ),
     ),
   );
@@ -27,12 +27,10 @@ Future<void> showEventSignupSheet(
 
 class _EventSignupSheet extends StatefulWidget {
   const _EventSignupSheet({
-    required this.eventId,
-    required this.eventTitle,
+    required this.event,
   });
 
-  final int eventId;
-  final String eventTitle;
+  final ApiEvent event;
 
   @override
   State<_EventSignupSheet> createState() => _EventSignupSheetState();
@@ -48,7 +46,7 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
     setState(() => _submitting = true);
     try {
       await context.read<EventsProvider>().reserveEvent(
-            widget.eventId,
+            widget.event.id,
             _guestsCount,
           );
       if (!mounted) return;
@@ -56,7 +54,7 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Вы записаны на «${widget.eventTitle}». Подтверждение придёт от ресторана.',
+            'Вы записаны на «${widget.event.title}». Подтверждение придёт от ресторана.',
             style: PiligrimTextStyles.body.copyWith(fontSize: 14),
           ),
           backgroundColor: PiligrimColors.earth,
@@ -83,6 +81,12 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    
+    // Рассчитываем оставшееся число свободных мест
+    final int remaining = widget.event.maxPlaces > 0
+        ? (widget.event.maxPlaces - widget.event.occupiedPlaces)
+        : 999; // Значение "без ограничений" для инкремента
+
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
       child: Container(
@@ -118,7 +122,7 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  widget.eventTitle,
+                  widget.event.title,
                   style: PiligrimTextStyles.caption.copyWith(
                     color: PiligrimColors.water,
                     fontSize: 13,
@@ -127,10 +131,22 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
                 const SizedBox(height: 24),
                 Text(
                   'Количество героев',
+                  textAlign: TextAlign.center,
                   style: PiligrimTextStyles.caption.copyWith(
                     color: PiligrimColors.sky.withValues(alpha: 0.7),
                   ),
                 ),
+                if (widget.event.maxPlaces > 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Осталось мест: $remaining',
+                    textAlign: TextAlign.center,
+                    style: PiligrimTextStyles.caption.copyWith(
+                      color: PiligrimColors.water,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -150,7 +166,7 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
                       ),
                     ),
                     IconButton(
-                      onPressed: !_submitting
+                      onPressed: _guestsCount < remaining && !_submitting
                           ? () => setState(() => _guestsCount++)
                           : null,
                       icon: const Icon(Icons.add_circle_outline),
@@ -198,18 +214,16 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
   }
 }
 
-/// Auth guard для записи: sheet → login → sheet снова не открывается автоматически.
+/// Проверяет авторизацию перед открытием формы записи на мероприятие
 Future<void> showEventSignupWithAuth(
   BuildContext context, {
-  required int eventId,
-  required String eventTitle,
+  required ApiEvent event,
   required Future<bool> Function() ensureAuth,
 }) async {
   if (!await ensureAuth()) return;
   if (!context.mounted) return;
   await showEventSignupSheet(
     context,
-    eventId: eventId,
-    eventTitle: eventTitle,
+    event: event,
   );
 }

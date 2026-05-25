@@ -22,7 +22,8 @@ import 'booking_history_screen.dart';
 import 'onboarding_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.onNavigate});
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -136,7 +137,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         if (user.isAuthorized) ...[
-                          _StatsRow(user: user),
+                          _StatsRow(
+                            user: user,
+                            onNavigate: widget.onNavigate,
+                          ),
                           const SizedBox(height: 20),
                         ],
 
@@ -290,57 +294,71 @@ class _HeroHeaderState extends State<_HeroHeader> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Имя пользователя — главный типографический акцент
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Декоративный тотем-знак — не аватарка, просто марка
-                    SvgPicture.asset(
-                      'assets/images/shaman.svg',
-                      width: 22,
-                      height: 22,
-                      colorFilter: ColorFilter.mode(
-                        PiligrimColors.steppe.withValues(alpha: 0.55),
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            authorized
-                                ? (widget.user.name.isEmpty ||
-                                        widget.user.name == widget.user.phone
-                                    ? widget.user.phone
-                                    : widget.user.name)
-                                : 'Герой без имени',
-                            style: PiligrimTextStyles.heading.copyWith(
-                              fontSize: 22,
-                              color: PiligrimColors.sky,
-                              letterSpacing: 0.3,
-                            ),
+                PiligrimTap(
+                  onTap: () async {
+                    if (authorized) {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const OnboardingScreen(),
+                        ),
+                      );
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Декоративный тотем-знак — не аватарка, просто марка
+                        SvgPicture.asset(
+                          'assets/images/shaman.svg',
+                          width: 22,
+                          height: 22,
+                          colorFilter: ColorFilter.mode(
+                            PiligrimColors.steppe.withValues(alpha: 0.55),
+                            BlendMode.srcIn,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            authorized
-                                ? (widget.user.name.isEmpty ||
-                                        widget.user.name == widget.user.phone
-                                    ? 'Герой Piligrim'
-                                    : widget.user.phone)
-                                : 'Войдите, чтобы открыть путь',
-                            style: PiligrimTextStyles.caption.copyWith(
-                              color: authorized
-                                  ? PiligrimColors.steppe.withValues(alpha: 0.7)
-                                  : PiligrimColors.steppe.withValues(alpha: 0.6),
-                              fontSize: 12,
-                            ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                authorized
+                                    ? (widget.user.name.isEmpty ||
+                                            widget.user.name == widget.user.phone
+                                        ? widget.user.phone
+                                        : widget.user.name)
+                                    : 'Герой без имени',
+                                style: PiligrimTextStyles.heading.copyWith(
+                                  fontSize: 22,
+                                  color: PiligrimColors.sky,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                authorized
+                                    ? (widget.user.name.isEmpty ||
+                                            widget.user.name == widget.user.phone
+                                        ? 'Заполнить имя и фамилию'
+                                        : widget.user.phone)
+                                    : 'Войдите, чтобы открыть путь',
+                                style: PiligrimTextStyles.caption.copyWith(
+                                  color: authorized
+                                      ? PiligrimColors.steppe.withValues(alpha: 0.7)
+                                      : PiligrimColors.steppe.withValues(alpha: 0.6),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 )
                     .animate()
                     .fadeIn(delay: 200.ms, duration: 700.ms)
@@ -390,7 +408,7 @@ class _HeroHeaderState extends State<_HeroHeader> {
   }
 }
 
-// Плашка «Путь начат» — показывает дату, когда гость начал взаимодействие с рестораном
+// Плашка «Путь начат» — показывает дату, когда герой начал взаимодействие с рестораном
 class _JourneyTag extends StatelessWidget {
   const _JourneyTag({required this.label});
   final String label;
@@ -421,8 +439,9 @@ class _JourneyTag extends StatelessWidget {
 // STATS ROW
 // ─────────────────────────────────────────────────────────────────────────────
 class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.user});
+  const _StatsRow({required this.user, this.onNavigate});
   final HeroUser user;
+  final ValueChanged<int>? onNavigate;
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +456,7 @@ class _StatsRow extends StatelessWidget {
       children: [
         _StatCard(
           value: '$bookingsCount',
-          label: 'Бронирования',
+          label: 'Бронирований',
           delay: 0.ms,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
@@ -450,6 +469,7 @@ class _StatsRow extends StatelessWidget {
           value: '${user.eventsCount}',
           label: 'Мероприятия',
           delay: 80.ms,
+          onTap: () => onNavigate?.call(3),
         ),
         const SizedBox(width: 12),
         _StatCard(

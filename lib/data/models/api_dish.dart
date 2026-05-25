@@ -61,7 +61,7 @@ class ApiDish {
       tags: asJsonMapList(json['tags']).map(ApiTag.fromJson).toList(growable: false),
       // allergens — тоже список объектов: [{"id": 1, "name": "глютен"}, ...]
       allergens: _parseAllergens(json['allergens']),
-      imageUrl: resolveMediaUrl(parseStringOrNull(json['image'])),
+      imageUrl: parseStringOrNull(json['image']) != null ? resolveMediaUrl(parseStringOrNull(json['image'])) : null,
       videoUrl: parseStringOrNull(json['video_url'] ?? json['video']),
       videoStatus: parseString(json['video_status'] ?? json['videoStatus'] ?? 'pending', field: 'video_status'),
       weight: parseString(json['weight'] ?? '', field: 'weight'),

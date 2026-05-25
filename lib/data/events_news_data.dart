@@ -128,7 +128,7 @@ List<PiligrimEvent> buildMockEvents() {
       id: '102',
       title: 'Закрытый ужин с шефом',
       description:
-          'Сезонное меню путешествия по Центральной Азии, вино и рассказ проводника о традициях. Закрытый формат — список гостей согласуется заранее.',
+          'Сезонное меню путешествия по Центральной Азии, вино и рассказ проводника о традициях. Закрытый формат — список героев согласуется заранее.',
       startsAt: t0.add(const Duration(days: 6, hours: 19, minutes: 30)),
       format: EventAccessFormat.closed,
       coverAssetPath: covers[1],

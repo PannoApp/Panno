@@ -238,8 +238,8 @@ class AuthProvider extends ChangeNotifier {
   }
 }
 
-String? _formatJourneyStart(DateTime? dt) {
-  if (dt == null) return null;
+String _formatJourneyStart(DateTime? dt) {
+  final date = dt ?? DateTime.now();
   const months = [
     '',
     'Январь',
@@ -255,5 +255,5 @@ String? _formatJourneyStart(DateTime? dt) {
     'Ноябрь',
     'Декабрь',
   ];
-  return '${months[dt.month]} ${dt.year}';
+  return '${months[date.month]} ${date.year}';
 }

@@ -415,7 +415,7 @@ class TelegramWebhookView(View):
 
             _tg_post('sendMessage', {
                 'chat_id': chat_id,
-                'text': 'Шаг 5 из 7: Укажите <b>цену входа</b> (в тенге) или нажмите кнопку «🆓 Вход свободный»:',
+                'text': 'Шаг 5 из 8: Укажите <b>цену входа</b> (в тенге) или нажмите кнопку «🆓 Вход свободный»:',
                 'parse_mode': 'HTML',
                 'reply_markup': {
                     'keyboard': [[{'text': '🆓 Вход свободный'}], [{'text': '❌ Отмена'}]],
@@ -460,6 +460,7 @@ class TelegramWebhookView(View):
                 format_val = state_data['data']['format']
                 price_val = state_data['data']['price']
                 file_id = state_data['data'].get('file_id')
+                max_places = state_data['data'].get('max_places', 0)
                 cache.delete(cache_key)
 
                 from datetime import datetime
@@ -479,7 +480,8 @@ class TelegramWebhookView(View):
                     description=description,
                     date_time=dt_obj,
                     format=format_val,
-                    price=price
+                    price=price,
+                    max_places=max_places
                 )
 
                 if file_id:
@@ -530,7 +532,7 @@ class TelegramWebhookView(View):
                 _tg_post('editMessageText', {
                     'chat_id': chat_id,
                     'message_id': message_id,
-                    'text': f"✅ <b>Мероприятие успешно опубликовано!</b>\n\n<b>Заголовок:</b> {html.escape(title)}\n<b>Дата и время:</b> {datetime_str}\n<b>Формат:</b> {format_label}\n<b>Вход:</b> {price_label}",
+                    'text': f"✅ <b>Мероприятие успешно опубликовано!</b>\n\n<b>Заголовок:</b> {html.escape(title)}\n<b>Дата и время:</b> {datetime_str}\n<b>Формат:</b> {format_label}\n<b>Вход:</b> {price_label}\n<b>Количество мест:</b> {max_places}",
                     'parse_mode': 'HTML',
                 }, token)
                 _tg_post('sendMessage', {
@@ -677,7 +679,7 @@ class TelegramWebhookView(View):
             cache.set(cache_key, {'state': 'waiting_for_event_title', 'data': {}}, timeout=600)
             _tg_post('sendMessage', {
                 'chat_id': chat_id,
-                'text': 'Шаг 1 из 7: Введите <b>заголовок</b> для мероприятия:',
+                'text': 'Шаг 1 из 8: Введите <b>заголовок</b> для мероприятия:',
                 'parse_mode': 'HTML',
                 'reply_markup': {
                     'keyboard': [[{'text': '❌ Отмена'}]],
@@ -832,7 +834,7 @@ class TelegramWebhookView(View):
             cache.set(cache_key, {'state': 'waiting_for_event_description', 'data': {'title': text}}, timeout=600)
             _tg_post('sendMessage', {
                 'chat_id': chat_id,
-                'text': f'Название: "<b>{html.escape(text)}</b>"\n\nШаг 2 из 7: Введите <b>описание</b> мероприятия:',
+                'text': f'Название: "<b>{html.escape(text)}</b>"\n\nШаг 2 из 8: Введите <b>описание</b> мероприятия:',
                 'parse_mode': 'HTML',
                 'reply_markup': {
                     'keyboard': [[{'text': '❌ Отмена'}]],
@@ -853,7 +855,7 @@ class TelegramWebhookView(View):
             cache.set(cache_key, {'state': 'waiting_for_event_datetime', 'data': {'title': title, 'description': text}}, timeout=600)
             _tg_post('sendMessage', {
                 'chat_id': chat_id,
-                'text': 'Шаг 3 из 7: Введите <b>дату и время</b> проведения мероприятия в формате `ДД.ММ.ГГГГ ЧЧ:ММ` (например, `25.05.2026 19:00`):',
+                'text': 'Шаг 3 из 8: Введите <b>дату и время</b> проведения мероприятия в формате `ДД.ММ.ГГГГ ЧЧ:ММ` (например, `25.05.2026 19:00`):',
                 'parse_mode': 'HTML',
                 'reply_markup': {
                     'keyboard': [[{'text': '❌ Отмена'}]],
@@ -885,7 +887,7 @@ class TelegramWebhookView(View):
 
             _tg_post('sendMessage', {
                 'chat_id': chat_id,
-                'text': 'Шаг 4 из 7: Выберите <b>формат</b> мероприятия:',
+                'text': 'Шаг 4 из 8: Выберите <b>формат</b> мероприятия:',
                 'parse_mode': 'HTML',
                 'reply_markup': {
                     'inline_keyboard': [[
@@ -928,7 +930,7 @@ class TelegramWebhookView(View):
             # Сохраняем цену как строку или None для кэша
             price_val = str(price) if price is not None else None
             cache.set(cache_key, {
-                'state': 'waiting_for_event_image',
+                'state': 'waiting_for_event_max_places',
                 'data': {
                     'title': title,
                     'description': description,
@@ -940,10 +942,51 @@ class TelegramWebhookView(View):
 
             _tg_post('sendMessage', {
                 'chat_id': chat_id,
+                'text': 'Шаг 6 из 8: Введите <b>количество разрешенных мест</b> для мероприятия (целое положительное число):',
+                'parse_mode': 'HTML',
+                'reply_markup': {
+                    'keyboard': [[{'text': '❌ Отмена'}]],
+                    'resize_keyboard': True,
+                }
+            }, token)
+            return JsonResponse({'ok': True})
+
+        elif state == 'waiting_for_event_max_places':
+            title = state_data['data']['title']
+            description = state_data['data']['description']
+            datetime_str = state_data['data']['datetime']
+            format_val = state_data['data']['format']
+            price_val = state_data['data']['price']
+
+            try:
+                max_places = int(text)
+                if max_places <= 0:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                _tg_post('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': '❌ Некорректное число мест. Пожалуйста, введите целое положительное число (например, 50):'
+                }, token)
+                return JsonResponse({'ok': True})
+
+            cache.set(cache_key, {
+                'state': 'waiting_for_event_image',
+                'data': {
+                    'title': title,
+                    'description': description,
+                    'datetime': datetime_str,
+                    'format': format_val,
+                    'price': price_val,
+                    'max_places': max_places
+                }
+            }, timeout=600)
+
+            _tg_post('sendMessage', {
+                'chat_id': chat_id,
                 'text': (
                     "⚠️ <b>Важно:</b> Обложка является обязательной для мероприятия. Изменить или удалить её позже можно будет только через панель управления (админку) Django.\n\n"
                     "Пожалуйста, перед отправкой подготовьте изображение с соотношением сторон <b>16:9</b> (например, 1920x1080) для идеального отображения в мобильном приложении.\n\n"
-                    "Шаг 6 из 7: Отправьте изображение обложки (фото):"
+                    "Шаг 7 из 8: Отправьте изображение обложки (фото):"
                 ),
                 'parse_mode': 'HTML',
                 'reply_markup': {
@@ -968,6 +1011,7 @@ class TelegramWebhookView(View):
             datetime_str = state_data['data']['datetime']
             format_val = state_data['data']['format']
             price_val = state_data['data']['price']
+            max_places = state_data['data'].get('max_places', 0)
 
             cache.set(cache_key, {
                 'state': 'waiting_for_event_confirmation',
@@ -977,7 +1021,8 @@ class TelegramWebhookView(View):
                     'datetime': datetime_str,
                     'format': format_val,
                     'price': price_val,
-                    'file_id': file_id
+                    'file_id': file_id,
+                    'max_places': max_places
                 }
             }, timeout=600)
 
@@ -993,6 +1038,7 @@ class TelegramWebhookView(View):
                     f"<b>Дата и время:</b> {datetime_str}\n"
                     f"<b>Формат:</b> {format_label}\n"
                     f"<b>Цена входа:</b> {price_label}\n"
+                    f"<b>Количество мест:</b> {max_places}\n"
                     f"<b>Обложка:</b> Прикреплена 16:9\n\n"
                     f"Опубликовать мероприятие?"
                 ),

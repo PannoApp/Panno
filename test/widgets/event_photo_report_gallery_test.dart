@@ -25,27 +25,42 @@ void main() {
       await tester.pumpWidget(
         _wrap(const EventPhotoReportGallery(photos: [_photo1, _photo2])),
       );
+      await tester.pump();
 
       expect(find.byType(PageView), findsOneWidget);
+
+      // Clean up to dispose repeating shimmer animation and avoid pending timer error
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
     });
 
     testWidgets('PageView has correct item count', (tester) async {
       await tester.pumpWidget(
         _wrap(const EventPhotoReportGallery(photos: [_photo1, _photo2])),
       );
+      await tester.pump();
 
       final pageView =
           tester.widget<PageView>(find.byType(PageView));
       // itemCount is available via delegate
       expect(pageView.childrenDelegate, isA<SliverChildBuilderDelegate>());
+
+      // Clean up to dispose repeating shimmer animation and avoid pending timer error
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
     });
 
     testWidgets('single photo renders without crashing', (tester) async {
       await tester.pumpWidget(
         _wrap(const EventPhotoReportGallery(photos: [_photo1])),
       );
+      await tester.pump();
 
       expect(find.byType(PageView), findsOneWidget);
+
+      // Clean up to dispose repeating shimmer animation and avoid pending timer error
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
     });
   });
 }

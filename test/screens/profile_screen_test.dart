@@ -111,12 +111,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
-    testWidgets('При isLoggedIn=false → кнопка «НАЧАТЬ ПУТЬ» видна',
+    testWidgets('При isLoggedIn=false → форма авторизации видна',
         (tester) async {
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
+      expect(find.text('Сначала нужно авторизоваться'), findsOneWidget);
+      expect(find.text('ПОЛУЧИТЬ КОД'), findsOneWidget);
     });
 
     testWidgets('При isLoggedIn=true → имя и телефон из currentUser',
@@ -129,7 +130,7 @@ void main() {
 
       expect(find.text('Айдар Нурланов'), findsOneWidget);
       expect(find.text('+77001234567'), findsOneWidget);
-      expect(find.text('НАЧАТЬ ПУТЬ'), findsNothing);
+      expect(find.text('Сначала нужно авторизоваться'), findsNothing);
     });
 
     testWidgets('Переключение «Мероприятия» → PATCH notify_events',
@@ -198,6 +199,8 @@ void main() {
 
     testWidgets('Privacy link использует URL из CoreInfoProvider',
         (tester) async {
+      auth.currentUser = _sampleProfile();
+      auth.notifyListeners();
       core.coreInfo = _coreInfo(
         privacyPolicy: 'https://api.piligrim.kz/legal/privacy',
       );
@@ -213,14 +216,22 @@ void main() {
       expect(launchedUrl, 'https://api.piligrim.kz/legal/privacy');
     });
 
-    testWidgets('«НАЧАТЬ ПУТЬ» → PhoneEntryScreen', (tester) async {
+    testWidgets('Ввод телефона и получение кода в _UnauthProfileView', (tester) async {
+      adapter.enqueue(200, {});
+
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      await tester.tap(find.text('НАЧАТЬ ПУТЬ'));
+      expect(find.text('Сначала нужно авторизоваться'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '+77001234567');
+      await tester.pump();
+
+      await tester.tap(find.text('ПОЛУЧИТЬ КОД'));
       await settle(tester);
 
-      expect(find.byType(PhoneEntryScreen), findsOneWidget);
+      expect(find.text('Код отправлен на +77001234567'), findsOneWidget);
+      expect(find.text('ПОДТВЕРДИТЬ'), findsOneWidget);
     });
 
     testWidgets('При notificationsEnabled: false категории визуально задизаблены',

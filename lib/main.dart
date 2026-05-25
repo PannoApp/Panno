@@ -196,7 +196,7 @@ class _RootShellState extends State<RootShell> {
           MenuScreen(isTabActive: _currentIndex == 1),
           InteriorScreen(isTabActive: _currentIndex == 2),
           const EventsScreen(),
-          const ProfileScreen(),
+          ProfileScreen(onNavigate: _navigate),
         ],
       ),
       bottomNavigationBar: PiligrimNavBar(

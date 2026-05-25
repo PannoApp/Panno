@@ -720,3 +720,105 @@ class EventFileCleanupTest(TestCase):
             report.delete()
 
         self.assertFalse(default_storage.exists(name))
+
+
+# ---------------------------------------------------------------------------
+# Тесты лимита мест на мероприятиях (вместимость)
+# ---------------------------------------------------------------------------
+
+class EventCapacityModelAndSerializerTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77009999901')
+        self.other_user = make_user('+77009999902')
+        # Создаем событие с лимитом 10 мест
+        self.event = Event.objects.create(
+            title='Ограниченный ивент',
+            description='Свободных мест: 10',
+            date_time=timezone.now() + timezone.timedelta(days=1),
+            image=_make_landscape_image('limit.png'),
+            max_places=10
+        )
+
+    def _context(self, user=None):
+        factory = APIRequestFactory()
+        request = factory.post('/')
+        request.user = user or self.user
+        return {'request': request}
+
+    def test_occupied_places_updates_correctly(self):
+        """Проверяет, что occupied_places правильно вычисляет занятые места."""
+        self.assertEqual(self.event.occupied_places, 0)
+        
+        # Первая бронь на 3 места
+        EventReservation.objects.create(event=self.event, user=self.user, guests_count=3)
+        self.assertEqual(self.event.occupied_places, 3)
+
+        # Вторая бронь на 4 места
+        EventReservation.objects.create(event=self.event, user=self.other_user, guests_count=4)
+        self.assertEqual(self.event.occupied_places, 7)
+
+    def test_reservation_within_capacity_succeeds(self):
+        """Бронирование в пределах вместимости проходит валидацию."""
+        s = EventReservationSerializer(
+            data={'event': self.event.pk, 'guests_count': 5},
+            context=self._context()
+        )
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_reservation_exceeding_capacity_fails(self):
+        """Бронирование, превышающее вместимость, вызывает ошибку валидации."""
+        # Занимаем 8 мест из 10
+        EventReservation.objects.create(event=self.event, user=self.other_user, guests_count=8)
+
+        # Пытаемся забронировать еще 3 места (итого 11/10)
+        s = EventReservationSerializer(
+            data={'event': self.event.pk, 'guests_count': 3},
+            context=self._context()
+        )
+        self.assertFalse(s.is_valid())
+        self.assertIn('non_field_errors', s.errors)
+        self.assertIn('Недостаточно свободных мест', s.errors['non_field_errors'][0])
+
+
+class EventCapacityAPITest(APITestCase):
+    def setUp(self):
+        self.user = make_user('+77009999903')
+        self.event = Event.objects.create(
+            title='Ивент API',
+            description='Свободных мест: 5',
+            date_time=timezone.now() + timezone.timedelta(days=1),
+            image=_make_landscape_image('limit_api.png'),
+            max_places=5
+        )
+
+    def _auth(self):
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    def test_api_returns_max_places_and_occupied_places(self):
+        """API возвращает информацию о лимите и занятых местах."""
+        # Делаем бронь на 2 места
+        EventReservation.objects.create(event=self.event, user=self.user, guests_count=2)
+
+        response = self.client.get('/api/v1/events/upcoming/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        event_data = response.data['results'][0]
+        self.assertEqual(event_data['max_places'], 5)
+        self.assertEqual(event_data['occupied_places'], 2)
+
+    @patch('apps.notifications.tasks.send_push_notification')
+    def test_reservation_api_enforces_capacity(self, _):
+        """API бронирования отклоняет запросы при превышении лимита мест."""
+        self._auth()
+        
+        # Пытаемся забронировать 6 мест при лимите 5
+        response = self.client.post(
+            '/api/v1/events/reservations/create/',
+            {'event': self.event.pk, 'guests_count': 6},
+            HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4())
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('non_field_errors', response.data)
+        self.assertIn('Недостаточно свободных мест', response.data['non_field_errors'][0])
+

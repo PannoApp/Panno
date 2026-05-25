@@ -77,5 +77,38 @@ void main() {
       expect(closed.format, ApiEventFormat.closed);
       expect(closed.isPast, isTrue);
     });
+
+    // --- Тесты лимита мест (вместимости) ---
+
+    test('дефолтные значения maxPlaces и occupiedPlaces равны 0', () {
+      final event = ApiEvent.fromJson(_base({}));
+      expect(event.maxPlaces, 0);
+      expect(event.occupiedPlaces, 0);
+    });
+
+    test('парсинг max_places и occupied_places из JSON', () {
+      final event = ApiEvent.fromJson(_base({
+        'max_places': 50,
+        'occupied_places': 12,
+      }));
+      expect(event.maxPlaces, 50);
+      expect(event.occupiedPlaces, 12);
+    });
+
+    test('сериализация toJson содержит max_places и occupied_places', () {
+      final event = ApiEvent(
+        id: 1,
+        title: 'Тест',
+        description: 'd',
+        startsAt: DateTime.parse('2026-01-01T12:00:00Z'),
+        format: ApiEventFormat.open,
+        isPast: false,
+        maxPlaces: 40,
+        occupiedPlaces: 10,
+      );
+      final json = event.toJson();
+      expect(json['max_places'], 40);
+      expect(json['occupied_places'], 10);
+    });
   });
 }

@@ -48,6 +48,11 @@ class Event(AutoCropImageMixin, models.Model):
         default=True,
         verbose_name="Активно"
     )
+    max_places = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Количество разрешенных мест",
+        help_text="0 означает отсутствие ограничений на количество мест"
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата создания"
@@ -62,6 +67,14 @@ class Event(AutoCropImageMixin, models.Model):
             # Составной индекс для получения активных мероприятий, отсортированных по дате
             models.Index(fields=['is_active', 'date_time'], name='event_active_date_idx'),
         ]
+
+    @property
+    def occupied_places(self):
+        """
+        Вычисляет количество занятых мест на мероприятии.
+        Суммирует количество гостей во всех записях на это мероприятие.
+        """
+        return self.reservations.aggregate(total=models.Sum('guests_count'))['total'] or 0
 
     def __str__(self):
         return f"{self.title} ({self.date_time})"

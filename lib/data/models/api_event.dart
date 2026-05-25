@@ -30,6 +30,8 @@ class ApiEvent {
     this.priceFrom,
     required this.isPast,
     this.hasPhotoReport = false,
+    this.maxPlaces = 0,
+    this.occupiedPlaces = 0,
   });
 
   final int id;
@@ -41,6 +43,8 @@ class ApiEvent {
   final int? priceFrom;
   final bool isPast;
   final bool hasPhotoReport;
+  final int maxPlaces;
+  final int occupiedPlaces;
 
   factory ApiEvent.fromJson(
     Map<String, dynamic> json, {
@@ -64,6 +68,8 @@ class ApiEvent {
         json['has_photo_report'] ?? json['hasPhotoReport'],
         defaultValue: false,
       ),
+      maxPlaces: parseIntOrNull(json['max_places'] ?? json['maxPlaces']) ?? 0,
+      occupiedPlaces: parseIntOrNull(json['occupied_places'] ?? json['occupiedPlaces']) ?? 0,
     );
   }
 
@@ -77,5 +83,7 @@ class ApiEvent {
         if (priceFrom != null) 'price_from': priceFrom,
         'is_past': isPast,
         'has_photo_report': hasPhotoReport,
+        'max_places': maxPlaces,
+        'occupied_places': occupiedPlaces,
       };
 }
