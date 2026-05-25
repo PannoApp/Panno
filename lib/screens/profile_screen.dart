@@ -1,6 +1,7 @@
 // Экран Профиль / Контакты — «Карта Героя»
-// Согласно ТЗ раздел 4.5 | Концепция «Modern Nomad»
-// Textured header · water ripple · totem decorations · brand-styled toggles
+// Согласно ТЗ раздел 4.5 | Luxury member lounge · cinematic glass
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -110,16 +111,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
         final user = auth.user;
         return Scaffold(
-          backgroundColor: PiligrimColors.earth,
+          backgroundColor: PiligrimColors.earthSurface,
           body: Stack(
             children: [
               const Positioned.fill(
                 child: PiligrimBackground(
-                  textureOpacity: 0.45,
-                  vignetteIntensity: 0.25,
+                  textureOpacity: 0.38,
+                  vignetteIntensity: 0.18,
                   cinematic: true,
                 ),
               ),
+              const Positioned.fill(child: _ProfileAtmosphere()),
               CustomScrollView(
                 physics: const ClampingScrollPhysics(),
                 clipBehavior: Clip.none,
@@ -141,7 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             user: user,
                             onNavigate: widget.onNavigate,
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 28),
                         ],
 
                     // Push-уведомления
@@ -149,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: 'УВЕДОМЛЕНИЯ',
                       icon: 'assets/images/star_totem (1).svg',
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     _NotificationsCard(
                       enabled: auth.isLoggedIn,
                       globalEnabled:
@@ -157,35 +159,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       isOn: (id) => _notifValue(auth, id),
                       onToggle: _handleNotifToggle,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 28),
 
                     // Контакты
                     const PiligrimSectionHeader(
                       label: 'КОНТАКТЫ',
-                      icon: 'assets/images/splash_path (1).svg',
+                      icon: 'assets/images/bird_totem (1).svg',
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     _ContactsCard(
                       coreInfo: coreInfo,
                       onLaunch: _launch,
                     ),
-                    const SizedBox(height: 20),
-
-                    // Часы работы
-                    const PiligrimSectionHeader(
-                      label: 'ЧАСЫ РАБОТЫ',
-                      icon: 'assets/images/sun.svg',
-                    ),
-                    const SizedBox(height: 12),
-                    _HoursCard(),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 28),
 
                     // Правила посещения
                     const PiligrimSectionHeader(
                       label: 'ПРАВИЛА ПОСЕЩЕНИЯ',
                       icon: 'assets/images/shaman.svg',
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     _RulesCard(
                       rules: coreInfo?.visitRules.isNotEmpty == true
                           ? coreInfo!.visitRules
@@ -195,7 +188,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     // Выход из аккаунта
                         if (auth.isLoggedIn) ...[
-                          const SizedBox(height: 8),
                           _LogoutButton(
                             onTap: () async {
                               await context.read<AuthProvider>().logout();
@@ -252,35 +244,39 @@ class _HeroHeaderState extends State<_HeroHeader> {
         fit: StackFit.expand,
         clipBehavior: Clip.none,
         children: [
-          // Мягкое дыхание сверху — снизу бесшовно в Қара жер (без линии среза с лентой)
+          // Мягкий amber glow — depth через свет, без декоративных тотемов
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topCenter,
+                  begin: Alignment.topLeft,
                   end: Alignment.bottomCenter,
-                  stops: const [0.0, 0.5, 1.0],
+                  stops: const [0.0, 0.45, 1.0],
                   colors: [
-                    PiligrimColors.steppe.withValues(alpha: 0.11),
-                    PiligrimColors.steppe.withValues(alpha: 0.035),
+                    PiligrimColors.ember.withValues(alpha: 0.07),
+                    PiligrimColors.steppe.withValues(alpha: 0.05),
                     PiligrimColors.clear,
                   ],
                 ),
               ),
             ),
           ),
-
-          // Статичный тотем-фон (не вращается — благородство, не игра)
           Positioned(
-            right: -50,
-            top: top - 30,
-            child: SvgPicture.asset(
-              'assets/images/wheel_totem (1).svg',
-              width: 240,
-              height: 240,
-              colorFilter: ColorFilter.mode(
-                PiligrimColors.steppe.withValues(alpha: 0.10),
-                BlendMode.srcIn,
+            right: -80,
+            top: top - 60,
+            child: IgnorePointer(
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      PiligrimColors.steppe.withValues(alpha: 0.14),
+                      PiligrimColors.clear,
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -419,9 +415,9 @@ class _JourneyTag extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         border: Border.all(
-            color: PiligrimColors.steppe.withValues(alpha: 0.30)),
+            color: PiligrimColors.steppe.withValues(alpha: 0.22)),
         borderRadius: BorderRadius.circular(4),
-        color: PiligrimColors.steppe.withValues(alpha: 0.07),
+        color: PiligrimColors.steppe.withValues(alpha: 0.05),
       ),
       child: Text(
         label.toUpperCase(),
@@ -500,23 +496,9 @@ class _StatCard extends StatelessWidget {
       child: PiligrimTap(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap ?? () {},
-        child: Container(
+        child: _ProfileGlassCard(
+          variant: ProfileGlassVariant.stat,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-          decoration: BoxDecoration(
-            color: PiligrimColors.earth,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: PiligrimColors.steppe.withValues(alpha: 0.15),
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: PiligrimColors.shadow.withValues(alpha: 0.35),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -563,7 +545,8 @@ class _NotificationsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!enabled) {
-      return _BrandCard(
+      return _ProfileGlassCard(
+        variant: ProfileGlassVariant.settings,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
@@ -577,7 +560,8 @@ class _NotificationsCard extends StatelessWidget {
       );
     }
 
-    return _BrandCard(
+    return _ProfileGlassCard(
+      variant: ProfileGlassVariant.settings,
       child: Column(
         children: [
           // Главный переключатель — отражает notifications_enabled с сервера
@@ -591,7 +575,7 @@ class _NotificationsCard extends StatelessWidget {
             isOn: globalEnabled,
             onChanged: (val) => onToggle('global', val),
           ),
-          const Divider(height: 1, color: PiligrimColors.divider, indent: 48),
+          const _ProfileHairlineDivider(),
           // Категории — задизаблены визуально и функционально при globalEnabled=false
           Opacity(
             opacity: globalEnabled ? 1.0 : 0.4,
@@ -609,11 +593,7 @@ class _NotificationsCard extends StatelessWidget {
                           globalEnabled ? (val) => onToggle(cat.id, val) : null,
                     ),
                     if (i < kNotifCategories.length - 1)
-                      const Divider(
-                        height: 1,
-                        color: PiligrimColors.divider,
-                        indent: 48,
-                      ),
+                      const _ProfileHairlineDivider(),
                   ],
                 );
               }).toList(),
@@ -640,7 +620,7 @@ class _NotifRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       child: Row(
         children: [
           Expanded(
@@ -653,33 +633,38 @@ class _NotifRow extends StatelessWidget {
                     fontSize: 14,
                     color: isOn
                         ? PiligrimColors.sky
-                        : PiligrimColors.sky.withValues(alpha: 0.4),
+                        : PiligrimColors.sky.withValues(alpha: 0.45),
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   category.subtitle,
-                  style: PiligrimTextStyles.caption.copyWith(fontSize: 11),
+                  style: PiligrimTextStyles.caption.copyWith(
+                    fontSize: 11,
+                    color: PiligrimColors.sky.withValues(alpha: 0.38),
+                  ),
                 ),
               ],
             ),
           ),
-          // Брендовый toggle
+          const SizedBox(width: 12),
+          // iOS-style toggle — тихий, без gaming glow
           PiligrimTap(
             onTap: onChanged != null ? () => onChanged!(!isOn) : null,
             child: AnimatedContainer(
               duration: 250.ms,
-              width: 44,
-              height: 24,
+              width: 46,
+              height: 26,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(13),
                 color: isOn
-                    ? PiligrimColors.steppe.withValues(alpha: 0.25)
-                    : PiligrimColors.sky.withValues(alpha: 0.06),
+                    ? PiligrimColors.steppe.withValues(alpha: 0.32)
+                    : PiligrimColors.sky.withValues(alpha: 0.08),
                 border: Border.all(
                   color: isOn
-                      ? PiligrimColors.steppe.withValues(alpha: 0.6)
-                      : PiligrimColors.sky.withValues(alpha: 0.12),
-                  width: 1,
+                      ? PiligrimColors.steppe.withValues(alpha: 0.45)
+                      : PiligrimColors.sky.withValues(alpha: 0.10),
+                  width: 0.5,
                 ),
               ),
               child: AnimatedAlign(
@@ -688,22 +673,23 @@ class _NotifRow extends StatelessWidget {
                 alignment:
                     isOn ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
-                  margin: const EdgeInsets.all(4),
-                  width: 16,
-                  height: 16,
+                  margin: const EdgeInsets.all(3),
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isOn
-                        ? PiligrimColors.steppe
-                        : PiligrimColors.sky.withValues(alpha: 0.25),
-                    boxShadow: isOn
-                        ? [
-                            BoxShadow(
-                              color: PiligrimColors.steppe.withValues(alpha: 0.5),
-                              blurRadius: 6,
-                            ),
-                          ]
-                        : null,
+                        ? PiligrimColors.nomadCream
+                        : PiligrimColors.sky.withValues(alpha: 0.35),
+                    boxShadow: [
+                      BoxShadow(
+                        color: PiligrimColors.shadow.withValues(
+                          alpha: isOn ? 0.22 : 0.12,
+                        ),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -742,7 +728,7 @@ class _MessengerChip extends StatelessWidget {
     return PiligrimTap(
       onTap: () => onLaunch(url),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         child: Row(
           children: [
             SvgPicture.asset(
@@ -750,7 +736,7 @@ class _MessengerChip extends StatelessWidget {
               width: 18,
               height: 18,
               colorFilter: ColorFilter.mode(
-                PiligrimColors.steppe.withValues(alpha: 0.75),
+                PiligrimColors.steppe.withValues(alpha: 0.65),
                 BlendMode.srcIn,
               ),
             ),
@@ -759,7 +745,7 @@ class _MessengerChip extends StatelessWidget {
               label,
               style: PiligrimTextStyles.body.copyWith(
                 fontSize: 13,
-                color: PiligrimColors.sky.withValues(alpha: 0.75),
+                color: PiligrimColors.sky.withValues(alpha: 0.68),
               ),
             ),
             const Spacer(),
@@ -811,13 +797,14 @@ class _ContactsCard extends StatelessWidget {
         ? coreInfo!.socialLinks
         : null;
 
-    return _BrandCard(
+    return _ProfileGlassCard(
+      variant: ProfileGlassVariant.integrated,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Адрес
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
             child: Text(
               address,
               style: PiligrimTextStyles.body.copyWith(
@@ -831,7 +818,7 @@ class _ContactsCard extends StatelessWidget {
           // Кнопки карт — скрываем если все ссылки null
           if (mapLinks.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
               child: Row(
                 children: mapLinks.map((t) {
                   return Expanded(
@@ -845,10 +832,10 @@ class _ContactsCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: PiligrimColors.steppe.withValues(alpha: 0.08),
+                            color: PiligrimColors.steppe.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: PiligrimColors.steppe.withValues(alpha: 0.25),
+                              color: PiligrimColors.steppe.withValues(alpha: 0.16),
                             ),
                           ),
                           child: Column(
@@ -883,13 +870,13 @@ class _ContactsCard extends StatelessWidget {
               ),
             ),
 
-          const Divider(height: 1, color: PiligrimColors.divider),
+          const _ProfileHairlineDivider(inset: 18),
 
           // Телефон
           PiligrimTap(
             onTap: () => onLaunch('tel:$phone'),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               child: Row(
                 children: [
                   SvgPicture.asset(
@@ -922,7 +909,7 @@ class _ContactsCard extends StatelessWidget {
             ),
           ),
 
-          const Divider(height: 1, color: PiligrimColors.divider),
+          const _ProfileHairlineDivider(inset: 18),
 
           // Мессенджеры — список строк с иконками
           ...() {
@@ -947,8 +934,7 @@ class _ContactsCard extends StatelessWidget {
             for (int i = 0; i < items.length; i++) {
               rows.add(items[i]);
               if (i < items.length - 1) {
-                rows.add(const Divider(
-                    height: 1, color: PiligrimColors.divider, indent: 46));
+                rows.add(const _ProfileHairlineDivider(inset: 48));
               }
             }
             return rows;
@@ -959,112 +945,6 @@ class _ContactsCard extends StatelessWidget {
         .animate()
         .fadeIn(delay: 150.ms, duration: 600.ms)
         .slideY(begin: 0.05, end: 0, duration: 600.ms);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HOURS CARD
-// ─────────────────────────────────────────────────────────────────────────────
-class _HoursCard extends StatefulWidget {
-  @override
-  State<_HoursCard> createState() => _HoursCardState();
-}
-
-class _HoursCardState extends State<_HoursCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final core = context.watch<CoreInfoProvider>();
-    final open = core.isOpenNow;
-    if (open) {
-      if (!_pulseCtrl.isAnimating) _pulseCtrl.repeat(reverse: true);
-    } else if (_pulseCtrl.isAnimating) {
-      _pulseCtrl.stop();
-      _pulseCtrl.value = 0;
-    }
-    final hoursText = core.workingHoursNote?.isNotEmpty == true
-        ? '${core.workingHoursDisplay}\n${core.workingHoursNote}'
-        : core.workingHoursDisplay;
-    return _BrandCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Пульс
-            AnimatedBuilder(
-              animation: _pulseCtrl,
-              builder: (_, __) {
-                final dot = open ? PiligrimColors.ember : PiligrimColors.sky.withValues(alpha: 0.18);
-                return Container(
-                  width: 11,
-                  height: 11,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: dot,
-                    boxShadow: open
-                        ? [
-                            BoxShadow(
-                              color: dot.withValues(
-                                  alpha: 0.3 + _pulseCtrl.value * 0.4),
-                              blurRadius: 4 + _pulseCtrl.value * 8,
-                              spreadRadius: _pulseCtrl.value * 3,
-                            ),
-                          ]
-                        : null,
-                  ),
-                );
-              },
-            ),
-            const SizedBox(width: 14),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  open ? 'Открыто сейчас' : 'Закрыто',
-                  style: PiligrimTextStyles.body.copyWith(
-                    fontSize: 15,
-                    color: open ? PiligrimColors.ember : PiligrimColors.sky.withValues(alpha: 0.3),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  hoursText,
-                  style: PiligrimTextStyles.caption,
-                ),
-              ],
-            ),
-            const Spacer(),
-            SvgPicture.asset(
-              'assets/images/sun.svg',
-              width: 28,
-              height: 28,
-              colorFilter: ColorFilter.mode(
-                PiligrimColors.steppe.withValues(alpha: open ? 0.35 : 0.07),
-                BlendMode.srcIn,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -1105,7 +985,7 @@ class _RulesCardState extends State<_RulesCard> {
   @override
   Widget build(BuildContext context) {
     final items = _items;
-    return _BrandCard(
+    return _ProfileGlassCard(
       child: Column(
         children: items.asMap().entries.map((entry) {
           final i = entry.key;
@@ -1169,11 +1049,7 @@ class _RulesCardState extends State<_RulesCard> {
                     : const SizedBox.shrink(),
               ),
               if (i < items.length - 1)
-                const Divider(
-                  height: 1,
-                  color: PiligrimColors.divider,
-                  indent: 16,
-                ),
+                const _ProfileHairlineDivider(inset: 18),
             ],
           );
         }).toList(),
@@ -1206,21 +1082,23 @@ class _LegalFooter extends StatelessWidget {
 
     return Column(
       children: [
-        // Центральный тотем-разделитель
-        Center(
-          child: SvgPicture.asset(
-            'assets/images/spiral.svg',
-            width: 20,
-            height: 20,
-            colorFilter: ColorFilter.mode(
-              PiligrimColors.steppe.withValues(alpha: 0.25),
-              BlendMode.srcIn,
+        Container(
+          height: 0.5,
+          margin: const EdgeInsets.symmetric(horizontal: 48),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                PiligrimColors.clear,
+                PiligrimColors.steppe.withValues(alpha: 0.22),
+                PiligrimColors.clear,
+              ],
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
 
-        _BrandCard(
+        _ProfileGlassCard(
+          variant: ProfileGlassVariant.integrated,
           child: Column(
             children: [
               if (coreInfo?.termsOfService != null) ...[
@@ -1228,14 +1106,14 @@ class _LegalFooter extends StatelessWidget {
                   label: 'Пользовательское соглашение',
                   onTap: () => onLaunch(coreInfo!.termsOfService!),
                 ),
-                const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
+                const _ProfileHairlineDivider(inset: 18),
               ],
               _LegalRow(
                 label: 'Политика конфиденциальности',
                 onTap: () => onLaunch(privacy),
               ),
               if (coreInfo?.feedbackUrl != null) ...[
-                const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
+                const _ProfileHairlineDivider(inset: 18),
                 _LegalRow(
                   label: 'Обратная связь',
                   accent: true,
@@ -1283,32 +1161,19 @@ class _LogoutButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _BrandCard(
+    return _ProfileGlassCard(
+      variant: ProfileGlassVariant.integrated,
       child: PiligrimTap(
         borderRadius: BorderRadius.circular(PiligrimRadius.md),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Text(
-                'Выйти из аккаунта',
-                style: PiligrimTextStyles.body.copyWith(
-                  fontSize: 13,
-                  color: PiligrimColors.ember.withValues(alpha: 0.85),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '→',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: PiligrimColors.ember.withValues(alpha: 0.5),
-                  height: 1.0,
-                  fontFamily: 'MuseoSans',
-                ),
-              ),
-            ],
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Text(
+            'Выйти из аккаунта',
+            style: PiligrimTextStyles.body.copyWith(
+              fontSize: 13,
+              color: PiligrimColors.ember.withValues(alpha: 0.85),
+            ),
           ),
         ),
       ),
@@ -1360,32 +1225,196 @@ class _LegalRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHARED: Brand Card + Section Header
+// LUXURY ATMOSPHERE + GLASS SURFACES
 // ─────────────────────────────────────────────────────────────────────────────
-class _BrandCard extends StatelessWidget {
-  const _BrandCard({required this.child});
-  final Widget child;
+
+enum ProfileGlassVariant { panel, settings, stat, integrated }
+
+/// Кинематографичный оверлей: amber glow, дымчатый gradient, без декора.
+class _ProfileAtmosphere extends StatelessWidget {
+  const _ProfileAtmosphere();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: PiligrimColors.earth,
-        borderRadius: BorderRadius.circular(PiligrimRadius.md),
-        border: Border.all(
-          color: PiligrimColors.steppe.withValues(alpha: 0.12),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: PiligrimColors.shadow.withValues(alpha: 0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0.0, 0.35, 0.72, 1.0],
+                colors: [
+                  PiligrimColors.ember.withValues(alpha: 0.06),
+                  PiligrimColors.clear,
+                  PiligrimColors.earthWarm.withValues(alpha: 0.12),
+                  PiligrimColors.earthSurface.withValues(alpha: 0.55),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: -60,
+            top: MediaQuery.sizeOf(context).height * 0.12,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    PiligrimColors.steppe.withValues(alpha: 0.10),
+                    PiligrimColors.clear,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: -40,
+            bottom: MediaQuery.sizeOf(context).height * 0.18,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    PiligrimColors.ember.withValues(alpha: 0.07),
+                    PiligrimColors.clear,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0.5, -0.2),
+                radius: 1.1,
+                colors: [
+                  PiligrimColors.clear,
+                  PiligrimColors.shadow.withValues(alpha: 0.35),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(PiligrimRadius.md),
-        child: child,
+    );
+  }
+}
+
+class _ProfileHairlineDivider extends StatelessWidget {
+  const _ProfileHairlineDivider({this.inset = 0});
+
+  final double inset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(left: inset),
+      child: Container(
+        height: 0.5,
+        color: PiligrimColors.sky.withValues(alpha: 0.10),
+      ),
+    );
+  }
+}
+
+class _ProfileGlassCard extends StatelessWidget {
+  const _ProfileGlassCard({
+    required this.child,
+    this.variant = ProfileGlassVariant.panel,
+    this.padding,
+  });
+
+  final Widget child;
+  final ProfileGlassVariant variant;
+  final EdgeInsetsGeometry? padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(
+      variant == ProfileGlassVariant.stat ? 14 : PiligrimRadius.md,
+    );
+
+    final (fillTop, fillBottom, borderAlpha, blurSigma, shadowAlpha) =
+        switch (variant) {
+      ProfileGlassVariant.stat => (
+          0.10,
+          0.04,
+          0.18,
+          10.0,
+          0.14,
+        ),
+      ProfileGlassVariant.settings => (
+          0.14,
+          0.06,
+          0.14,
+          14.0,
+          0.10,
+        ),
+      ProfileGlassVariant.integrated => (
+          0.08,
+          0.03,
+          0.10,
+          8.0,
+          0.06,
+        ),
+      ProfileGlassVariant.panel => (
+          0.12,
+          0.05,
+          0.12,
+          12.0,
+          0.12,
+        ),
+    };
+
+    Widget content = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            PiligrimColors.earthWarm.withValues(alpha: fillTop),
+            PiligrimColors.earth.withValues(alpha: fillBottom),
+          ],
+        ),
+        border: Border.all(
+          color: PiligrimColors.steppe.withValues(alpha: borderAlpha),
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: PiligrimColors.steppe.withValues(alpha: shadowAlpha * 0.5),
+            blurRadius: variant == ProfileGlassVariant.stat ? 16 : 10,
+            offset: const Offset(0, 4),
+          ),
+          if (variant == ProfileGlassVariant.stat)
+            BoxShadow(
+              color: PiligrimColors.ember.withValues(alpha: 0.06),
+              blurRadius: 20,
+              spreadRadius: -4,
+            ),
+        ],
+      ),
+      child: child,
+    );
+
+    if (variant == ProfileGlassVariant.integrated) {
+      return ClipRRect(borderRadius: radius, child: content);
+    }
+
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+        child: content,
       ),
     );
   }
@@ -1475,16 +1504,17 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
-      backgroundColor: PiligrimColors.earth,
+      backgroundColor: PiligrimColors.earthSurface,
       resizeToAvoidBottomInset: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
           const PiligrimBackground(
             cinematic: true,
-            textureOpacity: 0.45,
-            vignetteIntensity: 0.25,
+            textureOpacity: 0.38,
+            vignetteIntensity: 0.18,
           ),
+          const Positioned.fill(child: _ProfileAtmosphere()),
           Positioned(
             bottom: 0,
             left: 0,
@@ -1496,8 +1526,8 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                   colors: [
-                    PiligrimColors.ember.withValues(alpha: 0.12),
-                    PiligrimColors.steppe.withValues(alpha: 0.04),
+                    PiligrimColors.ember.withValues(alpha: 0.08),
+                    PiligrimColors.steppe.withValues(alpha: 0.03),
                     PiligrimColors.clear,
                   ],
                   stops: const [0.0, 0.5, 1.0],
@@ -1594,7 +1624,7 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
                               ),
                               counterText: '',
                               filled: true,
-                              fillColor: PiligrimColors.earthDeep.withValues(alpha: 0.60),
+                              fillColor: PiligrimColors.earthWarm.withValues(alpha: 0.35),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 14),
                               enabledBorder: OutlineInputBorder(
@@ -1618,7 +1648,7 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
                             label: _submitting
                                 ? 'Подождите…'
                                 : (_awaitingCode ? 'ПОДТВЕРДИТЬ' : 'ПОЛУЧИТЬ КОД'),
-                            iconAsset: 'assets/images/moon_totem (1).svg',
+                            showTrailingArrow: false,
                             onTap: _submitting
                                 ? null
                                 : (_awaitingCode ? _confirmCode : _requestCode),

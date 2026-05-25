@@ -250,10 +250,15 @@ class _SegmentedAficha extends StatelessWidget {
   static const double _height = 36;
   static const double _radius = 18;
   static const double _trackWidth = 184;
+  /// Внутренний воздух между track border и active pill (Apple-style inset).
+  static const double _pillInset = 3;
 
   @override
   Widget build(BuildContext context) {
     final isEvents = value == _AfichaView.events;
+    const innerWidth = _trackWidth - _pillInset * 2;
+    const pillWidth = innerWidth / 2;
+    const pillRadius = _radius - _pillInset;
 
     return SizedBox(
       width: _trackWidth,
@@ -269,32 +274,39 @@ class _SegmentedAficha extends StatelessWidget {
               ),
             ),
           ),
-          AnimatedAlign(
-            duration: 280.ms,
-            curve: Curves.easeOutCubic,
-            alignment:
-                isEvents ? Alignment.centerLeft : Alignment.centerRight,
-            child: Container(
-              width: _trackWidth / 2,
-              height: _height,
-              decoration: BoxDecoration(
-                color: PiligrimColors.water.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(_radius),
-                border: Border.all(
-                  color: PiligrimColors.water.withValues(alpha: 0.5),
-                  width: 0.8,
-                ),
-                boxShadow: [
-                  BoxShadow(
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.all(_pillInset),
+              child: AnimatedAlign(
+                duration: 280.ms,
+                curve: Curves.easeOutCubic,
+                alignment: isEvents
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                child: Container(
+                  width: pillWidth,
+                  height: double.infinity,
+                  decoration: BoxDecoration(
                     color: PiligrimColors.water.withValues(alpha: 0.18),
-                    blurRadius: 12,
-                    spreadRadius: 0.5,
+                    borderRadius: BorderRadius.circular(pillRadius),
+                    border: Border.all(
+                      color: PiligrimColors.water.withValues(alpha: 0.5),
+                      width: 0.8,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: PiligrimColors.water.withValues(alpha: 0.18),
+                        blurRadius: 12,
+                        spreadRadius: 0.5,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
                 child: _AfichaTabLabel(
@@ -335,20 +347,43 @@ class _AfichaTabLabel extends StatelessWidget {
         ? PiligrimColors.water
         : PiligrimColors.sky.withValues(alpha: 0.45);
 
+    const textHeightBehavior = TextHeightBehavior(
+      applyHeightToFirstAscent: false,
+      applyHeightToLastDescent: false,
+    );
+
     return PiligrimTap(
       onTap: onTap,
       borderRadius: BorderRadius.circular(_SegmentedAficha._radius),
-      child: Center(
-        child: AnimatedDefaultTextStyle(
-          duration: 220.ms,
-          curve: Curves.easeOut,
-          style: PiligrimTextStyles.caption.copyWith(
-            fontSize: 11.5,
-            color: color,
-            fontWeight: active ? FontWeight.w700 : FontWeight.w300,
-            letterSpacing: active ? 0.6 : 0.4,
+      child: SizedBox(
+        height: _SegmentedAficha._height,
+        child: Center(
+          child: Transform.translate(
+            offset: const Offset(0, -0.5),
+            child: AnimatedDefaultTextStyle(
+              duration: 220.ms,
+              curve: Curves.easeOut,
+              style: PiligrimTextStyles.caption.copyWith(
+                fontSize: 11.5,
+                height: 1.0,
+                leadingDistribution: TextLeadingDistribution.even,
+                color: color,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w300,
+                letterSpacing: active ? 0.6 : 0.4,
+              ),
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                textHeightBehavior: textHeightBehavior,
+                strutStyle: const StrutStyle(
+                  fontSize: 11.5,
+                  height: 1.0,
+                  leading: 0,
+                  forceStrutHeight: true,
+                ),
+              ),
+            ),
           ),
-          child: Text(label),
         ),
       ),
     );

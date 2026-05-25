@@ -222,6 +222,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                       label: _submitting
                           ? 'Подождите…'
                           : (_awaitingCode ? 'Подтвердить' : 'Получить код'),
+                      showTrailingArrow: false,
                       onTap: _submitting
                           ? null
                           : (_awaitingCode ? _confirmCode : _requestCode),

@@ -1,4 +1,4 @@
-// Строка статуса внизу главного экрана — «Открыто/Закрыто» с пульсирующей точкой
+// Строка статуса на главном экране — «Открыто/Закрыто» с пульсирующей точкой
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/theme.dart';
@@ -70,12 +70,12 @@ class _HomeStatusLineState extends State<HomeStatusLine>
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Тонкая steppe-hairline — визуальное завершение контента перед статусом
+        // Тонкая steppe-hairline — разделитель перед строкой статуса
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Container(
             height: 0.5,
-            margin: const EdgeInsets.only(bottom: 20),
+            margin: const EdgeInsets.only(top: 12, bottom: 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
