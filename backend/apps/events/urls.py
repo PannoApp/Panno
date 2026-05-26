@@ -14,8 +14,8 @@ from .views import (
 app_name = 'events'
 
 router = DefaultRouter()
-router.register(r'staff/events', StaffEventViewSet, basename='staff-event')
-router.register(r'staff/news', StaffNewsViewSet, basename='staff-news')
+router.register(r'admin/events', StaffEventViewSet, basename='staff-event')
+router.register(r'admin/news', StaffNewsViewSet, basename='staff-news')
 
 urlpatterns = [
     # Список будущих мероприятий
