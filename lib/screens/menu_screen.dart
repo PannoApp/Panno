@@ -15,6 +15,7 @@ import '../data/models/api_dish.dart';
 import '../data/models/api_tag.dart';
 import '../providers/auth_provider.dart';
 import '../providers/menu_provider.dart';
+import 'dish_edit_screen.dart';
 import '../widgets/dish_detail_sheet.dart';
 import '../widgets/dish_elements.dart';
 import '../widgets/dish_video_card.dart';
@@ -56,12 +57,12 @@ class _MenuScreenState extends State<MenuScreen>
               shape: const CircleBorder(),
               elevation: 6,
               onPressed: () {
-                // TODO: navigate to DishEditScreen(dish: null) — TICKET-016
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('DishEditScreen — coming soon'),
-                    backgroundColor: PiligrimColors.earthDeep,
-                    duration: Duration(seconds: 2),
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => DishEditScreen(
+                      dish: null,
+                      categories: menuProvider.categories,
+                    ),
                   ),
                 );
               },
@@ -1272,12 +1273,12 @@ class _FilterChips extends StatelessWidget {
 // — pill-badge категории, многоступенчатый gradient, премиальная цена-pill.
 // ─────────────────────────────────────────────────────────────────────────────
 void _openDishEdit(BuildContext context, ApiDish dish) {
-  // TODO: navigate to DishEditScreen when implemented
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text('Редактировать: ${dish.name}'),
-      backgroundColor: PiligrimColors.earthDeep,
-      duration: const Duration(seconds: 2),
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => DishEditScreen(
+        dish: dish,
+        categories: context.read<MenuProvider>().categories,
+      ),
     ),
   );
 }
