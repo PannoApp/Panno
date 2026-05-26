@@ -202,17 +202,121 @@ Category (Категория)
 
 `video_url` в ответе API — абсолютный URL к `video_processed`. Возвращает `null`, пока видео не готово.
 
+## Admin Dish CRUD (Staff Only)
+
+Управление блюдами для пользователей с `is_staff=True`. Видит все блюда включая неактивные (`is_active=False`).
+
+**Авторизация:** `Authorization: Bearer <access_token>` + `is_staff=true`
+
+**Base URL:** `/api/v1/menu/admin/dishes/`
+
+### Маршруты
+
+| Метод | URL | Действие |
+|---|---|---|
+| `GET` | `/api/v1/menu/admin/dishes/` | Список всех блюд (без пагинации) |
+| `POST` | `/api/v1/menu/admin/dishes/` | Создать блюдо |
+| `GET` | `/api/v1/menu/admin/dishes/{id}/` | Получить блюдо по ID |
+| `PUT` | `/api/v1/menu/admin/dishes/{id}/` | Полное обновление блюда |
+| `PATCH` | `/api/v1/menu/admin/dishes/{id}/` | Частичное обновление блюда |
+| `DELETE` | `/api/v1/menu/admin/dishes/{id}/` | Удалить блюдо |
+
+**Content-Type:**
+- `POST`, `PUT`, `PATCH` с изображением — `multipart/form-data`
+- `PATCH` без изображения — `application/json`
+
+---
+
+### Поля StaffDishSerializer
+
+| Поле | Тип | Режим | Обязательность | Описание |
+|---|---|---|---|---|
+| `id` | int | read | — | Первичный ключ (авто) |
+| `name` | string | read/write | required | Название блюда |
+| `description` | text | read/write | optional | Описание блюда |
+| `price` | decimal | read/write | required | Цена (строка: `"4500.00"`) |
+| `category` | int | read/write | required | ID категории (FK) |
+| `tags` | int[] | read/write | optional | Список ID тегов (M2M) |
+| `allergens` | int[] | read/write | optional | Список ID аллергенов (M2M) |
+| `image` | file | write | required при создании | Фото блюда (multipart) |
+| `image_url` | string | read | — | Абсолютный URL фото |
+| `weight` | int | read/write | optional | Вес порции в граммах |
+| `story` | text | read/write | optional | История блюда |
+| `is_active` | bool | read/write | optional | Видимость блюда в публичном API (default: `true`) |
+
+> `video` и `video_processed` через Staff API не управляются — только через Django Admin.
+
+---
+
+### Примеры
+
+**Создать блюдо (`multipart/form-data`):**
+```bash
+curl -X POST http://localhost:8000/api/v1/menu/admin/dishes/ \
+  -H "Authorization: Bearer <access_token>" \
+  -F "name=Стейк Рибай" \
+  -F "description=Мраморная говядина" \
+  -F "price=4500.00" \
+  -F "category=1" \
+  -F "tags=2" \
+  -F "allergens=1" \
+  -F "weight=350" \
+  -F "is_active=true" \
+  -F "image=@/path/to/photo.jpg"
+```
+
+**Частичное обновление (`application/json`):**
+```bash
+curl -X PATCH http://localhost:8000/api/v1/menu/admin/dishes/1/ \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"price": "5000.00", "is_active": false}'
+```
+
+---
+
+### Коды ошибок
+
+| Код | Причина |
+|---|---|
+| `400 Bad Request` | Нет `image` при создании (`{"image": "Фото обязательно при создании блюда."}`) |
+| `403 Forbidden` | Пользователь не авторизован или `is_staff=False` |
+| `404 Not Found` | Блюдо с указанным `id` не существует |
+
+---
+
+## Allergens
+
+### GET /api/v1/menu/allergens/
+
+Возвращает все аллергены, отсортированные по имени.
+
+**Авторизация:** не нужна
+
+**Ответ 200:**
+```json
+[
+  { "id": 1, "name": "Глютен" },
+  { "id": 2, "name": "Лактоза" },
+  { "id": 3, "name": "Орехи" }
+]
+```
+
+Пагинации нет — возвращаются все аллергены сразу. Кэш не применяется.
+
+---
+
 ## Файлы модуля
 
 ```
 apps/menu/
 ├── models.py       # Category, Tag, Allergen, Dish (+ VideoStatus enum)
 ├── serializers.py  # CategorySerializer, TagSerializer, AllergenSerializer, DishSerializer
-├── views.py        # CategoryListView, DishListView, VideoFeedView
+├── views.py        # CategoryListView, AllergenListView, TagListView, DishListView, VideoFeedView, StaffDishViewSet
 ├── filters.py      # DishFilter (category_id, tag_ids, search)
 ├── tasks.py        # process_dish_video — Celery-задача FFmpeg транскодирования
 ├── signals.py      # trigger_video_processing, кэш-инвалидация
-└── urls.py         # /categories/, /dishes/, /feed/
+└── urls.py         # /categories/, /tags/, /allergens/, /dishes/, /feed/, /admin/dishes/
 ```
 
 ## Кэширование

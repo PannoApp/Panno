@@ -379,6 +379,56 @@ class UserProfileViewTest(APITestCase):
 
 
 # ---------------------------------------------------------------------------
+# UserProfileSerializer — поля is_staff и role
+# ---------------------------------------------------------------------------
+
+class UserProfileSerializerTest(APITestCase):
+    """Проверяем, что is_staff и role корректно отдаются и защищены от записи."""
+
+    PROFILE_URL = '/api/v1/users/profile/'
+
+    def _auth(self, user):
+        refresh = RefreshToken.for_user(user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    def test_profile_response_includes_is_staff(self):
+        """Staff-пользователь получает is_staff=True в ответе."""
+        # Модель синхронизирует is_staff из role при save(), поэтому задаём role
+        staff = User.objects.create_user(phone='+77009990001', role='admin')
+        self._auth(staff)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_staff'])
+
+    def test_profile_response_includes_role(self):
+        """Staff-пользователь с ролью admin получает role='admin' в ответе."""
+        staff = User.objects.create_user(phone='+77009990002')
+        staff.role = 'admin'
+        staff.save()
+        self._auth(staff)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['role'], 'admin')
+
+    def test_profile_response_regular_user(self):
+        """Обычный пользователь получает is_staff=False и role='' (не null)."""
+        regular = User.objects.create_user(phone='+77009990003')
+        self._auth(regular)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['is_staff'])
+        self.assertEqual(response.data['role'], '')
+
+    def test_profile_role_readonly(self):
+        """PATCH с role='admin' игнорируется — поле только для чтения."""
+        regular = User.objects.create_user(phone='+77009990004')
+        self._auth(regular)
+        self.client.patch(self.PROFILE_URL, {'role': 'admin'})
+        regular.refresh_from_db()
+        self.assertEqual(regular.role, '')
+
+
+# ---------------------------------------------------------------------------
 # PhoneSMSThrottle
 # ---------------------------------------------------------------------------
 

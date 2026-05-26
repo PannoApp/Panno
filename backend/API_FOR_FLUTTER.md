@@ -184,6 +184,12 @@ Future<void> logout() async {
 - **Без пагинации** — ответ: `[{"id": 1, "name": "Вегетарианское"}, {"id": 2, "name": "Острое"}, ...]`
 - Загружать при инициализации меню (параллельно с категориями) для наполнения фильтр-чипов.
 
+### 2.2.1 Аллергены
+`GET /api/v1/menu/allergens/` (Без авторизации)
+- Возвращает **плоский массив** всех аллергенов, отсортированных по имени.
+- **Без пагинации** — ответ: `[{"id": 1, "name": "Глютен"}, {"id": 2, "name": "Лактоза"}, {"id": 3, "name": "Орехи"}, ...]`
+- Загружать при инициализации admin-панели редактирования блюда (для чекбоксов выбора аллергенов).
+
 ### 2.3 Список блюд (классическое меню)
 `GET /api/v1/menu/dishes/`
 - По умолчанию отдает **5 блюд** на страницу. Пагинация — страничная (`?page=2`).
@@ -478,7 +484,138 @@ Navigator.of(context).push(
 
 ---
 
-## 🔁 6. Идемпотентность (защита от дублей при ретраях)
+## 🛠️ 6. Admin Panel (Staff Only)
+
+Функционал доступен только пользователям с `is_staff=true`. Флаг возвращается в `GET /api/v1/users/profile/`.
+
+### 6.1 Определение роли на клиенте
+
+```dart
+// После успешного логина загрузи профиль
+final profile = await userRepository.getProfile(); // GET /api/v1/users/profile/
+if (profile.isStaff) {
+  // Показать кнопку/вкладку «Управление меню» в profile screen
+}
+```
+
+`is_staff` — булево поле в ответе профиля. Кнопка входа в admin UI показывается только при `true`. Обычный авторизованный пользователь (`is_staff=false`) не видит admin-элементов.
+
+---
+
+### 6.2 Список всех блюд (включая неактивные)
+`GET /api/v1/menu/admin/dishes/` (Staff only)
+
+Возвращает все блюда без пагинации, включая `is_active=false`.
+
+```dart
+final resp = await dio.get('/api/v1/menu/admin/dishes/');
+// resp.data — List<dynamic>, каждый элемент содержит image_url, is_active и т.д.
+```
+
+---
+
+### 6.3 Создать блюдо
+`POST /api/v1/menu/admin/dishes/` (Staff only)  
+**Content-Type: `multipart/form-data`** — обязателен, так как передаётся `image`.
+
+```dart
+Future<void> createDish({
+  required String name,
+  required String price,
+  required int categoryId,
+  required File imageFile,
+  String? description,
+  String? story,
+  int? weight,
+  bool isActive = true,
+  List<int> tagIds = const [],
+  List<int> allergenIds = const [],
+}) async {
+  final formData = FormData.fromMap({
+    'name': name,
+    'price': price,
+    'category': categoryId,
+    'description': description ?? '',
+    'story': story ?? '',
+    if (weight != null) 'weight': weight,
+    'is_active': isActive,
+    'image': await MultipartFile.fromFile(
+      imageFile.path,
+      filename: path.basename(imageFile.path),
+    ),
+    // Списки передаются как повторяющиеся поля
+    for (final id in tagIds) 'tags': id,
+    for (final id in allergenIds) 'allergens': id,
+  });
+
+  await dio.post('/api/v1/menu/admin/dishes/', data: formData);
+}
+```
+
+> **Автообрезка изображений:** загружай фото в любом формате (PNG, HEIC, JPEG, любое соотношение сторон) — бэкенд автоматически обрежет до 16:9, сконвертирует в JPEG (max 1200px, quality 85) и сохранит с UUID-именем. Оригинальное имя файла не сохраняется. В ответе `image_url` вернёт абсолютный URL обрезанного файла.
+
+---
+
+### 6.4 Полное обновление блюда (с заменой фото)
+`PUT /api/v1/menu/admin/dishes/{id}/` (Staff only)  
+**Content-Type: `multipart/form-data`**
+
+Аналогично созданию — передавать все поля + `image` если нужно заменить фото.
+
+```dart
+final formData = FormData.fromMap({
+  'name': updatedName,
+  'price': updatedPrice,
+  'category': categoryId,
+  'is_active': isActive,
+  'image': await MultipartFile.fromFile(newImageFile.path),
+  // ... остальные поля
+});
+
+await dio.put('/api/v1/menu/admin/dishes/$dishId/', data: formData);
+```
+
+---
+
+### 6.5 Частичное обновление блюда (без замены фото)
+`PATCH /api/v1/menu/admin/dishes/{id}/` (Staff only)
+
+**Без `image`** → отправлять `application/json` (не multipart):
+
+```dart
+// Обновить только цену и статус активности
+await dio.patch(
+  '/api/v1/menu/admin/dishes/$dishId/',
+  data: {'price': '5500.00', 'is_active': false},
+  options: Options(contentType: 'application/json'),
+);
+```
+
+**С новым `image`** → использовать `multipart/form-data` (как в PUT).
+
+---
+
+### 6.6 Удалить блюдо
+`DELETE /api/v1/menu/admin/dishes/{id}/` (Staff only)
+
+```dart
+await dio.delete('/api/v1/menu/admin/dishes/$dishId/');
+// Response 204 — тело пустое. Файлы (image, video) удаляются автоматически на сервере.
+```
+
+---
+
+### 6.7 Коды ошибок Admin API
+
+| Код | Причина |
+|---|---|
+| `400` | Нет `image` при создании (`{"image": "Фото обязательно при создании блюда."}`) |
+| `403` | Пользователь не авторизован или `is_staff=false` |
+| `404` | Блюдо с указанным `id` не существует |
+
+---
+
+## 🔁 7. Идемпотентность (защита от дублей при ретраях)
 
 POST-запросы на создание брони и записи на мероприятие **обязательно** требуют заголовок `Idempotency-Key`.
 
@@ -511,7 +648,7 @@ final response = await dio.post(
 
 ---
 
-## 🛑 7. Обработка ошибок в приложении (Важно)
+## 🛑 8. Обработка ошибок в приложении (Важно)
 
 1. **401 Unauthorized**: Access-токен истёк.
    - *Действие:* Вызови `POST /api/v1/users/auth/token/refresh/` с сохранённым refresh-токеном. Если refresh тоже вернул 401 — разлогинь пользователя и отправь на экран SMS-входа. Подробная схема — в разделе 1.3.

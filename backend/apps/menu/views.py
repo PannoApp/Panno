@@ -1,15 +1,17 @@
 from django.core.cache import cache
-from rest_framework import generics
-from rest_framework.permissions import AllowAny
+from rest_framework import generics, viewsets
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.filters import SearchFilter
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
-from .models import Dish, Category, Tag
-from .serializers import DishSerializer, CategorySerializer, TagSerializer
+from .models import Dish, Category, Tag, Allergen
+from .serializers import DishSerializer, CategorySerializer, TagSerializer, AllergenSerializer, StaffDishSerializer
 from utils.pagination import VideoFeedPagination, VideoCursorPagination
 from utils.cache import safe_cache_get, safe_cache_set
+from utils.permissions import IsStaffOrAdmin
 from .filters import DishFilter
 
 # TTL кэша (категории и теги меняются редко, блюда чаще)
@@ -41,6 +43,18 @@ class CategoryListView(generics.ListAPIView):
         response = super().list(request, *args, **kwargs)
         safe_cache_set('menu_categories', response.data, timeout=_CACHE_CATEGORIES)
         return response
+
+
+@extend_schema(
+    tags=['Menu'],
+    summary='Список аллергенов',
+    description='Возвращает все аллергены, отсортированные по имени.',
+    responses={200: AllergenSerializer(many=True)},
+)
+class AllergenListView(generics.ListAPIView):
+    serializer_class = AllergenSerializer
+    permission_classes = [AllowAny]
+    queryset = Allergen.objects.all().order_by('name')
 
 
 @extend_schema(
@@ -175,3 +189,18 @@ class VideoFeedView(generics.ListAPIView):
             .prefetch_related('tags', 'allergens')
             .order_by('id')
         )
+
+
+@extend_schema(tags=['Staff: Menu'])
+class StaffDishViewSet(viewsets.ModelViewSet):
+    """CRUD блюд для staff/admin. Видит все блюда включая неактивные."""
+    queryset = (
+        Dish.objects
+        .select_related('category')
+        .prefetch_related('tags', 'allergens')
+        .order_by('category__order', 'id')
+    )
+    serializer_class = StaffDishSerializer
+    permission_classes = [IsAuthenticated, IsStaffOrAdmin]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None

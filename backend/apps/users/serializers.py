@@ -38,6 +38,10 @@ class LogoutSerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    # read_only=True обязателен на явно объявленном поле — Meta.read_only_fields
+    # не распространяется на поля, объявленные вне Meta.
+    role = serializers.CharField(default="", read_only=True)
+
     class Meta:
         model = User
         fields = (
@@ -46,5 +50,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'city',
             'notifications_enabled',
             'notify_events', 'notify_promotions', 'notify_closed_events',
+            'is_staff', 'role',
         )
-        read_only_fields = ('id', 'phone')
+        read_only_fields = ('id', 'phone', 'is_staff', 'role')

@@ -45,3 +45,31 @@ class DishSerializer(serializers.ModelSerializer):
             'image', 'video_url', 'video_status',
             'weight', 'story', 'is_active'
         )
+
+
+class StaffDishSerializer(serializers.ModelSerializer):
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
+    tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all(), required=False)
+    allergens = serializers.PrimaryKeyRelatedField(many=True, queryset=Allergen.objects.all(), required=False)
+    image = serializers.ImageField(required=False)
+    image_url = serializers.SerializerMethodField()
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
+    def validate(self, attrs):
+        if self.instance is None and not attrs.get('image'):
+            raise serializers.ValidationError({'image': 'Фото обязательно при создании блюда.'})
+        return attrs
+
+    class Meta:
+        model = Dish
+        fields = (
+            'id', 'name', 'description', 'price',
+            'category', 'tags', 'allergens',
+            'image', 'image_url',
+            'weight', 'story', 'is_active',
+        )
