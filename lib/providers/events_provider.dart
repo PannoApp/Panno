@@ -29,9 +29,11 @@ class EventsProvider extends ChangeNotifier {
   String? archivedError;
   String? newsError;
   String? reserveError;
+  String? photoReportError;
 
   List<ApiEventPhoto> _photoReport = const [];
   List<ApiEventPhoto> get photoReport => List.unmodifiable(_photoReport);
+  int? _photoReportEventId;
 
   Future<void> loadUpcoming() async {
     if (isLoadingUpcoming) return;
@@ -94,12 +96,26 @@ class EventsProvider extends ChangeNotifier {
 
   Future<void> retry() => load();
 
+  Future<void> retryNews() => loadNews();
+
+  Future<void> retryArchived() => loadArchived();
+
   Future<void> loadPhotoReport(int eventId) async {
+    if (_photoReportEventId != eventId) {
+      _photoReport = const [];
+      photoReportError = null;
+    }
+    _photoReportEventId = eventId;
+
     isLoadingPhotoReport = true;
+    photoReportError = null;
     notifyListeners();
+
     try {
       _photoReport = await _repository.fetchPhotoReport(eventId);
-    } catch (_) {
+      photoReportError = null;
+    } catch (e) {
+      photoReportError = dioErrorMessage(e);
       _photoReport = const [];
     } finally {
       isLoadingPhotoReport = false;

@@ -28,6 +28,8 @@ class MenuProvider extends ChangeNotifier {
   bool isLoadingMore = false;
   bool hasMore = true;
   String? error;
+  bool isBootstrapping = false;
+  String? bootstrapError;
 
   int _page = 1;
   int? activeCategoryId;
@@ -84,18 +86,37 @@ class MenuProvider extends ChangeNotifier {
   // Загружает сохранённый режим из SharedPreferences, затем параллельно
   // запрашивает категории, первую страницу блюд и первую страницу ленты.
   Future<void> load() async {
+    isBootstrapping = true;
+    bootstrapError = null;
+    notifyListeners();
+
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('menu_mode');
     _mode = saved == 'classic' ? MenuViewMode.classic : MenuViewMode.feed;
     _loaded = true;
     notifyListeners();
 
-    await Future.wait([
-      loadCategories(),
-      loadTags(),
-      loadDishes(refresh: true),
-      loadFeed(refresh: true),
-    ]);
+    try {
+      await Future.wait([
+        loadCategories(),
+        loadTags(),
+        loadDishes(refresh: true),
+        loadFeed(refresh: true),
+      ]);
+    } finally {
+      isBootstrapping = false;
+      _syncBootstrapError();
+      notifyListeners();
+    }
+  }
+
+  void _syncBootstrapError() {
+    final hasDishes = dishes.isNotEmpty || feedDishes.isNotEmpty;
+    if (hasDishes) {
+      bootstrapError = null;
+      return;
+    }
+    bootstrapError = error ?? feedError;
   }
 
   // ── Категории ──────────────────────────────────────────────────────────────
@@ -171,6 +192,7 @@ class MenuProvider extends ChangeNotifier {
     } finally {
       isLoading = false;
       isLoadingMore = false;
+      if (!isBootstrapping) _syncBootstrapError();
       notifyListeners();
     }
   }
@@ -204,11 +226,17 @@ class MenuProvider extends ChangeNotifier {
       hasMoreFeed = false;
     } finally {
       isLoadingFeed = false;
+      if (!isBootstrapping) _syncBootstrapError();
       notifyListeners();
     }
   }
 
-  Future<void> retry() => load();
+  Future<void> retry() async {
+    bootstrapError = null;
+    error = null;
+    feedError = null;
+    await load();
+  }
 
   // ── С главной (Путь героя / быстрые действия) ───────────────────────────────
 

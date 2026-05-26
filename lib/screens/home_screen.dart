@@ -18,6 +18,7 @@ import '../widgets/home_hero_section.dart';
 import '../widgets/home_hero_intro_block.dart';
 import '../widgets/home_action_block.dart';
 import '../widgets/home_event_block.dart';
+import '../widgets/error_view.dart';
 import '../widgets/home_status_line.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -161,6 +162,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         hoursLabel: hoursLine,
                       ),
                     ),
+                    if (core.error != null && !core.isLoading)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        child: PiligrimInlineError(
+                          message:
+                              'Не удалось обновить данные. ${core.error!}',
+                          onRetry: () => core.retry(),
+                        ),
+                      ),
                   ],
                 ),
               ),

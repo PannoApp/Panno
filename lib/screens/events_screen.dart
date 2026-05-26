@@ -151,6 +151,26 @@ class _EventsScreenState extends State<EventsScreen> {
                         ),
                       ),
                     ),
+                  if (events.isLoadingArchived &&
+                      past.isEmpty &&
+                      events.archivedError == null)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(20, 14, 20, 0),
+                        child: _ArchiveLoadingSkeleton(),
+                      ),
+                    ),
+                  if (events.archivedError != null && past.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                        child: PiligrimInlineError(
+                          message: events.archivedError!,
+                          onRetry: () =>
+                              context.read<EventsProvider>().retryArchived(),
+                        ),
+                      ),
+                    ),
                   if (past.isNotEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -201,6 +221,12 @@ class _EventsScreenState extends State<EventsScreen> {
                   const SliverToBoxAdapter(child: SizedBox(height: 8)),
                   if (events.isLoadingNews && news.isEmpty)
                     const SliverToBoxAdapter(child: _NewsLoadingSkeleton())
+                  else if (events.newsError != null && news.isEmpty)
+                    SliverErrorView(
+                      message: events.newsError!,
+                      onRetry: () =>
+                          context.read<EventsProvider>().retryNews(),
+                    )
                   else if (news.isEmpty)
                     const SliverToBoxAdapter(
                       child: _AfichaEmpty(
@@ -1592,6 +1618,18 @@ class _NewsLoadingSkeleton extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _ArchiveLoadingSkeleton extends StatelessWidget {
+  const _ArchiveLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: _SkeletonRow(height: 56),
     );
   }
 }

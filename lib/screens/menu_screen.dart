@@ -42,7 +42,29 @@ class _MenuScreenState extends State<MenuScreen>
     super.build(context);
     final menuProvider = context.watch<MenuProvider>();
 
-    if (!menuProvider.loaded) return const _MenuLoadingSkeleton();
+    if (!menuProvider.loaded ||
+        (menuProvider.isBootstrapping && menuProvider.bootstrapError == null)) {
+      return const _MenuLoadingSkeleton();
+    }
+
+    if (menuProvider.bootstrapError != null) {
+      return Scaffold(
+        backgroundColor: PiligrimColors.earth,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const PiligrimBackground(
+              textureOpacity: 0.45,
+              vignetteIntensity: 0.25,
+            ),
+            ErrorView(
+              message: menuProvider.bootstrapError!,
+              onRetry: () => context.read<MenuProvider>().retry(),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
