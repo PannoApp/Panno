@@ -9,7 +9,7 @@ import '../providers/booking_provider.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
-import '../widgets/piligrim_tap.dart';
+import '../widgets/piligrim_nav_button.dart';
 
 class BookingHistoryScreen extends StatefulWidget {
   const BookingHistoryScreen({super.key});
@@ -64,21 +64,9 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                         child: Row(
                           children: [
-                            PiligrimTap(
-                              borderRadius: BorderRadius.circular(8),
+                            PiligrimNavButton(
+                              icon: Icons.chevron_left,
                               onTap: () => Navigator.of(context).pop(),
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: SvgPicture.asset(
-                                  'assets/images/splash_path (1).svg',
-                                  width: 20,
-                                  height: 20,
-                                  colorFilter: ColorFilter.mode(
-                                    PiligrimColors.water.withValues(alpha: 0.7),
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                              ),
                             ),
                             const SizedBox(width: 14),
                             Text(

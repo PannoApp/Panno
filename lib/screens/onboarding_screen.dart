@@ -100,6 +100,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
+          // ── Кнопка закрытия (для push из профиля) ────────────────────────
+          if (Navigator.of(context).canPop())
+            Positioned(
+              top: top + 12,
+              left: 16,
+              child: PiligrimTap(
+                onTap: () => Navigator.of(context).pop(),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: PiligrimColors.sky.withValues(alpha: 0.10),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 16,
+                    color: PiligrimColors.sky.withValues(alpha: 0.45),
+                  ),
+                ),
+              ).animate().fadeIn(delay: 600.ms, duration: 400.ms),
+            ),
+
           // ── Контент ──────────────────────────────────────────────────────
           SingleChildScrollView(
             physics: const ClampingScrollPhysics(),

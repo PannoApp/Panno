@@ -358,6 +358,8 @@ class _HeroHeaderState extends State<_HeroHeader> {
                                   color: PiligrimColors.sky,
                                   letterSpacing: 0.3,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
                               Text(
@@ -373,6 +375,8 @@ class _HeroHeaderState extends State<_HeroHeader> {
                                       : PiligrimColors.steppe.withValues(alpha: 0.6),
                                   fontSize: 12,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
@@ -527,17 +531,23 @@ class _StatCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                value,
-                style: PiligrimTextStyles.heading.copyWith(
-                  fontSize: small ? 14 : 20,
-                  color: PiligrimColors.steppe,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  style: PiligrimTextStyles.heading.copyWith(
+                    fontSize: small ? 14 : 20,
+                    color: PiligrimColors.steppe,
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: PiligrimTextStyles.caption.copyWith(fontSize: 10),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ],
           ),

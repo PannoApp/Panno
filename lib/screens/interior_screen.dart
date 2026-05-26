@@ -124,21 +124,10 @@ class _InteriorScreenState extends State<InteriorScreen>
 
   void _openPhoto(List<InteriorSlide> slides, int index) {
     Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: false,
-        barrierColor: Colors.black87,
-        pageBuilder: (_, __, ___) => InteriorPhotoViewer(
+      MaterialPageRoute<void>(
+        builder: (_) => InteriorPhotoViewer(
           slides: slides,
           initialIndex: index,
-        ),
-        transitionsBuilder: (_, anim, __, child) => FadeTransition(
-          opacity: anim,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.93, end: 1.0).animate(
-              CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-            ),
-            child: child,
-          ),
         ),
       ),
     );
