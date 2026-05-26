@@ -24,3 +24,20 @@ Flutter app: repo root (`lib/`, `pubspec.yaml`). Backend: `backend/` — only to
 
 ## Copy
 - User-facing text: Russian, calm premium tone (путь / герой / традиции).
+
+## Copy restraint
+
+User-facing text must be Russian, calm and premium.
+
+Avoid:
+- over-poetic wording;
+- mystical/dramatic language;
+- theatrical ritual phrasing;
+- marketing pressure;
+- emoji.
+
+Prefer:
+- clear hospitality language;
+- short helpful messages;
+- light brand tone;
+- calm confidence.

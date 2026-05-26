@@ -164,10 +164,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     if (core.error != null && !core.isLoading)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                         child: PiligrimInlineError(
-                          message:
-                              'Не удалось обновить данные. ${core.error!}',
+                          title: 'Данные не обновились',
+                          message: core.error!,
                           onRetry: () => core.retry(),
                         ),
                       ),

@@ -1,172 +1,269 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+
 import '../core/theme.dart';
 
-/// Полноэкранный виджет ошибки с тотем-иконкой и кнопкой «Повторить».
-/// Используется на всех экранах при сетевых ошибках и ошибках сервера.
+/// Полноэкранное спокойное состояние «контент временно недоступен».
 class ErrorView extends StatelessWidget {
   const ErrorView({
     super.key,
+    this.title = _kDefaultTitle,
     required this.message,
     required this.onRetry,
   });
 
+  final String title;
   final String message;
   final VoidCallback onRetry;
+
+  static const String _kDefaultTitle = 'Временно недоступно';
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: _PiligrimErrorContent(
+        padding: const EdgeInsets.symmetric(horizontal: 48),
+        child: _PiligrimErrorBody(
+          title: title,
           message: message,
           onRetry: onRetry,
-          iconSize: 64,
-          compact: false,
+          layout: _PiligrimErrorLayout.fullscreen,
         ),
       ),
     );
   }
 }
 
-/// Компактный inline-блок для degraded-состояния (home, interior, архив, фотоотчёт).
+/// Лёгкое atmospheric notice — home, interior, архив, фотоотчёт.
 class PiligrimInlineError extends StatelessWidget {
   const PiligrimInlineError({
     super.key,
+    this.title,
     required this.message,
     required this.onRetry,
   });
 
+  final String? title;
   final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: PiligrimColors.divider),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: _PiligrimErrorContent(
-          message: message,
-          onRetry: onRetry,
-          iconSize: 36,
-          compact: true,
-        ),
-      ),
+    return _PiligrimErrorBody(
+      title: title,
+      message: message,
+      onRetry: onRetry,
+      layout: _PiligrimErrorLayout.inline,
     );
   }
 }
 
-class _PiligrimErrorContent extends StatelessWidget {
-  const _PiligrimErrorContent({
+enum _PiligrimErrorLayout { fullscreen, inline }
+
+class _PiligrimErrorBody extends StatelessWidget {
+  const _PiligrimErrorBody({
+    required this.title,
     required this.message,
     required this.onRetry,
-    required this.iconSize,
-    required this.compact,
+    required this.layout,
   });
 
+  final String? title;
   final String message;
   final VoidCallback onRetry;
-  final double iconSize;
-  final bool compact;
+  final _PiligrimErrorLayout layout;
+
+  bool get _isFullscreen => layout == _PiligrimErrorLayout.fullscreen;
 
   @override
   Widget build(BuildContext context) {
+    final resolvedTitle =
+        title ?? (_isFullscreen ? ErrorView._kDefaultTitle : null);
+
+    final titleStyle = (_isFullscreen
+            ? PiligrimTextStyles.heading
+            : PiligrimTextStyles.caption)
+        .copyWith(
+      color: PiligrimColors.sky.withValues(
+        alpha: _isFullscreen ? 0.88 : 0.55,
+      ),
+      fontSize: _isFullscreen ? 17 : 10,
+      fontWeight: _isFullscreen ? FontWeight.w700 : FontWeight.w300,
+      letterSpacing: _isFullscreen ? 0.4 : 1.8,
+      height: 1.35,
+    );
+
     final messageStyle = PiligrimTextStyles.body.copyWith(
-      color: PiligrimColors.sky.withValues(alpha: 0.6),
-      fontSize: compact ? 13 : 14,
-      height: 1.45,
+      color: PiligrimColors.sky.withValues(alpha: _isFullscreen ? 0.5 : 0.42),
+      fontSize: _isFullscreen ? 14 : 12.5,
+      height: 1.5,
+      fontWeight: FontWeight.w300,
     );
 
-    final retryButton = TextButton(
-      onPressed: onRetry,
-      style: TextButton.styleFrom(
-        foregroundColor: PiligrimColors.water,
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 20 : 28,
-          vertical: compact ? 8 : 12,
-        ),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(
-            color: PiligrimColors.water.withValues(alpha: 0.35),
-          ),
-        ),
-      ),
-      child: Text(
-        'Повторить',
-        style: PiligrimTextStyles.caption.copyWith(
-          color: PiligrimColors.water,
-          letterSpacing: 1.2,
-          fontSize: 12,
-        ),
-      ),
+    final accent = _SignalLossMark(
+      width: _isFullscreen ? 28 : 20,
+      opacity: _isFullscreen ? 0.22 : 0.14,
     );
 
-    final icon = SvgPicture.asset(
-      'assets/images/stone.svg',
-      width: iconSize,
-      height: iconSize,
-      colorFilter: ColorFilter.mode(
-        PiligrimColors.water.withValues(alpha: 0.4),
-        BlendMode.srcIn,
-      ),
-    );
+    final titleWidget = resolvedTitle == null
+        ? null
+        : Text(
+            resolvedTitle,
+            textAlign: _isFullscreen ? TextAlign.center : TextAlign.start,
+            style: titleStyle,
+          );
 
     final messageWidget = Text(
       message,
-      textAlign: compact ? TextAlign.start : TextAlign.center,
+      textAlign: _isFullscreen ? TextAlign.center : TextAlign.start,
       style: messageStyle,
     );
 
-    if (compact) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final retry = _PiligrimRetryAction(
+      onPressed: onRetry,
+      compact: !_isFullscreen,
+    );
+
+    if (_isFullscreen) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          icon,
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                messageWidget,
-                const SizedBox(height: 10),
-                Align(alignment: Alignment.centerLeft, child: retryButton),
-              ],
-            ),
-          ),
+          accent,
+          const SizedBox(height: 28),
+          if (titleWidget != null) ...[
+            titleWidget,
+            const SizedBox(height: 10),
+          ],
+          messageWidget,
+          const SizedBox(height: 32),
+          retry,
         ],
       );
     }
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        icon,
-        const SizedBox(height: 20),
-        messageWidget,
-        const SizedBox(height: 24),
-        retryButton,
+        DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: PiligrimColors.sky.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: accent,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (titleWidget != null) ...[
+                        titleWidget,
+                        const SizedBox(height: 4),
+                      ],
+                      messageWidget,
+                      const SizedBox(height: 6),
+                      retry,
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 }
 
-/// Sliver-обёртка ErrorView для использования внутри CustomScrollView.
+/// Едва заметная «разорванная» линия — сигнал недоступности без иконки.
+class _SignalLossMark extends StatelessWidget {
+  const _SignalLossMark({
+    required this.width,
+    required this.opacity,
+  });
+
+  final double width;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = PiligrimColors.water.withValues(alpha: opacity);
+    const gap = 5.0;
+    final segment = (width - gap) / 2;
+
+    return SizedBox(
+      width: width,
+      height: 1,
+      child: Row(
+        children: [
+          Container(width: segment, height: 1, color: color),
+          SizedBox(width: gap),
+          Container(width: segment, height: 1, color: color),
+        ],
+      ),
+    );
+  }
+}
+
+class _PiligrimRetryAction extends StatelessWidget {
+  const _PiligrimRetryAction({
+    required this.onPressed,
+    required this.compact,
+  });
+
+  final VoidCallback onPressed;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = PiligrimTextStyles.caption.copyWith(
+      color: PiligrimColors.water.withValues(alpha: 0.85),
+      letterSpacing: compact ? 0.8 : 1.0,
+      fontSize: compact ? 11.5 : 12,
+      fontWeight: FontWeight.w300,
+      decoration: TextDecoration.underline,
+      decorationColor: PiligrimColors.water.withValues(alpha: 0.35),
+    );
+
+    return Align(
+      alignment: compact ? Alignment.centerLeft : Alignment.center,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: PiligrimColors.water,
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 0 : 4,
+            vertical: compact ? 0 : 2,
+          ),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          overlayColor: PiligrimColors.water.withValues(alpha: 0.06),
+        ),
+        child: Text('Повторить', style: style),
+      ),
+    );
+  }
+}
+
+/// Sliver-обёртка [ErrorView] для использования внутри CustomScrollView.
 class SliverErrorView extends StatelessWidget {
   const SliverErrorView({
     super.key,
+    this.title,
     required this.message,
     required this.onRetry,
   });
 
+  final String? title;
   final String message;
   final VoidCallback onRetry;
 
@@ -174,7 +271,11 @@ class SliverErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverFillRemaining(
       hasScrollBody: false,
-      child: ErrorView(message: message, onRetry: onRetry),
+      child: ErrorView(
+        title: title ?? ErrorView._kDefaultTitle,
+        message: message,
+        onRetry: onRetry,
+      ),
     );
   }
 }

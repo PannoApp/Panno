@@ -204,10 +204,10 @@ class _InteriorScreenState extends State<InteriorScreen>
                     if (core.error != null && !core.isLoading)
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                           child: PiligrimInlineError(
-                            message:
-                                'Показаны локальные фото. ${core.error!}',
+                            title: 'Показаны локальные фото',
+                            message: core.error!,
                             onRetry: () => core.retry(),
                           ),
                         ),
