@@ -94,13 +94,18 @@ class _MenuHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isFeed = mode == MenuViewMode.feed;
+    final markToControlsGap = isFeed
+        ? PiligrimSpacing.menuFeedMarkToControlsGap
+        : PiligrimSpacing.tabEditorialMarkGap;
+
     return ClipRect(
       child: Container(
         padding: EdgeInsets.fromLTRB(
           20,
           PiligrimLayout.tabContentTop(context),
           20,
-          14,
+          isFeed ? 10 : 14,
         ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -121,7 +126,7 @@ class _MenuHeader extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: PiligrimTabEditorialMark(label: 'MENU', compact: true),
             ),
-            const SizedBox(height: PiligrimSpacing.tabEditorialMarkGap),
+            SizedBox(height: markToControlsGap),
             Align(
               alignment: Alignment.centerRight,
               child: _ModeSwitcher(mode: mode, onChanged: onModeChanged),
@@ -327,7 +332,7 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
         PageView.builder(
           controller: _pageCtrl,
           scrollDirection: Axis.vertical,
-          physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
+          physics: const PageScrollPhysics(),
           onPageChanged: (i) {
             setState(() => _currentPage = i);
             final provider = context.read<MenuProvider>();

@@ -17,6 +17,7 @@ import '../providers/booking_provider.dart';
 import '../providers/core_info_provider.dart';
 import '../widgets/ember_cta.dart';
 import '../widgets/piligrim_background.dart';
+import '../widgets/piligrim_delete_account_dialog.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
 import 'booking_history_screen.dart';
@@ -75,6 +76,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
           backgroundColor: PiligrimColors.earthDeep,
           content: Text(
             auth.error ?? 'Не удалось сохранить настройки',
+            style: PiligrimTextStyles.body.copyWith(fontSize: 13),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showPiligrimDeleteAccountDialog(context);
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await context.read<AuthProvider>().deleteAccount();
+    } catch (_) {
+      if (!mounted) return;
+      final message =
+          context.read<AuthProvider>().error ?? 'Не удалось удалить аккаунт';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: PiligrimColors.earthDeep,
+          content: Text(
+            message,
             style: PiligrimTextStyles.body.copyWith(fontSize: 13),
           ),
         ),
@@ -184,16 +208,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ? coreInfo!.visitRules
                           : null,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 28),
 
-                    // Выход из аккаунта
+                    // Выход и удаление аккаунта
                         if (auth.isLoggedIn) ...[
-                          _LogoutButton(
-                            onTap: () async {
+                          _AccountSessionCard(
+                            onLogout: () async {
                               await context.read<AuthProvider>().logout();
                             },
+                            onDeleteAccount: _confirmDeleteAccount,
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 28),
                         ],
 
                     // Юридическое + версия
@@ -1155,27 +1180,77 @@ class _LegalFooter extends StatelessWidget {
   }
 }
 
-class _LogoutButton extends StatelessWidget {
-  const _LogoutButton({required this.onTap});
-  final VoidCallback onTap;
+/// Выход и удаление — одна glass-карта, общая сетка отступов (18×14).
+class _AccountSessionCard extends StatelessWidget {
+  const _AccountSessionCard({
+    required this.onLogout,
+    required this.onDeleteAccount,
+  });
+
+  final VoidCallback onLogout;
+  final VoidCallback onDeleteAccount;
+
+  static const _rowPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 14);
 
   @override
   Widget build(BuildContext context) {
     return _ProfileGlassCard(
       variant: ProfileGlassVariant.integrated,
-      child: PiligrimTap(
-        borderRadius: BorderRadius.circular(PiligrimRadius.md),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          child: Text(
-            'Выйти из аккаунта',
-            style: PiligrimTextStyles.body.copyWith(
-              fontSize: 13,
-              color: PiligrimColors.ember.withValues(alpha: 0.85),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PiligrimTap(
+            borderRadius: BorderRadius.circular(PiligrimRadius.md),
+            onTap: onLogout,
+            child: Padding(
+              padding: _rowPadding,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Выйти из аккаунта',
+                  style: PiligrimTextStyles.body.copyWith(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: PiligrimColors.ember.withValues(alpha: 0.86),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          const _ProfileHairlineDivider(inset: 18),
+          PiligrimTap(
+            borderRadius: BorderRadius.circular(PiligrimRadius.md),
+            onTap: onDeleteAccount,
+            child: Padding(
+              padding: _rowPadding,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Удалить аккаунт',
+                    style: PiligrimTextStyles.body.copyWith(
+                      fontSize: 13,
+                      height: 1.35,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: 0.25,
+                      color: PiligrimColors.ember.withValues(alpha: 0.74),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Данные профиля и история будут удалены без возможности восстановления.',
+                    style: PiligrimTextStyles.caption.copyWith(
+                      fontSize: 11,
+                      height: 1.45,
+                      letterSpacing: 0.15,
+                      color: PiligrimColors.sky.withValues(alpha: 0.38),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -772,6 +772,40 @@ class LogoutViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class DeleteAccountViewTest(APITestCase):
+    URL = '/api/v1/users/account/'
+
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77007654321')
+        self.refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {self.refresh.access_token}',
+        )
+
+    def test_delete_account_returns_204_and_removes_user(self):
+        user_id = self.user.id
+        response = self.client.delete(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(pk=user_id).exists())
+
+    def test_delete_account_without_auth_returns_401(self):
+        self.client.credentials()
+        response = self.client.delete(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_delete_staff_account_returns_403(self):
+        staff = User.objects.create_user(
+            phone='+77001112233',
+            role='hall_manager',
+        )
+        refresh = RefreshToken.for_user(staff)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+        response = self.client.delete(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('error', response.data)
+        self.assertTrue(User.objects.filter(pk=staff.pk).exists())
+
+
 # ---------------------------------------------------------------------------
 # JWT-настройки: проверяем TTL токенов для разных окружений
 # ---------------------------------------------------------------------------

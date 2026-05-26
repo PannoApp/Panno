@@ -37,4 +37,9 @@ class AuthService {
       data: {'refresh': refreshToken},
     );
   }
+
+  /// Безвозвратное удаление аккаунта (DELETE /users/account/).
+  Future<void> deleteAccount() async {
+    await _dio.delete<void>('/users/account/');
+  }
 }

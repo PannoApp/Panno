@@ -267,6 +267,11 @@ class DishDetailSheet extends StatelessWidget {
                       ),
                     ),
 
+                  if (dish.tags.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    DishTagMetadataLine(tags: dish.tags),
+                  ],
+
                   if (dish.story.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     DishDetailSection(
@@ -274,15 +279,6 @@ class DishDetailSheet extends StatelessWidget {
                       icon: 'assets/images/cobyz.svg',
                       content: dish.story,
                       accent: true,
-                    ),
-                  ],
-
-                  if (dish.tags.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 6,
-                      children: dish.tags.map((t) => DishCardTagChip(tag: t)).toList(),
                     ),
                   ],
 
@@ -316,10 +312,22 @@ class _DishDetailImageBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: bordered ? 0.55 : 0.4),
+        color: bordered ? const Color(0xD61C1510) : Colors.black.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(7),
         border: bordered
-            ? Border.all(color: PiligrimColors.ember.withValues(alpha: 0.6))
+            ? Border.all(
+                color: PiligrimColors.steppe.withValues(alpha: 0.58),
+                width: 0.9,
+              )
+            : null,
+        boxShadow: bordered
+            ? [
+                BoxShadow(
+                  color: PiligrimColors.steppe.withValues(alpha: 0.28),
+                  blurRadius: 14,
+                  spreadRadius: 0,
+                ),
+              ]
             : null,
       ),
       child: Text(
@@ -328,7 +336,7 @@ class _DishDetailImageBadge extends StatelessWidget {
           fontFamily: 'MuseoSans',
           fontSize: bordered ? 14 : 13,
           fontWeight: bordered ? FontWeight.w700 : FontWeight.w300,
-          color: bordered ? PiligrimColors.ember : PiligrimColors.sky,
+          color: bordered ? PiligrimColors.steppe : PiligrimColors.sky,
         ),
       ),
     );
@@ -524,6 +532,11 @@ class ClassicDishDetailSheet extends StatelessWidget {
                     ),
                   ),
 
+                  if (dish.tags.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    DishTagMetadataLine(tags: dish.tags),
+                  ],
+
                   // История
                   if (dish.story.isNotEmpty) ...[
                     const SizedBox(height: 28),
@@ -599,15 +612,6 @@ class ClassicDishDetailSheet extends StatelessWidget {
                     ),
                   ],
 
-                  // Теги
-                  if (dish.tags.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 6,
-                      children: dish.tags.map((t) => DishCardTagChip(tag: t)).toList(),
-                    ),
-                  ],
                 ],
               ),
             ),
