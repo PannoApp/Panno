@@ -4,7 +4,6 @@
 import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -36,6 +35,12 @@ class _DishVideoCardState extends State<DishVideoCard>
   VideoPlayerController? _videoCtrl;
   bool _isMuted = true;
   bool _videoError = false;
+  bool _loopSeekPending = false;
+  // false пока платформенная текстура не отдала первый кадр; shield скрывает чёрный кадр
+  bool _videoFirstFrameReady = false;
+
+  bool get _hasVideoSource =>
+      widget.dish.videoUrl != null && widget.dish.videoStatus == 'ready';
 
   @override
   void initState() {
@@ -43,10 +48,12 @@ class _DishVideoCardState extends State<DishVideoCard>
     _ambientCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
-    )..repeat(reverse: true);
+    );
+    if (!_hasVideoSource) {
+      _ambientCtrl.repeat(reverse: true);
+    }
 
-    // Запускаем видео только если оно уже обработано на сервере
-    if (widget.dish.videoUrl != null && widget.dish.videoStatus == 'ready') {
+    if (_hasVideoSource) {
       _initVideo(widget.dish.videoUrl!);
     }
   }
@@ -59,17 +66,53 @@ class _DishVideoCardState extends State<DishVideoCard>
       final file = await DefaultCacheManager().getSingleFile(url);
       ctrl = VideoPlayerController.file(file);
       await ctrl.initialize();
-      ctrl.setLooping(true);
+      // Ручной loop: нативный setLooping(true) на iOS даёт чёрный кадр ~раз в цикл.
+      ctrl.setLooping(false);
+      ctrl.addListener(_handleVideoTick);
       await ctrl.setVolume(0);
       if (!mounted) {
+        ctrl.removeListener(_handleVideoTick);
         ctrl.dispose();
         return;
       }
-      setState(() => _videoCtrl = ctrl);
+      setState(() {
+        _videoCtrl = ctrl;
+        _videoFirstFrameReady = false; // shield до первого кадра
+      });
+      _ambientCtrl.stop();
       if (widget.isActive) ctrl.play();
     } catch (_) {
+      ctrl?.removeListener(_handleVideoTick);
       ctrl?.dispose();
-      if (mounted) setState(() => _videoError = true);
+      if (mounted) {
+        setState(() => _videoError = true);
+        if (!_ambientCtrl.isAnimating) {
+          _ambientCtrl.repeat(reverse: true);
+        }
+      }
+    }
+  }
+
+  void _handleVideoTick() {
+    final ctrl = _videoCtrl;
+    if (ctrl == null || !ctrl.value.isInitialized || _loopSeekPending) return;
+
+    final pos = ctrl.value.position;
+
+    // Снимаем shield как только платформа отдала первый кадр (pos > 0).
+    if (!_videoFirstFrameReady && pos.inMicroseconds > 0) {
+      setState(() => _videoFirstFrameReady = true);
+    }
+
+    final dur = ctrl.value.duration;
+    if (dur.inMilliseconds < 400) return;
+
+    if (pos >= dur - const Duration(milliseconds: 120)) {
+      _loopSeekPending = true;
+      ctrl.seekTo(Duration.zero).whenComplete(() {
+        _loopSeekPending = false;
+        if (mounted && widget.isActive) ctrl.play();
+      });
     }
   }
 
@@ -77,16 +120,23 @@ class _DishVideoCardState extends State<DishVideoCard>
   void didUpdateWidget(DishVideoCard old) {
     super.didUpdateWidget(old);
     if (widget.isActive && !old.isActive) {
-      _ambientCtrl.repeat(reverse: true);
+      if (_videoCtrl == null || !_videoCtrl!.value.isInitialized) {
+        if (!_ambientCtrl.isAnimating) {
+          _ambientCtrl.repeat(reverse: true);
+        }
+      } else {
+        _ambientCtrl.stop();
+      }
       _videoCtrl?.play();
     } else if (!widget.isActive && old.isActive) {
       _ambientCtrl.stop();
-      _videoCtrl?.pause(); // пауза, не dispose — для быстрого возобновления
+      _videoCtrl?.pause();
     }
   }
 
   @override
   void dispose() {
+    _videoCtrl?.removeListener(_handleVideoTick);
     _ambientCtrl.dispose();
     _videoCtrl?.dispose();
     super.dispose();
@@ -130,10 +180,140 @@ class _DishVideoCardState extends State<DishVideoCard>
     );
   }
 
+  Widget _buildMediaLayer(bool videoReady) {
+    if (videoReady) {
+      final size = _videoCtrl!.value.size;
+      return Positioned.fill(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            RepaintBoundary(
+              child: ClipRect(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: size.width,
+                    height: size.height,
+                    child: VideoPlayer(_videoCtrl!),
+                  ),
+                ),
+              ),
+            ),
+            // Shield: закрывает чёрный кадр платформенной текстуры пока
+            // декодер не выдал первый кадр (init) и во время seekTo (loop).
+            if (!_videoFirstFrameReady)
+              const IgnorePointer(
+                child: ColoredBox(color: PiligrimColors.earthDeep),
+              ),
+          ],
+        ),
+      );
+    }
+
+    if (_videoError &&
+        widget.dish.imageUrl != null &&
+        widget.dish.imageUrl!.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: widget.dish.imageUrl!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        placeholder: (_, __) => _buildCinematicBg(),
+        errorWidget: (_, __, ___) => _buildCinematicBg(),
+      );
+    }
+
+    return _buildCinematicBg();
+  }
+
+  Widget _buildBottomInfoText(double bottomInset) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, 0, 24, bottomInset + 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.dish.name,
+              style: TextStyle(
+                fontFamily: 'MuseoSans',
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: PiligrimColors.nomadCream,
+                letterSpacing: 0.4,
+                height: 1.2,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 14,
+                    offset: const Offset(0, 1),
+                  ),
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.20),
+                    blurRadius: 32,
+                  ),
+                ],
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (widget.dish.description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                widget.dish.description.replaceAll('\n', ' '),
+                style: TextStyle(
+                  fontFamily: 'MuseoSans',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w300,
+                  color: PiligrimColors.sky.withValues(alpha: 0.75),
+                  height: 1.5,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.42),
+                      blurRadius: 10,
+                    ),
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.20),
+                      blurRadius: 28,
+                    ),
+                  ],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                DishCardPriceTag(price: widget.dish.price),
+                const SizedBox(width: 14),
+                Text(
+                  widget.dish.weight.contains('г')
+                      ? widget.dish.weight
+                      : '${widget.dish.weight} г',
+                  style: TextStyle(
+                    fontFamily: 'MuseoSans',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w300,
+                    color: PiligrimColors.sky.withValues(alpha: 0.65),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final videoReady = _videoCtrl != null && _videoCtrl!.value.isInitialized;
-    final topInset = MediaQuery.viewPaddingOf(context).top;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return GestureDetector(
@@ -144,208 +324,35 @@ class _DishVideoCardState extends State<DishVideoCard>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // ── 1. Видео / фото / кинематографический фон ────────
-            if (videoReady)
-              ClipRect(
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: _videoCtrl!.value.size.width,
-                    height: _videoCtrl!.value.size.height,
-                    child: VideoPlayer(_videoCtrl!),
-                  ),
-                ),
-              )
-            else if (_videoError &&
-                widget.dish.imageUrl != null &&
-                widget.dish.imageUrl!.isNotEmpty)
-              // Видео не загрузилось — показываем статичное фото блюда
-              CachedNetworkImage(
-                imageUrl: widget.dish.imageUrl!,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                placeholder: (_, __) => _buildCinematicBg(),
-                errorWidget: (_, __, ___) => _buildCinematicBg(),
-              )
-            else
-              _buildCinematicBg(),
+            _buildMediaLayer(videoReady),
 
-            // ── 2. Верхний скрим (читаемость хэдера) ─────────────
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: PiligrimSpacing.menuFeedVideoCardGradient,
+                ),
+              ),
+            ),
+
+            _buildBottomInfoText(bottomInset),
+
             Positioned(
-              top: 0, left: 0, right: 0,
-              height: topInset + 100,
-              child: const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x99000000), Colors.transparent],
-                  ),
-                ),
-              ),
-            ),
-
-            // ── 3. Боковой виньет (кинематографичность) ──────────
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 1.0,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.28),
-                    ],
-                    stops: const [0.55, 1.0],
-                  ),
-                ),
-              ),
-            ),
-
-            // ── 4. Нижний градиент — многоступенчатый, без видимой «полосы» ─
-            const Positioned(
-              bottom: 0, left: 0, right: 0,
-              height: 360,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: [0.0, 0.28, 0.55, 0.78, 1.0],
-                    colors: [
-                      Colors.transparent,
-                      Color(0x552A2826),
-                      Color(0xBB2A2826),
-                      Color(0xEE2A2826),
-                      Color(0xFF2A2826),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // ── 5. Инфо о блюде (поверх градиента) ───────────────
-            Positioned(
-              bottom: 0, left: 0, right: 0,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(24, 0, 24, bottomInset + 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Название — крупно, это герой экрана
-                    Text(
-                      widget.dish.name,
-                      style: const TextStyle(
-                        fontFamily: 'MuseoSans',
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: PiligrimColors.nomadCream,
-                        letterSpacing: 0.4,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    // Краткое описание (ТЗ 4.2: «1–2 строки»)
-                    if (widget.dish.description.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.dish.description.replaceAll('\n', ' '),
-                        style: TextStyle(
-                          fontFamily: 'MuseoSans',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w300,
-                          color: PiligrimColors.sky.withValues(alpha: 0.62),
-                          height: 1.5,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.55),
-                              blurRadius: 12,
-                            ),
-                          ],
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-
-                    const SizedBox(height: 14),
-
-                    // Цена + вес
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          '${widget.dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
-                          style: const TextStyle(
-                            fontFamily: 'MuseoSans',
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: PiligrimColors.ember,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Text(
-                          widget.dish.weight.contains('г')
-                              ? widget.dish.weight
-                              : '${widget.dish.weight} г',
-                          style: TextStyle(
-                            fontFamily: 'MuseoSans',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w300,
-                            color: PiligrimColors.sky.withValues(alpha: 0.65),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // Теги (если есть)
-                    if (widget.dish.tags.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 7,
-                        runSpacing: 7,
-                        children: widget.dish.tags
-                            .take(4)
-                            .map((t) => DishCardTagChip(tag: t))
-                            .toList(),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-
-            // ── 6. Pill-badge категории сверху-слева (под status bar)
-            Positioned(
-              top: topInset + 60,
+              top: PiligrimSpacing.menuFeedCategoryBadgeTop(context),
               left: 20,
-              child: _VideoCategoryBadge(categoryId: widget.dish.category),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _VideoCategoryBadge(categoryId: widget.dish.category),
+                  if (videoReady) ...[
+                    const SizedBox(
+                      height: PiligrimSpacing.menuFeedCategoryToMuteGap,
+                    ),
+                    _MuteButton(isMuted: _isMuted, onToggle: _toggleMute),
+                  ],
+                ],
+              ),
             ),
-
-            // ── 7. Кнопка звука ───────────────────────────────────
-            if (videoReady)
-              Positioned(
-                top: topInset + 58,
-                right: 20,
-                child: _MuteButton(isMuted: _isMuted, onToggle: _toggleMute),
-              ),
-
-            // ── 8. Хинт свайпа ────────────────────────────────────
-            if (widget.isActive)
-              Positioned(
-                left: 24,
-                bottom: bottomInset + 170,
-                child: const DishCardSwipeHint()
-                    .animate(delay: 1800.ms)
-                    .fadeIn(duration: 600.ms)
-                    .then(delay: 2000.ms)
-                    .fadeOut(duration: 500.ms),
-              ),
           ],
         ),
       ),
@@ -355,8 +362,6 @@ class _DishVideoCardState extends State<DishVideoCard>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pill-badge категории на видео-карточке.
-// Имя берётся из MenuProvider по id блюда (без новых полей в модели).
-// Если категорий ещё нет в провайдере — badge скрыт.
 // ─────────────────────────────────────────────────────────────────────────────
 class _VideoCategoryBadge extends StatelessWidget {
   const _VideoCategoryBadge({required this.categoryId});
@@ -392,13 +397,10 @@ class _VideoCategoryBadge extends StatelessWidget {
           letterSpacing: 1.6,
         ),
       ),
-    ).animate().fadeIn(delay: 300.ms, duration: 500.ms);
+    );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Кнопка вкл/выкл звука на видео
-// ─────────────────────────────────────────────────────────────────────────────
 class _MuteButton extends StatelessWidget {
   const _MuteButton({required this.isMuted, required this.onToggle});
 
@@ -407,19 +409,35 @@ class _MuteButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const visual = PiligrimSpacing.menuFeedMuteSize;
+    const tap = PiligrimSpacing.menuFeedMuteTapExtent;
+
     return GestureDetector(
       onTap: onToggle,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.55),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-          color: Colors.white,
-          size: 18,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: tap,
+        height: tap,
+        child: Center(
+          child: Container(
+            width: visual,
+            height: visual,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(
+                alpha: PiligrimSpacing.menuFeedMuteBackgroundOpacity,
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.10),
+                width: 0.5,
+              ),
+            ),
+            child: Icon(
+              isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              color: Colors.white.withValues(alpha: 0.82),
+              size: PiligrimSpacing.menuFeedMuteIconSize,
+            ),
+          ),
         ),
       ),
     );

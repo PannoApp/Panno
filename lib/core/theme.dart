@@ -315,6 +315,54 @@ abstract final class PiligrimSpacing {
   /// Зазор между меткой и переключателем «Видео / Фото».
   static const double tabEditorialMarkGap = 8;
 
+  /// Video feed: плотнее между «MENU» и строкой chip / toggle.
+  static const double menuFeedMarkToControlsGap = 4;
+
+  /// Доп. отступ chip категории ниже строки MENU (не прилипать к метке).
+  static const double menuFeedCategoryBadgeExtraTop = 8;
+
+  /// Зазор между chip категории и mute под ним.
+  static const double menuFeedCategoryToMuteGap = 9;
+
+  /// Cinematic bottom-up scrim: начинается на 15% высоты, плавный editorial falloff,
+  /// ~85% непрозрачности у нижнего края — текст читаем даже на ярких кадрах.
+  static const BoxDecoration menuFeedVideoCardGradient = BoxDecoration(
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      stops: [0.0, 0.15, 0.32, 0.50, 0.65, 0.80, 1.0],
+      colors: [
+        Color(0x00000000),
+        Color(0x07000000),
+        Color(0x18000000),
+        Color(0x3E000000),
+        Color(0x6E000000),
+        Color(0xA5000000),
+        Color(0xD9000000),
+      ],
+    ),
+  );
+
+  /// Визуальный диаметр mute (secondary control, ~−30% от исходных 36).
+  static const double menuFeedMuteSize = 25;
+
+  /// Иконка mute в video feed.
+  static const double menuFeedMuteIconSize = 13;
+
+  /// Непрозрачность фона mute — мягкий, не перетягивает внимание.
+  static const double menuFeedMuteBackgroundOpacity = 0.38;
+
+  /// Минимальная зона тапа (визуал остаётся [menuFeedMuteSize]).
+  static const double menuFeedMuteTapExtent = 40;
+
+  /// Y pill категории на видео — чуть ниже switcher, с воздухом от «MENU».
+  static double menuFeedCategoryBadgeTop(BuildContext context) =>
+      PiligrimLayout.safeTop(context) +
+      tabContentTopInset +
+      tabEditorialMarkHeight +
+      menuFeedMarkToControlsGap +
+      menuFeedCategoryBadgeExtraTop;
+
   /// Высота оверлея шапки меню ниже safe area.
   static const double menuHeaderExtentBelowSafeArea =
       tabContentTopInset +

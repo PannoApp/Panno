@@ -10,6 +10,7 @@ import '../core/theme.dart';
 import '../data/models/interior_slide.dart';
 import '../providers/core_info_provider.dart';
 import '../widgets/interior_zone_filter.dart';
+import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_shimmer.dart';
@@ -199,6 +200,18 @@ class _InteriorScreenState extends State<InteriorScreen>
                         ),
                       ),
                     ),
+
+                    if (core.error != null && !core.isLoading)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                          child: PiligrimInlineError(
+                            message:
+                                'Показаны локальные фото. ${core.error!}',
+                            onRetry: () => core.retry(),
+                          ),
+                        ),
+                      ),
 
                     // ── Кнопка 3D-тура (если задан в панели управления) ─────
                     if (tourLink != null && tourLink.isNotEmpty)

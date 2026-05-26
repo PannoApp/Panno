@@ -44,7 +44,29 @@ class _MenuScreenState extends State<MenuScreen>
     super.build(context);
     final menuProvider = context.watch<MenuProvider>();
 
-    if (!menuProvider.loaded) return const _MenuLoadingSkeleton();
+    if (!menuProvider.loaded ||
+        (menuProvider.isBootstrapping && menuProvider.bootstrapError == null)) {
+      return const _MenuLoadingSkeleton();
+    }
+
+    if (menuProvider.bootstrapError != null) {
+      return Scaffold(
+        backgroundColor: PiligrimColors.earth,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const PiligrimBackground(
+              textureOpacity: 0.45,
+              vignetteIntensity: 0.25,
+            ),
+            ErrorView(
+              message: menuProvider.bootstrapError!,
+              onRetry: () => context.read<MenuProvider>().retry(),
+            ),
+          ],
+        ),
+      );
+    }
 
     final isClassic = menuProvider.mode == MenuViewMode.classic;
     final isAdmin = context.watch<AuthProvider>().isAdmin;
@@ -117,13 +139,18 @@ class _MenuHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isFeed = mode == MenuViewMode.feed;
+    final markToControlsGap = isFeed
+        ? PiligrimSpacing.menuFeedMarkToControlsGap
+        : PiligrimSpacing.tabEditorialMarkGap;
+
     return ClipRect(
       child: Container(
         padding: EdgeInsets.fromLTRB(
           20,
           PiligrimLayout.tabContentTop(context),
           20,
-          14,
+          isFeed ? 10 : 14,
         ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -144,7 +171,7 @@ class _MenuHeader extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: PiligrimTabEditorialMark(label: 'MENU', compact: true),
             ),
-            const SizedBox(height: PiligrimSpacing.tabEditorialMarkGap),
+            SizedBox(height: markToControlsGap),
             Align(
               alignment: Alignment.centerRight,
               child: _ModeSwitcher(mode: mode, onChanged: onModeChanged),
@@ -350,7 +377,7 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
         PageView.builder(
           controller: _pageCtrl,
           scrollDirection: Axis.vertical,
-          physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
+          physics: const PageScrollPhysics(),
           onPageChanged: (i) {
             setState(() => _currentPage = i);
             final provider = context.read<MenuProvider>();

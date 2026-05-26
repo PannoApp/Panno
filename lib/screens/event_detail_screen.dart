@@ -10,6 +10,7 @@ import '../providers/events_provider.dart';
 import '../widgets/event_cover_image.dart';
 import '../widgets/event_photo_report_gallery.dart';
 import '../widgets/event_signup_sheet.dart';
+import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../core/auth_guard.dart';
 import '../widgets/piligrim_tap.dart';
@@ -237,8 +238,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       const SizedBox(height: 32),
                       Consumer<EventsProvider>(
                         builder: (_, provider, __) {
-                          if (provider.isLoadingPhotoReport) {
+                          if (provider.isLoadingPhotoReport &&
+                              provider.photoReportError == null) {
                             return const _PhotoReportSkeleton();
+                          }
+                          if (provider.photoReportError != null) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Фотоотчёт',
+                                  style: PiligrimTextStyles.title.copyWith(
+                                    color: PiligrimColors.sky,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                PiligrimInlineError(
+                                  message: provider.photoReportError!,
+                                  onRetry: () => provider.loadPhotoReport(
+                                    event.id,
+                                  ),
+                                ),
+                              ],
+                            );
                           }
                           if (provider.photoReport.isEmpty) {
                             return const SizedBox.shrink();

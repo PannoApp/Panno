@@ -78,6 +78,31 @@ class DishCardBottomInfo extends StatelessWidget {
   }
 }
 
+/// Спокойная typographic-строка тегов для detail sheet (без capsules/chips).
+class DishTagMetadataLine extends StatelessWidget {
+  const DishTagMetadataLine({super.key, required this.tags});
+
+  final List<ApiTag> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tags.isEmpty) return const SizedBox.shrink();
+
+    final line = tags.map((t) => t.name.trim().toLowerCase()).join(' · ');
+
+    return Text(
+      line,
+      style: PiligrimTextStyles.caption.copyWith(
+        fontSize: 11,
+        fontWeight: FontWeight.w300,
+        letterSpacing: 0.8,
+        height: 1.45,
+        color: PiligrimColors.sky.withValues(alpha: 0.40),
+      ),
+    );
+  }
+}
+
 /// Чип тега блюда с иконкой и цветом.
 /// Принимает ApiTag из API; стиль подбирается по имени из реестра в menu_data.dart.
 /// Неизвестные теги отображаются с дефолтным стилем без обновления приложения.
@@ -127,58 +152,36 @@ class DishCardPriceTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: PiligrimColors.steppe.withValues(alpha: 0.2),
+        color: const Color(0xD61C1510),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: PiligrimColors.steppe.withValues(alpha: 0.5),
+          color: PiligrimColors.steppe.withValues(alpha: 0.58),
+          width: 0.9,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: PiligrimColors.steppe.withValues(alpha: 0.28),
+            blurRadius: 14,
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: PiligrimColors.shadow.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         '${price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
         style: PiligrimTextStyles.button.copyWith(
           color: PiligrimColors.steppe,
           fontSize: 14,
-          letterSpacing: 0.3,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
         ),
       ),
-    );
-  }
-}
-
-class DishCardSwipeHint extends StatelessWidget {
-  const DishCardSwipeHint({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SvgPicture.asset(
-          'assets/images/spiral.svg',
-          width: 12,
-          height: 12,
-          colorFilter: ColorFilter.mode(
-            PiligrimColors.steppe.withValues(alpha: 0.7),
-            BlendMode.srcIn,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          'Свайп вправо — история блюда',
-          style: PiligrimTextStyles.caption.copyWith(
-            color: PiligrimColors.sky.withValues(alpha: 0.55),
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Icon(
-          Icons.chevron_right_rounded,
-          size: 14,
-          color: PiligrimColors.steppe.withValues(alpha: 0.7),
-        ),
-      ],
     );
   }
 }

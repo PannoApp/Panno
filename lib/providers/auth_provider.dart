@@ -145,6 +145,27 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Удаляет аккаунт на сервере, затем очищает локальную сессию.
+  Future<void> deleteAccount() async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      await _authService.deleteAccount();
+      await _tokenStorage.clearTokens();
+      currentUser = null;
+      isNewUser = false;
+      eventsCount = 0;
+    } catch (e) {
+      error = dioErrorMessage(e);
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> updateName(String firstName) async {
     if (currentUser == null) return;
     isLoading = true;
