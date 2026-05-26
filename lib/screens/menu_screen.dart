@@ -17,7 +17,6 @@ import '../providers/auth_provider.dart';
 import '../providers/menu_provider.dart';
 import 'dish_edit_screen.dart';
 import '../widgets/dish_detail_sheet.dart';
-import '../widgets/dish_elements.dart';
 import '../widgets/dish_video_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
@@ -140,9 +139,7 @@ class _MenuHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isFeed = mode == MenuViewMode.feed;
-    final markToControlsGap = isFeed
-        ? PiligrimSpacing.menuFeedMarkToControlsGap
-        : PiligrimSpacing.tabEditorialMarkGap;
+    const markToControlsGap = PiligrimSpacing.tabEditorialMarkGap;
 
     return ClipRect(
       child: Container(
@@ -171,7 +168,7 @@ class _MenuHeader extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: PiligrimTabEditorialMark(label: 'MENU', compact: true),
             ),
-            SizedBox(height: markToControlsGap),
+            const SizedBox(height: markToControlsGap),
             Align(
               alignment: Alignment.centerRight,
               child: _ModeSwitcher(mode: mode, onChanged: onModeChanged),
@@ -377,7 +374,7 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
         PageView.builder(
           controller: _pageCtrl,
           scrollDirection: Axis.vertical,
-          physics: const PageScrollPhysics(),
+          physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
           onPageChanged: (i) {
             setState(() => _currentPage = i);
             final provider = context.read<MenuProvider>();
@@ -1492,17 +1489,6 @@ class _ClassicDishCard extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (dish.tags.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: dish.tags
-                                  .take(3)
-                                  .map((t) => DishCardTagChip(tag: t))
-                                  .toList(),
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -1661,9 +1647,10 @@ class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
               ),
             ),
           ),
-          // Пульсирующий тотем по центру
-          Center(
-            child: AnimatedBuilder(
+          // Пульсирующий тотем по центру — SafeArea даёт оптический центр
+          SafeArea(
+            child: Center(
+              child: AnimatedBuilder(
               animation: _ctrl,
               builder: (_, child) {
                 final t = _ctrl.value;
@@ -1699,6 +1686,7 @@ class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
                 ),
               ),
             ),
+          ),
           ),
         ],
       ),

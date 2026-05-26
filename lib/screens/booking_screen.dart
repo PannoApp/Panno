@@ -141,8 +141,6 @@ class _BookingScreenState extends State<BookingScreen> {
       final timeText = _timeLabel;
       final count = int.parse(_guestsCtrl.text);
       final zoneText = _selectedZone;
-      final depositRequired =
-          context.read<CoreInfoProvider>().coreInfo?.bookingDepositRequired ?? false;
 
       _nameCtrl.clear();
       _commentCtrl.clear();
@@ -159,7 +157,6 @@ class _BookingScreenState extends State<BookingScreen> {
             time: timeText,
             heroesCount: count,
             zone: zoneText,
-            depositRequired: depositRequired,
           ),
         ),
       );

@@ -1,12 +1,12 @@
 // Полноэкранный просмотр фотографий интерьера с зумом, листанием и подписями
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../core/theme.dart';
 import '../data/models/interior_slide.dart';
+import '../widgets/piligrim_nav_button.dart';
 import '../widgets/piligrim_shimmer.dart';
-import '../widgets/piligrim_tap.dart';
 
 /// Fullscreen-просмотрщик фотографий интерьера.
 ///
@@ -83,7 +83,7 @@ class _InteriorPhotoViewerState extends State<InteriorPhotoViewer> {
     final bottomPad = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           // Затемнённый фон, который тускнеет при свайпе вниз
@@ -130,23 +130,29 @@ class _InteriorPhotoViewerState extends State<InteriorPhotoViewer> {
             ),
           ),
 
-          // Кнопка закрытия — правый верхний угол
+          // Кнопка назад — левый верхний угол
           Positioned(
-            top: topPad + 12,
-            right: 16,
-            child: _CloseButton(onTap: () => Navigator.of(context).pop()),
+            top: topPad + 8,
+            left: 8,
+            child: PiligrimNavButton(
+              icon: Icons.chevron_left,
+              onTap: () => Navigator.of(context).pop(),
+            ),
           ),
 
-          // Счётчик фото — левый верхний угол
+          // Счётчик фото — по центру сверху
           if (widget.slides.length > 1)
             Positioned(
-              top: topPad + 18,
-              left: 20,
-              child: Text(
-                '${_currentIndex + 1} / ${widget.slides.length}',
-                style: PiligrimTextStyles.caption.copyWith(
-                  fontSize: 12,
-                  color: PiligrimColors.sky.withValues(alpha: 0.75),
+              top: topPad + 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  '${_currentIndex + 1} / ${widget.slides.length}',
+                  style: PiligrimTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    color: PiligrimColors.sky.withValues(alpha: 0.75),
+                  ),
                 ),
               ),
             ),
@@ -163,41 +169,19 @@ class _InteriorPhotoViewerState extends State<InteriorPhotoViewer> {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-// Кнопка закрытия [x] с брендовым оформлением
-class _CloseButton extends StatelessWidget {
-  const _CloseButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PiligrimTap(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: PiligrimColors.earthDeep.withValues(alpha: 0.80),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: PiligrimColors.divider),
-        ),
-        child: SvgPicture.asset(
-          'assets/images/x.svg',
-          width: 16,
-          height: 16,
-          colorFilter: const ColorFilter.mode(
-            PiligrimColors.sky,
-            BlendMode.srcIn,
+      )
+          .animate()
+          .fadeIn(duration: 220.ms)
+          .scale(
+            begin: const Offset(0.94, 0.94),
+            end: const Offset(1.0, 1.0),
+            duration: 300.ms,
+            curve: Curves.easeOutCubic,
           ),
-        ),
-      ),
     );
   }
 }
+
 
 // Нижний оверлей с подписью и названием зоны
 class _CaptionOverlay extends StatelessWidget {

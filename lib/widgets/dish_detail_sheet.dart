@@ -269,7 +269,7 @@ class DishDetailSheet extends StatelessWidget {
 
                   if (dish.tags.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    DishTagMetadataLine(tags: dish.tags),
+                    DishDetailTagsRow(tags: dish.tags),
                   ],
 
                   if (dish.story.isNotEmpty) ...[
@@ -534,7 +534,7 @@ class ClassicDishDetailSheet extends StatelessWidget {
 
                   if (dish.tags.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    DishTagMetadataLine(tags: dish.tags),
+                    DishDetailTagsRow(tags: dish.tags),
                   ],
 
                   // История

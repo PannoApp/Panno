@@ -78,26 +78,49 @@ class DishCardBottomInfo extends StatelessWidget {
   }
 }
 
-/// Спокойная typographic-строка тегов для detail sheet (без capsules/chips).
-class DishTagMetadataLine extends StatelessWidget {
-  const DishTagMetadataLine({super.key, required this.tags});
+/// Premium minimal tag row для detail sheets.
+/// Тёплый монохромный стиль — restaurant metadata, не app chips.
+class DishDetailTagsRow extends StatelessWidget {
+  const DishDetailTagsRow({super.key, required this.tags});
 
   final List<ApiTag> tags;
 
   @override
   Widget build(BuildContext context) {
     if (tags.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 7,
+      runSpacing: 6,
+      children: tags.map((t) => _DishDetailTagChip(tag: t)).toList(),
+    );
+  }
+}
 
-    final line = tags.map((t) => t.name.trim().toLowerCase()).join(' · ');
+class _DishDetailTagChip extends StatelessWidget {
+  const _DishDetailTagChip({required this.tag});
 
-    return Text(
-      line,
-      style: PiligrimTextStyles.caption.copyWith(
-        fontSize: 11,
-        fontWeight: FontWeight.w300,
-        letterSpacing: 0.8,
-        height: 1.45,
-        color: PiligrimColors.sky.withValues(alpha: 0.40),
+  final ApiTag tag;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: PiligrimColors.water.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(
+          color: PiligrimColors.water.withValues(alpha: 0.22),
+          width: 0.7,
+        ),
+      ),
+      child: Text(
+        tag.name.toUpperCase(),
+        style: PiligrimTextStyles.sectionLabel.copyWith(
+          fontSize: 10,
+          letterSpacing: 1.6,
+          height: 1.3,
+          color: PiligrimColors.water.withValues(alpha: 0.65),
+        ),
       ),
     );
   }

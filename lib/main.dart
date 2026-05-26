@@ -121,19 +121,21 @@ class _PiligrimAppState extends State<PiligrimApp>
           debugShowCheckedModeBanner: false,
           theme: piligrimTheme,
           home: const SplashScreen(),
-          scrollBehavior: const _ClampingScrollBehavior(),
+          scrollBehavior: const _PlatformScrollBehavior(),
         ),
       ),
     );
   }
 }
 
-class _ClampingScrollBehavior extends ScrollBehavior {
-  const _ClampingScrollBehavior();
+class _PlatformScrollBehavior extends ScrollBehavior {
+  const _PlatformScrollBehavior();
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) =>
-      const ClampingScrollPhysics();
+      Theme.of(context).platform == TargetPlatform.iOS
+          ? const BouncingScrollPhysics()
+          : const ClampingScrollPhysics();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

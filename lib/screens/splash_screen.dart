@@ -436,8 +436,9 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _buildBottomLabel() {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Positioned(
-      bottom: 48,
+      bottom: bottomInset > 0 ? bottomInset + 16.0 : 48.0,
       left: 0,
       right: 0,
       child: FadeTransition(
