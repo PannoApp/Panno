@@ -1,6 +1,7 @@
 from django.db import models
 
 from utils.image_processing import AutoCropImageMixin
+from utils.upload_paths import dish_image_upload, dish_video_upload, dish_video_processed_upload
 
 
 class Category(models.Model):
@@ -59,7 +60,7 @@ class Dish(AutoCropImageMixin, models.Model):
 
     image = models.ImageField(
         "Фото",
-        upload_to="dishes/images/",
+        upload_to=dish_image_upload,
         help_text=(
             "Любой формат и ориентация — фото автоматически обрезается до 16:9 "
             "и конвертируется в JPEG. Рекомендуемый минимум: 1200×675 px."
@@ -68,7 +69,7 @@ class Dish(AutoCropImageMixin, models.Model):
     # Оригинальное видео, загружаемое администратором
     video = models.FileField(
         "Видео (для ленты)",
-        upload_to="dishes/videos/",
+        upload_to=dish_video_upload,
         blank=True,
         null=True,
         help_text=(
@@ -79,7 +80,7 @@ class Dish(AutoCropImageMixin, models.Model):
     # Видео после транскодирования (заполняется Celery-задачей)
     video_processed = models.FileField(
         "Обработанное видео",
-        upload_to="dishes/videos/processed/",
+        upload_to=dish_video_processed_upload,
         blank=True, null=True,
     )
     # Текущий этап обработки видео; индексируется для быстрой фильтрации ленты

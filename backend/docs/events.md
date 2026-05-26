@@ -35,7 +35,7 @@ News (Новость) — независимая сущность
       "title": "Jazz Night",
       "description": "Живая джазовая музыка и авторские коктейли",
       "date_time": "2026-06-20T20:00:00+06:00",
-      "image": "https://piligrim.kz/media/events/images/jazz.jpg",
+      "image": "https://piligrim.kz/media/events/images/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6.jpg",
       "format": "open",
       "price": null,
       "is_active": true,
@@ -78,7 +78,7 @@ News (Новость) — независимая сущность
       "id": 7,
       "title": "Новое летнее меню",
       "content": "Мы обновили меню — теперь у нас есть...",
-      "image": "https://piligrim.kz/media/news/images/summer.jpg",
+      "image": "https://piligrim.kz/media/news/images/c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6.jpg",
       "created_at": "2026-05-10T12:00:00+06:00"
     }
   ]
@@ -115,7 +115,7 @@ News (Новость) — независимая сущность
     "title": "Jazz Night",
     "description": "...",
     "date_time": "2026-06-20T20:00:00+06:00",
-    "image": "https://piligrim.kz/media/events/images/jazz.jpg",
+    "image": "https://piligrim.kz/media/events/images/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6.jpg",
     "format": "open",
     "price": null,
     "is_active": true,
@@ -160,12 +160,12 @@ News (Новость) — независимая сущность
 [
   {
     "id": 1,
-    "image": "https://cdn.example.com/media/events/reports/img1.jpg",
+    "image": "https://cdn.example.com/media/events/reports/d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6.jpg",
     "order": 0
   },
   {
     "id": 2,
-    "image": "https://cdn.example.com/media/events/reports/img2.jpg",
+    "image": "https://cdn.example.com/media/events/reports/e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6.jpg",
     "order": 1
   }
 ]
@@ -206,7 +206,7 @@ News (Новость) — независимая сущность
 |---|---|---|
 | `id` | int | Первичный ключ |
 | `event` | FK → Event | Мероприятие (CASCADE при удалении) |
-| `image` | image | Фотография (upload_to: `events/reports/`). Не обрезается — отображается fullscreen с `BoxFit.contain`. API возвращает **абсолютный URL**. При замене или удалении объекта старый файл удаляется из хранилища автоматически (django-cleanup). |
+| `image` | image | Фотография (папка: `events/reports/`, имя файла — UUID hex, расширение оригинала сохраняется). Не обрезается — отображается fullscreen с `BoxFit.contain`. API возвращает **абсолютный URL**. При замене или удалении объекта старый файл удаляется из хранилища автоматически (django-cleanup). |
 | `order` | int | Порядок отображения в галерее (по умолчанию 0) |
 | `uploaded_at` | datetime | Дата загрузки (auto) |
 

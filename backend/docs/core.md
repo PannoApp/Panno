@@ -33,7 +33,7 @@
   "hero_slides": [
     {
       "id": 1,
-      "image": "https://cdn.example.com/media/core/hero/slide1.jpg",
+      "image": "https://cdn.example.com/media/core/hero/f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6.jpg",
       "order": 0
     }
   ],
@@ -61,7 +61,7 @@
 | `telegram` | string | Контакт в Telegram |
 | `instagram` | string | Ссылка/никнейм Instagram |
 | `concept_description` | text | Краткое описание концепции ресторана (главный экран приложения) |
-| `hero_slides` | array | Список изображений-слайдов для главного экрана. Каждый слайд: `{id, image, order}`. Поле `image` — **абсолютный URL** к JPEG, автоматически обрезанному до 16:9. При замене или удалении слайда старый файл удаляется из хранилища автоматически (django-cleanup). |
+| `hero_slides` | array | Список изображений-слайдов для главного экрана. Каждый слайд: `{id, image, order}`. Поле `image` — **абсолютный URL** к JPEG, автоматически обрезанному до 16:9. Имя файла — UUID hex (32 символа). При замене или удалении слайда старый файл удаляется из хранилища автоматически (django-cleanup). |
 | `visit_rules` | text | Правила посещения ресторана |
 | `privacy_policy` | text | Политика обработки персональных данных |
 | `terms_of_service` | text | Пользовательское соглашение |
@@ -122,7 +122,7 @@
     "id": 1,
     "zone": "main_hall",
     "zone_display": "Главный зал",
-    "image": "https://piligrim.kz/media/interior/main_hall_1.jpg",
+    "image": "https://piligrim.kz/media/interior/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6.jpg",
     "caption": "Главный зал, 40 мест",
     "order": 0
   },
@@ -130,7 +130,7 @@
     "id": 2,
     "zone": "bar",
     "zone_display": "Бар",
-    "image": "https://piligrim.kz/media/interior/bar_1.jpg",
+    "image": "https://piligrim.kz/media/interior/b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6.jpg",
     "caption": "",
     "order": 0
   }

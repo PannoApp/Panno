@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 
 from utils.image_processing import AutoCropImageMixin
+from utils.upload_paths import event_image_upload, news_image_upload, event_report_image_upload
 
 
 class Event(AutoCropImageMixin, models.Model):
@@ -20,7 +21,7 @@ class Event(AutoCropImageMixin, models.Model):
         verbose_name="Дата и время проведения"
     )
     image = models.ImageField(
-        upload_to="events/images/",
+        upload_to=event_image_upload,
         verbose_name="Обложка",
         help_text=(
             "Любой формат и ориентация — фото автоматически обрезается до 16:9 "
@@ -93,7 +94,7 @@ class News(AutoCropImageMixin, models.Model):
         verbose_name="Текст новости"
     )
     image = models.ImageField(
-        upload_to="news/images/",
+        upload_to=news_image_upload,
         verbose_name="Изображение",
         null=True,
         blank=True,
@@ -167,7 +168,7 @@ class EventPhotoReport(models.Model):
         verbose_name='Мероприятие',
     )
     image = models.ImageField(
-        upload_to='events/reports/',
+        upload_to=event_report_image_upload,
         verbose_name='Фотография',
         help_text=(
             "Фото отображается fullscreen без обрезки. "

@@ -44,7 +44,7 @@ Category (Категория)
     {
       "id": 3,
       "name": "Стейк Рибай",
-      "video_url": "http://localhost:8000/media/dishes/videos/processed/dish_3_processed.mp4",
+      "video_url": "http://localhost:8000/media/dishes/videos/processed/a3f8c2d1e0b74f6a9c2e1d0b3f8a7c2d.mp4",
       "video_status": "ready",
       ...
     }
@@ -129,8 +129,8 @@ Category (Категория)
       "category": { "id": 1, "name": "Горячие блюда", "order": 1 },
       "tags": [{ "id": 2, "name": "Хит" }],
       "allergens": [{ "id": 1, "name": "Глютен" }],
-      "image": "http://localhost:8000/media/dishes/images/steak.jpg",
-      "video_url": "http://localhost:8000/media/dishes/videos/processed/dish_1_processed.mp4",
+      "image": "http://localhost:8000/media/dishes/images/b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6.jpg",
+      "video_url": "http://localhost:8000/media/dishes/videos/processed/f1e2d3c4b5a6f7e8d9c0b1a2f3e4d5c6.mp4",
       "video_status": "ready",
       "weight": 350,
       "story": "Рибай — классика американского стейкхауса...",
@@ -175,7 +175,7 @@ Category (Категория)
 | `category` | FK → Category | Категория блюда |
 | `tags` | M2M → Tag | Теги (может быть пустым) |
 | `allergens` | M2M → Allergen | Аллергены (может быть пустым) |
-| `image` | image | Фото блюда (обязательное). Автоматически обрезается до 16:9 и конвертируется в JPEG при сохранении. API возвращает **абсолютный URL**. При замене или удалении объекта старый файл удаляется из хранилища автоматически (django-cleanup). |
+| `image` | image | Фото блюда (обязательное). Автоматически обрезается до 16:9 и конвертируется в JPEG при сохранении. Имя файла — UUID hex (32 символа), оригинальное имя не сохраняется. API возвращает **абсолютный URL**. При замене или удалении объекта старый файл удаляется из хранилища автоматически (django-cleanup). |
 | `video` | file | Оригинальное видео, загружаемое администратором (необязательное). В API не возвращается. При замене или удалении объекта старый файл удаляется автоматически (django-cleanup). |
 | `video_processed` | file | Транскодированное видео H.264/720×1280 (заполняется Celery, не редактируется вручную). При замене новым обработанным видео старый файл удаляется автоматически (django-cleanup). |
 | `video_status` | enum | Статус обработки: `pending` / `processing` / `ready` / `failed`. Flutter воспроизводит видео только при `ready`. |

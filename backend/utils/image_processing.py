@@ -1,5 +1,6 @@
 import io
 import os
+from uuid import uuid4
 
 from django.core.files.base import ContentFile
 from PIL import Image, ImageOps
@@ -109,10 +110,7 @@ class AutoCropImageMixin:
 
         processed = center_crop_to_ratio(field, self._image_ratio)
 
-        base_name = os.path.splitext(os.path.basename(field.name))[0]
-        # Pass only the filename so generate_filename adds upload_to exactly once.
-        # Passing the full path (including upload_to) would double it in storage.
-        new_name = base_name + '.jpg'
+        new_name = uuid4().hex + '.jpg'
 
         # Удаляем оригинал и записываем обработанный файл
         field.delete(save=False)
