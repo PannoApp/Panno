@@ -13,6 +13,7 @@ import '../core/theme.dart';
 import '../data/models/api_category.dart';
 import '../data/models/api_dish.dart';
 import '../data/models/api_tag.dart';
+import '../providers/auth_provider.dart';
 import '../providers/menu_provider.dart';
 import '../widgets/dish_detail_sheet.dart';
 import '../widgets/dish_elements.dart';
@@ -44,8 +45,29 @@ class _MenuScreenState extends State<MenuScreen>
 
     if (!menuProvider.loaded) return const _MenuLoadingSkeleton();
 
+    final isClassic = menuProvider.mode == MenuViewMode.classic;
+    final isAdmin = context.watch<AuthProvider>().isAdmin;
+
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
+      floatingActionButton: (isClassic && isAdmin)
+          ? FloatingActionButton(
+              backgroundColor: PiligrimColors.earthWarm,
+              shape: const CircleBorder(),
+              elevation: 6,
+              onPressed: () {
+                // TODO: navigate to DishEditScreen(dish: null) — TICKET-016
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('DishEditScreen — coming soon'),
+                    backgroundColor: PiligrimColors.earthDeep,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: const Icon(Icons.add, color: PiligrimColors.water),
+            )
+          : null,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -560,6 +582,7 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
     final categoryName = <int, String>{
       for (final c in categories) c.id: c.name,
     };
+    final isAdmin = context.read<AuthProvider>().isAdmin;
 
     if (!group) {
       for (var i = 0; i < dishes.length; i++) {
@@ -567,6 +590,7 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
           dish: dishes[i],
           categoryName: categoryName[dishes[i].category],
           animationDelay: Duration(milliseconds: i * 40),
+          isAdmin: isAdmin,
         ));
       }
       return items;
@@ -603,6 +627,7 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
           dish: dish,
           categoryName: name,
           animationDelay: Duration(milliseconds: dishIndex * 35),
+          isAdmin: isAdmin,
         ));
         dishIndex++;
       }
@@ -1246,14 +1271,27 @@ class _FilterChips extends StatelessWidget {
 // Карточка классического меню (ApiDish)
 // — pill-badge категории, многоступенчатый gradient, премиальная цена-pill.
 // ─────────────────────────────────────────────────────────────────────────────
+void _openDishEdit(BuildContext context, ApiDish dish) {
+  // TODO: navigate to DishEditScreen when implemented
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Редактировать: ${dish.name}'),
+      backgroundColor: PiligrimColors.earthDeep,
+      duration: const Duration(seconds: 2),
+    ),
+  );
+}
+
 class _ClassicDishCard extends StatelessWidget {
   const _ClassicDishCard({
     required this.dish,
+    required this.isAdmin,
     this.categoryName,
     this.animationDelay = Duration.zero,
   });
 
   final ApiDish dish;
+  final bool isAdmin;
   final String? categoryName;
   final Duration animationDelay;
 
@@ -1344,6 +1382,14 @@ class _ClassicDishCard extends StatelessWidget {
                         top: 14,
                         left: 16,
                         child: _CategoryPillBadge(name: categoryName!),
+                      ),
+                    if (isAdmin)
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: _AdminEditButton(
+                          onTap: () => _openDishEdit(context, dish),
+                        ),
                       ),
                     // Цена — premium pill внизу слева, тёплая steppe-обводка + ember-glow (огонь по ТЗ).
                     Positioned(
@@ -1491,6 +1537,37 @@ class _CategoryPillBadge extends StatelessWidget {
           fontSize: 10,
           letterSpacing: 1.6,
           fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+// Кнопка редактирования блюда для администратора — круглая 36×36 поверх изображения.
+class _AdminEditButton extends StatelessWidget {
+  const _AdminEditButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: PiligrimColors.earthDeep.withValues(alpha: 0.85),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: PiligrimColors.water.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
+        child: const Icon(
+          Icons.edit_outlined,
+          size: 16,
+          color: PiligrimColors.water,
         ),
       ),
     );
