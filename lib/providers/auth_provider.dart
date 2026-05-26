@@ -41,6 +41,7 @@ class AuthProvider extends ChangeNotifier {
   int eventsCount = 0;
 
   bool get isLoggedIn => currentUser != null;
+  bool get isAdmin => currentUser?.isAdmin ?? false;
 
   /// Совместимость с экранами на [HeroUser].
   HeroUser get user {
