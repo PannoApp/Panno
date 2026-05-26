@@ -613,13 +613,214 @@ await dio.delete('/api/v1/menu/admin/dishes/$dishId/');
 
 ---
 
-### 6.7 Коды ошибок Admin API
+### 6.7 Загрузка видео к блюду
+
+`PATCH /api/v1/menu/admin/dishes/{id}/` (Staff only)  
+**Content-Type: `multipart/form-data`** — обязателен при передаче видеофайла.
+
+Поддерживаемые форматы: MP4, MOV (QuickTime), M4V. Любой другой тип → `400`.
+
+```dart
+Future<void> uploadDishVideo({
+  required int dishId,
+  required File videoFile,
+}) async {
+  final formData = FormData.fromMap({
+    'video': await MultipartFile.fromFile(
+      videoFile.path,
+      filename: path.basename(videoFile.path),
+      contentType: DioMediaType('video', 'mp4'),
+    ),
+  });
+
+  await dio.patch(
+    '/api/v1/menu/admin/dishes/$dishId/',
+    data: formData,
+    // Не передавать ContentType.json — форма с файлом!
+  );
+  // Ответ 200: video_status == "pending"
+}
+```
+
+После `PATCH` бэкенд возвращает `video_status: "pending"`. Транскодирование происходит асинхронно в Celery. Flutter должен опрашивать детальный эндпоинт до получения `ready` или `failed`:
+
+```dart
+Future<String> waitForVideoReady(int dishId) async {
+  while (true) {
+    await Future.delayed(const Duration(seconds: 5));
+    final resp = await dio.get('/api/v1/menu/admin/dishes/$dishId/');
+    final status = resp.data['video_status'] as String;
+    if (status == 'ready' || status == 'failed') return status;
+  }
+}
+```
+
+**Статусы видео:**
+
+| Статус | Что показывать |
+|---|---|
+| `pending` | Прогресс-индикатор «Видео в очереди...» |
+| `processing` | Прогресс-индикатор «Транскодирование...» |
+| `ready` | Плеер с `video_url` |
+| `failed` | Сообщение об ошибке + кнопка повторной загрузки |
+
+Ориентировочное время транскодирования: до 30 сек видео — 5–15 сек; 1–3 мин видео — 30–90 сек.
+
+---
+
+### 6.8 Events & News CRUD (Staff Only)
+
+Контент-менеджеры и администраторы могут создавать, редактировать и удалять мероприятия и новости напрямую из мобильного приложения.
+
+**Base URLs:**
+- Мероприятия: `/api/v1/events/admin/events/`
+- Новости: `/api/v1/events/admin/news/`
+
+Все эндпоинты требуют `Authorization: Bearer <access_token>` и `is_staff=true`. Пагинация отключена — возвращается плоский список.
+
+---
+
+#### Мероприятия (EventEditScreen)
+
+**Список всех мероприятий (включая неактивные):**
+```dart
+final resp = await dio.get('/api/v1/events/admin/events/');
+// resp.data — List<dynamic>, отсортирован по убыванию date_time
+```
+
+**Создать мероприятие** (`multipart/form-data`, `image` обязателен):
+```dart
+Future<void> createEvent({
+  required String title,
+  required String description,
+  required DateTime dateTime,
+  required File imageFile,
+  String format = 'open',    // 'open' | 'closed'
+  String? price,             // null = вход свободный
+  int maxPlaces = 0,         // 0 = без ограничений
+  bool isActive = true,
+}) async {
+  final formData = FormData.fromMap({
+    'title': title,
+    'description': description,
+    'date_time': dateTime.toIso8601String(),
+    'format': format,
+    if (price != null) 'price': price,
+    'max_places': maxPlaces,
+    'is_active': isActive,
+    'image': await MultipartFile.fromFile(
+      imageFile.path,
+      filename: path.basename(imageFile.path),
+    ),
+  });
+  await dio.post('/api/v1/events/admin/events/', data: formData);
+}
+```
+
+**Частичное обновление** (без смены обложки — JSON, со сменой — multipart):
+```dart
+// Скрыть мероприятие (JSON)
+await dio.patch(
+  '/api/v1/events/admin/events/$eventId/',
+  data: {'is_active': false},
+  options: Options(contentType: 'application/json'),
+);
+
+// Заменить обложку (multipart)
+final formData = FormData.fromMap({
+  'image': await MultipartFile.fromFile(newImage.path),
+});
+await dio.patch('/api/v1/events/admin/events/$eventId/', data: formData);
+```
+
+**Удалить мероприятие:**
+```dart
+await dio.delete('/api/v1/events/admin/events/$eventId/');
+// 204 — тело пустое. Обложка удаляется из storage автоматически.
+```
+
+**Поля ответа** (`StaffEventSerializer`):
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | int | ID |
+| `title` | string | Заголовок |
+| `description` | text | Описание |
+| `date_time` | datetime | ISO 8601 с timezone |
+| `image` | file | write-only при upload |
+| `image_url` | string | Абсолютный URL обложки (read) |
+| `format` | string | `"open"` или `"closed"` |
+| `price` | decimal / null | `null` = вход свободный |
+| `is_active` | bool | Видимость в публичных эндпоинтах |
+| `max_places` | int | `0` = без ограничений |
+| `occupied_places` | int | Вычисляемое (read) |
+| `created_at` | datetime | Дата создания (read) |
+
+---
+
+#### Новости (NewsEditScreen)
+
+**Список всех новостей:**
+```dart
+final resp = await dio.get('/api/v1/events/admin/news/');
+// resp.data — List<dynamic>, отсортирован по убыванию created_at
+```
+
+**Создать новость** (`image` необязателен):
+```dart
+Future<void> createNews({
+  required String title,
+  required String content,
+  File? imageFile,  // null — новость без картинки допустима
+}) async {
+  final map = <String, dynamic>{
+    'title': title,
+    'content': content,
+  };
+  if (imageFile != null) {
+    map['image'] = await MultipartFile.fromFile(imageFile.path);
+  }
+
+  // Если есть изображение — multipart; иначе можно JSON
+  if (imageFile != null) {
+    await dio.post('/api/v1/events/admin/news/', data: FormData.fromMap(map));
+  } else {
+    await dio.post(
+      '/api/v1/events/admin/news/',
+      data: {'title': title, 'content': content},
+      options: Options(contentType: 'application/json'),
+    );
+  }
+}
+```
+
+**Удалить новость:**
+```dart
+await dio.delete('/api/v1/events/admin/news/$newsId/');
+// 204 — изображение удаляется из storage автоматически.
+```
+
+**Поля ответа** (`StaffNewsSerializer`):
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | int | ID |
+| `title` | string | Заголовок |
+| `content` | text | Текст новости |
+| `image` | file | write-only при upload |
+| `image_url` | string / null | Абсолютный URL изображения (read); `null` если нет фото |
+| `created_at` | datetime | Дата публикации (read) |
+
+---
+
+### 6.9 Коды ошибок Admin API
 
 | Код | Причина |
 |---|---|
-| `400` | Нет `image` при создании (`{"image": "Фото обязательно при создании блюда."}`) |
+| `400` | Нет `image` при создании мероприятия или блюда; недопустимый `format` у события; неподдерживаемый тип видеофайла |
+| `401` | Токен не передан или истёк |
 | `403` | Пользователь не авторизован или `is_staff=false` |
-| `404` | Блюдо с указанным `id` не существует |
+| `404` | Объект с указанным `id` не существует |
 
 ---
 

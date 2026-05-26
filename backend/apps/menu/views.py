@@ -204,3 +204,11 @@ class StaffDishViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsStaffOrAdmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
+
+    def perform_update(self, serializer):
+        # Если передан новый видеофайл — сбрасываем статус в PENDING,
+        # чтобы сигнал trigger_video_processing сработал даже при video_status='ready'.
+        if serializer.validated_data.get('video'):
+            serializer.save(video_status=Dish.VideoStatus.PENDING)
+        else:
+            serializer.save()

@@ -20,6 +20,9 @@ class PiligrimNewsPost {
   final DateTime publishedAt;
   final String? imageUrl;
 
+  // Нужен для admin CRUD (deleteNews / updateNews принимают int id)
+  int get numericId => int.tryParse(id) ?? 0;
+
   factory PiligrimNewsPost.fromJson(Map<String, dynamic> json) {
     return PiligrimNewsPost(
       id: parseInt(json['id'], field: 'id').toString(),

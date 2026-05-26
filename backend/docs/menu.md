@@ -238,13 +238,56 @@ Category (Категория)
 | `category` | int | read/write | required | ID категории (FK) |
 | `tags` | int[] | read/write | optional | Список ID тегов (M2M) |
 | `allergens` | int[] | read/write | optional | Список ID аллергенов (M2M) |
-| `image` | file | write | required при создании | Фото блюда (multipart) |
-| `image_url` | string | read | — | Абсолютный URL фото |
+| `image` | file | write | required при создании | Фото блюда (multipart). При PATCH без смены фото — не передавать |
+| `image_url` | string | read | — | Абсолютный URL текущего фото |
+| `video` | file | write | optional | Оригинальный видеофайл (MP4 или MOV). Запускает Celery-транскодирование. При PATCH без смены видео — не передавать |
+| `video_url` | string | read | — | Абсолютный URL обработанного видео (H.264 720×1280); `null` пока видео не готово |
+| `video_status` | string | read | — | Статус: `pending` / `processing` / `ready` / `failed` |
 | `weight` | int | read/write | optional | Вес порции в граммах |
 | `story` | text | read/write | optional | История блюда |
 | `is_active` | bool | read/write | optional | Видимость блюда в публичном API (default: `true`) |
 
-> `video` и `video_processed` через Staff API не управляются — только через Django Admin.
+---
+
+### Загрузка видео через Staff API
+
+Видео передаётся вместе с остальными полями через `multipart/form-data` в `PATCH`-запросе. При загрузке нового файла `video_status` сбрасывается в `pending` автоматически — даже если блюдо уже имело статус `ready`.
+
+**PATCH с видеофайлом:**
+```bash
+curl -X PATCH https://piligrim.kz/api/v1/menu/admin/dishes/1/ \
+  -H "Authorization: Bearer <access_token>" \
+  -F "video=@/path/to/clip.mp4"
+```
+
+Допустимые форматы: `video/mp4`, `video/quicktime` (MOV), `video/x-m4v`. Любой другой content-type вернёт `400`.
+
+**Flow статусов после загрузки:**
+
+```
+PATCH video → video_status = pending
+                     ↓
+              Celery принял задачу
+                     ↓
+              video_status = processing
+                     ↓ (FFmpeg)
+          ┌──────────┴──────────┐
+        успех                ошибка (max 2 retry)
+          ↓                      ↓
+  video_status = ready    video_status = failed
+  video_url = <URL>       video_url = null
+```
+
+**Примерные оценки времени транскодирования (FFmpeg, Docker):**
+
+| Длина видео | Ориентировочное время |
+|---|---|
+| до 30 сек | 5–15 сек |
+| 30–60 сек | 15–30 сек |
+| 1–3 мин | 30–90 сек |
+| > 3 мин | 90–180 сек |
+
+Эти цифры справедливы для CPU-транскодирования внутри Docker-контейнера. На продакшн-сервере время зависит от мощности CPU. Flutter должен периодически опрашивать `GET /api/v1/menu/admin/dishes/{id}/` и читать `video_status` до перехода в `ready` или `failed`.
 
 ---
 

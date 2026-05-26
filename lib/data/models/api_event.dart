@@ -29,6 +29,7 @@ class ApiEvent {
     this.coverUrl,
     this.priceFrom,
     required this.isPast,
+    this.isActive = true,
     this.hasPhotoReport = false,
     this.maxPlaces = 0,
     this.occupiedPlaces = 0,
@@ -42,6 +43,7 @@ class ApiEvent {
   final String? coverUrl;
   final int? priceFrom;
   final bool isPast;
+  final bool isActive;
   final bool hasPhotoReport;
   final int maxPlaces;
   final int occupiedPlaces;
@@ -64,6 +66,7 @@ class ApiEvent {
       ),
       priceFrom: _parseDecimalPrice(json['price'] ?? json['price_from']),
       isPast: parseBool(json['is_past'] ?? json['isPast'], defaultValue: isPast),
+      isActive: parseBool(json['is_active'] ?? json['isActive'], defaultValue: true),
       hasPhotoReport: parseBool(
         json['has_photo_report'] ?? json['hasPhotoReport'],
         defaultValue: false,
@@ -82,6 +85,7 @@ class ApiEvent {
         if (coverUrl != null) 'cover_url': coverUrl,
         if (priceFrom != null) 'price_from': priceFrom,
         'is_past': isPast,
+        'is_active': isActive,
         'has_photo_report': hasPhotoReport,
         'max_places': maxPlaces,
         'occupied_places': occupiedPlaces,

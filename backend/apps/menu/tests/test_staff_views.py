@@ -1,6 +1,6 @@
 import io
 import sys
-from unittest.mock import MagicMock as _MagicMock
+from unittest.mock import MagicMock as _MagicMock, patch
 
 # ffmpeg присутствует только в Docker-образе; stub чтобы модуль загрузился в CI
 if 'ffmpeg' not in sys.modules:
@@ -198,3 +198,76 @@ class StaffDishViewSetTest(APITestCase):
             default_storage.exists(img_name),
             f'Изображение должно быть удалено из storage после DELETE: {img_name}',
         )
+
+    # ------------------------------------------------------------------
+    # Video status
+    # ------------------------------------------------------------------
+
+    def test_create_dish_with_video(self):
+        """POST multipart с image + video → 201, video_status='pending' в ответе."""
+        self._auth(self.staff)
+        data = {
+            'name': 'Видеоблюдо',
+            'price': '1500.00',
+            'category': self.category.pk,
+            'image': _make_image('video_dish.png'),
+            'video': SimpleUploadedFile('clip.mp4', b'fake-video-data', content_type='video/mp4'),
+        }
+        response = self.client.post(STAFF_URL, data, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['video_status'], 'pending')
+
+    def test_create_dish_without_video(self):
+        """POST только с image → 201, video_status='pending' (дефолт модели)."""
+        self._auth(self.staff)
+        data = {
+            'name': 'Без видео',
+            'price': '800.00',
+            'category': self.category.pk,
+            'image': _make_image('no_video.png'),
+        }
+        response = self.client.post(STAFF_URL, data, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['video_status'], 'pending')
+
+    def test_partial_update_video_resets_to_pending(self):
+        """PATCH с новым video на блюдо с video_status='ready' → 200, video_status='pending'.
+
+        Мокируем process_dish_video.delay, чтобы задача не выполнялась синхронно
+        (CELERY_TASK_ALWAYS_EAGER=True) и не перезаписывала статус в PROCESSING/READY.
+        """
+        dish = self._create_dish('Лагман с видео')
+        dish.video_status = Dish.VideoStatus.READY
+        dish.save(update_fields=['video_status'])
+
+        self._auth(self.staff)
+        with patch('apps.menu.tasks.process_dish_video.delay'):
+            response = self.client.patch(
+                f'{STAFF_URL}{dish.pk}/',
+                {'video': SimpleUploadedFile('new_clip.mp4', b'new-video', content_type='video/mp4')},
+                format='multipart',
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        dish.refresh_from_db()
+        self.assertEqual(dish.video_status, Dish.VideoStatus.PENDING)
+
+    def test_video_status_in_response(self):
+        """GET detail → ответ содержит поля video_status и video_url."""
+        dish = self._create_dish('Бешбармак')
+        self._auth(self.staff)
+        response = self.client.get(f'{STAFF_URL}{dish.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('video_status', response.data)
+        self.assertIn('video_url', response.data)
+
+    def test_invalid_video_format_returns_400(self):
+        """PATCH с файлом content_type='image/jpeg' → 400."""
+        dish = self._create_dish('Манты видео')
+        self._auth(self.staff)
+        response = self.client.patch(
+            f'{STAFF_URL}{dish.pk}/',
+            {'video': SimpleUploadedFile('bad.jpg', b'not-a-video', content_type='image/jpeg')},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('video', response.data)

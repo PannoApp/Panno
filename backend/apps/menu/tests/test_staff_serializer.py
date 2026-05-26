@@ -115,3 +115,75 @@ class StaffDishSerializerTest(TestCase):
         url = serializer.data['image_url']
         self.assertIsNotNone(url)
         self.assertTrue(url.startswith('http://'), f'Expected absolute URL, got: {url}')
+
+    # ------------------------------------------------------------------
+    # test_video_field_is_optional_on_create
+    # ------------------------------------------------------------------
+
+    def test_video_field_is_optional_on_create(self):
+        serializer = StaffDishSerializer(data=self._valid_data())
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    # ------------------------------------------------------------------
+    # test_video_field_accepts_mp4
+    # ------------------------------------------------------------------
+
+    def test_video_field_accepts_mp4(self):
+        video = SimpleUploadedFile('clip.mp4', b'fake-video-data', content_type='video/mp4')
+        serializer = StaffDishSerializer(data=self._valid_data(video=video))
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    # ------------------------------------------------------------------
+    # test_video_field_rejects_text
+    # ------------------------------------------------------------------
+
+    def test_video_field_rejects_text(self):
+        bad_file = SimpleUploadedFile('clip.txt', b'not-a-video', content_type='text/plain')
+        serializer = StaffDishSerializer(data=self._valid_data(video=bad_file))
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('video', serializer.errors)
+
+    # ------------------------------------------------------------------
+    # test_video_status_is_readonly
+    # ------------------------------------------------------------------
+
+    def test_video_status_is_readonly(self):
+        data = self._valid_data()
+        data['video_status'] = 'ready'
+        serializer = StaffDishSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        # read_only поле не попадает в validated_data
+        self.assertNotIn('video_status', serializer.validated_data)
+
+    # ------------------------------------------------------------------
+    # test_video_url_null_when_not_processed
+    # ------------------------------------------------------------------
+
+    def test_video_url_null_when_not_processed(self):
+        dish = Dish.objects.create(
+            name='Самса',
+            description='',
+            price='500.00',
+            category=self.category,
+            image=_make_landscape_image('samsa.png'),
+        )
+        serializer = StaffDishSerializer(dish, context={'request': _make_request()})
+        self.assertIsNone(serializer.data['video_url'])
+
+    # ------------------------------------------------------------------
+    # test_video_url_absolute_when_processed
+    # ------------------------------------------------------------------
+
+    def test_video_url_absolute_when_processed(self):
+        dish = Dish.objects.create(
+            name='Бешбармак',
+            description='',
+            price='2000.00',
+            category=self.category,
+            image=_make_landscape_image('besh.png'),
+            video_processed=SimpleUploadedFile('besh.mp4', b'data', content_type='video/mp4'),
+        )
+        serializer = StaffDishSerializer(dish, context={'request': _make_request()})
+        url = serializer.data['video_url']
+        self.assertIsNotNone(url)
+        self.assertTrue(url.startswith('http://'), f'Expected absolute URL, got: {url}')

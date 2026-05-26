@@ -5,7 +5,7 @@ from .views import DishListView, CategoryListView, TagListView, AllergenListView
 app_name = 'menu'
 
 router = DefaultRouter()
-router.register(r'admin/dishes', StaffDishViewSet, basename='staff-dish')
+router.register(r'staff/dishes', StaffDishViewSet, basename='staff-dish')
 
 urlpatterns = [
     path('categories/', CategoryListView.as_view(), name='category-list'),

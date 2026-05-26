@@ -253,6 +253,126 @@ News (Новость) — независимая сущность
 - **Тело:** "Jazz Night — 20.06.2026 20:00"
 - **data:** `{ "event_id": "3", "reservation_id": "15" }`
 
+---
+
+## Admin Events CRUD (Staff Only)
+
+Полный CRUD мероприятий для сотрудников. Видит **все** мероприятия, включая неактивные (`is_active=False`).
+
+**Авторизация:** `Bearer <access_token>`, пользователь должен иметь роль `content_manager`, `manager`, или `admin` (`is_staff=True`).
+
+| Метод | URL | Описание |
+|---|---|---|
+| `GET` | `/api/v1/events/admin/events/` | Список всех мероприятий |
+| `POST` | `/api/v1/events/admin/events/` | Создать мероприятие |
+| `GET` | `/api/v1/events/admin/events/{id}/` | Детали мероприятия |
+| `PUT` | `/api/v1/events/admin/events/{id}/` | Полное обновление |
+| `PATCH` | `/api/v1/events/admin/events/{id}/` | Частичное обновление |
+| `DELETE` | `/api/v1/events/admin/events/{id}/` | Удалить мероприятие |
+
+Пагинация отключена — возвращается плоский массив, отсортированный по убыванию `date_time`.
+
+### Поля StaffEventSerializer
+
+| Поле | Тип | R/W | Обязательное | Описание |
+|---|---|---|---|---|
+| `id` | int | read | — | Первичный ключ |
+| `title` | string | write | да | Заголовок мероприятия |
+| `description` | text | write | да | Описание |
+| `date_time` | datetime | write | да | Дата и время проведения |
+| `image` | file | write | при создании | Обложка (multipart). При обновлении необязательна |
+| `image_url` | string | read | — | Абсолютный URL текущей обложки |
+| `format` | string | write | нет | `open` или `closed` (по умолчанию `open`) |
+| `price` | decimal | write | нет | Цена в тенге; `null` = вход свободный |
+| `is_active` | bool | write | нет | `false` — мероприятие скрыто из публичных эндпоинтов |
+| `max_places` | int | write | нет | Лимит мест (по умолчанию `0` — без ограничений) |
+| `occupied_places` | int | read | — | Вычисляемое: сумма `guests_count` всех бронирований |
+| `created_at` | datetime | read | — | Дата создания |
+
+### Content-Type
+
+- `multipart/form-data` — при создании и при обновлении с новой обложкой
+- `application/json` — для `PATCH` без смены изображения
+
+### Примеры
+
+**Создать мероприятие:**
+```bash
+curl -X POST https://piligrim.kz/api/v1/events/admin/events/ \
+  -H "Authorization: Bearer <access_token>" \
+  -F "title=Jazz Night" \
+  -F "description=Живая джазовая музыка" \
+  -F "date_time=2026-06-20T20:00:00+06:00" \
+  -F "format=open" \
+  -F "price=" \
+  -F "image=@/path/to/cover.jpg"
+```
+
+**Скрыть мероприятие (PATCH без файла):**
+```bash
+curl -X PATCH https://piligrim.kz/api/v1/events/admin/events/3/ \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"is_active": false}'
+```
+
+### Ошибки
+
+| Код | Причина |
+|---|---|
+| `400` | Нет `image` при создании; недопустимое значение `format` |
+| `401` | Токен не передан или истёк |
+| `403` | Пользователь не является staff |
+| `404` | Мероприятие не найдено |
+
+---
+
+## Admin News CRUD (Staff Only)
+
+Полный CRUD новостей для сотрудников.
+
+**Авторизация:** аналогично Admin Events — `Bearer <access_token>`, `is_staff=True`.
+
+| Метод | URL | Описание |
+|---|---|---|
+| `GET` | `/api/v1/events/admin/news/` | Список всех новостей |
+| `POST` | `/api/v1/events/admin/news/` | Создать новость |
+| `GET` | `/api/v1/events/admin/news/{id}/` | Детали новости |
+| `PUT` | `/api/v1/events/admin/news/{id}/` | Полное обновление |
+| `PATCH` | `/api/v1/events/admin/news/{id}/` | Частичное обновление |
+| `DELETE` | `/api/v1/events/admin/news/{id}/` | Удалить новость |
+
+Пагинация отключена — плоский массив, отсортированный по убыванию `created_at`.
+
+### Поля StaffNewsSerializer
+
+| Поле | Тип | R/W | Обязательное | Описание |
+|---|---|---|---|---|
+| `id` | int | read | — | Первичный ключ |
+| `title` | string | write | да | Заголовок |
+| `content` | text | write | да | Текст новости |
+| `image` | file | write | нет | Изображение (multipart). Может быть `null` |
+| `image_url` | string | read | — | Абсолютный URL изображения или `null` |
+| `created_at` | datetime | read | — | Дата публикации |
+
+> В отличие от мероприятий, `image` у новости **необязательна** — как при создании, так и при обновлении.
+
+### Content-Type
+
+- `multipart/form-data` — при создании/обновлении с изображением
+- `application/json` — для `PATCH` без смены изображения
+
+### Ошибки
+
+| Код | Причина |
+|---|---|
+| `400` | Ошибка валидации полей |
+| `401` | Токен не передан или истёк |
+| `403` | Пользователь не является staff |
+| `404` | Новость не найдена |
+
+---
+
 ## Файлы модуля
 
 ```
@@ -260,11 +380,15 @@ apps/events/
 ├── models.py       # Event, News, EventReservation, EventPhotoReport
 ├── serializers.py  # EventSerializer (+has_photo_report), NewsSerializer,
 │                   # EventReservationSerializer, EventReservationStaffSerializer,
-│                   # EventPhotoReportSerializer
-├── views.py        # 6 view-классов (+ EventPhotoReportListView)
-├── signals.py      # push при создании EventReservation
+│                   # EventPhotoReportSerializer,
+│                   # StaffEventSerializer, StaffNewsSerializer
+├── views.py        # UpcomingEventsListView, ArchivedEventsListView, NewsListView,
+│                   # EventReservationCreateView, UserEventReservationsListView,
+│                   # EventPhotoReportListView,
+│                   # StaffEventViewSet, StaffNewsViewSet
+├── signals.py      # push при создании EventReservation; инвалидация кэша
 ├── apps.py         # подключение signals в ready()
-└── urls.py         # Маршруты /api/v1/events/...
+└── urls.py         # Маршруты /api/v1/events/... + router для admin/events, admin/news
 ```
 
 ## Важные нюансы

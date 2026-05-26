@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import '../events_news_data.dart';
 import '../models/api_event.dart';
@@ -68,5 +70,105 @@ class EventsRepository {
         headers: {'Idempotency-Key': idempotencyKey},
       ),
     );
+  }
+
+  // ─── Admin: Events ───────────────────────────────────────────────────────────
+
+  /// Список всех событий без пагинации (pagination_class = None на бэкенде).
+  Future<List<ApiEvent>> fetchAdminEvents() async {
+    final response = await _dio.get<List<dynamic>>('/events/admin/events/');
+    return (response.data ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map((json) => ApiEvent.fromJson(
+              json,
+              isPast: DateTime.tryParse(json['date_time']?.toString() ?? '')
+                      ?.isBefore(DateTime.now()) ==
+                  true,
+            ))
+        .toList();
+  }
+
+  Future<void> createEvent(
+    Map<String, dynamic> fields, {
+    File? image,
+  }) async {
+    final data = _buildFormData(fields, image: image);
+    await _dio.post<void>('/events/admin/events/', data: data);
+  }
+
+  /// С image — multipart PATCH; без image — JSON PATCH.
+  Future<void> updateEvent(
+    int id,
+    Map<String, dynamic> fields, {
+    File? image,
+  }) async {
+    if (image != null) {
+      final data = _buildFormData(fields, image: image);
+      await _dio.patch<void>('/events/admin/events/$id/', data: data);
+    } else {
+      await _dio.patch<void>(
+        '/events/admin/events/$id/',
+        data: _prepareFields(fields),
+      );
+    }
+  }
+
+  Future<void> deleteEvent(int id) async {
+    await _dio.delete<void>('/events/admin/events/$id/');
+  }
+
+  // ─── Admin: News ─────────────────────────────────────────────────────────────
+
+  /// Список всех новостей без пагинации.
+  Future<List<PiligrimNewsPost>> fetchAdminNews() async {
+    final response = await _dio.get<List<dynamic>>('/events/admin/news/');
+    return (response.data ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(PiligrimNewsPost.fromJson)
+        .toList();
+  }
+
+  Future<void> createNews(
+    Map<String, dynamic> fields, {
+    File? image,
+  }) async {
+    final data = _buildFormData(fields, image: image);
+    await _dio.post<void>('/events/admin/news/', data: data);
+  }
+
+  Future<void> updateNews(
+    int id,
+    Map<String, dynamic> fields, {
+    File? image,
+  }) async {
+    final data = _buildFormData(fields, image: image);
+    await _dio.patch<void>('/events/admin/news/$id/', data: data);
+  }
+
+  Future<void> deleteNews(int id) async {
+    await _dio.delete<void>('/events/admin/news/$id/');
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+  /// DateTime → UTC ISO8601; остальные значения без изменений.
+  Map<String, dynamic> _prepareFields(Map<String, dynamic> fields) {
+    return {
+      for (final e in fields.entries)
+        e.key: e.value is DateTime
+            ? (e.value as DateTime).toUtc().toIso8601String()
+            : e.value,
+    };
+  }
+
+  FormData _buildFormData(Map<String, dynamic> fields, {File? image}) {
+    final formMap = <String, dynamic>{..._prepareFields(fields)};
+    if (image != null) {
+      formMap['image'] = MultipartFile.fromFileSync(
+        image.path,
+        filename: image.path.split('/').last,
+      );
+    }
+    return FormData.fromMap(formMap);
   }
 }
