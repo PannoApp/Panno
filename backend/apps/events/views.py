@@ -1,5 +1,6 @@
 from django.core.cache import cache
-from rest_framework import generics
+from rest_framework import generics, viewsets
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
@@ -7,8 +8,12 @@ from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParamete
 from drf_spectacular.types import OpenApiTypes
 from utils.idempotency import IdempotencyMixin
 from utils.pagination import StandardPagination
+from utils.permissions import IsStaffOrAdmin
 from .models import Event, News, EventReservation, EventPhotoReport
-from .serializers import EventSerializer, NewsSerializer, EventReservationSerializer, EventPhotoReportSerializer
+from .serializers import (
+    EventSerializer, NewsSerializer, EventReservationSerializer,
+    EventPhotoReportSerializer, StaffEventSerializer, StaffNewsSerializer,
+)
 
 # Предстоящие/прошедшие события зависят от текущего времени — короткий TTL,
 # чтобы список обновлялся автоматически когда событие «наступает».
@@ -216,3 +221,22 @@ class EventPhotoReportListView(generics.ListAPIView):
             event_id=self.kwargs['event_id'],
             event__date_time__lt=timezone.now(),
         )
+
+
+@extend_schema(tags=['Staff: Events'])
+class StaffEventViewSet(viewsets.ModelViewSet):
+    queryset = Event.objects.prefetch_related('reservations').order_by('-date_time')
+    serializer_class = StaffEventSerializer
+    permission_classes = [IsAuthenticated, IsStaffOrAdmin]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
+
+
+@extend_schema(tags=['Staff: Events'])
+class StaffNewsViewSet(viewsets.ModelViewSet):
+    queryset = News.objects.all().order_by('-created_at')
+    serializer_class = StaffNewsSerializer
+    permission_classes = [IsAuthenticated, IsStaffOrAdmin]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
+    # destroy наследуется; django-cleanup удаляет файл при замене/удалении через on_commit

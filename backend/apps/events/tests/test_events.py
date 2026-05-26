@@ -12,8 +12,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase, APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Event, News, EventReservation, EventPhotoReport
-from .serializers import EventReservationSerializer, EventReservationStaffSerializer, EventSerializer
+from apps.events.models import Event, News, EventReservation, EventPhotoReport
+from apps.events.serializers import EventReservationSerializer, EventReservationStaffSerializer, EventSerializer
 
 User = get_user_model()
 
@@ -596,7 +596,7 @@ class NewsCacheTest(APITestCase):
 class EventReservationAdminTest(TestCase):
     def test_admin_config_has_guest_fields(self):
         from django.contrib.admin.sites import AdminSite
-        from .admin import EventReservationAdmin
+        from apps.events.admin import EventReservationAdmin
         
         site = AdminSite()
         admin_instance = EventReservationAdmin(EventReservation, site)
@@ -655,7 +655,7 @@ class EventFileCleanupTest(TestCase):
     # --- News.image (AutoCropImageMixin, nullable) ---
 
     def test_news_image_old_file_deleted_on_update(self):
-        from .models import News
+        from apps.events.models import News
         news = News.objects.create(
             title='Новость', content='Текст', image=_make_landscape_image('n1.png')
         )
@@ -670,7 +670,7 @@ class EventFileCleanupTest(TestCase):
         self.assertFalse(default_storage.exists(old_name))
 
     def test_news_image_file_deleted_on_instance_delete(self):
-        from .models import News
+        from apps.events.models import News
         news = News.objects.create(
             title='Новость удалённая', content='Текст', image=_make_landscape_image()
         )
@@ -685,7 +685,7 @@ class EventFileCleanupTest(TestCase):
 
     def test_news_without_image_delete_does_not_raise(self):
         """Удаление новости без изображения не должно поднимать исключений."""
-        from .models import News
+        from apps.events.models import News
         news = News.objects.create(title='Без фото', content='Текст')
         with self.captureOnCommitCallbacks(execute=True):
             news.delete()  # не должен вызвать ошибку
@@ -693,7 +693,7 @@ class EventFileCleanupTest(TestCase):
     # --- EventPhotoReport.image (plain ImageField, без AutoCropImageMixin) ---
 
     def test_event_photo_report_old_file_deleted_on_update(self):
-        from .models import EventPhotoReport
+        from apps.events.models import EventPhotoReport
         event = make_event(title='Отчёт')
         report = EventPhotoReport.objects.create(
             event=event, image=make_image('r1.png'), order=0
@@ -708,7 +708,7 @@ class EventFileCleanupTest(TestCase):
         self.assertFalse(default_storage.exists(old_name))
 
     def test_event_photo_report_file_deleted_on_instance_delete(self):
-        from .models import EventPhotoReport
+        from apps.events.models import EventPhotoReport
         event = make_event(title='Отчёт удаление')
         report = EventPhotoReport.objects.create(
             event=event, image=make_image(), order=0

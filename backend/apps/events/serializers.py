@@ -127,3 +127,73 @@ class EventReservationStaffSerializer(EventReservationSerializer):
             return None
         full = f"{obj.user.first_name} {obj.user.last_name}".strip()
         return full or obj.user.phone
+
+
+class StaffEventSerializer(serializers.ModelSerializer):
+    image      = serializers.ImageField(required=False)
+    image_url  = serializers.SerializerMethodField()
+    format     = serializers.CharField(default='open')
+    price      = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    is_active  = serializers.BooleanField(default=True)
+    max_places = serializers.IntegerField(default=0, required=False)
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
+    def validate_format(self, value):
+        allowed = ['open', 'closed']
+        if value not in allowed:
+            raise serializers.ValidationError(
+                f"Недопустимое значение. Допустимые значения: {allowed}."
+            )
+        return value
+
+    def validate(self, data):
+        # при создании обложка обязательна
+        if self.instance is None and not data.get('image'):
+            raise serializers.ValidationError({'image': 'Обложка обязательна при создании мероприятия.'})
+        return data
+
+    class Meta:
+        model  = Event
+        fields = (
+            'id',
+            'title',
+            'description',
+            'date_time',
+            'image',
+            'image_url',
+            'format',
+            'price',
+            'is_active',
+            'max_places',
+            'created_at',
+            'occupied_places',
+        )
+        read_only_fields = ('id', 'created_at', 'occupied_places')
+
+
+class StaffNewsSerializer(serializers.ModelSerializer):
+    image     = serializers.ImageField(required=False, allow_null=True)
+    image_url = serializers.SerializerMethodField()
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
+    class Meta:
+        model  = News
+        fields = (
+            'id',
+            'title',
+            'content',
+            'image',
+            'image_url',
+            'created_at',
+        )
+        read_only_fields = ('id', 'created_at')
