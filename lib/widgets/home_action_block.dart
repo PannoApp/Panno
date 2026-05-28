@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../core/auth_guard.dart';
+import '../core/piligrim_route.dart';
 import '../screens/booking_screen.dart';
 import 'ember_cta.dart';
 
@@ -25,7 +26,7 @@ class HomeActionBlock extends StatelessWidget {
           if (!await guardAuth(context)) return;
           if (!context.mounted) return;
           await Navigator.of(context).push(
-            MaterialPageRoute<void>(
+            PiligrimPageRoute<void>(
               builder: (_) => const BookingScreen(),
             ),
           );

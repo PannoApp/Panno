@@ -16,6 +16,7 @@ import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_shimmer.dart';
 import '../widgets/piligrim_tab_editorial_mark.dart';
 import '../widgets/piligrim_tap.dart';
+import '../core/piligrim_route.dart';
 import 'interior_photo_viewer.dart';
 import 'tour_webview_screen.dart';
 
@@ -107,7 +108,7 @@ class _InteriorScreenState extends State<InteriorScreen>
 
     if (!mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(
+      PiligrimPageRoute(
         builder: (_) => TourWebViewScreen(url: url),
       ),
     );
@@ -124,7 +125,7 @@ class _InteriorScreenState extends State<InteriorScreen>
 
   void _openPhoto(List<InteriorSlide> slides, int index) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      PiligrimPageRoute<void>(
         builder: (_) => InteriorPhotoViewer(
           slides: slides,
           initialIndex: index,
@@ -167,7 +168,7 @@ class _InteriorScreenState extends State<InteriorScreen>
         final pairCount = hasOrphan ? itemCount - 1 : itemCount;
 
         return Scaffold(
-          backgroundColor: const Color(0xFF1E1B19),
+          backgroundColor: PiligrimColors.earthWarm,
           body: Stack(
             children: [
               const Positioned.fill(child: PiligrimBackground(cinematic: true)),
@@ -407,27 +408,33 @@ class _HeroPhotoBlock extends StatelessWidget {
                     const ColoredBox(color: PiligrimColors.earthDeep),
               ),
               // Верхняя виньетка — плавный переход к тёмному фону сверху
-              const Positioned.fill(
+              Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      stops: [0.0, 0.30],
-                      colors: [Color(0x55000000), Colors.transparent],
+                      stops: const [0.0, 0.30],
+                      colors: [
+                        PiligrimColors.shadow.withValues(alpha: 0.33),
+                        PiligrimColors.clear,
+                      ],
                     ),
                   ),
                 ),
               ),
               // Нижний градиент — читаемость текста зоны
-              const Positioned.fill(
+              Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      stops: [0.42, 1.0],
-                      colors: [Colors.transparent, Color(0xCC000000)],
+                      stops: const [0.42, 1.0],
+                      colors: [
+                        PiligrimColors.clear,
+                        PiligrimColors.shadow.withValues(alpha: 0.80),
+                      ],
                     ),
                   ),
                 ),
@@ -468,7 +475,7 @@ class _HeroPhotoBlock extends StatelessWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: PiligrimColors.sky.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: PiligrimRadius.smAll,
                         border: Border.all(
                           color: PiligrimColors.sky.withValues(alpha: 0.25),
                           width: 1,
@@ -525,14 +532,17 @@ class _InteriorSlideTile extends StatelessWidget {
                   const ColoredBox(color: PiligrimColors.earthDeep),
             ),
             // Градиент снизу — создаёт «кино» ощущение
-            const Positioned.fill(
+            Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: [0.45, 1.0],
-                    colors: [Colors.transparent, Color(0xB5000000)],
+                    stops: const [0.45, 1.0],
+                    colors: [
+                      PiligrimColors.clear,
+                      PiligrimColors.shadow.withValues(alpha: 0.71),
+                    ],
                   ),
                 ),
               ),
@@ -633,8 +643,8 @@ class _TourButton extends StatelessWidget {
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
             colors: [
-              Color(0xFF2E2420),
-              Color(0xFF3A2C22),
+              PiligrimColors.surfaceToast,
+              PiligrimColors.surfaceClay,
             ],
           ),
           border: Border.all(

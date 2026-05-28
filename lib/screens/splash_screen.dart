@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/home_data.dart';
+import '../core/piligrim_route.dart';
 import '../core/theme.dart';
 import '../data/repositories/core_repository.dart';
 import '../main.dart';
@@ -196,7 +197,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (auth.isNewUser) {
       auth.isNewUser = false;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        PiligrimPageRoute(builder: (_) => const OnboardingScreen()),
       );
       return;
     }

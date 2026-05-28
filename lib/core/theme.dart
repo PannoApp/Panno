@@ -93,6 +93,29 @@ abstract final class PiligrimColors {
   /// Базовый цвет тени
   static const Color shadow = Color(0xFF000000);
 
+  // ─── OVERLAYS & SCRIMS (Phase 1 — visual consistency tokens) ───
+
+  /// Тёплый тёмный скрим — базовый цвет для photo-gradient stops в карточках блюд.
+  /// Используется с .withValues(alpha: x) для создания многоступенчатых cinematic градиентов.
+  static const Color imageScrim = Color(0xFF1C1510);
+
+  /// Backdrop бейджей поверх фото — earthDeep @65%.
+  /// Единый фон для CategoryPillBadge, DateBadge, FormatBadge.
+  static const Color cardOverlay = Color(0xA60E0C0B);
+
+  /// Нейтральный фон glass chip/пилюли — earthDeep @40%.
+  /// Для чипов на тёмном фоне без фотографии под ним.
+  static const Color glassChip = Color(0x660E0C0B);
+
+  /// Янтарное тёплое ядро — центр радиального glow для пустых состояний.
+  static const Color glowAmber = Color(0xFF2E1A10);
+
+  /// Тёплая матовая поверхность — левый старт gradient-кнопок (тур, меню-раздел).
+  static const Color surfaceToast = Color(0xFF2E2420);
+
+  /// Более тёплая поверхность — правый конец gradient-кнопок.
+  static const Color surfaceClay = Color(0xFF3A2C22);
+
   // ─── ТЕГИ МЕНЮ (Gemstone Pastels, согласованные с бэкендом) ───
 
   /// Острое блюдо
@@ -415,6 +438,41 @@ abstract final class PiligrimRadius {
   static const BorderRadius mdAll = BorderRadius.all(mdR);
   static const BorderRadius cardAll = BorderRadius.all(cardR);
   static const BorderRadius lgAll = BorderRadius.all(lgR);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ТЕНИ — три уровня depth для карточек, вторичных элементов и навбара
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class PiligrimShadows {
+  /// Стандартная тень карточки — блюда, мероприятия, новости.
+  static const List<BoxShadow> card = [
+    BoxShadow(
+      color: Color(0x38000000),
+      blurRadius: 16,
+      offset: Offset(0, 4),
+      spreadRadius: 0,
+    ),
+  ];
+
+  /// Мягкая тень — вторичные элементы, кнопки.
+  static const List<BoxShadow> soft = [
+    BoxShadow(
+      color: Color(0x28000000),
+      blurRadius: 8,
+      offset: Offset(0, 2),
+      spreadRadius: 0,
+    ),
+  ];
+
+  /// Тень навбара (направлена вверх) — отделяет контент от нижней панели.
+  static const List<BoxShadow> nav = [
+    BoxShadow(
+      color: Color(0x18000000),
+      blurRadius: 8,
+      offset: Offset(0, -3),
+      spreadRadius: 0,
+    ),
+  ];
 }
 
 // Текущая версия приложения — сравнивается с minVersion/latestVersion из API

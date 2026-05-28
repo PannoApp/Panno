@@ -9,6 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../core/menu_data.dart';
+import '../core/piligrim_route.dart';
 import '../core/theme.dart';
 import '../data/models/api_category.dart';
 import '../data/models/api_dish.dart';
@@ -72,24 +73,29 @@ class _MenuScreenState extends State<MenuScreen>
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
-      floatingActionButton: (isClassic && isAdmin)
-          ? FloatingActionButton(
-              backgroundColor: PiligrimColors.earthWarm,
-              shape: const CircleBorder(),
-              elevation: 6,
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => DishEditScreen(
-                      dish: null,
-                      categories: menuProvider.categories,
-                    ),
+      floatingActionButton: AnimatedOpacity(
+        opacity: (isClassic && isAdmin) ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: IgnorePointer(
+          ignoring: !(isClassic && isAdmin),
+          child: FloatingActionButton(
+            backgroundColor: PiligrimColors.earthWarm,
+            shape: const CircleBorder(),
+            elevation: 6,
+            onPressed: () {
+              Navigator.of(context).push(
+                PiligrimPageRoute(
+                  builder: (context) => DishEditScreen(
+                    dish: null,
+                    categories: menuProvider.categories,
                   ),
-                );
-              },
-              child: const Icon(Icons.add, color: PiligrimColors.water),
-            )
-          : null,
+                ),
+              );
+            },
+            child: const Icon(Icons.add, color: PiligrimColors.water),
+          ),
+        ),
+      ),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -898,7 +904,7 @@ class _FeedEmptyState extends StatelessWidget {
               center: Alignment(0, 0.15),
               radius: 0.85,
               colors: [
-                Color(0xFF2E1A10),
+                PiligrimColors.glowAmber,
                 PiligrimColors.earth,
               ],
             ),
@@ -1298,7 +1304,7 @@ class _FilterChips extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 void _openDishEdit(BuildContext context, ApiDish dish) {
   Navigator.of(context).push(
-    MaterialPageRoute(
+    PiligrimPageRoute(
       builder: (context) => DishEditScreen(
         dish: dish,
         categories: context.read<MenuProvider>().categories,
@@ -1345,13 +1351,7 @@ class _ClassicDishCard extends StatelessWidget {
               color: PiligrimColors.earthWarm,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: PiligrimColors.divider, width: 0.5),
-              boxShadow: [
-                BoxShadow(
-                  color: PiligrimColors.shadow.withValues(alpha: 0.22),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              boxShadow: PiligrimShadows.card,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1371,32 +1371,35 @@ class _ClassicDishCard extends StatelessWidget {
                         : const DishClassicThumbnailFallback(),
                     ),
                     // Верхний виньет — приглушает яркие фотографии и даёт атмосферность.
-                    const Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Color(0x501C1510), Colors.transparent],
-                            stops: [0.0, 0.55],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Многоступенчатый bottom gradient — гарантирует читаемость цены/категории.
-                    const Positioned.fill(
+                    Positioned.fill(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              Colors.transparent,
-                              Color(0x441C1510),
-                              Color(0xD41C1510),
-                              Color(0xF61C1510),
+                              PiligrimColors.imageScrim.withValues(alpha: 0.31),
+                              PiligrimColors.clear,
                             ],
-                            stops: [0.0, 0.40, 0.80, 1.0],
+                            stops: const [0.0, 0.55],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Многоступенчатый bottom gradient — гарантирует читаемость цены/категории.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              PiligrimColors.clear,
+                              PiligrimColors.imageScrim.withValues(alpha: 0.27),
+                              PiligrimColors.imageScrim.withValues(alpha: 0.83),
+                              PiligrimColors.imageScrim.withValues(alpha: 0.96),
+                            ],
+                            stops: const [0.0, 0.40, 0.80, 1.0],
                           ),
                         ),
                       ),
@@ -1426,7 +1429,7 @@ class _ClassicDishCard extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xD61C1510),
+                          color: PiligrimColors.imageScrim.withValues(alpha: 0.84),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: PiligrimColors.steppe.withValues(alpha: 0.58),
@@ -1537,11 +1540,11 @@ class _CategoryPillBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep.withValues(alpha: 0.62),
+        color: PiligrimColors.cardOverlay,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: PiligrimColors.water.withValues(alpha: 0.38),
-          width: 0.7,
+          width: 0.8,
         ),
       ),
       child: Text(
@@ -1629,7 +1632,7 @@ class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
             vignetteIntensity: 0.25,
           ),
           // Тёплое свечение снизу — огненный мотив
-          const Positioned(
+          Positioned(
             bottom: 0,
             left: 0,
             right: 0,
@@ -1640,8 +1643,8 @@ class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                   colors: [
-                    Color(0x1AD9793E),
-                    Color(0x00000000),
+                    PiligrimColors.ember.withValues(alpha: 0.10),
+                    PiligrimColors.clear,
                   ],
                 ),
               ),

@@ -20,6 +20,7 @@ import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_delete_account_dialog.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
+import '../core/piligrim_route.dart';
 import 'booking_history_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -319,7 +320,7 @@ class _HeroHeaderState extends State<_HeroHeader> {
                   onTap: () async {
                     if (authorized) {
                       await Navigator.of(context).push(
-                        MaterialPageRoute(
+                        PiligrimPageRoute(
                           builder: (_) => const OnboardingScreen(),
                         ),
                       );
@@ -479,7 +480,7 @@ class _StatsRow extends StatelessWidget {
           label: 'Бронирований',
           delay: 0.ms,
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
+            PiligrimPageRoute(
               builder: (_) => const BookingHistoryScreen(),
             ),
           ),
@@ -1574,7 +1575,7 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
       if (auth.isNewUser) {
         auth.clearNewUserFlag();
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          PiligrimPageRoute(builder: (_) => const OnboardingScreen()),
         );
       }
       if (!mounted) return;

@@ -4,8 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../core/theme.dart';
 import 'piligrim_tap.dart';
 
-const Color _kNavBase     = PiligrimColors.earthDeep;
-const Color _kNavTop      = Color(0xFF171411);
 const Color _kNavActive   = PiligrimColors.water;
 const Color _kNavInactive = PiligrimColors.navInactive;
 const Color _kNavRimTop   = PiligrimColors.navBarRim;
@@ -34,30 +32,23 @@ class PiligrimNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: _kNavBase,
+      color: PiligrimColors.navBarBase,
       child: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              _kNavTop,
-              Color(0xFF120F0D),
-              _kNavBase,
+              PiligrimColors.navBarTop,
+              PiligrimColors.navBarBase,
+              PiligrimColors.earthDeep,
             ],
             stops: [0.0, 0.35, 1.0],
           ),
           border: Border(
             top: BorderSide(color: _kNavRimTop, width: 0.5),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x18000000),
-              blurRadius: 8,
-              offset: Offset(0, -3),
-              spreadRadius: 0,
-            ),
-          ],
+          boxShadow: PiligrimShadows.nav,
         ),
         child: SafeArea(
           top: false,

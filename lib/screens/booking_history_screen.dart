@@ -10,6 +10,7 @@ import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_nav_button.dart';
+import '../widgets/piligrim_tap.dart';
 
 class BookingHistoryScreen extends StatefulWidget {
   const BookingHistoryScreen({super.key});

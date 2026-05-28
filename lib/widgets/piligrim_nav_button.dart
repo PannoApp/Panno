@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'piligrim_tap.dart';
 
 /// Unified back/close navigation button for pushed and fullscreen screens.
 ///
@@ -16,9 +17,9 @@ class PiligrimNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return PiligrimTap(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
+      borderRadius: BorderRadius.circular(16),
       child: SizedBox(
         width: 44,
         height: 44,
