@@ -11,6 +11,7 @@ import '../core/theme.dart';
 import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
 import '../data/models/api_event.dart';
+import '../providers/auth_provider.dart';
 import '../providers/core_info_provider.dart';
 import '../providers/events_provider.dart';
 import '../widgets/error_view.dart';
@@ -18,6 +19,8 @@ import '../widgets/event_cover_image.dart'
     show EventCoverImage, PiligrimNetworkOrAssetImage;
 import '../widgets/piligrim_background.dart';
 import 'event_detail_screen.dart';
+import 'event_edit_screen.dart';
+import 'news_edit_screen.dart';
 import '../widgets/piligrim_tab_editorial_mark.dart';
 import '../widgets/piligrim_tap.dart';
 
@@ -43,11 +46,35 @@ class _EventsScreenState extends State<EventsScreen> {
         final upcoming = events.upcoming;
         final past = events.archived;
         final news = events.news;
+        final isAdmin = context.watch<AuthProvider>().isAdmin;
 
         return Scaffold(
       backgroundColor: PiligrimColors.earth,
       extendBodyBehindAppBar: true,
       extendBody: true,
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              backgroundColor: PiligrimColors.earthWarm,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: PiligrimColors.water.withValues(alpha: 0.35),
+                ),
+              ),
+              child: const Icon(Icons.add, color: PiligrimColors.water),
+              onPressed: () {
+                if (_view == _AfichaView.events) {
+                  Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => const EventEditScreen(event: null),
+                  ));
+                } else {
+                  Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => const NewsEditScreen(news: null),
+                  ));
+                }
+              },
+            )
+          : null,
       body: Stack(
         children: [
           const Positioned.fill(
@@ -134,6 +161,7 @@ class _EventsScreenState extends State<EventsScreen> {
                               child: _EventListCard(
                                 event: e,
                                 coverFallbackIndex: i,
+                                isAdmin: isAdmin,
                                 onOpen: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute<void>(
@@ -244,7 +272,7 @@ class _EventsScreenState extends State<EventsScreen> {
                             final n = news[i];
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 14),
-                            child: _NewsCard(post: n),
+                            child: _NewsCard(post: n, isAdmin: isAdmin),
                           );
                           },
                           childCount: news.length,
@@ -852,11 +880,13 @@ class _EventListCard extends StatelessWidget {
   const _EventListCard({
     required this.event,
     required this.coverFallbackIndex,
+    required this.isAdmin,
     required this.onOpen,
   });
 
   final ApiEvent event;
   final int coverFallbackIndex;
+  final bool isAdmin;
   final VoidCallback onOpen;
 
   String _priceLine() {
@@ -1031,11 +1061,24 @@ class _EventListCard extends StatelessWidget {
                     ],
                   ),
                 ),
-              ],
-            ),
+              // Кнопка редактирования — показывается только администратору
+              if (isAdmin)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: _AdminEditButton(
+                    onTap: () => _openEventEdit(context, event),
+                  ),
+                ),
+            ],
           ),
         ),
+      ),
     );
+  }
+
+  void _openEventEdit(BuildContext context, ApiEvent event) {
+    // TODO: навигация на экран редактирования мероприятия
   }
 }
 
@@ -1368,8 +1411,9 @@ class _PhotoReportChip extends StatelessWidget {
 // Карточка новости — steppe-accent line, steppe-dot перед title,
 // тонкий sky-divider между датой и body.
 class _NewsCard extends StatelessWidget {
-  const _NewsCard({required this.post});
+  const _NewsCard({required this.post, required this.isAdmin});
   final PiligrimNewsPost post;
+  final bool isAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -1513,10 +1557,23 @@ class _NewsCard extends StatelessWidget {
                     ],
               ),
             ),
+            // Кнопка редактирования — показывается только администратору
+            if (isAdmin)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: _AdminEditButton(
+                  onTap: () => _openNewsEdit(context, post),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  void _openNewsEdit(BuildContext context, PiligrimNewsPost post) {
+    // TODO: навигация на экран редактирования новости
   }
 }
 
@@ -1575,6 +1632,37 @@ class _AfichaEmpty extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// Круглая кнопка карандаша для администратора — 36×36, water-иконка.
+class _AdminEditButton extends StatelessWidget {
+  const _AdminEditButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: PiligrimColors.earthDeep.withValues(alpha: 0.88),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: PiligrimColors.water.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
+        child: const Icon(
+          Icons.edit_outlined,
+          color: PiligrimColors.water,
+          size: 16,
+        ),
       ),
     );
   }
