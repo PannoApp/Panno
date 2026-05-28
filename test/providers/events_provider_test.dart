@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:piligrim/data/events_news_data.dart';
 import 'package:piligrim/data/models/api_event.dart';
 import 'package:piligrim/data/models/api_event_photo.dart';
 import 'package:piligrim/data/repositories/events_repository.dart';
@@ -33,28 +32,27 @@ void main() {
       await provider.loadUpcoming();
 
       expect(provider.upcoming, hasLength(1));
-      expect(provider.usedMockFallback, isFalse);
       expect(provider.upcomingError, isNull);
     });
 
-    test('loadUpcoming uses demo when API returns empty list', () async {
+    test('loadUpcoming sets empty list when API returns empty list', () async {
       when(() => repository.fetchUpcoming()).thenAnswer((_) async => []);
 
       final provider = EventsProvider(repository: repository);
       await provider.loadUpcoming();
 
-      expect(provider.upcoming.length, greaterThan(3));
-      expect(provider.usedMockFallback, isTrue);
+      expect(provider.upcoming, isEmpty);
+      expect(provider.upcomingError, isNull);
     });
 
-    test('loadUpcoming falls back to mocks on error', () async {
+    test('loadUpcoming sets empty list on error', () async {
       when(() => repository.fetchUpcoming()).thenThrow(Exception('offline'));
 
       final provider = EventsProvider(repository: repository);
       await provider.loadUpcoming();
 
-      expect(provider.upcoming, isNotEmpty);
-      expect(provider.usedMockFallback, isTrue);
+      expect(provider.upcoming, isEmpty);
+      expect(provider.upcomingError, isNotNull);
     });
 
     test('reserveEvent calls repository', () async {
@@ -114,13 +112,14 @@ void main() {
       expect(provider.reserveError, isNotNull);
     });
 
-    test('loadNews uses mock posts when API fails', () async {
+    test('loadNews sets empty list when API fails', () async {
       when(() => repository.fetchNews()).thenThrow(Exception('fail'));
 
       final provider = EventsProvider(repository: repository);
       await provider.loadNews();
 
-      expect(provider.news.length, mockNewsPosts().length);
+      expect(provider.news, isEmpty);
+      expect(provider.newsError, isNotNull);
     });
 
     test('loadPhotoReport sets photoReport on success', () async {
@@ -138,25 +137,15 @@ void main() {
       expect(provider.isLoadingPhotoReport, isFalse);
     });
 
-    test('loadPhotoReport uses demo assets for archive mock event', () async {
+    test('loadPhotoReport sets empty list on error', () async {
       when(() => repository.fetchPhotoReport(201))
           .thenThrow(Exception('offline'));
 
       final provider = EventsProvider(repository: repository);
       await provider.loadPhotoReport(201);
 
-      expect(provider.photoReport, isNotEmpty);
-      expect(provider.isLoadingPhotoReport, isFalse);
-    });
-
-    test('loadPhotoReport sets empty list when no demo for event', () async {
-      when(() => repository.fetchPhotoReport(999))
-          .thenThrow(Exception('offline'));
-
-      final provider = EventsProvider(repository: repository);
-      await provider.loadPhotoReport(999);
-
       expect(provider.photoReport, isEmpty);
+      expect(provider.photoReportError, isNotNull);
       expect(provider.isLoadingPhotoReport, isFalse);
     });
 
