@@ -32,12 +32,15 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: PiligrimColors.earthDeep,
+      systemNavigationBarColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarContrastEnforced: false,
     ),
   );
 
@@ -204,7 +207,7 @@ class _RootShellState extends State<RootShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: false,
+      extendBody: true,
       backgroundColor: PiligrimColors.earth,
       body: IndexedStack(
         index: _currentIndex,

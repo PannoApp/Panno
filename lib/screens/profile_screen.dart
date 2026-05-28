@@ -2,6 +2,8 @@
 // Согласно ТЗ раздел 4.5 | Luxury member lounge · cinematic glass
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -1427,6 +1429,10 @@ class _ProfileGlassCard extends StatelessWidget {
       variant == ProfileGlassVariant.stat ? 14 : PiligrimRadius.md,
     );
 
+    // Blur рендерится корректно только на iOS.
+    // На Android BackdropFilter даёт артефакты и лаги при скролле.
+    final bool useBlur = defaultTargetPlatform == TargetPlatform.iOS;
+
     final (fillTop, fillBottom, borderAlpha, blurSigma, shadowAlpha) =
         switch (variant) {
       ProfileGlassVariant.stat => (
@@ -1459,6 +1465,11 @@ class _ProfileGlassCard extends StatelessWidget {
         ),
     };
 
+    // На Android увеличиваем непрозрачность заливки, чтобы карточки
+    // читались без блюра.
+    final double effectiveFillTop    = useBlur ? fillTop    : fillTop    * 2.0;
+    final double effectiveFillBottom = useBlur ? fillBottom : fillBottom * 2.0;
+
     Widget content = Container(
       padding: padding,
       decoration: BoxDecoration(
@@ -1467,8 +1478,8 @@ class _ProfileGlassCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            PiligrimColors.earthWarm.withValues(alpha: fillTop),
-            PiligrimColors.earth.withValues(alpha: fillBottom),
+            PiligrimColors.earthWarm.withValues(alpha: effectiveFillTop),
+            PiligrimColors.earth.withValues(alpha: effectiveFillBottom),
           ],
         ),
         border: Border.all(
@@ -1492,17 +1503,24 @@ class _ProfileGlassCard extends StatelessWidget {
       child: child,
     );
 
+    // `integrated` — блюр не применялся и раньше, ветка не меняется.
     if (variant == ProfileGlassVariant.integrated) {
       return ClipRRect(borderRadius: radius, child: content);
     }
 
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-        child: content,
-      ),
-    );
+    // iOS: glassmorphism с BackdropFilter.
+    // Android: твёрдая карточка без блюра (нет артефактов при скролле).
+    if (useBlur) {
+      return ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+          child: content,
+        ),
+      );
+    }
+
+    return ClipRRect(borderRadius: radius, child: content);
   }
 }
 
@@ -1587,11 +1605,14 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom;
+    // viewInsetsOf — высота клавиатуры; paddingOf — system insets (notch/home).
+    // resizeToAvoidBottomInset: false убирает двойное сжатие на Android:
+    // Scaffold не сжимает тело, SingleChildScrollView сам отступает через keyboardHeight.
+    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
       backgroundColor: PiligrimColors.earthSurface,
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -1624,7 +1645,7 @@ class _UnauthProfileViewState extends State<_UnauthProfileView> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(28, 48, 28, bottom + 32),
+                padding: EdgeInsets.fromLTRB(28, 48, 28, keyboardHeight + 32),
                 child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,

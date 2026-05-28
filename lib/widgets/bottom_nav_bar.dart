@@ -52,7 +52,6 @@ class PiligrimNavBar extends StatelessWidget {
         ),
         child: SafeArea(
           top: false,
-          minimum: const EdgeInsets.only(bottom: 5),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(4, 7, 4, 0),
             child: Row(
