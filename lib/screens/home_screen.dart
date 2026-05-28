@@ -128,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
           CustomScrollView(
             controller: _scrollCtrl,
             clipBehavior: Clip.none,
-            physics: const ClampingScrollPhysics(),
+            physics: null,
             slivers: [
               SliverToBoxAdapter(
                 child: RepaintBoundary(

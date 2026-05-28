@@ -96,7 +96,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       20,
-                      MediaQuery.of(context).padding.top + 16,
+                      MediaQuery.paddingOf(context).top + 16,
                       20,
                       12,
                     ),
@@ -612,7 +612,7 @@ class _AfishaHeroState extends State<_AfishaHero> {
     return Column(
       children: [
         SizedBox(
-          height: 194,
+          height: (MediaQuery.sizeOf(context).height * 0.24).clamp(160.0, 220.0),
           child: PageView.builder(
             itemCount: total,
             controller: _controller,

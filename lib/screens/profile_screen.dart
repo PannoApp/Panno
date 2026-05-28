@@ -137,6 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return const _UnauthProfileView();
         }
         final user = auth.user;
+        final bottomPad = MediaQuery.paddingOf(context).bottom + 32;
         return Scaffold(
           backgroundColor: PiligrimColors.earthSurface,
           body: Stack(
@@ -150,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const Positioned.fill(child: _ProfileAtmosphere()),
               CustomScrollView(
-                physics: const ClampingScrollPhysics(),
+                physics: null,
                 clipBehavior: Clip.none,
                 slivers: [
                   SliverToBoxAdapter(
@@ -162,7 +163,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPad),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         if (user.isAuthorized) ...[

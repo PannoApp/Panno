@@ -524,7 +524,7 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
 
     return CustomScrollView(
       controller: _scrollCtrl,
-      physics: const ClampingScrollPhysics(),
+      physics: null,
       slivers: [
         SliverToBoxAdapter(
           child: SizedBox(

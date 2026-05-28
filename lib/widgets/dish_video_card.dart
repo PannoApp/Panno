@@ -232,58 +232,66 @@ class _DishVideoCardState extends State<DishVideoCard>
       right: 0,
       bottom: 0,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(24, 0, 24, bottomInset + 18),
+        padding: EdgeInsets.fromLTRB(20, 0, 20, bottomInset + 18),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.dish.name,
-              style: TextStyle(
-                fontFamily: 'MuseoSans',
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                color: PiligrimColors.nomadCream,
-                letterSpacing: 0.4,
-                height: 1.2,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    blurRadius: 14,
-                    offset: const Offset(0, 1),
-                  ),
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.20),
-                    blurRadius: 32,
-                  ),
-                ],
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (widget.dish.description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                widget.dish.description.replaceAll('\n', ' '),
+            // Padding(4) даёт место для text shadows на Android —
+            // без него тени обрезаются клипом родителя.
+            Padding(
+              padding: const EdgeInsets.all(4),
+              child: Text(
+                widget.dish.name,
                 style: TextStyle(
                   fontFamily: 'MuseoSans',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w300,
-                  color: PiligrimColors.sky.withValues(alpha: 0.75),
-                  height: 1.5,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  color: PiligrimColors.nomadCream,
+                  letterSpacing: 0.4,
+                  height: 1.2,
                   shadows: [
                     Shadow(
-                      color: Colors.black.withValues(alpha: 0.42),
-                      blurRadius: 10,
+                      color: Colors.black.withValues(alpha: 0.45),
+                      blurRadius: 14,
+                      offset: const Offset(0, 1),
                     ),
                     Shadow(
                       color: Colors.black.withValues(alpha: 0.20),
-                      blurRadius: 28,
+                      blurRadius: 32,
                     ),
                   ],
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (widget.dish.description.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.all(4),
+                child: Text(
+                  widget.dish.description.replaceAll('\n', ' '),
+                  style: TextStyle(
+                    fontFamily: 'MuseoSans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w300,
+                    color: PiligrimColors.sky.withValues(alpha: 0.75),
+                    height: 1.5,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        blurRadius: 10,
+                      ),
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.20),
+                        blurRadius: 28,
+                      ),
+                    ],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
             const SizedBox(height: 14),

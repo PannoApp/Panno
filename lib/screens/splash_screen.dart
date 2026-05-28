@@ -460,7 +460,7 @@ class _SplashScreenState extends State<SplashScreen>
   // Отклоняемый баннер — показывается когда min ≤ current < latest
   Widget _buildUpdateBanner() {
     return Positioned(
-      top: MediaQuery.of(context).padding.top + 12,
+      top: MediaQuery.paddingOf(context).top + 12,
       left: 16,
       right: 16,
       child: Material(
