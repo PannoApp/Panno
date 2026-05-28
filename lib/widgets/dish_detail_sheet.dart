@@ -10,9 +10,9 @@ import 'dish_elements.dart';
 
 // Дефолтные цвета кинематографического фона (лента / sheet fallback).
 const kDishCinematicFallbackColors = [
-  Color(0xFF1A0E08),
-  Color(0xFF2E1A10),
-  Color(0xFF1A0E08),
+  PiligrimColors.earthDeep,
+  PiligrimColors.glowAmber,
+  PiligrimColors.earthDeep,
 ];
 
 String formatDishPrice(int price) =>
@@ -165,9 +165,17 @@ class DishDetailSheet extends StatelessWidget {
       glowValue: 0.8,
     );
 
+    final topInset = MediaQuery.paddingOf(context).top;
+    final screenH = MediaQuery.sizeOf(context).height;
+    // Ensure the sheet top never reaches into the Dynamic Island / notch zone.
+    // 8pt buffer so the rounded corner sits visibly below the system bar.
+    final safeMax = screenH > 0
+        ? ((screenH - topInset - 8) / screenH).clamp(0.88, 0.94)
+        : 0.90;
+
     return DraggableScrollableSheet(
       initialChildSize: 0.88,
-      maxChildSize: 0.95,
+      maxChildSize: safeMax,
       minChildSize: 0.4,
       builder: (_, controller) => Container(
         decoration: const BoxDecoration(
@@ -176,63 +184,77 @@ class DishDetailSheet extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Handle
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 38,
-              height: 3,
-              decoration: BoxDecoration(
-                color: PiligrimColors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            // Полноширинное изображение с оверлеем цены и веса
-            const SizedBox(height: 16),
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  dish.imageUrl != null && dish.imageUrl!.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: dish.imageUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => fallbackBg,
-                          errorWidget: (_, __, ___) => fallbackBg,
-                        )
-                      : fallbackBg,
-
-                  // Градиент снизу для читаемости бейджей
-                  const Positioned(
-                    bottom: 0, left: 0, right: 0,
-                    height: 80,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [Color(0xBF000000), Colors.transparent],
+            // Изображение заполняет сверху; handle и бейджи наложены поверх
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        dish.imageUrl != null && dish.imageUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: dish.imageUrl!,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => fallbackBg,
+                                errorWidget: (_, __, ___) => fallbackBg,
+                              )
+                            : fallbackBg,
+                        // Градиент снизу для читаемости бейджей
+                        Positioned(
+                          bottom: 0, left: 0, right: 0,
+                          height: 80,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  PiligrimColors.shadow.withValues(alpha: 0.75),
+                                  PiligrimColors.clear,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Handle — поверх фото, как в ClassicDishDetailSheet
+                Positioned(
+                  top: 12,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: SizedBox(
+                      width: 38,
+                      height: 3,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: PiligrimColors.sky.withValues(alpha: 0.28),
+                          borderRadius: BorderRadius.all(Radius.circular(2)),
                         ),
                       ),
                     ),
                   ),
-
-                  // Бейджи цены и веса поверх фото
-                  Positioned(
-                    bottom: 14,
-                    left: 16,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _DishDetailImageBadge(text: _formattedPrice, bordered: true),
-                        const SizedBox(width: 8),
-                        _DishDetailImageBadge(text: _weightLabel),
-                      ],
-                    ),
+                ),
+                // Бейджи цены и веса
+                Positioned(
+                  bottom: 14,
+                  left: 16,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _DishDetailImageBadge(text: _formattedPrice, bordered: true),
+                      const SizedBox(width: 8),
+                      _DishDetailImageBadge(text: _weightLabel),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
 
             // Контент
@@ -312,7 +334,9 @@ class _DishDetailImageBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: bordered ? const Color(0xD61C1510) : Colors.black.withValues(alpha: 0.4),
+        color: bordered
+            ? PiligrimColors.imageScrim.withValues(alpha: 0.84)
+            : PiligrimColors.shadow.withValues(alpha: 0.40),
         borderRadius: BorderRadius.circular(7),
         border: bordered
             ? Border.all(
@@ -350,9 +374,16 @@ class ClassicDishDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
+
+    final topInset = MediaQuery.paddingOf(context).top;
+    final screenH = MediaQuery.sizeOf(context).height;
+    final safeMax = screenH > 0
+        ? ((screenH - topInset - 8) / screenH).clamp(0.88, 0.94)
+        : 0.90;
+
     return DraggableScrollableSheet(
       initialChildSize: 0.88,
-      maxChildSize: 0.95,
+      maxChildSize: safeMax,
       minChildSize: 0.4,
       builder: (_, controller) => Container(
         decoration: const BoxDecoration(
@@ -377,34 +408,37 @@ class ClassicDishDetailSheet extends StatelessWidget {
                   ),
                 ),
                 // Верхний виньет — тонирует яркие фото, делает handle читаемым.
-                const Positioned.fill(
+                Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Color(0x701C1510), Colors.transparent],
-                        stops: [0.0, 0.45],
+                        colors: [
+                          PiligrimColors.imageScrim.withValues(alpha: 0.44),
+                          PiligrimColors.clear,
+                        ],
+                        stops: const [0.0, 0.45],
                       ),
                     ),
                   ),
                 ),
                 // Многоступенчатый bottom gradient
-                const Positioned.fill(
+                Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.transparent,
-                          Color(0x441C1510),
-                          Color(0xD01C1510),
-                          Color(0xF61C1510),
+                          PiligrimColors.clear,
+                          PiligrimColors.imageScrim.withValues(alpha: 0.27),
+                          PiligrimColors.imageScrim.withValues(alpha: 0.82),
+                          PiligrimColors.imageScrim.withValues(alpha: 0.96),
                         ],
-                        stops: [0.0, 0.38, 0.78, 1.0],
+                        stops: const [0.0, 0.38, 0.78, 1.0],
                       ),
                     ),
                   ),
@@ -436,7 +470,7 @@ class ClassicDishDetailSheet extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xCC1C1510),
+                          color: PiligrimColors.imageScrim.withValues(alpha: 0.80),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: PiligrimColors.steppe.withValues(alpha: 0.58),

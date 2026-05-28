@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'core/ambient_preset_scope.dart';
 import 'core/theme.dart';
 import 'firebase_options.dart';
+import 'core/piligrim_route.dart';
 import 'core/push_navigation.dart';
 import 'data/services/fcm_service.dart';
 import 'providers/auth_provider.dart';
@@ -151,6 +152,7 @@ class RootShell extends StatefulWidget {
 
 class _RootShellState extends State<RootShell> {
   late int _currentIndex;
+  final _scrollControllers = List.generate(5, (_) => ScrollController());
 
   @override
   void initState() {
@@ -164,6 +166,9 @@ class _RootShellState extends State<RootShell> {
     if (PushNavigationHandler.onPushType == _onPushType) {
       PushNavigationHandler.onPushType = null;
     }
+    for (final c in _scrollControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -174,7 +179,7 @@ class _RootShellState extends State<RootShell> {
         setState(() => _currentIndex = 3);
       case 'booking':
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const BookingScreen()),
+          PiligrimPageRoute(builder: (_) => const BookingScreen()),
         );
       default:
         break;
@@ -182,7 +187,17 @@ class _RootShellState extends State<RootShell> {
   }
 
   void _navigate(int index) {
-    if (index == _currentIndex) return;
+    if (index == _currentIndex) {
+      final ctrl = _scrollControllers[index];
+      if (ctrl.hasClients) {
+        ctrl.animateTo(
+          0,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      return;
+    }
     setState(() => _currentIndex = index);
   }
 
@@ -194,11 +209,26 @@ class _RootShellState extends State<RootShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          HomeScreen(onNavigate: _navigate),
-          MenuScreen(isTabActive: _currentIndex == 1),
-          InteriorScreen(isTabActive: _currentIndex == 2),
-          const EventsScreen(),
-          ProfileScreen(onNavigate: _navigate),
+          PrimaryScrollController(
+            controller: _scrollControllers[0],
+            child: HomeScreen(onNavigate: _navigate),
+          ),
+          PrimaryScrollController(
+            controller: _scrollControllers[1],
+            child: MenuScreen(isTabActive: _currentIndex == 1),
+          ),
+          PrimaryScrollController(
+            controller: _scrollControllers[2],
+            child: InteriorScreen(isTabActive: _currentIndex == 2),
+          ),
+          PrimaryScrollController(
+            controller: _scrollControllers[3],
+            child: const EventsScreen(),
+          ),
+          PrimaryScrollController(
+            controller: _scrollControllers[4],
+            child: ProfileScreen(onNavigate: _navigate),
+          ),
         ],
       ),
       bottomNavigationBar: PiligrimNavBar(

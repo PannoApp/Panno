@@ -7,6 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../core/interior_assets.dart';
+import '../core/piligrim_route.dart';
 import '../core/theme.dart';
 import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
@@ -52,29 +53,34 @@ class _EventsScreenState extends State<EventsScreen> {
       backgroundColor: PiligrimColors.earth,
       extendBodyBehindAppBar: true,
       extendBody: true,
-      floatingActionButton: isAdmin
-          ? FloatingActionButton(
-              backgroundColor: PiligrimColors.earthWarm,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: PiligrimColors.water.withValues(alpha: 0.35),
-                ),
+      floatingActionButton: AnimatedOpacity(
+        opacity: isAdmin ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: IgnorePointer(
+          ignoring: !isAdmin,
+          child: FloatingActionButton(
+            backgroundColor: PiligrimColors.earthWarm,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: PiligrimColors.water.withValues(alpha: 0.35),
               ),
-              child: const Icon(Icons.add, color: PiligrimColors.water),
-              onPressed: () {
-                if (_view == _AfichaView.events) {
-                  Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => const EventEditScreen(event: null),
-                  ));
-                } else {
-                  Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => const NewsEditScreen(news: null),
-                  ));
-                }
-              },
-            )
-          : null,
+            ),
+            child: const Icon(Icons.add, color: PiligrimColors.water),
+            onPressed: () {
+              if (_view == _AfichaView.events) {
+                Navigator.of(context).push(PiligrimPageRoute<void>(
+                  builder: (_) => const EventEditScreen(event: null),
+                ));
+              } else {
+                Navigator.of(context).push(PiligrimPageRoute<void>(
+                  builder: (_) => const NewsEditScreen(news: null),
+                ));
+              }
+            },
+          ),
+        ),
+      ),
       body: Stack(
         children: [
           const Positioned.fill(
@@ -164,7 +170,7 @@ class _EventsScreenState extends State<EventsScreen> {
                                 isAdmin: isAdmin,
                                 onOpen: () {
                                   Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
+                                    PiligrimPageRoute<void>(
                                       builder: (_) => EventDetailScreen(
                                         event: e,
                                         coverFallbackIndex: i,
@@ -227,7 +233,7 @@ class _EventsScreenState extends State<EventsScreen> {
                                 coverFallbackIndex: i,
                                 onOpen: () {
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(
+                                    PiligrimPageRoute(
                                       builder: (_) => EventDetailScreen(
                                         event: e,
                                         coverFallbackIndex: i,
@@ -809,12 +815,12 @@ class _HeroSlide extends StatelessWidget {
                     const SizedBox(height: 10),
                     PiligrimTap(
                       onTap: onTap,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: PiligrimRadius.smAll,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                         decoration: BoxDecoration(
                           color: PiligrimColors.steppe.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: PiligrimRadius.smAll,
                           border: Border.all(
                             color: PiligrimColors.steppe.withValues(alpha: 0.55),
                           ),
@@ -920,13 +926,7 @@ class _EventListCard extends StatelessWidget {
           color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: PiligrimColors.divider),
-          boxShadow: [
-            BoxShadow(
-              color: PiligrimColors.shadow.withValues(alpha: 0.18),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: PiligrimShadows.card,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
@@ -940,7 +940,7 @@ class _EventListCard extends StatelessWidget {
                   children: [
                       // Обложка с badge'ами и кинематографичным gradient
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: PiligrimRadius.smAll,
                         child: SizedBox(
                           width: 100,
                           height: 124,
@@ -1093,10 +1093,10 @@ class _DateBadge extends StatelessWidget {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep.withValues(alpha: 0.7),
+        color: PiligrimColors.cardOverlay,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: PiligrimColors.water.withValues(alpha: 0.4),
+          color: PiligrimColors.water.withValues(alpha: 0.38),
           width: 0.8,
         ),
       ),
@@ -1132,7 +1132,7 @@ class _FormatBadge extends StatelessWidget {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep.withValues(alpha: 0.78),
+        color: PiligrimColors.cardOverlay,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: accent, width: 0.8),
       ),
@@ -1422,13 +1422,7 @@ class _NewsCard extends StatelessWidget {
         color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: PiligrimColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: PiligrimColors.shadow.withValues(alpha: 0.16),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: PiligrimShadows.card,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
@@ -1461,7 +1455,7 @@ class _NewsCard extends StatelessWidget {
                       if (post.imageUrl != null &&
                           post.imageUrl!.isNotEmpty) ...[
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: PiligrimRadius.smAll,
                           child: Stack(
                             children: [
                               PiligrimNetworkOrAssetImage(

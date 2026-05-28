@@ -13,6 +13,7 @@ import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tap.dart';
+import '../core/piligrim_route.dart';
 import 'booking_success_screen.dart';
 
 String bookingTimeForApi(TimeOfDay time) {
@@ -151,7 +152,7 @@ class _BookingScreenState extends State<BookingScreen> {
       });
 
       Navigator.of(context).push(
-        MaterialPageRoute<void>(
+        PiligrimPageRoute<void>(
           builder: (_) => BookingSuccessScreen(
             date: dateText,
             time: timeText,
