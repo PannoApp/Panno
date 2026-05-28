@@ -47,7 +47,7 @@ class UserAdmin(AdminOnlyMixin, BaseUserAdmin):
 
     fieldsets = (
         (None, {'fields': ('phone', 'password')}),
-        ('Персональная информация', {'fields': ('first_name', 'last_name', 'role', 'telegram_id', 'city')}),
+        ('Персональная информация', {'fields': ('first_name', 'last_name', 'role', 'telegram_id')}),
         ('Права доступа', {'fields': ('is_active', 'is_staff', 'is_superuser')}),
         ('Настройки уведомлений', {'fields': ('notifications_enabled', 'notify_events', 'notify_promotions', 'notify_closed_events')}),
         ('Важные даты', {'fields': ('last_login', 'date_joined')}),

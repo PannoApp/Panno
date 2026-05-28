@@ -302,5 +302,68 @@ void main() {
       expect(req.method, 'DELETE');
       expect(req.path, endsWith('/menu/admin/dishes/7/'));
     });
+
+    // test_createDish_with_video_sends_multipart
+    test('createDish() с video → FormData содержит ключ video', () async {
+      adapter.enqueue(201, _dishJson(id: 20));
+
+      final tmpVideo =
+          File('${Directory.systemTemp.path}/test_dish_video.mp4')
+            ..writeAsBytesSync([0x00, 0x00, 0x00, 0x18]);
+
+      try {
+        await repository.createDish(
+          {'name': 'С видео', 'price': 3000},
+          video: tmpVideo,
+        );
+
+        final req = adapter.captured.single;
+        expect(req.data, isA<FormData>());
+        final fd = req.data as FormData;
+        expect(fd.files.any((e) => e.key == 'video'), isTrue);
+      } finally {
+        tmpVideo.deleteSync();
+      }
+    });
+
+    // test_createDish_without_video_sends_multipart_without_video_key
+    test('createDish() без video → FormData не содержит ключ video', () async {
+      adapter.enqueue(201, _dishJson(id: 21));
+
+      await repository.createDish({'name': 'Без видео', 'price': 1000});
+
+      final req = adapter.captured.single;
+      expect(req.data, isA<FormData>());
+      final fd = req.data as FormData;
+      expect(fd.files.any((e) => e.key == 'video'), isFalse);
+    });
+
+    // test_updateDish_with_video_returns_pending_status
+    test(
+        'updateDish() с video → ApiDish.videoStatus == pending когда сервер возвращает video_status: pending',
+        () async {
+      final responseJson = {
+        ..._dishJson(id: 30),
+        'video_status': 'pending',
+        'video': null,
+      };
+      adapter.enqueue(200, responseJson);
+
+      final tmpVideo =
+          File('${Directory.systemTemp.path}/test_dish_video2.mp4')
+            ..writeAsBytesSync([0x00, 0x00, 0x00, 0x18]);
+
+      try {
+        final dish = await repository.updateDish(
+          30,
+          {'name': 'Видео в обработке'},
+          video: tmpVideo,
+        );
+
+        expect(dish.videoStatus, 'pending');
+      } finally {
+        tmpVideo.deleteSync();
+      }
+    });
   });
 }

@@ -168,20 +168,6 @@ class BulkPushView(views.APIView):
                 .values_list('user_id', flat=True)
                 .distinct()
             )
-        elif segment == 'by_city':
-            # Геолокационный сегмент: пользователи, у которых поле city совпадает с переданным
-            city = data.get('city', '').strip()
-            if not city:
-                return Response({'city': ['Обязательно для сегмента by_city.']}, status=400)
-            raw_ids = list(
-                User.objects.filter(city__iexact=city).values_list('id', flat=True)
-            )
-            # Оставляем только тех, у кого есть хотя бы одно FCM-устройство.
-            user_ids = list(
-                UserDevice.objects.filter(user_id__in=raw_ids)
-                .values_list('user_id', flat=True)
-                .distinct()
-            )
         else:
             user_ids = []
 

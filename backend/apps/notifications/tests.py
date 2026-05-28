@@ -425,24 +425,6 @@ class BulkPushViewTest(APITestCase):
         queued_ids = kwargs['user_ids']
         self.assertIn(user_with_device.pk, queued_ids)
 
-    @patch('apps.notifications.tasks.send_bulk_push_notification')
-    def test_by_city_excludes_users_without_devices(self, mock_task):
-        """
-        Сегмент by_city: пользователи без FCM-устройств не учитываются в queued.
-        """
-        from django.contrib.auth import get_user_model
-        U = get_user_model()
-        user_with_dev = U.objects.create_user(phone='+77009001001', city='Алматы')
-        UserDevice.objects.create(user=user_with_dev, fcm_token='tok_city_filter')
-        U.objects.create_user(phone='+77009001002', city='Алматы')  # без устройства
-
-        self._auth(self.admin)
-        response = self.client.post('/api/v1/notifications/bulk-push/', {
-            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Алматы',
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        # queued должен содержать только пользователя с устройством
-        self.assertEqual(response.data['queued'], 1)
 
 
 # ---------------------------------------------------------------------------
@@ -657,68 +639,6 @@ class NotificationsEnabledFlagTest(TestCase):
         from apps.notifications.tasks import send_push_notification
         send_push_notification(self.user.pk, 'T', 'B', category='events')
         mock_msg.send_each_for_multicast.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# Сегмент by_city (ТЗ блок 6 — геолокация)
-# ---------------------------------------------------------------------------
-
-class BulkPushByCitySegmentTest(APITestCase):
-    def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_user(phone='+77031000001', role='content_manager', is_staff=True)
-        self.almaty_user = User.objects.create_user(phone='+77031000002', city='Алматы')
-        self.astana_user = User.objects.create_user(phone='+77031000003', city='Астана')
-        self.no_city_user = User.objects.create_user(phone='+77031000004')
-        # После добавления фильтрации по UserDevice пользователи без устройств
-        # не попадают в рассылку — регистрируем устройства для тестовых пользователей
-        UserDevice.objects.create(user=self.almaty_user, fcm_token='tok_almaty')
-        UserDevice.objects.create(user=self.astana_user, fcm_token='tok_astana')
-
-    def _auth(self):
-        refresh = RefreshToken.for_user(self.admin)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
-
-    @patch('apps.notifications.tasks.send_bulk_push_notification')
-    def test_by_city_segment_filters_by_city(self, mock_task):
-        """Сегмент by_city возвращает только пользователей с совпадающим городом."""
-        self._auth()
-        response = self.client.post('/api/v1/notifications/bulk-push/', {
-            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Алматы',
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        # Только almaty_user попадает в выборку
-        self.assertEqual(response.data['queued'], 1)
-
-    @patch('apps.notifications.tasks.send_bulk_push_notification')
-    def test_by_city_segment_exact_match_only(self, mock_task):
-        """Пользователи другого города не попадают в выборку."""
-        self._auth()
-        response = self.client.post('/api/v1/notifications/bulk-push/', {
-            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Астана',
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        self.assertEqual(response.data['queued'], 1)  # только astana_user
-
-    @patch('apps.notifications.tasks.send_bulk_push_notification')
-    def test_by_city_without_city_param_returns_400(self, mock_task):
-        """Без параметра city возвращается 400."""
-        self._auth()
-        response = self.client.post('/api/v1/notifications/bulk-push/', {
-            'title': 'T', 'body': 'B', 'segment': 'by_city',
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('city', response.data)
-
-    def test_city_field_saved_via_profile_patch(self):
-        """Поле city сохраняется через PATCH /api/v1/users/profile/."""
-        from rest_framework_simplejwt.tokens import RefreshToken as RT
-        refresh = RT.for_user(self.almaty_user)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
-        response = self.client.patch('/api/v1/users/profile/', {'city': 'Шымкент'}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.almaty_user.refresh_from_db()
-        self.assertEqual(self.almaty_user.city, 'Шымкент')
 
 
 # ---------------------------------------------------------------------------

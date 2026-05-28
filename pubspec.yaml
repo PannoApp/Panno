@@ -16,6 +16,7 @@ dependencies:
   shared_preferences: ^2.5.5
   # HTTP-клиент с поддержкой JWT-интерцептора и retry
   dio: ^5.7.0
+  http_parser: ^4.0.0
   # Безопасное хранение JWT-токенов (keychain/keystore)
   flutter_secure_storage: ^9.2.2
   # State management — минимальная надстройка над InheritedNotifier

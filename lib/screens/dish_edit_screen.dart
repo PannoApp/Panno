@@ -36,6 +36,7 @@ class DishEditScreen extends StatefulWidget {
 class _DishEditScreenState extends State<DishEditScreen> {
   final _formKey = GlobalKey<FormState>();
   File? _localImageFile; // Локальный файл выбранного и кадрированного изображения блюда
+  File? _localVideoFile; // Локальный файл выбранного видео для ленты
   final _repo = MenuRepository();
   bool _isSaving = false;
 
@@ -130,6 +131,15 @@ class _DishEditScreenState extends State<DishEditScreen> {
     }
   }
 
+  /// Выбор вертикального видео из галереи (9:16, до 5 минут).
+  Future<void> _pickVideo() async {
+    final picked = await ImagePicker().pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 5),
+    );
+    if (picked != null) setState(() => _localVideoFile = File(picked.path));
+  }
+
   /// Выбор изображения из галереи и его последующее кадрирование (16:9).
   Future<void> _pickAndCropImage() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -163,8 +173,8 @@ class _DishEditScreenState extends State<DishEditScreen> {
         'allergens': _selectedAllergenIds.toList(),
       };
       widget.dish == null
-          ? await _repo.createDish(fields, image: _localImageFile)
-          : await _repo.updateDish(widget.dish!.id, fields, image: _localImageFile);
+          ? await _repo.createDish(fields, image: _localImageFile, video: _localVideoFile)
+          : await _repo.updateDish(widget.dish!.id, fields, image: _localImageFile, video: _localVideoFile);
       if (mounted) {
         context.read<MenuProvider>().load(); // Обновить меню
       }
@@ -370,6 +380,7 @@ class _DishEditScreenState extends State<DishEditScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildImageSection(),
+                _buildVideoSection(),
                 _buildFieldLabel('Название блюда *'),
                 _buildInput(
                   controller: _nameCtrl,
@@ -738,6 +749,116 @@ class _DishEditScreenState extends State<DishEditScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Бейдж статуса существующего видео на сервере.
+  Widget _buildVideoStatusBadge() {
+    final (label, color) = switch (widget.dish?.videoStatus ?? 'pending') {
+      'ready'      => ('ГОТОВО',         PiligrimColors.water),
+      'processing' => ('ОБРАБАТЫВАЕТСЯ', PiligrimColors.steppe),
+      'failed'     => ('ОШИБКА',         PiligrimColors.fruit),
+      _            => ('ОЖИДАЕТ',        PiligrimColors.sky.withValues(alpha: 0.45)),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: PiligrimColors.earthWarm.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.5),
+          width: 0.9,
+        ),
+      ),
+      child: Text(
+        label,
+        style: PiligrimTextStyles.caption.copyWith(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  /// Секция выбора видео для ленты «Путь» с отображением статуса и подсказкой.
+  Widget _buildVideoSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFieldLabel('Видео для ленты (9:16)'),
+        const SizedBox(height: 4),
+        if (_localVideoFile != null)
+          Row(
+            children: [
+              const Icon(
+                Icons.check_circle_outline,
+                color: PiligrimColors.water,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _localVideoFile!.path.split('/').last,
+                  style: PiligrimTextStyles.caption.copyWith(
+                    color: PiligrimColors.water,
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          )
+        else if (widget.dish?.videoUrl != null)
+          _buildVideoStatusBadge(),
+        const SizedBox(height: 8),
+        Text(
+          'Вертикальное видео 9:16. Транскодирование занимает 1–5 минут.',
+          style: PiligrimTextStyles.caption.copyWith(
+            color: PiligrimColors.sky.withValues(alpha: 0.35),
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 10),
+        PiligrimTap(
+          onTap: _pickVideo,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 44,
+            width: double.infinity,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: PiligrimColors.water,
+                width: 1.2,
+              ),
+              color: PiligrimColors.earthWarm.withValues(alpha: 0.95),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.video_library_outlined,
+                  color: PiligrimColors.water,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Выбрать видео'.toUpperCase(),
+                  style: PiligrimTextStyles.button.copyWith(
+                    fontSize: 13,
+                    color: PiligrimColors.water,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+      ],
     );
   }
 

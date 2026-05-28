@@ -56,10 +56,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         help_text="ID чата менеджера в Telegram для авторизации в боте."
     )
 
-    # Город пользователя — заполняется из геолокации на стороне приложения (если разрешена).
-    # Используется для сегментирования push-рассылок по городу/региону.
-    city = models.CharField("Город", max_length=100, blank=True, default='')
-
     # Категорийные настройки уведомлений (сервисные уведомления — бронь — не отключаются)
     notify_events = models.BooleanField("Уведомления: мероприятия", default=True)
     notify_promotions = models.BooleanField("Уведомления: акции", default=True)
@@ -78,9 +74,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
         indexes = [
-            # Индекс для сегментирования пользователей по городу (push-рассылки по региону)
-            models.Index(fields=['city'], name='user_city_idx'),
-            # Индекс для сортировки/фильтрации по дате регистрации (аналитика)
             models.Index(fields=['date_joined'], name='user_date_joined_idx'),
         ]
 

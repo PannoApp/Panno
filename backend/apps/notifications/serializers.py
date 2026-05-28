@@ -13,7 +13,7 @@ class UserDeviceSerializer(serializers.ModelSerializer):
         }
 
 
-SEGMENT_CHOICES = ['all', 'last_visit_days', 'participated_in_event', 'registered_after', 'by_city']
+SEGMENT_CHOICES = ['all', 'last_visit_days', 'participated_in_event', 'registered_after']
 CATEGORY_CHOICES = ['events', 'promotions', 'closed_events']
 
 
@@ -27,8 +27,6 @@ class BulkPushSerializer(serializers.Serializer):
     last_visit_days = serializers.IntegerField(required=False, min_value=1, help_text="Только пользователи, чьи брони были в последние N дней")
     event_id = serializers.IntegerField(required=False, help_text="Только участники указанного мероприятия")
     registered_after = serializers.DateField(required=False, help_text="Только пользователи, зарегистрированные после даты (YYYY-MM-DD)")
-    # Сегмент по геолокации: Flutter сохраняет город пользователя через PATCH /api/v1/users/profile/
-    city = serializers.CharField(required=False, max_length=100, help_text="Только пользователи с указанным городом (по полю city на профиле)")
 
 
 class SendPushViaBotSerializer(serializers.Serializer):

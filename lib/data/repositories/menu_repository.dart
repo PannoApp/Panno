@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../models/api_allergen.dart';
 import '../models/api_category.dart';
@@ -116,14 +117,15 @@ class MenuRepository {
     return const [];
   }
 
-  /// Создаёт новое блюдо. Всегда отправляет multipart (image опционален).
+  /// Создаёт новое блюдо. Всегда отправляет multipart (image/video опциональны).
   /// Lists (tags, allergens) передаются как JSON-строки: tags_json="[1,2]"
   /// — StaffDishSerializer.validate() разворачивает их на сервере.
   Future<ApiDish> createDish(
     Map<String, dynamic> fields, {
     File? image,
+    File? video,
   }) async {
-    final data = await _buildFormData(fields, image);
+    final data = await _buildFormData(fields, image, video);
     final response = await _dio.post<Map<String, dynamic>>(
       '/menu/admin/dishes/',
       data: data,
@@ -132,15 +134,16 @@ class MenuRepository {
   }
 
   /// Обновляет блюдо частично (PATCH).
-  /// С image → multipart/form-data; без image → application/json.
+  /// С image или video → multipart/form-data; без обоих → application/json.
   Future<ApiDish> updateDish(
     int id,
     Map<String, dynamic> fields, {
     File? image,
+    File? video,
   }) async {
     final Response<Map<String, dynamic>> response;
-    if (image != null) {
-      final data = await _buildFormData(fields, image);
+    if (image != null || video != null) {
+      final data = await _buildFormData(fields, image, video);
       response = await _dio.patch<Map<String, dynamic>>(
         '/menu/admin/dishes/$id/',
         data: data,
@@ -163,14 +166,22 @@ class MenuRepository {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   /// Собирает FormData: List-поля кодируются как JSON-строки (tags_json, allergens_json),
-  /// остальные поля передаются as-is, image добавляется как MultipartFile.
+  /// остальные поля передаются as-is, image и video добавляются как MultipartFile.
   Future<FormData> _buildFormData(
     Map<String, dynamic> fields,
     File? image,
+    File? video,
   ) async {
     final map = _encodeListFields(fields);
     if (image != null) {
       map['image'] = await MultipartFile.fromFile(image.path);
+    }
+    if (video != null) {
+      map['video'] = await MultipartFile.fromFile(
+        video.path,
+        filename: 'dish_video.mp4',
+        contentType: MediaType('video', 'mp4'),
+      );
     }
     return FormData.fromMap(map);
   }
