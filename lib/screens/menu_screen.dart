@@ -73,26 +73,36 @@ class _MenuScreenState extends State<MenuScreen>
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
-      floatingActionButton: AnimatedOpacity(
-        opacity: (isClassic && isAdmin) ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 200),
-        child: IgnorePointer(
-          ignoring: !(isClassic && isAdmin),
-          child: FloatingActionButton(
-            backgroundColor: PiligrimColors.earthWarm,
-            shape: const CircleBorder(),
-            elevation: 6,
-            onPressed: () {
-              Navigator.of(context).push(
-                PiligrimPageRoute(
-                  builder: (context) => DishEditScreen(
-                    dish: null,
-                    categories: menuProvider.categories,
-                  ),
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.paddingOf(context).bottom -
+              MediaQuery.viewPaddingOf(context).bottom,
+        ),
+        child: AnimatedOpacity(
+          opacity: (isClassic && isAdmin) ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          child: IgnorePointer(
+            ignoring: !(isClassic && isAdmin),
+            child: FloatingActionButton(
+              backgroundColor: PiligrimColors.earthWarm,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: PiligrimColors.water.withValues(alpha: 0.35),
                 ),
-              );
-            },
-            child: const Icon(Icons.add, color: PiligrimColors.water),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  PiligrimPageRoute(
+                    builder: (context) => DishEditScreen(
+                      dish: null,
+                      categories: menuProvider.categories,
+                    ),
+                  ),
+                );
+              },
+              child: const Icon(Icons.add, color: PiligrimColors.water),
+            ),
           ),
         ),
       ),

@@ -1,5 +1,7 @@
 from django.core.cache import cache
-from rest_framework import generics, viewsets
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, viewsets, status
+from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -13,6 +15,7 @@ from .models import Event, News, EventReservation, EventPhotoReport
 from .serializers import (
     EventSerializer, NewsSerializer, EventReservationSerializer,
     EventPhotoReportSerializer, StaffEventSerializer, StaffNewsSerializer,
+    StaffPhotoReportCreateSerializer,
 )
 
 # Предстоящие/прошедшие события зависят от текущего времени — короткий TTL,
@@ -230,6 +233,34 @@ class StaffEventViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsStaffOrAdmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
+
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='photos',
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def add_photo(self, request, pk=None):
+        """Загружает фото в фотоотчёт прошедшего мероприятия."""
+        event = self.get_object()
+        serializer = StaffPhotoReportCreateSerializer(
+            data=request.data, context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(event=event)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=['delete'],
+        url_path=r'photos/(?P<photo_pk>[^/.]+)',
+        url_name='photo-delete',
+    )
+    def delete_photo(self, request, pk=None, photo_pk=None):
+        """Удаляет фото из фотоотчёта мероприятия."""
+        photo = get_object_or_404(EventPhotoReport, pk=photo_pk, event__pk=pk)
+        photo.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema(tags=['Staff: Events'])

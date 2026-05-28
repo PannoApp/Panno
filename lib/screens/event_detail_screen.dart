@@ -6,6 +6,7 @@ import '../core/theme.dart';
 import '../data/api_event_display.dart';
 import '../data/events_news_data.dart' show formatDateTimeRu;
 import '../data/models/api_event.dart';
+import '../providers/auth_provider.dart';
 import '../providers/events_provider.dart';
 import '../widgets/event_cover_image.dart';
 import '../widgets/event_photo_report_gallery.dart';
@@ -279,6 +280,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               const SizedBox(height: 12),
                               EventPhotoReportGallery(
                                 photos: provider.photoReport,
+                                isAdmin: context.watch<AuthProvider>().isAdmin,
+                                onDeletePhoto: (photo) async {
+                                  try {
+                                    await context
+                                        .read<EventsProvider>()
+                                        .deletePhotoFromReport(
+                                          event.id,
+                                          photo.id,
+                                        );
+                                  } catch (_) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(SnackBar(
+                                        content: Text(
+                                          'Не удалось удалить фото',
+                                          style: PiligrimTextStyles.body
+                                              .copyWith(
+                                                  color: PiligrimColors.sky),
+                                        ),
+                                        backgroundColor:
+                                            PiligrimColors.earthDeep,
+                                      ));
+                                    }
+                                  }
+                                },
                               ),
                             ],
                           );

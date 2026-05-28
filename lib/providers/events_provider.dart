@@ -123,6 +123,18 @@ class EventsProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> deletePhotoFromReport(int eventId, int photoId) async {
+    await _repository.deletePhotoFromReport(eventId, photoId);
+    _photoReport = _photoReport.where((p) => p.id != photoId).toList();
+    notifyListeners();
+  }
+
+  Future<void> deleteArchivedEvent(int eventId) async {
+    await _repository.deleteEvent(eventId);
+    archived = archived.where((e) => e.id != eventId).toList();
+    notifyListeners();
+  }
+
   Future<void> reserveEvent(int eventId, int guestsCount) async {
     isReserving = true;
     reserveError = null;

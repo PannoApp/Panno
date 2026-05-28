@@ -21,6 +21,7 @@ import '../widgets/event_cover_image.dart'
 import '../widgets/piligrim_background.dart';
 import 'event_detail_screen.dart';
 import 'event_edit_screen.dart';
+import 'event_photo_report_screen.dart';
 import 'news_edit_screen.dart';
 import '../widgets/piligrim_tab_editorial_mark.dart';
 import '../widgets/piligrim_tap.dart';
@@ -53,7 +54,12 @@ class _EventsScreenState extends State<EventsScreen> {
       backgroundColor: PiligrimColors.earth,
       extendBodyBehindAppBar: true,
       extendBody: true,
-      floatingActionButton: AnimatedOpacity(
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.paddingOf(context).bottom -
+              MediaQuery.viewPaddingOf(context).bottom,
+        ),
+        child: AnimatedOpacity(
         opacity: isAdmin ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 200),
         child: IgnorePointer(
@@ -80,6 +86,7 @@ class _EventsScreenState extends State<EventsScreen> {
             },
           ),
         ),
+      ),
       ),
       body: Stack(
         children: [
@@ -231,6 +238,7 @@ class _EventsScreenState extends State<EventsScreen> {
                               child: _PastEventCard(
                                 event: e,
                                 coverFallbackIndex: i,
+                                isAdmin: isAdmin,
                                 onOpen: () {
                                   Navigator.of(context).push(
                                     PiligrimPageRoute(
@@ -1078,7 +1086,9 @@ class _EventListCard extends StatelessWidget {
   }
 
   void _openEventEdit(BuildContext context, ApiEvent event) {
-    // TODO: навигация на экран редактирования мероприятия
+    Navigator.of(context).push(PiligrimPageRoute<void>(
+      builder: (_) => EventEditScreen(event: event),
+    ));
   }
 }
 
@@ -1279,16 +1289,69 @@ class _ArchiveHeader extends StatelessWidget {
 
 // Карточка прошедшего мероприятия — тонкая matte-вуаль на обложке,
 // «Фотоотчёт» chip (water-tint) если доступен фотоотчёт.
+// Администратор видит кнопки удаления и управления фотоотчётом.
 class _PastEventCard extends StatelessWidget {
   const _PastEventCard({
     required this.event,
     required this.coverFallbackIndex,
+    required this.isAdmin,
     required this.onOpen,
   });
 
   final ApiEvent event;
   final int coverFallbackIndex;
+  final bool isAdmin;
   final VoidCallback onOpen;
+
+  void _confirmDelete(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: PiligrimColors.earthDeep,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: PiligrimColors.divider),
+        ),
+        title: Text(
+          'Удалить мероприятие?',
+          style: PiligrimTextStyles.heading.copyWith(color: PiligrimColors.sky),
+        ),
+        content: Text(
+          'Вы хотите удалить «${event.title}»? Это действие нельзя отменить.',
+          style: PiligrimTextStyles.body
+              .copyWith(color: PiligrimColors.sky.withValues(alpha: 0.8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Отмена',
+                style:
+                    PiligrimTextStyles.button.copyWith(color: PiligrimColors.water)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await context.read<EventsProvider>().deleteArchivedEvent(event.id);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Не удалось удалить мероприятие',
+                        style: PiligrimTextStyles.body
+                            .copyWith(color: PiligrimColors.sky)),
+                    backgroundColor: PiligrimColors.earthDeep,
+                  ));
+                }
+              }
+            },
+            child: Text('Удалить',
+                style:
+                    PiligrimTextStyles.button.copyWith(color: PiligrimColors.fruit)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1302,66 +1365,135 @@ class _PastEventCard extends StatelessWidget {
           border: Border.all(color: PiligrimColors.divider),
         ),
         padding: const EdgeInsets.all(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 76,
-                height: 92,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    EventCoverImage(
-                      imageUrl: event.coverUrl,
-                      fallbackAsset:
-                          event.fallbackCoverAsset(coverFallbackIndex),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 76,
+                    height: 92,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        EventCoverImage(
+                          imageUrl: event.coverUrl,
+                          fallbackAsset:
+                              event.fallbackCoverAsset(coverFallbackIndex),
+                        ),
+                        // Тонкая matte-вуаль для «архивного» ощущения
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: PiligrimColors.earth.withValues(alpha: 0.22),
+                          ),
+                        ),
+                      ],
                     ),
-                    // Тонкая matte-вуаль для «архивного» ощущения
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: PiligrimColors.earth.withValues(alpha: 0.22),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Отступ справа, чтобы заголовок не перекрывался кнопками
+                      Padding(
+                        padding:
+                            EdgeInsets.only(right: isAdmin ? 72.0 : 0.0),
+                        child: Text(
+                          event.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: PiligrimTextStyles.body.copyWith(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            height: 1.3,
+                            color: PiligrimColors.sky.withValues(alpha: 0.78),
+                          ),
+                        ),
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        formatShortDateRu(event.startsAt),
+                        style: PiligrimTextStyles.caption.copyWith(
+                          color: PiligrimColors.sky.withValues(alpha: 0.38),
+                          fontSize: 12,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      if (event.hasPhotoReport) ...[
+                        const SizedBox(height: 8),
+                        _PhotoReportChip(),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            // Кнопки администратора: фотоотчёт + удалить
+            if (isAdmin)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _AdminIconButton(
+                      icon: Icons.photo_library_outlined,
+                      onTap: () => Navigator.of(context).push(
+                        PiligrimPageRoute<void>(
+                          builder: (_) =>
+                              EventPhotoReportScreen(event: event),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _AdminIconButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: PiligrimColors.fruit,
+                      onTap: () => _confirmDelete(context),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: PiligrimTextStyles.body.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                      color: PiligrimColors.sky.withValues(alpha: 0.78),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    formatShortDateRu(event.startsAt),
-                    style: PiligrimTextStyles.caption.copyWith(
-                      color: PiligrimColors.sky.withValues(alpha: 0.38),
-                      fontSize: 12,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  if (event.hasPhotoReport) ...[
-                    const SizedBox(height: 8),
-                    _PhotoReportChip(),
-                  ],
-                ],
-              ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Маленькая иконка-кнопка для действий администратора на карточках архива.
+class _AdminIconButton extends StatelessWidget {
+  const _AdminIconButton({
+    required this.icon,
+    required this.onTap,
+    this.color = PiligrimColors.water,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: PiligrimColors.earthDeep.withValues(alpha: 0.88),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: color.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
+        child: Icon(icon, color: color, size: 14),
       ),
     );
   }
@@ -1567,7 +1699,9 @@ class _NewsCard extends StatelessWidget {
   }
 
   void _openNewsEdit(BuildContext context, PiligrimNewsPost post) {
-    // TODO: навигация на экран редактирования новости
+    Navigator.of(context).push(PiligrimPageRoute<void>(
+      builder: (_) => NewsEditScreen(news: post),
+    ));
   }
 }
 

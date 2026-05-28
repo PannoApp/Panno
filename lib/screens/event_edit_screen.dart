@@ -69,10 +69,16 @@ class _EventEditScreenState extends State<EventEditScreen> {
   /// Открывает последовательно DatePicker, затем TimePicker и сохраняет результат.
   Future<void> _pickDateTime() async {
     final now = DateTime.now();
+    // Запрещаем выбирать прошедшие даты: firstDate = сегодня.
+    // initialDate должен быть >= firstDate, поэтому берём максимум из текущей даты и now.
+    final initialDate =
+        (_selectedDateTime != null && _selectedDateTime!.isAfter(now))
+            ? _selectedDateTime!
+            : now;
     final pickedDate = await showDatePicker(
       context: context,
-      initialDate: _selectedDateTime ?? now,
-      firstDate: DateTime(2020),
+      initialDate: initialDate,
+      firstDate: now,
       lastDate: DateTime(2100),
       builder: (ctx, child) => Theme(
         data: ThemeData.dark().copyWith(
@@ -134,6 +140,18 @@ class _EventEditScreenState extends State<EventEditScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isCreating &&
+        _selectedDateTime != null &&
+        _selectedDateTime!.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'Нельзя создавать мероприятие на прошедшую дату',
+          style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
+        ),
+        backgroundColor: PiligrimColors.earthDeep,
+      ));
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       final priceRaw = _priceCtrl.text.trim();

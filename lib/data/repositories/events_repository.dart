@@ -117,6 +117,24 @@ class EventsRepository {
     await _dio.delete<void>('/events/admin/events/$id/');
   }
 
+  Future<ApiEventPhoto> addPhotoToReport(int eventId, File image) async {
+    final data = FormData.fromMap({
+      'image': MultipartFile.fromFileSync(
+        image.path,
+        filename: image.path.split('/').last,
+      ),
+    });
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/events/admin/events/$eventId/photos/',
+      data: data,
+    );
+    return ApiEventPhoto.fromJson(response.data!);
+  }
+
+  Future<void> deletePhotoFromReport(int eventId, int photoId) async {
+    await _dio.delete<void>('/events/admin/events/$eventId/photos/$photoId/');
+  }
+
   // ─── Admin: News ─────────────────────────────────────────────────────────────
 
   /// Список всех новостей без пагинации.

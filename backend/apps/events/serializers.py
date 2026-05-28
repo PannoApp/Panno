@@ -176,6 +176,18 @@ class StaffEventSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at', 'occupied_places')
 
 
+class StaffPhotoReportCreateSerializer(serializers.ModelSerializer):
+    """Принимает image (файл) и опциональный order при загрузке фото в фотоотчёт."""
+
+    class Meta:
+        model = EventPhotoReport
+        fields = ('id', 'image', 'order')
+        read_only_fields = ('id',)
+
+    def to_representation(self, instance):
+        return EventPhotoReportSerializer(instance, context=self.context).data
+
+
 class StaffNewsSerializer(serializers.ModelSerializer):
     image     = serializers.ImageField(required=False, allow_null=True)
     image_url = serializers.SerializerMethodField()
