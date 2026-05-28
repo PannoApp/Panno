@@ -283,7 +283,13 @@ class _HeroHeaderState extends State<_HeroHeader> {
         clipBehavior: Clip.none,
         children: [
           // Мягкий amber glow — depth через свет, без декоративных тотемов
-          Positioned.fill(
+          // Overflows 56px below hero boundary (Stack + CustomScrollView both have
+          // Clip.none) to bleed warmth into the stats area and kill the seam.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: -56,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -1346,7 +1352,7 @@ class _ProfileAtmosphere extends StatelessWidget {
                 stops: const [0.0, 0.35, 0.72, 1.0],
                 colors: [
                   PiligrimColors.ember.withValues(alpha: 0.06),
-                  PiligrimColors.clear,
+                  PiligrimColors.earthWarm.withValues(alpha: 0.03),
                   PiligrimColors.earthWarm.withValues(alpha: 0.12),
                   PiligrimColors.earthSurface.withValues(alpha: 0.55),
                 ],
@@ -1355,10 +1361,10 @@ class _ProfileAtmosphere extends StatelessWidget {
           ),
           Positioned(
             left: -60,
-            top: MediaQuery.sizeOf(context).height * 0.12,
+            top: MediaQuery.sizeOf(context).height * 0.20,
             child: Container(
-              width: 220,
-              height: 220,
+              width: 280,
+              height: 280,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -1448,13 +1454,13 @@ class _ProfileGlassCard extends StatelessWidget {
       ProfileGlassVariant.stat => (
           0.10,
           0.04,
-          0.18,
-          10.0,
           0.14,
+          10.0,
+          0.10,
         ),
       ProfileGlassVariant.settings => (
-          0.14,
-          0.06,
+          0.10,
+          0.04,
           0.14,
           14.0,
           0.10,
@@ -1499,12 +1505,13 @@ class _ProfileGlassCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: PiligrimColors.steppe.withValues(alpha: shadowAlpha * 0.5),
-            blurRadius: variant == ProfileGlassVariant.stat ? 16 : 10,
-            offset: const Offset(0, 4),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
           ),
-          if (variant == ProfileGlassVariant.stat)
+          if (variant == ProfileGlassVariant.stat ||
+              variant == ProfileGlassVariant.settings)
             BoxShadow(
-              color: PiligrimColors.ember.withValues(alpha: 0.06),
+              color: PiligrimColors.ember.withValues(alpha: 0.05),
               blurRadius: 20,
               spreadRadius: -4,
             ),
