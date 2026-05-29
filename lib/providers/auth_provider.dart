@@ -262,20 +262,10 @@ class AuthProvider extends ChangeNotifier {
 
 String _formatJourneyStart(DateTime? dt) {
   final date = dt ?? DateTime.now();
-  const months = [
-    '',
-    'Январь',
-    'Февраль',
-    'Март',
-    'Апрель',
-    'Май',
-    'Июнь',
-    'Июль',
-    'Август',
-    'Сентябрь',
-    'Октябрь',
-    'Ноябрь',
-    'Декабрь',
-  ];
-  return '${months[date.month]} ${date.year}';
+  final now = DateTime.now();
+  final years = now.year - date.year - (now.month < date.month || (now.month == date.month && now.day < date.day) ? 1 : 0);
+  if (years < 1) return '< 1 г.';
+  if (years == 1) return '1 год';
+  if (years >= 2 && years <= 4) return '$years года';
+  return '$years лет';
 }

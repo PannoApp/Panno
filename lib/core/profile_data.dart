@@ -31,7 +31,7 @@ const kAnonymousHero = HeroUser(name: '', phone: '');
 const kDemoUser = HeroUser(
   name: 'Герой без имени',
   phone: '+7 ··· ··· ·· ··',
-  journeyStartLabel: 'Март 2024',
+  journeyStartLabel: '2 года',
   bookingsCount: 0,
   eventsCount: 0,
 );

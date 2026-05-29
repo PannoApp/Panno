@@ -558,7 +558,7 @@ class _StatCard extends StatelessWidget {
                 child: Text(
                   value,
                   style: PiligrimTextStyles.heading.copyWith(
-                    fontSize: small ? 14 : 20,
+                    fontSize: 20,
                     color: PiligrimColors.steppe,
                   ),
                 ),
