@@ -65,6 +65,7 @@ class _EventsScreenState extends State<EventsScreen> {
         child: IgnorePointer(
           ignoring: !isAdmin,
           child: FloatingActionButton(
+            heroTag: 'events_fab',
             backgroundColor: PiligrimColors.earthWarm,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),

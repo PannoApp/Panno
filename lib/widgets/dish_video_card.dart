@@ -322,7 +322,9 @@ class _DishVideoCardState extends State<DishVideoCard>
   @override
   Widget build(BuildContext context) {
     final videoReady = _videoCtrl != null && _videoCtrl!.value.isInitialized;
-    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    // paddingOf учитывает и системный navbar, и PiligrimNavBar (extendBody: true).
+    // viewPaddingOf давал только системный отступ — на Android контент уходил за tab-bar.
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return GestureDetector(
       onTap: _showDishDetail,

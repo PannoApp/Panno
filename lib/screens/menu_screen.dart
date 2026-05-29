@@ -84,6 +84,7 @@ class _MenuScreenState extends State<MenuScreen>
           child: IgnorePointer(
             ignoring: !(isClassic && isAdmin),
             child: FloatingActionButton(
+              heroTag: 'menu_fab',
               backgroundColor: PiligrimColors.earthWarm,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -605,7 +606,11 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
             child: _EndOfListMarker(count: dishes.length),
           ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        // Отступ снизу: динамический, учитывает высоту системного nav-bar Android
+        // и нижнего tab-bar'а, которые проецируются в padding при extendBody: true.
+        SliverToBoxAdapter(
+          child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
+        ),
       ],
     );
   }
