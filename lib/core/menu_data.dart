@@ -23,7 +23,7 @@ const kDefaultTagStyle = TagStyle(
 // Реестр стилей по отображаемому имени тега (без учёта регистра).
 // Имена должны совпадать с тем, что задаёт администратор в бекенде.
 const _kTagStyles = <String, TagStyle>{
-  'острое':           TagStyle(iconAsset: 'assets/images/luk.svg',              color: PiligrimColors.tagSpicy),
+  'острое':           TagStyle(iconAsset: 'assets/images/luk.svg',              color: PiligrimColors.water),
   'вегетарианское':   TagStyle(iconAsset: 'assets/images/zerno.svg',            color: PiligrimColors.tagVegetarian),
   'алкоголь':         TagStyle(iconAsset: 'assets/images/cobyz.svg',            color: PiligrimColors.tagAlcohol),
   'без глютена':      TagStyle(iconAsset: 'assets/images/stone.svg',            color: PiligrimColors.water),

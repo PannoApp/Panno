@@ -932,154 +932,123 @@ class _EventListCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: Container(
         decoration: BoxDecoration(
-          color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: PiligrimColors.divider),
           boxShadow: PiligrimShadows.card,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
-          child: Stack(
-            clipBehavior: Clip.hardEdge,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                      // Обложка с badge'ами и кинематографичным gradient
-                      ClipRRect(
-                        borderRadius: PiligrimRadius.smAll,
-                        child: SizedBox(
-                          width: 100,
-                          height: 124,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              EventCoverImage(
-                                imageUrl: event.coverUrl,
-                                fallbackAsset:
-                                    event.fallbackCoverAsset(coverFallbackIndex),
-                              ),
-                              // Многоступенчатый gradient для читаемости badge'ей
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      PiligrimColors.earthDeep
-                                          .withValues(alpha: 0.55),
-                                      PiligrimColors.earthDeep
-                                          .withValues(alpha: 0.0),
-                                      PiligrimColors.earthDeep
-                                          .withValues(alpha: 0.3),
-                                      PiligrimColors.earthDeep
-                                          .withValues(alpha: 0.85),
-                                    ],
-                                    stops: const [0.0, 0.32, 0.65, 1.0],
-                                  ),
-                                ),
-                              ),
-                              // Water-pill даты (top-left)
-                              Positioned(
-                                top: 8,
-                                left: 8,
-                                right: 8,
-                                child: _DateBadge(text: _dateBadgeText()),
-                              ),
-                              // Format-badge (bottom-right) — Открытое/Закрытое
-                              Positioned(
-                                left: 8,
-                                right: 8,
-                                bottom: 8,
-                                child: _FormatBadge(isOpen: isOpen),
-                              ),
-                            ],
-                          ),
-                        ),
+          child: AspectRatio(
+            aspectRatio: 1.6,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Фоновая обложка full-bleed
+                EventCoverImage(
+                  imageUrl: event.coverUrl,
+                  fallbackAsset: event.fallbackCoverAsset(coverFallbackIndex),
+                ),
+
+                // Многоступенчатый градиент снизу для читаемости текста
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x00000000),
+                          Color(0x00000000),
+                          Color(0xBB0E0B09),
+                          Color(0xF50E0B09),
+                        ],
+                        stops: [0.0, 0.35, 0.68, 1.0],
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              event.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: PiligrimTextStyles.heading.copyWith(
-                                fontSize: 16,
-                                height: 1.25,
-                                color: PiligrimColors.sky,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              formatDateTimeRu(event.startsAt),
-                              style: PiligrimTextStyles.caption.copyWith(
-                                color: PiligrimColors.water
-                                    .withValues(alpha: 0.95),
-                                fontSize: 12,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            // Стоимость со steppe-dot префиксом
-                            Row(
-                              children: [
-                                Container(
-                                  width: 4,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: PiligrimColors.steppe
-                                        .withValues(alpha: 0.78),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    _priceLine(),
-                                    style: PiligrimTextStyles.caption.copyWith(
-                                      fontSize: 12,
-                                      letterSpacing: 0.3,
-                                      color: PiligrimColors.steppe
-                                          .withValues(alpha: 0.78),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              event.description,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: PiligrimTextStyles.body.copyWith(
-                                fontSize: 13,
-                                height: 1.45,
-                                color: PiligrimColors.sky
-                                    .withValues(alpha: 0.62),
-                              ),
-                            ),
-                          ],
+                    ),
+                  ),
+                ),
+
+                // Steppe-левая акцентная полоса
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 3,
+                    color: PiligrimColors.steppe.withValues(alpha: 0.8),
+                  ),
+                ),
+
+                // Water-pill даты (top-left)
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: _DateBadge(text: _dateBadgeText()),
+                ),
+
+                // Format-badge (top-right) + кнопка редактирования рядом для админа
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _FormatBadge(isOpen: isOpen),
+                      if (isAdmin) ...[
+                        const SizedBox(width: 6),
+                        _AdminEditButton(
+                          onTap: () => _openEventEdit(context, event),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-              // Кнопка редактирования — показывается только администратору
-              if (isAdmin)
+
+                // Текстовый блок снизу: заголовок + дата + цена
                 Positioned(
-                  top: 8,
-                  right: 8,
-                  child: _AdminEditButton(
-                    onTap: () => _openEventEdit(context, event),
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          event.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: PiligrimTextStyles.heading.copyWith(
+                            fontSize: 20,
+                            color: PiligrimColors.sky,
+                            height: 1.22,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          formatDateTimeRu(event.startsAt),
+                          style: PiligrimTextStyles.caption.copyWith(
+                            color: PiligrimColors.water.withValues(alpha: 0.95),
+                            fontSize: 12,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _priceLine(),
+                          style: PiligrimTextStyles.caption.copyWith(
+                            fontSize: 12,
+                            letterSpacing: 0.3,
+                            color: PiligrimColors.steppe.withValues(alpha: 0.78),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
