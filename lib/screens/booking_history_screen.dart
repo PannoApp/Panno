@@ -170,7 +170,10 @@ class _BookingCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            const Divider(height: 1, color: PiligrimColors.divider),
+            Container(
+              height: 0.5,
+              color: PiligrimColors.sky.withValues(alpha: 0.10),
+            ),
             const SizedBox(height: 10),
 
             // Детали

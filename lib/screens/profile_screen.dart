@@ -283,13 +283,15 @@ class _HeroHeaderState extends State<_HeroHeader> {
         clipBehavior: Clip.none,
         children: [
           // Мягкий amber glow — depth через свет, без декоративных тотемов
-          // Overflows 56px below hero boundary (Stack + CustomScrollView both have
-          // Clip.none) to bleed warmth into the stats area and kill the seam.
+          // Overflow увеличен до 120px: при -56 нижняя граница DecoratedBox
+          // совпадала с последней строкой "Бронирований" (header+56 = card+56),
+          // что давало 1px артефакт на Android. Градиент к тому моменту уже
+          // clear, поэтому визуально разницы нет.
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            bottom: -56,
+            bottom: -120,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -1349,11 +1351,10 @@ class _ProfileAtmosphere extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: const [0.0, 0.35, 0.72, 1.0],
+                stops: const [0.0, 0.55, 1.0],
                 colors: [
-                  PiligrimColors.ember.withValues(alpha: 0.06),
-                  PiligrimColors.earthWarm.withValues(alpha: 0.03),
-                  PiligrimColors.earthWarm.withValues(alpha: 0.12),
+                  PiligrimColors.ember.withValues(alpha: 0.05),
+                  PiligrimColors.earthWarm.withValues(alpha: 0.09),
                   PiligrimColors.earthSurface.withValues(alpha: 0.55),
                 ],
               ),
