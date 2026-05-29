@@ -9,7 +9,7 @@ import '../providers/booking_provider.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
-import '../widgets/piligrim_nav_button.dart';
+import '../widgets/piligrim_tap.dart';
 
 class BookingHistoryScreen extends StatefulWidget {
   const BookingHistoryScreen({super.key});
@@ -64,9 +64,30 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                         child: Row(
                           children: [
-                            PiligrimNavButton(
-                              icon: Icons.chevron_left,
+                            PiligrimTap(
                               onTap: () => Navigator.of(context).pop(),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.arrow_back_ios_new_rounded,
+                                      size: 12,
+                                      color: PiligrimColors.sky.withValues(alpha: 0.45),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Назад',
+                                      style: PiligrimTextStyles.caption.copyWith(
+                                        color: PiligrimColors.sky.withValues(alpha: 0.45),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 14),
                             Text(

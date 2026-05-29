@@ -233,14 +233,32 @@ class _EventEditScreenState extends State<EventEditScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: PiligrimTap(
-          onTap: () => Navigator.of(context).pop(),
-          borderRadius: BorderRadius.circular(6),
-          child: const Center(
-            child: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 16,
-              color: PiligrimColors.sky,
+        leadingWidth: 80,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: PiligrimTap(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 12,
+                    color: PiligrimColors.sky.withValues(alpha: 0.45),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Назад',
+                    style: PiligrimTextStyles.caption.copyWith(
+                      color: PiligrimColors.sky.withValues(alpha: 0.45),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

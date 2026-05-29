@@ -1,6 +1,5 @@
 // Детальная карточка мероприятия — ТЗ: обложка, название, дата/время, описание, формат, цена, «Записаться»
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../data/api_event_display.dart';
@@ -74,38 +73,28 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 expandedHeight: 220,
                 pinned: true,
                 backgroundColor: PiligrimColors.earthDeep,
-                leadingWidth: 108,
+                leadingWidth: 80,
                 leading: Padding(
                   padding: const EdgeInsets.only(left: 4),
                   child: PiligrimTap(
                     onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 10,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SvgPicture.asset(
-                            'assets/images/chevron_left_totem.svg',
-                            width: 20,
-                            height: 20,
-                            colorFilter: const ColorFilter.mode(
-                              PiligrimColors.water,
-                              BlendMode.srcIn,
-                            ),
+                          Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 12,
+                            color: PiligrimColors.sky.withValues(alpha: 0.45),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           Text(
                             'Назад',
-                            maxLines: 1,
-                            softWrap: false,
-                            style: PiligrimTextStyles.body.copyWith(
-                              fontSize: 15,
-                              color: PiligrimColors.sky,
-                              fontWeight: FontWeight.w700,
+                            style: PiligrimTextStyles.caption.copyWith(
+                              color: PiligrimColors.sky.withValues(alpha: 0.45),
+                              fontSize: 12,
                             ),
                           ),
                         ],

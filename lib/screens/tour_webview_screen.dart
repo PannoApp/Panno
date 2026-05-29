@@ -4,6 +4,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../core/theme.dart';
 import '../widgets/piligrim_loader.dart';
+import '../widgets/piligrim_tap.dart';
 
 class TourWebViewScreen extends StatefulWidget {
   const TourWebViewScreen({super.key, required this.url});
@@ -57,16 +58,34 @@ class _TourWebViewScreenState extends State<TourWebViewScreen> {
             letterSpacing: 0.5,
           ),
         ),
-        leading: IconButton(
-          icon: const Text(
-            '×',
-            style: TextStyle(
-              fontSize: 22,
-              color: PiligrimColors.sky,
-              height: 1.0,
+        leadingWidth: 80,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: PiligrimTap(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 12,
+                    color: PiligrimColors.sky.withValues(alpha: 0.45),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Назад',
+                    style: PiligrimTextStyles.caption.copyWith(
+                      color: PiligrimColors.sky.withValues(alpha: 0.45),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: Stack(
