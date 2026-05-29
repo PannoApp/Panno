@@ -23,6 +23,7 @@ import '../widgets/piligrim_tap.dart';
 import '../core/piligrim_route.dart';
 import '../widgets/piligrim_auth_view.dart';
 import 'booking_history_screen.dart';
+import 'event_reservation_history_screen.dart';
 import 'onboarding_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -63,7 +64,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       switch (id) {
         case 'global':
-          await auth.updateNotificationPreferences(notificationsEnabled: value);
+          await auth.updateNotificationPreferences(
+            notificationsEnabled: value,
+            events: value,
+            promotions: value,
+            closedEvents: value,
+          );
         case 'events':
           await auth.updateNotificationPreferences(events: value);
         case 'promo':
@@ -193,7 +199,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _NotificationsCard(
                       enabled: auth.isLoggedIn,
                       globalEnabled:
-                          auth.currentUser?.notificationsEnabled ?? true,
+                          (auth.currentUser?.notifyEvents ?? false) &&
+                          (auth.currentUser?.notifyPromotions ?? false) &&
+                          (auth.currentUser?.notifyClosedEvents ?? false),
                       isOn: (id) => _notifValue(auth, id),
                       onToggle: _handleNotifToggle,
                     ),
@@ -429,6 +437,15 @@ class _HeroHeaderState extends State<_HeroHeader> {
   }
 }
 
+String _pluralize(int n, String one, String few, String many) {
+  final mod10 = n % 10;
+  final mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 19) return many;
+  if (mod10 == 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // STATS ROW
 // ─────────────────────────────────────────────────────────────────────────────
@@ -445,7 +462,7 @@ class _StatsRow extends StatelessWidget {
       children: [
         _StatCard(
           value: '$bookingsCount',
-          label: 'Бронирований',
+          label: _pluralize(bookingsCount, 'Бронирование', 'Бронирования', 'Бронирований'),
           delay: 0.ms,
           onTap: () => Navigator.of(context).push(
             PiligrimPageRoute(
@@ -456,9 +473,13 @@ class _StatsRow extends StatelessWidget {
         const SizedBox(width: 12),
         _StatCard(
           value: '${user.eventsCount}',
-          label: 'Мероприятия',
+          label: _pluralize(user.eventsCount, 'Мероприятие', 'Мероприятия', 'Мероприятий'),
           delay: 80.ms,
-          onTap: () => onNavigate?.call(3),
+          onTap: () => Navigator.of(context).push(
+            PiligrimPageRoute(
+              builder: (_) => const EventReservationHistoryScreen(),
+            ),
+          ),
         ),
         const SizedBox(width: 12),
         _StatCard(
@@ -580,28 +601,23 @@ class _NotificationsCard extends StatelessWidget {
             onChanged: (val) => onToggle('global', val),
           ),
           const _ProfileHairlineDivider(),
-          // Категории — задизаблены визуально и функционально при globalEnabled=false
-          Opacity(
-            opacity: globalEnabled ? 1.0 : 0.4,
-            child: Column(
-              children: kNotifCategories.asMap().entries.map((entry) {
-                final i = entry.key;
-                final cat = entry.value;
-                final on = isOn(cat.id);
-                return Column(
-                  children: [
-                    _NotifRow(
-                      category: cat,
-                      isOn: on,
-                      onChanged:
-                          globalEnabled ? (val) => onToggle(cat.id, val) : null,
-                    ),
-                    if (i < kNotifCategories.length - 1)
-                      const _ProfileHairlineDivider(),
-                  ],
-                );
-              }).toList(),
-            ),
+          Column(
+            children: kNotifCategories.asMap().entries.map((entry) {
+              final i = entry.key;
+              final cat = entry.value;
+              final on = isOn(cat.id);
+              return Column(
+                children: [
+                  _NotifRow(
+                    category: cat,
+                    isOn: on,
+                    onChanged: (val) => onToggle(cat.id, val),
+                  ),
+                  if (i < kNotifCategories.length - 1)
+                    const _ProfileHairlineDivider(),
+                ],
+              );
+            }).toList(),
           ),
         ],
       ),

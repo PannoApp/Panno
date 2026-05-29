@@ -113,6 +113,7 @@ class _MenuScreenState extends State<MenuScreen>
           const PiligrimBackground(
             textureOpacity: 0.45,
             vignetteIntensity: 0.25,
+            cinematic: true,
           ),
 
           // Контент режима
@@ -1626,6 +1627,7 @@ class _MenuLoadingSkeletonState extends State<_MenuLoadingSkeleton>
           const PiligrimBackground(
             textureOpacity: 0.45,
             vignetteIntensity: 0.25,
+            cinematic: true,
           ),
           // Тёплое свечение снизу — огненный мотив
           Positioned(

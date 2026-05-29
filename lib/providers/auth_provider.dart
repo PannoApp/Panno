@@ -211,8 +211,16 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     if (currentUser == null) return;
 
-    isLoading = true;
+    final previous = currentUser!;
     error = null;
+
+    // Optimistic update — UI reacts immediately, no network wait
+    currentUser = previous.copyWith(
+      notifyEvents: events,
+      notifyPromotions: promotions,
+      notifyClosedEvents: closedEvents,
+      notificationsEnabled: notificationsEnabled,
+    );
     notifyListeners();
 
     try {
@@ -226,10 +234,10 @@ class AuthProvider extends ChangeNotifier {
 
       currentUser = await _profileRepository.updateProfile(body);
     } catch (e) {
+      currentUser = previous;
       error = dioErrorMessage(e);
       rethrow;
     } finally {
-      isLoading = false;
       notifyListeners();
     }
   }

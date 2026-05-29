@@ -43,6 +43,7 @@ class BookingSuccessScreen extends StatelessWidget {
             child: PiligrimBackground(
               textureOpacity: 0.45,
               vignetteIntensity: 0.25,
+              cinematic: true,
             ),
           ),
           SafeArea(
