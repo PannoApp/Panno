@@ -1363,9 +1363,9 @@ class _ClassicDishCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: Container(
             decoration: BoxDecoration(
-              color: PiligrimColors.earthWarm,
+              color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: PiligrimColors.divider, width: 0.5),
+              border: Border.all(color: PiligrimColors.divider),
               boxShadow: PiligrimShadows.card,
             ),
             child: Column(
@@ -1483,7 +1483,7 @@ class _ClassicDishCard extends StatelessWidget {
                   children: [
                     Container(
                       width: double.infinity,
-                      color: PiligrimColors.earthWarm,
+                      color: Colors.transparent,
                       padding: const EdgeInsets.fromLTRB(20, 13, 16, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1508,25 +1508,6 @@ class _ClassicDishCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
-                      ),
-                    ),
-                    // Steppe left-accent — «нить пути», фирменный штрих карточки.
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 2.5,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              PiligrimColors.steppe.withValues(alpha: 0.55),
-                              PiligrimColors.steppe.withValues(alpha: 0.0),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ],

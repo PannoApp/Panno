@@ -819,11 +819,11 @@ class _EventPreviewCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xD61C1510),
+                        color: PiligrimColors.imageScrim.withValues(alpha: 0.84),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: PiligrimColors.steppe.withValues(alpha: 0.58),
-                          width: 0.9,
+                          width: 0.75,
                         ),
                         boxShadow: [
                           BoxShadow(

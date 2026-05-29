@@ -116,7 +116,7 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
     );
 
     final tapChild = PiligrimTap(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(PiligrimRadius.button),
       onTap: widget.onTap,
       scaleDown: 0.965,
       releaseDuration: const Duration(milliseconds: 320),
@@ -135,7 +135,7 @@ class _EmberCtaState extends State<EmberCta> with TickerProviderStateMixin {
           return Container(
             height: widget.small ? 44 : 56,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(PiligrimRadius.button),
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,

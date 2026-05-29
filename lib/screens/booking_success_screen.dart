@@ -118,7 +118,7 @@ class BookingSuccessScreen extends StatelessWidget {
 
                   // Карточка деталей
                   Container(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: PiligrimColors.earthDeep,
                       borderRadius: BorderRadius.circular(16),

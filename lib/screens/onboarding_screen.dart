@@ -107,20 +107,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               left: 16,
               child: PiligrimTap(
                 onTap: () => Navigator.of(context).pop(),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: PiligrimColors.sky.withValues(alpha: 0.10),
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: PiligrimColors.sky.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 12,
+                        color: PiligrimColors.sky.withValues(alpha: 0.45),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Назад',
+                        style: PiligrimTextStyles.caption.copyWith(
+                          color: PiligrimColors.sky.withValues(alpha: 0.45),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ).animate().fadeIn(delay: 600.ms, duration: 400.ms),
@@ -197,6 +203,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   hint: 'Фамилия',
                   delay: 460.ms,
                 ),
+                const SizedBox(height: 14),
+                _PhoneReadOnly(
+                  phone: context.read<AuthProvider>().currentUser?.phone ?? '',
+                  delay: 530.ms,
+                ),
                 const SizedBox(height: 48),
 
                 // ── CTA — «Начать путь» ──────────────────────────────────────
@@ -242,6 +253,58 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read-only поле телефона
+// ─────────────────────────────────────────────────────────────────────────────
+class _PhoneReadOnly extends StatelessWidget {
+  const _PhoneReadOnly({required this.phone, required this.delay});
+
+  final String phone;
+  final Duration delay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: PiligrimColors.earthDeep.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: PiligrimColors.sky.withValues(alpha: 0.07),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              phone,
+              style: PiligrimTextStyles.body.copyWith(
+                color: PiligrimColors.sky.withValues(alpha: 0.35),
+                fontSize: 16,
+                height: 1.4,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 14,
+            color: PiligrimColors.sky.withValues(alpha: 0.20),
+          ),
+        ],
+      ),
+    )
+        .animate()
+        .fadeIn(delay: delay, duration: 500.ms)
+        .slideY(
+          begin: 0.04,
+          end: 0,
+          delay: delay,
+          duration: 500.ms,
+          curve: Curves.easeOutCubic,
+        );
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Брендованное поле ввода

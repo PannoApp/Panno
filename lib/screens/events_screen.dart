@@ -165,7 +165,7 @@ class _EventsScreenState extends State<EventsScreen> {
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, i) {
@@ -227,7 +227,7 @@ class _EventsScreenState extends State<EventsScreen> {
                     ),
                   if (past.isNotEmpty && _archiveOpen)
                     SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, i) {
@@ -280,7 +280,7 @@ class _EventsScreenState extends State<EventsScreen> {
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, i) {
@@ -935,6 +935,10 @@ class _EventListCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           boxShadow: PiligrimShadows.card,
         ),
+        foregroundDecoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: PiligrimColors.divider),
+        ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: AspectRatio(
@@ -964,17 +968,6 @@ class _EventListCard extends StatelessWidget {
                         stops: [0.0, 0.35, 0.68, 1.0],
                       ),
                     ),
-                  ),
-                ),
-
-                // Steppe-левая акцентная полоса
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 3,
-                    color: PiligrimColors.steppe.withValues(alpha: 0.8),
                   ),
                 ),
 
@@ -1071,13 +1064,13 @@ class _DateBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: PiligrimColors.cardOverlay,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: PiligrimColors.water.withValues(alpha: 0.38),
-          width: 0.8,
+          width: 0.75,
         ),
       ),
       child: Text(
@@ -1089,7 +1082,7 @@ class _DateBadge extends StatelessWidget {
         style: PiligrimTextStyles.micro.copyWith(
           color: PiligrimColors.sky.withValues(alpha: 0.92),
           letterSpacing: 0.6,
-          fontSize: 9.5,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -1114,7 +1107,7 @@ class _FormatBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: PiligrimColors.cardOverlay,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accent, width: 0.8),
+        border: Border.all(color: accent, width: 0.75),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1137,7 +1130,7 @@ class _FormatBadge extends StatelessWidget {
               style: PiligrimTextStyles.micro.copyWith(
                 color: PiligrimColors.sky.withValues(alpha: 0.85),
                 letterSpacing: 0.8,
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1188,8 +1181,8 @@ class _ArchiveHeader extends StatelessWidget {
               children: [
                 SvgPicture.asset(
                   'assets/images/wheel_totem (1).svg',
-                  width: 22,
-                  height: 22,
+                  width: 18,
+                  height: 18,
                   colorFilter: ColorFilter.mode(
                     PiligrimColors.water.withValues(alpha: 0.55),
                     BlendMode.srcIn,
@@ -1453,8 +1446,8 @@ class _AdminIconButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        width: 32,
-        height: 32,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: PiligrimColors.earthDeep.withValues(alpha: 0.88),
           shape: BoxShape.circle,
@@ -1463,7 +1456,7 @@ class _AdminIconButton extends StatelessWidget {
             width: 0.8,
           ),
         ),
-        child: Icon(icon, color: color, size: 14),
+        child: Icon(icon, color: color, size: 16),
       ),
     );
   }
@@ -1500,7 +1493,7 @@ class _PhotoReportChip extends StatelessWidget {
             style: PiligrimTextStyles.micro.copyWith(
               color: PiligrimColors.water.withValues(alpha: 0.85),
               letterSpacing: 0.8,
-              fontSize: 9,
+              fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1531,24 +1524,6 @@ class _NewsCard extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.hardEdge,
           children: [
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 1.5,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      PiligrimColors.steppe.withValues(alpha: 0.55),
-                      PiligrimColors.steppe.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
               child: Column(
@@ -1774,7 +1749,7 @@ class _EventsLoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
           for (var i = 0; i < 2; i++)
@@ -1794,7 +1769,7 @@ class _NewsLoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
           for (var i = 0; i < 2; i++)
@@ -1814,7 +1789,7 @@ class _ArchiveLoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: 24),
       child: _SkeletonRow(height: 56),
     );
   }

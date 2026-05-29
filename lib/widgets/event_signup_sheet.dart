@@ -188,11 +188,41 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
                   height: 52,
                   child: PiligrimTap(
                     onTap: _submitting || _guestsCount < 1 ? null : _submit,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
+                    scaleDown: 0.97,
+                    releaseDuration: const Duration(milliseconds: 280),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: PiligrimColors.water,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: (_submitting || _guestsCount < 1)
+                            ? null
+                            : const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  PiligrimColors.steppe,
+                                  PiligrimColors.emberDeep,
+                                ],
+                              ),
+                        color: (_submitting || _guestsCount < 1)
+                            ? PiligrimColors.earthDeep
+                            : null,
+                        boxShadow: (_submitting || _guestsCount < 1)
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: PiligrimColors.shadow
+                                      .withValues(alpha: 0.28),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 5),
+                                ),
+                                BoxShadow(
+                                  color: PiligrimColors.ember
+                                      .withValues(alpha: 0.12),
+                                  blurRadius: 10,
+                                  spreadRadius: -2,
+                                ),
+                              ],
                       ),
                       alignment: Alignment.center,
                       child: Text(

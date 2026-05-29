@@ -104,13 +104,13 @@ class _DishDetailTagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: PiligrimColors.water.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(3),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(
           color: PiligrimColors.water.withValues(alpha: 0.22),
-          width: 0.7,
+          width: 0.75,
         ),
       ),
       child: Text(
@@ -138,11 +138,14 @@ class DishCardTagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = tagStyleFor(tag.name);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: style.color.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: style.color.withValues(alpha: 0.4)),
+        border: Border.all(
+          color: style.color.withValues(alpha: 0.4),
+          width: 0.75,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -177,11 +180,11 @@ class DishCardPriceTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xD61C1510),
+        color: PiligrimColors.earthDeep.withValues(alpha: 0.84),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: PiligrimColors.steppe.withValues(alpha: 0.58),
-          width: 0.9,
+          width: 0.75,
         ),
         boxShadow: [
           BoxShadow(
@@ -225,11 +228,14 @@ class DishInfoChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = accent ? PiligrimColors.steppe : PiligrimColors.water;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 0.75,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

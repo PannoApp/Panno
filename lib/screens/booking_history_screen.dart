@@ -93,7 +93,7 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                             Text(
                               'МОИ БРОНИРОВАНИЯ',
                               style: PiligrimTextStyles.heading.copyWith(
-                                fontSize: 16,
+                                fontSize: 17,
                                 color: PiligrimColors.sky,
                                 letterSpacing: 2.0,
                               ),
@@ -163,13 +163,7 @@ class _BookingCard extends StatelessWidget {
         color: PiligrimColors.earthDeep,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: PiligrimColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: PiligrimColors.shadow.withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: PiligrimShadows.card,
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -314,7 +308,7 @@ class _StatusBadge extends StatelessWidget {
       case 'completed':
         return const _StatusBadge(
           label: 'Завершено',
-          color: Color(0xFF5A9A6A),
+          color: PiligrimColors.success,
         );
       case 'canceled':
       default:

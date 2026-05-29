@@ -25,7 +25,7 @@ class _TourWebViewScreenState extends State<TourWebViewScreen> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF1E1B19))
+      ..setBackgroundColor(PiligrimColors.earthWarm)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
@@ -45,7 +45,7 @@ class _TourWebViewScreenState extends State<TourWebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1B19),
+      backgroundColor: PiligrimColors.earthWarm,
       appBar: AppBar(
         backgroundColor: PiligrimColors.earthDeep,
         foregroundColor: PiligrimColors.sky,

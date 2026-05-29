@@ -166,6 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SliverToBoxAdapter(
                     child: _HeroHeader(
                       user: user,
+                      isLoggedIn: auth.isLoggedIn,
                       onStartJourney: () async {
                         await guardAuth(context);
                       },
@@ -259,10 +260,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _HeroHeader extends StatefulWidget {
   const _HeroHeader({
     required this.user,
+    required this.isLoggedIn,
     required this.onStartJourney,
   });
 
   final HeroUser user;
+  final bool isLoggedIn;
   final Future<void> Function() onStartJourney;
 
   @override
@@ -274,7 +277,11 @@ class _HeroHeaderState extends State<_HeroHeader> {
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
-    final authorized = widget.user.isAuthorized;
+    final hasName = widget.user.name.isNotEmpty &&
+        widget.user.name != widget.user.phone;
+    final displayName = hasName
+        ? widget.user.name.split(' ').first
+        : 'Гость';
 
     return SizedBox(
       height: 152 + top,
@@ -336,75 +343,46 @@ class _HeroHeaderState extends State<_HeroHeader> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                PiligrimTap(
-                  onTap: () async {
-                    if (authorized) {
-                      await Navigator.of(context).push(
-                        PiligrimPageRoute(
-                          builder: (_) => const OnboardingScreen(),
-                        ),
-                      );
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Декоративный тотем-знак — не аватарка, просто марка
-                        SvgPicture.asset(
-                          'assets/images/shaman.svg',
-                          width: 22,
-                          height: 22,
-                          colorFilter: ColorFilter.mode(
-                            PiligrimColors.steppe.withValues(alpha: 0.55),
-                            BlendMode.srcIn,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            style: PiligrimTextStyles.heading.copyWith(
+                              fontSize: 22,
+                              color: PiligrimColors.sky,
+                              letterSpacing: 0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                authorized
-                                    ? (widget.user.name.isEmpty ||
-                                            widget.user.name == widget.user.phone
-                                        ? widget.user.phone
-                                        : widget.user.name)
-                                    : 'Герой без имени',
-                                style: PiligrimTextStyles.heading.copyWith(
-                                  fontSize: 22,
-                                  color: PiligrimColors.sky,
-                                  letterSpacing: 0.3,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                authorized
-                                    ? (widget.user.name.isEmpty ||
-                                            widget.user.name == widget.user.phone
-                                        ? 'Заполнить имя и фамилию'
-                                        : widget.user.phone)
-                                    : 'Войдите, чтобы открыть путь',
-                                style: PiligrimTextStyles.caption.copyWith(
-                                  color: authorized
-                                      ? PiligrimColors.steppe.withValues(alpha: 0.7)
-                                      : PiligrimColors.steppe.withValues(alpha: 0.6),
-                                  fontSize: 12,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                    if (widget.isLoggedIn)
+                      PiligrimTap(
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            PiligrimPageRoute(
+                              builder: (_) => const OnboardingScreen(),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Icon(
+                            Icons.edit_outlined,
+                            size: 18,
+                            color: PiligrimColors.steppe.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ),
+                  ],
                 )
                     .animate()
                     .fadeIn(delay: 200.ms, duration: 700.ms)
@@ -412,10 +390,7 @@ class _HeroHeaderState extends State<_HeroHeader> {
 
                 const SizedBox(height: 16),
 
-                // Плашка начала пути
-                if (authorized && widget.user.journeyStartLabel != null)
-                  _JourneyTag(label: 'Путь начат: ${widget.user.journeyStartLabel}'),
-                if (!authorized)
+                if (!widget.isLoggedIn)
                   PiligrimTap(
                     borderRadius: BorderRadius.circular(8),
                     onTap: widget.onStartJourney,
@@ -451,33 +426,6 @@ class _HeroHeaderState extends State<_HeroHeader> {
         ],
       ),
     );
-  }
-}
-
-// Плашка «Путь начат» — показывает дату, когда герой начал взаимодействие с рестораном
-class _JourneyTag extends StatelessWidget {
-  const _JourneyTag({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        border: Border.all(
-            color: PiligrimColors.steppe.withValues(alpha: 0.22)),
-        borderRadius: BorderRadius.circular(4),
-        color: PiligrimColors.steppe.withValues(alpha: 0.05),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: PiligrimTextStyles.caption.copyWith(
-          color: PiligrimColors.steppe.withValues(alpha: 0.75),
-          letterSpacing: 1.8,
-          fontSize: 9.5,
-        ),
-      ),
-    ).animate().fadeIn(delay: 500.ms, duration: 500.ms);
   }
 }
 
@@ -602,7 +550,7 @@ class _NotificationsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!enabled) {
       return _ProfileGlassCard(
-        variant: ProfileGlassVariant.settings,
+        variant: ProfileGlassVariant.integrated,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
@@ -617,7 +565,7 @@ class _NotificationsCard extends StatelessWidget {
     }
 
     return _ProfileGlassCard(
-      variant: ProfileGlassVariant.settings,
+      variant: ProfileGlassVariant.integrated,
       child: Column(
         children: [
           // Главный переключатель — отражает notifications_enabled с сервера
@@ -801,7 +749,7 @@ class _MessengerChip extends StatelessWidget {
               label,
               style: PiligrimTextStyles.body.copyWith(
                 fontSize: 13,
-                color: PiligrimColors.sky.withValues(alpha: 0.68),
+                color: PiligrimColors.steppe.withValues(alpha: 0.82),
               ),
             ),
             const Spacer(),
@@ -833,9 +781,6 @@ class _ContactsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final address = coreInfo?.address.isNotEmpty == true
-        ? coreInfo!.address
-        : kRestaurantAddress;
     final phone = coreInfo?.phone.isNotEmpty == true
         ? coreInfo!.phone
         : kRestaurantPhone;
@@ -858,23 +803,10 @@ class _ContactsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Адрес
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-            child: Text(
-              address,
-              style: PiligrimTextStyles.body.copyWith(
-                fontSize: 13,
-                color: PiligrimColors.sky.withValues(alpha: 0.75),
-                height: 1.5,
-              ),
-            ),
-          ),
-
           // Кнопки карт — скрываем если все ссылки null
           if (mapLinks.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
               child: Row(
                 children: mapLinks.map((t) {
                   return Expanded(
@@ -948,8 +880,8 @@ class _ContactsCard extends StatelessWidget {
                   Text(
                     phone,
                     style: PiligrimTextStyles.body.copyWith(
-                      fontSize: 14,
-                      color: PiligrimColors.steppe,
+                      fontSize: 13,
+                      color: PiligrimColors.steppe.withValues(alpha: 0.82),
                     ),
                   ),
                   const Spacer(),
@@ -1242,7 +1174,7 @@ class _AccountSessionCard extends StatelessWidget {
                   style: PiligrimTextStyles.body.copyWith(
                     fontSize: 13,
                     height: 1.35,
-                    color: PiligrimColors.ember.withValues(alpha: 0.86),
+                    color: PiligrimColors.fruit.withValues(alpha: 0.86),
                   ),
                 ),
               ),
@@ -1262,9 +1194,8 @@ class _AccountSessionCard extends StatelessWidget {
                     style: PiligrimTextStyles.body.copyWith(
                       fontSize: 13,
                       height: 1.35,
-                      fontWeight: FontWeight.w300,
                       letterSpacing: 0.25,
-                      color: PiligrimColors.ember.withValues(alpha: 0.74),
+                      color: PiligrimColors.fruit.withValues(alpha: 0.74),
                     ),
                   ),
                   const SizedBox(height: 5),

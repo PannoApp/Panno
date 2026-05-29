@@ -394,12 +394,8 @@ class _EventSignupCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color buttonColor = isFull
-        ? PiligrimColors.earthDeep.withValues(alpha: 0.8)
-        : PiligrimColors.water;
-
     return SizedBox(
-      height: 54,
+      height: 52,
       child: PiligrimTap(
         onTap: isFull ? null : onTap,
         borderRadius: BorderRadius.circular(12),
@@ -408,15 +404,17 @@ class _EventSignupCta extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: isFull ? buttonColor : null,
+            color: isFull
+                ? PiligrimColors.earthDeep.withValues(alpha: 0.8)
+                : null,
             gradient: isFull
                 ? null
                 : const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      PiligrimColors.water,
-                      PiligrimColors.waterMuted,
+                      PiligrimColors.steppe,
+                      PiligrimColors.emberDeep,
                     ],
                   ),
             border: isFull
@@ -434,9 +432,9 @@ class _EventSignupCta extends StatelessWidget {
                       offset: const Offset(0, 5),
                     ),
                     BoxShadow(
-                      color: PiligrimColors.water.withValues(alpha: 0.25),
-                      blurRadius: 16,
-                      spreadRadius: 0.5,
+                      color: PiligrimColors.ember.withValues(alpha: 0.12),
+                      blurRadius: 10,
+                      spreadRadius: -2,
                     ),
                   ],
           ),

@@ -90,6 +90,9 @@ abstract final class PiligrimColors {
   /// Прозрачный служебный цвет
   static const Color clear = Color(0x00000000);
 
+  /// Цвет успешного/завершённого статуса
+  static const Color success = Color(0xFF5A9A6A);
+
   /// Базовый цвет тени
   static const Color shadow = Color(0xFF000000);
 
@@ -426,16 +429,20 @@ abstract final class PiligrimLayout {
 abstract final class PiligrimRadius {
   static const double sm = 8;
   static const double md = 12;
+  /// Радиус основной CTA-кнопки (EmberCta и аналоги).
+  static const double button = 10;
   static const double card = 14;
   static const double lg = 20;
 
   static const Radius smR = Radius.circular(sm);
   static const Radius mdR = Radius.circular(md);
+  static const Radius buttonR = Radius.circular(button);
   static const Radius cardR = Radius.circular(card);
   static const Radius lgR = Radius.circular(lg);
 
   static const BorderRadius smAll = BorderRadius.all(smR);
   static const BorderRadius mdAll = BorderRadius.all(mdR);
+  static const BorderRadius buttonAll = BorderRadius.all(buttonR);
   static const BorderRadius cardAll = BorderRadius.all(cardR);
   static const BorderRadius lgAll = BorderRadius.all(lgR);
 }
