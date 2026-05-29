@@ -15,6 +15,7 @@ import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_shimmer.dart';
 import '../widgets/piligrim_tab_editorial_mark.dart';
+import '../widgets/piligrim_nav_button.dart';
 import '../widgets/piligrim_tap.dart';
 import '../core/piligrim_route.dart';
 import 'interior_photo_viewer.dart';
@@ -311,12 +312,23 @@ class _InteriorScreenState extends State<InteriorScreen>
                                             milliseconds: 80 + i * 35))
                                     .fadeIn(duration: 380.ms);
                               }
-                              return ClipRRect(
+                              return PiligrimTap(
+                                onTap: () => Navigator.of(context).push(
+                                  PiligrimPageRoute<void>(
+                                    builder: (_) => _AssetPhotoViewer(
+                                      paths: assetPaths,
+                                      initialIndex: i,
+                                    ),
+                                  ),
+                                ),
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.asset(
-                                  assetPaths[i],
-                                  fit: BoxFit.cover,
-                                  cacheWidth: cacheW,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.asset(
+                                    assetPaths[i],
+                                    fit: BoxFit.cover,
+                                    cacheWidth: cacheW,
+                                  ),
                                 ),
                               );
                             },
@@ -711,6 +723,138 @@ class _TourButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Полноэкранный просмотрщик для локальных ассет-фотографий (fallback без API)
+// ─────────────────────────────────────────────────────────────────────────────
+class _AssetPhotoViewer extends StatefulWidget {
+  const _AssetPhotoViewer({required this.paths, required this.initialIndex});
+
+  final List<String> paths;
+  final int initialIndex;
+
+  @override
+  State<_AssetPhotoViewer> createState() => _AssetPhotoViewerState();
+}
+
+class _AssetPhotoViewerState extends State<_AssetPhotoViewer> {
+  late final PageController _pageCtrl;
+  late int _currentIndex;
+
+  double _dragOffset = 0;
+  double _bgOpacity = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageCtrl = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    if (details.delta.dy <= 0 && _dragOffset <= 0) return;
+    setState(() {
+      _dragOffset += details.delta.dy;
+      if (_dragOffset < 0) _dragOffset = 0;
+      _bgOpacity = (1.0 - (_dragOffset / 150)).clamp(0.0, 1.0);
+    });
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    final vel = details.velocity.pixelsPerSecond.dy;
+    if (vel > 400 || _dragOffset > 100) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _dragOffset = 0;
+        _bgOpacity = 1.0;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topPad = MediaQuery.paddingOf(context).top;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedOpacity(
+              opacity: _bgOpacity,
+              duration: Duration.zero,
+              child: const ColoredBox(color: Colors.black),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(0, _dragOffset),
+            child: PageView.builder(
+              controller: _pageCtrl,
+              itemCount: widget.paths.length,
+              onPageChanged: (i) => setState(() => _currentIndex = i),
+              itemBuilder: (context, i) {
+                return GestureDetector(
+                  onVerticalDragUpdate: _onDragUpdate,
+                  onVerticalDragEnd: _onDragEnd,
+                  child: InteractiveViewer(
+                    minScale: 1.0,
+                    maxScale: 4.0,
+                    clipBehavior: Clip.none,
+                    boundaryMargin: const EdgeInsets.all(20),
+                    child: SizedBox.expand(
+                      child: Image.asset(
+                        widget.paths[i],
+                        fit: BoxFit.fitWidth,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Positioned(
+            top: topPad + 8,
+            left: 8,
+            child: PiligrimNavButton(
+              icon: Icons.chevron_left,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ),
+          if (widget.paths.length > 1)
+            Positioned(
+              top: topPad + 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  '${_currentIndex + 1} / ${widget.paths.length}',
+                  style: PiligrimTextStyles.caption.copyWith(
+                    fontSize: 12,
+                    color: PiligrimColors.sky.withValues(alpha: 0.75),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      )
+          .animate()
+          .fadeIn(duration: 220.ms)
+          .scale(
+            begin: const Offset(0.94, 0.94),
+            end: const Offset(1.0, 1.0),
+            duration: 300.ms,
+            curve: Curves.easeOutCubic,
+          ),
     );
   }
 }
