@@ -57,6 +57,13 @@ class MenuProvider extends ChangeNotifier {
   MenuViewMode _mode = MenuViewMode.feed;
   bool _loaded = false;
 
+  bool _globalMuted = true;
+  bool get globalMuted => _globalMuted;
+  void toggleGlobalMute() {
+    _globalMuted = !_globalMuted;
+    notifyListeners();
+  }
+
   /// Индекс карточки в ленте после перехода из классического меню (см. [openFeedAtDish]).
   int? feedStartIndex;
 

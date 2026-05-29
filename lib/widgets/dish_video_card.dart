@@ -33,7 +33,6 @@ class _DishVideoCardState extends State<DishVideoCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _ambientCtrl;
   VideoPlayerController? _videoCtrl;
-  bool _isMuted = true;
   bool _videoError = false;
   bool _loopSeekPending = false;
   // false пока платформенная текстура не отдала первый кадр; shield скрывает чёрный кадр
@@ -69,7 +68,6 @@ class _DishVideoCardState extends State<DishVideoCard>
       // Ручной loop: нативный setLooping(true) на iOS даёт чёрный кадр ~раз в цикл.
       ctrl.setLooping(false);
       ctrl.addListener(_handleVideoTick);
-      await ctrl.setVolume(0);
       if (!mounted) {
         ctrl.removeListener(_handleVideoTick);
         ctrl.dispose();
@@ -80,6 +78,8 @@ class _DishVideoCardState extends State<DishVideoCard>
         _videoFirstFrameReady = false; // shield до первого кадра
       });
       _ambientCtrl.stop();
+      final muted = context.read<MenuProvider>().globalMuted;
+      await ctrl.setVolume(muted ? 0 : 1);
       if (widget.isActive) ctrl.play();
     } catch (_) {
       ctrl?.removeListener(_handleVideoTick);
@@ -127,6 +127,8 @@ class _DishVideoCardState extends State<DishVideoCard>
       } else {
         _ambientCtrl.stop();
       }
+      final muted = context.read<MenuProvider>().globalMuted;
+      _videoCtrl?.setVolume(muted ? 0 : 1);
       _videoCtrl?.play();
     } else if (!widget.isActive && old.isActive) {
       _ambientCtrl.stop();
@@ -160,8 +162,9 @@ class _DishVideoCardState extends State<DishVideoCard>
   }
 
   void _toggleMute() {
-    setState(() => _isMuted = !_isMuted);
-    _videoCtrl?.setVolume(_isMuted ? 0 : 1);
+    context.read<MenuProvider>().toggleGlobalMute();
+    final muted = context.read<MenuProvider>().globalMuted;
+    _videoCtrl?.setVolume(muted ? 0 : 1);
   }
 
   void _handleDragEnd(DragEndDetails d) {
@@ -358,7 +361,10 @@ class _DishVideoCardState extends State<DishVideoCard>
                     const SizedBox(
                       height: PiligrimSpacing.menuFeedCategoryToMuteGap,
                     ),
-                    _MuteButton(isMuted: _isMuted, onToggle: _toggleMute),
+                    _MuteButton(
+                      isMuted: context.watch<MenuProvider>().globalMuted,
+                      onToggle: _toggleMute,
+                    ),
                   ],
                 ],
               ),
