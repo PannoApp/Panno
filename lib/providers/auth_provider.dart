@@ -49,10 +49,12 @@ class AuthProvider extends ChangeNotifier {
     if (profile == null) return kAnonymousHero;
     final name =
         profile.displayName.isEmpty ? profile.phone : profile.displayName;
+    final journey = _formatJourneyStart(profile.dateJoined);
     return HeroUser(
       name: name.isEmpty ? 'Герой без имени' : name,
       phone: profile.phone,
-      journeyStartLabel: _formatJourneyStart(profile.dateJoined),
+      journeyStartValue: journey.$1,
+      journeyStartLabel: journey.$2,
       eventsCount: eventsCount,
     );
   }
@@ -268,12 +270,27 @@ class AuthProvider extends ChangeNotifier {
   }
 }
 
-String _formatJourneyStart(DateTime? dt) {
+(String, String) _formatJourneyStart(DateTime? dt) {
   final date = dt ?? DateTime.now();
   final now = DateTime.now();
+
+  final totalDays = now.difference(date).inDays;
+
   final years = now.year - date.year - (now.month < date.month || (now.month == date.month && now.day < date.day) ? 1 : 0);
-  if (years < 1) return '< 1 г.';
-  if (years == 1) return '1 год';
-  if (years >= 2 && years <= 4) return '$years года';
-  return '$years лет';
+  if (years >= 1) {
+    if (years == 1) return ('1', 'Год с нами');
+    if (years <= 4) return ('$years', 'Года с нами');
+    return ('$years', 'Лет с нами');
+  }
+
+  final months = now.month - date.month + (now.year - date.year) * 12 - (now.day < date.day ? 1 : 0);
+  if (months >= 1) {
+    if (months == 1) return ('1', 'Месяц с нами');
+    if (months <= 4) return ('$months', 'Месяца с нами');
+    return ('$months', 'Месяцев с нами');
+  }
+
+  if (totalDays == 1) return ('1', 'День с нами');
+  if (totalDays >= 2 && totalDays <= 4) return ('$totalDays', 'Дня с нами');
+  return ('$totalDays', 'Дней с нами');
 }

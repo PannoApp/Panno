@@ -351,45 +351,57 @@ class _HeroHeaderState extends State<_HeroHeader> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                // Profile header group: имя + карандаш единым блоком
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            displayName,
-                            style: PiligrimTextStyles.heading.copyWith(
-                              fontSize: 22,
-                              color: PiligrimColors.sky,
-                              letterSpacing: 0.3,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          displayName,
+                          style: PiligrimTextStyles.heading.copyWith(
+                            fontSize: 22,
+                            color: PiligrimColors.sky,
+                            letterSpacing: 0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (widget.isLoggedIn) ...[
+                          const SizedBox(width: 6),
+                          PiligrimTap(
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                PiligrimPageRoute(
+                                  builder: (_) => const OnboardingScreen(),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.edit_outlined,
+                                size: 16,
+                                color: PiligrimColors.steppe.withValues(alpha: 0.55),
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Ваш путь в PILIGRIM',
+                      style: PiligrimTextStyles.caption.copyWith(
+                        fontSize: 12,
+                        color: PiligrimColors.steppe.withValues(alpha: 0.50),
+                        letterSpacing: 1.2,
                       ),
                     ),
-                    if (widget.isLoggedIn)
-                      PiligrimTap(
-                        onTap: () async {
-                          await Navigator.of(context).push(
-                            PiligrimPageRoute(
-                              builder: (_) => const OnboardingScreen(),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Icon(
-                            Icons.edit_outlined,
-                            size: 18,
-                            color: PiligrimColors.steppe.withValues(alpha: 0.55),
-                          ),
-                        ),
-                      ),
                   ],
                 )
                     .animate()
@@ -483,10 +495,9 @@ class _StatsRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         _StatCard(
-          value: user.journeyStartLabel ?? '—',
-          label: 'С нами',
+          value: user.journeyStartValue ?? '—',
+          label: user.journeyStartLabel ?? 'С нами',
           delay: 160.ms,
-          small: true,
         ),
       ],
     );
@@ -499,14 +510,12 @@ class _StatCard extends StatelessWidget {
     required this.value,
     required this.label,
     required this.delay,
-    this.small = false,
     this.onTap,
   });
 
   final String value;
   final String label;
   final Duration delay;
-  final bool small;
   final VoidCallback? onTap;
 
   @override

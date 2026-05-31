@@ -22,6 +22,7 @@ import 'event_edit_screen.dart';
 import 'event_photo_report_screen.dart';
 import 'news_edit_screen.dart';
 import '../widgets/piligrim_tab_editorial_mark.dart';
+import '../widgets/piligrim_segmented_control.dart';
 import '../widgets/piligrim_tap.dart';
 
 enum _AfichaView { events, news }
@@ -112,12 +113,17 @@ class _EventsScreenState extends State<EventsScreen> {
                           label: 'EVENTS',
                           compact: true,
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: PiligrimSpacing.tabEditorialMarkGap),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: _SegmentedAficha(
-                            value: _view,
-                            onChanged: (v) => setState(() => _view = v),
+                          child: PiligrimSegmentedControl(
+                            tabs: const ['Афиша', 'Новости'],
+                            selectedIndex: _view == _AfichaView.events ? 0 : 1,
+                            onChanged: (i) => setState(
+                              () => _view = i == 0
+                                  ? _AfichaView.events
+                                  : _AfichaView.news,
+                            ),
                           ),
                         ),
                       ],
@@ -285,159 +291,6 @@ class _EventsScreenState extends State<EventsScreen> {
       ),
         );
       },
-    );
-  }
-}
-
-// Переключатель «Афиша» / «Новости» — тот же water-pill, что _ModeSwitcher в Menu.
-class _SegmentedAficha extends StatelessWidget {
-  const _SegmentedAficha({
-    required this.value,
-    required this.onChanged,
-  });
-
-  final _AfichaView value;
-  final ValueChanged<_AfichaView> onChanged;
-
-  static const double _height = 36;
-  static const double _radius = 18;
-  static const double _trackWidth = 184;
-  /// Внутренний воздух между track border и active pill (Apple-style inset).
-  static const double _pillInset = 3;
-
-  @override
-  Widget build(BuildContext context) {
-    final isEvents = value == _AfichaView.events;
-    const innerWidth = _trackWidth - _pillInset * 2;
-    const pillWidth = innerWidth / 2;
-    const pillRadius = _radius - _pillInset;
-
-    return SizedBox(
-      width: _trackWidth,
-      height: _height,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: PiligrimColors.earthDeep.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(_radius),
-                border: Border.all(color: PiligrimColors.divider),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.all(_pillInset),
-              child: AnimatedAlign(
-                duration: 280.ms,
-                curve: Curves.easeOutCubic,
-                alignment: isEvents
-                    ? Alignment.centerLeft
-                    : Alignment.centerRight,
-                child: Container(
-                  width: pillWidth,
-                  height: double.infinity,
-                  decoration: BoxDecoration(
-                    color: PiligrimColors.water.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(pillRadius),
-                    border: Border.all(
-                      color: PiligrimColors.water.withValues(alpha: 0.5),
-                      width: 0.8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: PiligrimColors.water.withValues(alpha: 0.18),
-                        blurRadius: 12,
-                        spreadRadius: 0.5,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: _AfichaTabLabel(
-                  label: 'Афиша',
-                  active: isEvents,
-                  onTap: () => onChanged(_AfichaView.events),
-                ),
-              ),
-              Expanded(
-                child: _AfichaTabLabel(
-                  label: 'Новости',
-                  active: !isEvents,
-                  onTap: () => onChanged(_AfichaView.news),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AfichaTabLabel extends StatelessWidget {
-  const _AfichaTabLabel({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color color = active
-        ? PiligrimColors.water
-        : PiligrimColors.sky.withValues(alpha: 0.45);
-
-    const textHeightBehavior = TextHeightBehavior(
-      applyHeightToFirstAscent: false,
-      applyHeightToLastDescent: false,
-    );
-
-    return PiligrimTap(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(_SegmentedAficha._radius),
-      child: SizedBox(
-        height: _SegmentedAficha._height,
-        child: Center(
-          child: Transform.translate(
-            offset: const Offset(0, -0.5),
-            child: AnimatedDefaultTextStyle(
-              duration: 220.ms,
-              curve: Curves.easeOut,
-              style: PiligrimTextStyles.caption.copyWith(
-                fontSize: 11.5,
-                height: 1.0,
-                leadingDistribution: TextLeadingDistribution.even,
-                color: color,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w300,
-                letterSpacing: active ? 0.6 : 0.4,
-              ),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                textHeightBehavior: textHeightBehavior,
-                strutStyle: const StrutStyle(
-                  fontSize: 11.5,
-                  height: 1.0,
-                  leading: 0,
-                  forceStrutHeight: true,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

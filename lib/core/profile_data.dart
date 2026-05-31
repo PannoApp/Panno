@@ -10,6 +10,7 @@ class HeroUser {
   const HeroUser({
     required this.name,
     required this.phone,
+    this.journeyStartValue,
     this.journeyStartLabel,
     this.bookingsCount = 0,
     this.eventsCount = 0,
@@ -17,6 +18,7 @@ class HeroUser {
 
   final String name;
   final String phone;
+  final String? journeyStartValue;
   final String? journeyStartLabel;
   final int bookingsCount;
   final int eventsCount;
@@ -31,7 +33,8 @@ const kAnonymousHero = HeroUser(name: '', phone: '');
 const kDemoUser = HeroUser(
   name: 'Герой без имени',
   phone: '+7 ··· ··· ·· ··',
-  journeyStartLabel: '2 года',
+  journeyStartValue: '2',
+  journeyStartLabel: 'Года с нами',
   bookingsCount: 0,
   eventsCount: 0,
 );
