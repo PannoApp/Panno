@@ -168,6 +168,7 @@ if USE_S3:
             "BACKEND": "storages.backends.s3.S3Storage",
             "OPTIONS": {
                 "location": "media", # Все медиа-файлы будут в папке /media/ внутри бакета
+                "url_protocol": env('AWS_S3_URL_PROTOCOL', default='https:'), # http: для локального MinIO
             },
         },
         "staticfiles": {
