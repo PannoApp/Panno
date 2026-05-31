@@ -23,6 +23,7 @@ import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tab_editorial_mark.dart';
+import '../widgets/piligrim_segmented_control.dart';
 import '../widgets/piligrim_tap.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -189,138 +190,15 @@ class _MenuHeader extends StatelessWidget {
             const SizedBox(height: markToControlsGap),
             Align(
               alignment: Alignment.centerRight,
-              child: _ModeSwitcher(mode: mode, onChanged: onModeChanged),
+              child: PiligrimSegmentedControl(
+                tabs: const ['Видео', 'Фото'],
+                selectedIndex: mode == MenuViewMode.feed ? 0 : 1,
+                onChanged: (i) => onModeChanged(
+                  i == 0 ? MenuViewMode.feed : MenuViewMode.classic,
+                ),
+              ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// Переключатель режимов меню: «Путь» (видео) ↔ «Свиток» (классика)
-// Sliding water-pill indicator с плавной анимацией 280ms easeOutCubic.
-class _ModeSwitcher extends StatelessWidget {
-  const _ModeSwitcher({required this.mode, required this.onChanged});
-  final MenuViewMode mode;
-  final ValueChanged<MenuViewMode> onChanged;
-
-  static const double _height = 36;
-  static const double _radius = 18;
-  static const double _trackWidth = 184;
-  /// Внутренний воздух между track border и active pill (Apple-style inset).
-  static const double _pillInset = 3;
-
-  @override
-  Widget build(BuildContext context) {
-    final isFeed = mode == MenuViewMode.feed;
-    const innerWidth = _trackWidth - _pillInset * 2;
-    const pillWidth = innerWidth / 2;
-    const pillRadius = _radius - _pillInset;
-
-    return SizedBox(
-      width: _trackWidth,
-      height: _height,
-      child: Stack(
-        children: [
-          // Фон-«дорожка»
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: PiligrimColors.earthDeep.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(_radius),
-                border: Border.all(color: PiligrimColors.divider),
-              ),
-            ),
-          ),
-          // Скользящий water-индикатор
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.all(_pillInset),
-              child: AnimatedAlign(
-                duration: 280.ms,
-                curve: Curves.easeOutCubic,
-                alignment:
-                    isFeed ? Alignment.centerLeft : Alignment.centerRight,
-                child: Container(
-                  width: pillWidth,
-                  height: double.infinity,
-                  decoration: BoxDecoration(
-                    color: PiligrimColors.water.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(pillRadius),
-                    border: Border.all(
-                      color: PiligrimColors.water.withValues(alpha: 0.5),
-                      width: 0.8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: PiligrimColors.water.withValues(alpha: 0.18),
-                        blurRadius: 12,
-                        spreadRadius: 0.5,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Тапы и подписи
-          Row(
-            children: [
-              Expanded(
-                child: _ModeTabLabel(
-                  label: 'Видео',
-                  active: isFeed,
-                  onTap: () => onChanged(MenuViewMode.feed),
-                ),
-              ),
-              Expanded(
-                child: _ModeTabLabel(
-                  label: 'Фото',
-                  active: !isFeed,
-                  onTap: () => onChanged(MenuViewMode.classic),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Подпись + иконка одной из двух вкладок mode switcher.
-class _ModeTabLabel extends StatelessWidget {
-  const _ModeTabLabel({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color color = active
-        ? PiligrimColors.water
-        : PiligrimColors.sky.withValues(alpha: 0.45);
-
-    return PiligrimTap(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(_ModeSwitcher._radius),
-      child: Center(
-        child: AnimatedDefaultTextStyle(
-          duration: 220.ms,
-          curve: Curves.easeOut,
-          style: PiligrimTextStyles.caption.copyWith(
-            fontSize: 11.5,
-            color: color,
-            fontWeight: active ? FontWeight.w700 : FontWeight.w300,
-            letterSpacing: active ? 0.6 : 0.4,
-          ),
-          child: Text(label),
         ),
       ),
     );

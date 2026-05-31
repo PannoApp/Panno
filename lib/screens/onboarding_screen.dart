@@ -100,38 +100,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
-          // ── Кнопка закрытия (для push из профиля) ────────────────────────
-          if (Navigator.of(context).canPop())
-            Positioned(
-              top: top + 12,
-              left: 16,
-              child: PiligrimTap(
-                onTap: () => Navigator.of(context).pop(),
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 12,
-                        color: PiligrimColors.sky.withValues(alpha: 0.45),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Назад',
-                        style: PiligrimTextStyles.caption.copyWith(
-                          color: PiligrimColors.sky.withValues(alpha: 0.45),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ).animate().fadeIn(delay: 600.ms, duration: 400.ms),
-            ),
-
           // ── Контент ──────────────────────────────────────────────────────
           SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
@@ -246,6 +214,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ],
             ),
           ),
+
+          // ── Кнопка «Назад» поверх контента — только при push из профиля ──
+          // Расположена последней в Stack, чтобы получать нажатия раньше
+          // SingleChildScrollView (RenderViewport всегда захватывает hitTest).
+          if (Navigator.of(context).canPop())
+            Positioned(
+              top: top + 12,
+              left: 16,
+              child: PiligrimTap(
+                onTap: () => Navigator.of(context).pop(),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 12,
+                        color: PiligrimColors.sky.withValues(alpha: 0.45),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Назад',
+                        style: PiligrimTextStyles.caption.copyWith(
+                          color: PiligrimColors.sky.withValues(alpha: 0.45),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ).animate().fadeIn(delay: 600.ms, duration: 400.ms),
+            ),
         ],
       ),
     );
