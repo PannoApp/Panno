@@ -142,7 +142,6 @@ class _InteriorScreenState extends State<InteriorScreen>
       builder: (context, core, _) {
         final slides = core.interiorSlides;
         final useApi = slides.isNotEmpty;
-        final assetPaths = PiligrimInteriorAssets.allInteriorPngs;
         final cacheW = PiligrimInteriorAssets.decodeCacheWidth(context);
         final tourLink = core.coreInfo?.tourLink;
 
@@ -163,7 +162,7 @@ class _InteriorScreenState extends State<InteriorScreen>
         final heroSlide = (useApi && filtered.isNotEmpty) ? filtered[0] : null;
         final gridSlides =
             (useApi && filtered.length > 1) ? filtered.sublist(1) : <InteriorSlide>[];
-        final itemCount = useApi ? gridSlides.length : assetPaths.length;
+        final itemCount = useApi ? gridSlides.length : 0;
         // Нечётные плитки — последняя одна, рендерим её полноширокой
         final hasOrphan = useApi && itemCount.isOdd && itemCount > 0;
         final pairCount = hasOrphan ? itemCount - 1 : itemCount;
@@ -301,36 +300,15 @@ class _InteriorScreenState extends State<InteriorScreen>
                           ),
                           delegate: SliverChildBuilderDelegate(
                             (context, i) {
-                              if (useApi) {
-                                return _InteriorSlideTile(
-                                  slide: gridSlides[i],
-                                  cacheWidth: cacheW,
-                                  onTap: () => _openPhoto(filtered, i + 1),
-                                )
-                                    .animate(
-                                        delay: Duration(
-                                            milliseconds: 80 + i * 35))
-                                    .fadeIn(duration: 380.ms);
-                              }
-                              return PiligrimTap(
-                                onTap: () => Navigator.of(context).push(
-                                  PiligrimPageRoute<void>(
-                                    builder: (_) => _AssetPhotoViewer(
-                                      paths: assetPaths,
-                                      initialIndex: i,
-                                    ),
-                                  ),
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.asset(
-                                    assetPaths[i],
-                                    fit: BoxFit.cover,
-                                    cacheWidth: cacheW,
-                                  ),
-                                ),
-                              );
+                              return _InteriorSlideTile(
+                                slide: gridSlides[i],
+                                cacheWidth: cacheW,
+                                onTap: () => _openPhoto(filtered, i + 1),
+                              )
+                                  .animate(
+                                      delay: Duration(
+                                          milliseconds: 80 + i * 35))
+                                  .fadeIn(duration: 380.ms);
                             },
                             childCount: pairCount,
                           ),
