@@ -25,14 +25,11 @@ class UserDeviceAdmin(ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return _is_content_or_admin(request.user)
 
-    list_display = ('user', 'fcm_token_short', 'created_at')
+    list_display = ('user', 'created_at')
     list_filter = ('created_at',)
-    search_fields = ('user__phone', 'fcm_token')
+    search_fields = ('user__phone',)
     readonly_fields = ('created_at',)
-
-    def fcm_token_short(self, obj):
-        return obj.fcm_token[:40] + '...' if len(obj.fcm_token) > 40 else obj.fcm_token
-    fcm_token_short.short_description = 'FCM Токен'
+    exclude = ('fcm_token',)
 
 
 from django import forms
@@ -42,11 +39,24 @@ class PushCampaignForm(forms.ModelForm):
         ('all', 'Всем (у кого есть приложение)'),
         ('last_visit_days', 'Активные (бронировали за последние 30 дней)'),
     ]
+    CATEGORY_CHOICES = [
+        ('', 'Сервисное (без ограничений)'),
+        ('events', 'Мероприятия — уважает настройки + лимит'),
+        ('promotions', 'Акции — уважает настройки + лимит'),
+        ('closed_events', 'Закрытые мероприятия — уважает настройки + лимит'),
+    ]
     segment = forms.ChoiceField(
         choices=SEGMENT_CHOICES,
         initial='all',
         label="Кому отправить",
         help_text="Выберите аудиторию для рассылки"
+    )
+    category = forms.ChoiceField(
+        choices=CATEGORY_CHOICES,
+        required=False,
+        initial='',
+        label="Категория",
+        help_text="Сервисное — отправляется сразу всем без ограничений. Остальные — проверяют настройки пользователя и время (9:00–21:00).",
     )
 
     class Meta:

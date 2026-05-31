@@ -242,10 +242,12 @@ class SendPushViaBotView(views.APIView):
             UserDevice.objects.values_list('user_id', flat=True).distinct()
         )
 
+        category = serializer.validated_data.get('category') or ''
+
         campaign = PushCampaign.objects.create(
             title=title,
             body=body,
-            category='promotions',
+            category=category,
             segment='all',
             total_users=len(user_ids),
         )
@@ -256,7 +258,7 @@ class SendPushViaBotView(views.APIView):
             title=title,
             body=body,
             data={'campaign_id': str(campaign.pk)},
-            category='promotions',
+            category=category,
             campaign_id=campaign.pk,
         )
 

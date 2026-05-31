@@ -33,4 +33,10 @@ class SendPushViaBotSerializer(serializers.Serializer):
     manager_telegram_id = serializers.CharField(max_length=100)
     title = serializers.CharField(max_length=255)
     body = serializers.CharField()
+    category = serializers.ChoiceField(
+        choices=['', 'events', 'promotions', 'closed_events'],
+        required=False,
+        allow_blank=True,
+        default='',
+    )
 
