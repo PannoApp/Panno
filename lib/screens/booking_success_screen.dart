@@ -22,13 +22,11 @@ class BookingSuccessScreen extends StatelessWidget {
   String _formatHeroesCount(int count) {
     final mod10 = count % 10;
     final mod100 = count % 100;
-    if (mod10 == 1 && mod100 != 11) {
-      return '$count герой';
-    } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+    if (mod10 == 1 && mod100 != 11) return '$count герой';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
       return '$count героя';
-    } else {
-      return '$count героев';
     }
+    return '$count героев';
   }
 
   @override
@@ -41,136 +39,111 @@ class BookingSuccessScreen extends StatelessWidget {
         children: [
           const Positioned.fill(
             child: PiligrimBackground(
-              textureOpacity: 0.45,
-              vignetteIntensity: 0.25,
+              textureOpacity: 0.5,
+              vignetteIntensity: 0.4,
               cinematic: true,
             ),
           ),
+
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 36),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Пространство под кнопку × — смещает группу чуть выше центра
-                  const SizedBox(height: 52),
+                  const Spacer(flex: 2),
 
-                  // Анимированный тотем успеха
-                  Center(
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: PiligrimColors.water.withValues(alpha: 0.1),
-                        border: Border.all(
-                          color: PiligrimColors.water.withValues(alpha: 0.35),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: PiligrimColors.water.withValues(alpha: 0.15),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: SvgPicture.asset(
-                        'assets/images/bird_totem (1).svg',
-                        colorFilter: const ColorFilter.mode(
-                          PiligrimColors.water,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                    )
-                        .animate()
-                        .scale(duration: 600.ms, curve: Curves.elasticOut)
-                        .rotate(duration: 600.ms, curve: Curves.easeOut),
-                  ),
-                  const SizedBox(height: 24),
-
-                  Text(
-                    'ПУТЬ ЗАБРОНИРОВАН',
-                    textAlign: TextAlign.center,
-                    style: PiligrimTextStyles.heading.copyWith(
-                      fontSize: 20,
-                      color: PiligrimColors.sky,
-                      letterSpacing: 2.5,
+                  // Тотем — малый, вторичный, тёплый
+                  SvgPicture.asset(
+                    'assets/images/bird_totem (1).svg',
+                    width: 28,
+                    height: 28,
+                    colorFilter: ColorFilter.mode(
+                      PiligrimColors.steppe.withValues(alpha: 0.55),
+                      BlendMode.srcIn,
                     ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 200.ms, duration: 400.ms)
-                      .slideY(begin: 0.2, end: 0, duration: 400.ms),
-                  const SizedBox(height: 8),
+                  ).animate().fadeIn(duration: 700.ms),
+
+                  const SizedBox(height: 22),
+
+                  // Editorial-заголовок — двухстрочный, широкий трекинг
+                  Text(
+                    'ПУТЬ\nЗАБРОНИРОВАН',
+                    textAlign: TextAlign.center,
+                    style: PiligrimTextStyles.title.copyWith(
+                      fontSize: 26,
+                      color: PiligrimColors.sky,
+                      letterSpacing: 4.5,
+                      height: 1.3,
+                    ),
+                  ).animate().fadeIn(delay: 180.ms, duration: 700.ms),
+
+                  const SizedBox(height: 14),
 
                   Text(
-                    'Ваша заявка успешно отправлена проводникам',
+                    'Ваша заявка передана проводникам',
                     textAlign: TextAlign.center,
                     style: PiligrimTextStyles.caption.copyWith(
-                      color: PiligrimColors.sky.withValues(alpha: 0.65),
-                      fontSize: 14,
+                      color: PiligrimColors.sky.withValues(alpha: 0.45),
+                      fontSize: 13,
+                      letterSpacing: 0.5,
+                      height: 1.6,
                     ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 300.ms, duration: 400.ms)
-                      .slideY(begin: 0.1, end: 0, duration: 400.ms),
-                  const SizedBox(height: 32),
+                  ).animate().fadeIn(delay: 300.ms, duration: 700.ms),
 
-                  // Карточка деталей
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: PiligrimColors.earthDeep,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: PiligrimColors.divider),
-                      boxShadow: [
-                        BoxShadow(
-                          color: PiligrimColors.shadow.withValues(alpha: 0.2),
-                          blurRadius: 16,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _DetailRow(
-                          icon: 'assets/images/sun.svg',
-                          label: 'Дата и время',
-                          value: '$date, $time',
-                        ),
-                        const Divider(height: 24, color: PiligrimColors.divider),
-                        _DetailRow(
-                          icon: 'assets/images/shaman.svg',
-                          label: 'Количество героев',
-                          value: _formatHeroesCount(heroesCount),
-                        ),
-                        if (zone != null && zone!.isNotEmpty) ...[
-                          const Divider(height: 24, color: PiligrimColors.divider),
-                          _DetailRow(
-                            icon: 'assets/images/star_totem (1).svg',
-                            label: 'Зона / Зал',
-                            value: zone!,
-                          ),
-                        ],
-                      ],
-                    ),
-                  )
+                  const SizedBox(height: 44),
+
+                  // Детали без карточки — интегрированы в пространство
+                  const Divider(height: 1, color: Color(0x14F2ECE1))
                       .animate()
-                      .fadeIn(delay: 450.ms, duration: 500.ms)
-                      .scale(begin: const Offset(0.95, 0.95), duration: 500.ms),
+                      .fadeIn(delay: 420.ms, duration: 500.ms),
+
+                  _DetailLine(
+                    label: 'ДАТА И ВРЕМЯ',
+                    value: '$date, $time',
+                    animDelay: 480.ms,
+                  ),
+
+                  const Divider(height: 1, color: Color(0x14F2ECE1))
+                      .animate()
+                      .fadeIn(delay: 540.ms, duration: 500.ms),
+
+                  _DetailLine(
+                    label: 'КОЛИЧЕСТВО ГЕРОЕВ',
+                    value: _formatHeroesCount(heroesCount),
+                    animDelay: 580.ms,
+                  ),
+
+                  if (zone != null && zone!.isNotEmpty) ...[
+                    const Divider(height: 1, color: Color(0x14F2ECE1))
+                        .animate()
+                        .fadeIn(delay: 640.ms, duration: 500.ms),
+                    _DetailLine(
+                      label: 'ЗОНА / ЗАЛ',
+                      value: zone!,
+                      animDelay: 680.ms,
+                    ),
+                  ],
+
+                  const Divider(height: 1, color: Color(0x14F2ECE1))
+                      .animate()
+                      .fadeIn(delay: 700.ms, duration: 500.ms),
+
+                  const Spacer(flex: 3),
                 ],
               ),
             ),
           ),
 
-          // Кнопка закрытия — выход из success flow на главную
+          // Кнопка закрытия
           Positioned(
             top: top + 8,
             right: 8,
             child: PiligrimNavButton(
               icon: Icons.close,
-              onTap: () => Navigator.of(context).popUntil((route) => route.isFirst),
-            ).animate().fadeIn(delay: 700.ms, duration: 400.ms),
+              onTap: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
+            ).animate().fadeIn(delay: 900.ms, duration: 400.ms),
           ),
         ],
       ),
@@ -178,58 +151,48 @@ class BookingSuccessScreen extends StatelessWidget {
   }
 }
 
-// Строка детали с иконкой-тотемом, подписью и значением
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({
-    required this.icon,
+class _DetailLine extends StatelessWidget {
+  const _DetailLine({
     required this.label,
     required this.value,
+    this.animDelay = Duration.zero,
   });
 
-  final String icon;
   final String label;
   final String value;
+  final Duration animDelay;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SvgPicture.asset(
-          icon,
-          width: 18,
-          height: 18,
-          colorFilter: ColorFilter.mode(
-            PiligrimColors.water.withValues(alpha: 0.6),
-            BlendMode.srcIn,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: PiligrimTextStyles.caption.copyWith(
+              fontSize: 10,
+              color: PiligrimColors.sky.withValues(alpha: 0.38),
+              letterSpacing: 1.8,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: PiligrimTextStyles.caption.copyWith(
-                  fontSize: 11,
-                  color: PiligrimColors.sky.withValues(alpha: 0.5),
-                ),
-                overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 20),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: PiligrimTextStyles.body.copyWith(
+                fontSize: 15,
+                color: PiligrimColors.sky.withValues(alpha: 0.92),
+                fontWeight: FontWeight.w300,
+                letterSpacing: 0.2,
               ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: PiligrimTextStyles.body.copyWith(
-                  fontSize: 14,
-                  color: PiligrimColors.sky,
-                  fontWeight: FontWeight.w700,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
-    );
+        ],
+      ),
+    ).animate().fadeIn(delay: animDelay, duration: 600.ms);
   }
 }

@@ -4,24 +4,21 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../core/auth_guard.dart';
 import '../core/piligrim_route.dart';
 import '../screens/booking_screen.dart';
-import 'ember_cta.dart';
+import 'path_cta.dart';
 
 class HomeActionBlock extends StatelessWidget {
   const HomeActionBlock({super.key, this.bottomPadding = 0});
 
   /// Доп. нижний отступ — обычно `MediaQuery.padding.bottom` от Scaffold с
-  /// `extendBody: true`. Без него EmberCta «уплывает» под прозрачный navbar.
+  /// `extendBody: true`. Без него кнопка «уплывает» под прозрачный navbar.
   final double bottomPadding;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.fromLTRB(24, 24, 24, bottomPadding + 8),
-      child: EmberCta(
+      child: PathCta(
         label: 'Забронировать стол',
-        showTrailingArrow: false,
-        labelFontSize: 15.5,
-        labelOffset: const Offset(-14, 0),
         onTap: () async {
           if (!await guardAuth(context)) return;
           if (!context.mounted) return;
