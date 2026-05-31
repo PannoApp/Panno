@@ -6,6 +6,7 @@ from .throttles import PhoneSMSThrottle, SafeScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import update_last_login
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 
 from .serializers import RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer, LogoutSerializer
@@ -156,6 +157,7 @@ class VerifySMSView(APIView):
                 {'error': 'Ваш аккаунт заблокирован.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        update_last_login(None, user)
         refresh = RefreshToken.for_user(user)
 
         return Response({
