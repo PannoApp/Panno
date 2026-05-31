@@ -11,7 +11,8 @@ import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
-import '../widgets/piligrim_loader.dart';
+import '../widgets/path_cta.dart';
+import '../widgets/piligrim_cta.dart';
 import '../widgets/piligrim_tap.dart';
 import '../core/piligrim_route.dart';
 import 'booking_success_screen.dart';
@@ -490,7 +491,9 @@ class _BookingScreenState extends State<BookingScreen> {
                                       ],
                                     ),
                                     const SizedBox(height: 10),
-                                    PiligrimTap(
+                                    SecondaryCtaButton(
+                                      label: 'ПОЗВОНИТЬ МЕНЕДЖЕРУ',
+                                      height: 40,
                                       onTap: () async {
                                         final phone = context.read<CoreInfoProvider>().coreInfo?.phone ?? '';
                                         if (phone.isNotEmpty) {
@@ -500,41 +503,16 @@ class _BookingScreenState extends State<BookingScreen> {
                                           }
                                         }
                                       },
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8),
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: PiligrimColors.steppe.withValues(alpha: 0.2),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: PiligrimColors.steppe),
-                                        ),
-                                        child: Text(
-                                          'ПОЗВОНИТЬ МЕНЕДЖЕРУ',
-                                          style: PiligrimTextStyles.button.copyWith(
-                                            fontSize: 12,
-                                            color: PiligrimColors.steppe,
-                                            letterSpacing: 1.0,
-                                          ),
-                                        ),
-                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                             ],
                             const SizedBox(height: 32),
-                            booking.isSubmitting
-                                ? const SizedBox(
-                                    height: 52,
-                                    child: Center(
-                                      child: PiligrimLoader(
-                                        size: 22,
-                                        color: PiligrimColors.steppe,
-                                      ),
-                                    ),
-                                  )
-                                : _SubmitButton(onTap: _submit),
+                            PathCta(
+                              label: booking.isSubmitting ? 'ОТПРАВЛЯЕМ...' : 'ОТПРАВИТЬ ЗАЯВКУ',
+                              onTap: booking.isSubmitting ? null : _submit,
+                            ),
                             const SizedBox(height: 20),
                             Text(
                               'Важно: в приложении нет онлайн-оплаты и списания депозита.',
@@ -735,50 +713,3 @@ class _ZoneButton extends StatelessWidget {
   }
 }
 
-class _SubmitButton extends StatelessWidget {
-  const _SubmitButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PiligrimTap(
-      onTap: onTap,
-      scaleDown: 0.97,
-      releaseDuration: const Duration(milliseconds: 280),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 52,
-        width: double.infinity,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [PiligrimColors.steppe, PiligrimColors.emberDeep],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: PiligrimColors.shadow.withValues(alpha: 0.28),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-            BoxShadow(
-              color: PiligrimColors.ember.withValues(alpha: 0.12),
-              blurRadius: 10,
-              spreadRadius: -2,
-            ),
-          ],
-        ),
-        child: Text(
-          'ОТПРАВИТЬ ЗАЯВКУ',
-          style: PiligrimTextStyles.button.copyWith(
-            fontSize: 12,
-            letterSpacing: 1.8,
-            color: PiligrimColors.sky,
-          ),
-        ),
-      ),
-    );
-  }
-}

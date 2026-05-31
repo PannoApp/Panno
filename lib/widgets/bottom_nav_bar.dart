@@ -4,9 +4,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../core/theme.dart';
 import 'piligrim_tap.dart';
 
-const Color _kNavActive   = PiligrimColors.water;
-const Color _kNavInactive = PiligrimColors.navInactive;
-const Color _kNavRimTop   = PiligrimColors.navBarRim;
+const Color _kNavActive = PiligrimColors.water;
+// Тёплый янтарный песок — отсылка к Сары дала (жёлтой степи) палитры PILIGRIM.
+// На тёмном фоне читается как живой, тёплый оттенок, а не серый disabled.
+const Color _kNavInactive = Color(0xA0C4A880);
 
 const Duration _kDur   = Duration(milliseconds: 350);
 const Curve    _kCurve = Curves.easeInOutCubic;
@@ -31,42 +32,39 @@ class PiligrimNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: PiligrimColors.navBarBase,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              PiligrimColors.navBarTop,
-              PiligrimColors.navBarBase,
-              PiligrimColors.earthDeep,
-            ],
-            stops: [0.0, 0.35, 1.0],
-          ),
-          border: Border(
-            top: BorderSide(color: _kNavRimTop, width: 0.5),
-          ),
-          boxShadow: PiligrimShadows.nav,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        // Верх совпадает с earth — граница растворяется.
+        // Мягкий тёплый акцент в средней зоне: фон ощущается как материал, не как слой.
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF151210),  // = earth — нулевой разрыв с экраном
+            Color(0xFF1D1611),  // лёгкий тёплый акцент (−6R от прежнего)
+            Color(0xFF161110),  // спокойный земляной
+            Color(0xFF0D0B09),  // якорное дно
+          ],
+          stops: [0.0, 0.32, 0.66, 1.0],
         ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 7, 4, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: List.generate(_items.length, (i) {
-                final item = _items[i];
-                final active = i == currentIndex;
-                return Expanded(
-                  child: PiligrimTap(
-                    onTap: () => onTap(i),
-                    child: _NavTabCell(item: item, active: active),
-                  ),
-                );
-              }),
-            ),
+        boxShadow: PiligrimShadows.nav,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 5, 4, 0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(_items.length, (i) {
+              final item = _items[i];
+              final active = i == currentIndex;
+              return Expanded(
+                child: PiligrimTap(
+                  onTap: () => onTap(i),
+                  child: _NavTabCell(item: item, active: active),
+                ),
+              );
+            }),
           ),
         ),
       ),
@@ -89,30 +87,7 @@ class _NavTabCell extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _NavTotemIcon(asset: item.asset, active: active),
-        const SizedBox(height: 4),
-        // Индикатор активного таба — тонкая линия с glow
-        AnimatedContainer(
-          duration: _kDur,
-          curve: _kCurve,
-          height: 1.5,
-          width: active ? 20.0 : 0.0,
-          decoration: BoxDecoration(
-            color: active
-                ? _kNavActive.withValues(alpha: 0.65)
-                : PiligrimColors.clear,
-            borderRadius: BorderRadius.circular(1),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: _kNavActive.withValues(alpha: 0.30),
-                      blurRadius: 4,
-                      spreadRadius: 0,
-                    ),
-                  ]
-                : null,
-          ),
-        ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 5),
         // Подпись — плавный переход цвета и letter-spacing
         AnimatedDefaultTextStyle(
           duration: _kDur,

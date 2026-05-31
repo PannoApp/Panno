@@ -116,27 +116,34 @@ class _HomeStatusLineState extends State<HomeStatusLine>
               ),
               const SizedBox(width: 10),
               Text(
-                open ? 'Открыто' : 'Закрыто',
-                style: PiligrimTextStyles.body.copyWith(
+                open ? 'ОТКРЫТО' : 'ЗАКРЫТО',
+                style: PiligrimTextStyles.caption.copyWith(
                   color: open
                       ? PiligrimColors.water.withValues(alpha: 0.78)
                       : PiligrimColors.fruit.withValues(alpha: 0.88),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 0.2,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 1.6,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 14),
+              Container(
+                width: 1,
+                height: 9,
+                color: PiligrimColors.steppe.withValues(alpha: 0.22),
+              ),
+              const SizedBox(width: 14),
               Flexible(
                 child: Text(
                   _hours,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: PiligrimTextStyles.caption.copyWith(
                     color: PiligrimColors.sky.withValues(
-                      alpha: open ? 0.45 : 0.62,
+                      alpha: open ? 0.40 : 0.55,
                     ),
                     fontSize: 11,
+                    letterSpacing: 0.2,
                   ),
                 ),
               ),

@@ -163,12 +163,30 @@ class _ReservationCard extends StatelessWidget {
     final dateStr = _formatDate(event.startsAt);
     final timeStr = _formatTime(event.startsAt);
 
-    return Container(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
       decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: PiligrimColors.divider),
-        boxShadow: PiligrimShadows.card,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            PiligrimColors.earthWarm.withValues(alpha: 0.16),
+            PiligrimColors.earth.withValues(alpha: 0.06),
+          ],
+        ),
+        border: Border.all(
+          color: PiligrimColors.steppe.withValues(alpha: 0.14),
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: PiligrimColors.steppe.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -198,18 +216,17 @@ class _ReservationCard extends StatelessWidget {
               color: PiligrimColors.sky.withValues(alpha: 0.10),
             ),
             const SizedBox(height: 10),
-            _DetailRow(
-              icon: 'assets/images/sun.svg',
-              text: '$dateStr · $timeStr',
-            ),
-            const SizedBox(height: 6),
-            _DetailRow(
-              icon: 'assets/images/shaman.svg',
-              text: _formatGuestsCount(reservation.guestsCount),
+            Text(
+              '$dateStr  ·  $timeStr  ·  ${_formatGuestsCount(reservation.guestsCount)}',
+              style: PiligrimTextStyles.body.copyWith(
+                fontSize: 13,
+                color: PiligrimColors.sky.withValues(alpha: 0.55),
+              ),
             ),
           ],
         ),
       ),
+    ),
     )
         .animate(delay: (index * 60).ms)
         .fadeIn(duration: 400.ms)
@@ -241,40 +258,6 @@ class _ReservationCard extends StatelessWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.icon, required this.text});
-
-  final String icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SvgPicture.asset(
-          icon,
-          width: 14,
-          height: 14,
-          colorFilter: ColorFilter.mode(
-            PiligrimColors.water.withValues(alpha: 0.5),
-            BlendMode.srcIn,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: PiligrimTextStyles.body.copyWith(
-              fontSize: 13,
-              color: PiligrimColors.sky.withValues(alpha: 0.65),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _FormatBadge extends StatelessWidget {
   const _FormatBadge({required this.isPast});
 
@@ -287,21 +270,24 @@ class _FormatBadge extends StatelessWidget {
         : PiligrimColors.water;
     final label = isPast ? 'ЗАВЕРШЕНО' : 'ПРЕДСТОИТ';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Text(
-        label,
-        style: PiligrimTextStyles.caption.copyWith(
-          fontSize: 9.5,
-          color: color,
-          letterSpacing: 1.2,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         ),
-      ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: PiligrimTextStyles.caption.copyWith(
+            fontSize: 9.5,
+            color: color,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
     );
   }
 }

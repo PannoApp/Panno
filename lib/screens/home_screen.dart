@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final core = context.watch<CoreInfoProvider>();
     final size = MediaQuery.sizeOf(context);
     final heroHeight =
-        (size.height * 0.58).clamp(310.0, size.height * 0.62).roundToDouble();
+        (size.height * 0.68).clamp(330.0, size.height * 0.72).roundToDouble();
     final heroUrls = core.heroImageUrls;
     final hoursLine = core.workingHoursNote?.isNotEmpty == true
         ? '${core.workingHoursDisplay} · ${core.workingHoursNote}'

@@ -6,9 +6,9 @@ import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
 import '../providers/auth_provider.dart';
-import 'ember_cta.dart';
 import 'piligrim_background.dart';
-import 'piligrim_tap.dart';
+import 'path_cta.dart';
+import 'piligrim_cta.dart';
 
 /// Экран авторизации PILIGRIM.
 /// Бренд-блок и форма — единая вертикальная композиция, центрированная на экране.
@@ -265,13 +265,10 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
                   const SizedBox(height: 10),
 
                   // Кнопка — та же ширина, что и поле
-                  EmberCta(
+                  PathCta(
                     label: _submitting
-                        ? 'Подождите…'
+                        ? (_awaitingCode ? 'ПОДТВЕРЖДАЕМ...' : 'ОТПРАВЛЯЕМ...')
                         : (_awaitingCode ? 'ПОДТВЕРДИТЬ' : 'ПОЛУЧИТЬ КОД'),
-                    showTrailingArrow: false,
-                    small: true,
-                    labelFontSize: 13,
                     onTap: _submitting
                         ? null
                         : (_awaitingCode ? _confirmCode : _requestCode),
@@ -294,28 +291,15 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
                   if (_awaitingCode) ...[
                     const SizedBox(height: 14),
                     Center(
-                      child: PiligrimTap(
+                      child: TextCtaButton(
+                        label: 'Изменить номер',
                         onTap: () => setState(() {
                           _awaitingCode = false;
                           _codeCtrl.clear();
                           _error = null;
                         }),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          child: Text(
-                            'Изменить номер',
-                            style: PiligrimTextStyles.caption.copyWith(
-                              color:
-                                  PiligrimColors.sky.withValues(alpha: 0.28),
-                              fontSize: 12,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ).animate().fadeIn(duration: 300.ms),
+                      ).animate().fadeIn(duration: 300.ms),
+                    ),
                   ],
 
                   // Смещение вверх: group center = screen center − 40px
