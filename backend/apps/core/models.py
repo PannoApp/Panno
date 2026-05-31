@@ -58,7 +58,6 @@ class RestaurantInfo(models.Model):
 
     concept_description = models.TextField("Описание концепции", blank=True, default='')
 
-    visit_rules = models.TextField("Правила посещения", blank=True)
     privacy_policy = models.TextField("Политика обработки ПД", blank=True)
     terms_of_service = models.TextField("Пользовательское соглашение", blank=True)
 
@@ -187,6 +186,30 @@ class RestaurantInfo(models.Model):
         """Метод для получения синглтона. prefetch_related исключает N+1 при сериализации hero_slides."""
         obj, _ = cls.objects.prefetch_related('hero_slides').get_or_create(pk=1)
         return obj
+
+
+class VisitRule(models.Model):
+    """
+    Правило посещения ресторана. Привязано к RestaurantInfo (singleton).
+    Отображается в Flutter-приложении в разделе «Правила посещения».
+    """
+    restaurant_info = models.ForeignKey(
+        RestaurantInfo,
+        on_delete=models.CASCADE,
+        related_name='visit_rules',
+        verbose_name="Ресторан",
+    )
+    title = models.CharField("Название", max_length=100)
+    body = models.TextField("Текст")
+    order = models.PositiveIntegerField("Порядок", default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = "Правило посещения"
+        verbose_name_plural = "Правила посещения"
+
+    def __str__(self):
+        return self.title
 
 
 class InteriorPhoto(models.Model):

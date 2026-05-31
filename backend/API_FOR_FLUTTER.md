@@ -382,7 +382,10 @@ Navigator.of(context).push(
     "google_maps_link": "https://maps.google.com/?q=...",
     "yandex_maps_link": "https://yandex.kz/maps/?text=...",
     "feedback_url": "https://wa.me/77001234567",
-    "visit_rules": "Дресс-код: smart casual...",
+    "visit_rules": [
+      {"title": "Дресс-код", "body": "Деловой casual..."},
+      {"title": "Дети", "body": "Приветствуются до 21:00..."}
+    ],
     "privacy_policy": "Текст политики обработки ПД...",
     "terms_of_service": "Текст пользовательского соглашения..."
   }
@@ -399,7 +402,7 @@ Navigator.of(context).push(
 | `whatsapp` | WhatsApp-контакт (ссылка или номер) |
 | `telegram` | Telegram (username или ссылка) |
 | `instagram` | Instagram handle |
-| `visit_rules` | Правила посещения (для экрана "О ресторане") |
+| `visit_rules` | Правила посещения — массив объектов `{"title": "...", "body": "..."}`, отсортированных по полю `order`. Пустой список `[]` если не заполнено. |
 | `privacy_policy` | Политика обработки персональных данных (для экрана согласия) |
 | `terms_of_service` | Пользовательское соглашение |
 | `tour_link` | URL для WebView 3D-тура (`null` если не задано) |

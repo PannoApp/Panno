@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide
+from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide, VisitRule
 
 
 class HeroSlideSerializer(serializers.ModelSerializer):
@@ -16,9 +16,16 @@ class HeroSlideSerializer(serializers.ModelSerializer):
         fields = ('id', 'image', 'order')
 
 
+class VisitRuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VisitRule
+        fields = ('title', 'body')
+
+
 class RestaurantInfoSerializer(serializers.ModelSerializer):
     is_open_now = serializers.SerializerMethodField()
     hero_slides = HeroSlideSerializer(many=True, read_only=True)
+    visit_rules = VisitRuleSerializer(many=True, read_only=True)
 
     class Meta:
         model = RestaurantInfo
