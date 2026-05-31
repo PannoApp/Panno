@@ -2,6 +2,20 @@ from django.contrib.admin import ModelAdmin
 from django.contrib import admin
 from .models import UserDevice, PushCampaign
 
+try:
+    from rest_framework_simplejwt.token_blacklist.admin import (
+        BlacklistedTokenAdmin,
+        OutstandingTokenAdmin,
+    )
+    from rest_framework_simplejwt.token_blacklist.models import (
+        BlacklistedToken,
+        OutstandingToken,
+    )
+    admin.site.unregister(BlacklistedToken)
+    admin.site.unregister(OutstandingToken)
+except Exception:
+    pass
+
 
 def _is_content_or_admin(user):
     return user.is_superuser or getattr(user, 'role', '') in ('admin', 'content_manager')
@@ -25,11 +39,17 @@ class UserDeviceAdmin(ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return _is_content_or_admin(request.user)
 
-    list_display = ('user', 'created_at')
+    list_display = ('user', 'created_at', 'updated_at')
     list_filter = ('created_at',)
     search_fields = ('user__phone',)
-    readonly_fields = ('created_at',)
-    exclude = ('fcm_token',)
+    readonly_fields = ('user', 'created_at', 'updated_at')
+    fields = ('user', 'created_at', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 from django import forms
