@@ -10,7 +10,8 @@ import 'ember_cta.dart';
 import 'piligrim_background.dart';
 import 'piligrim_tap.dart';
 
-/// Unified centered authentication view widget used in both booking and profile tabs.
+/// Экран авторизации PILIGRIM.
+/// Бренд-блок и форма — единая вертикальная композиция, центрированная на экране.
 class PiligrimAuthView extends StatefulWidget {
   const PiligrimAuthView({
     super.key,
@@ -84,185 +85,242 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
 
   @override
   Widget build(BuildContext context) {
+    final mediaPadding = MediaQuery.paddingOf(context);
+    final screenHeight = MediaQuery.sizeOf(context).height;
     final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
+
+    // Высота экрана без safe area — для ConstrainedBox чтобы Column.center работал
+    final availableHeight =
+        screenHeight - mediaPadding.top - mediaPadding.bottom;
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        const PiligrimBackground(
-          cinematic: true,
-          textureOpacity: 0.38,
-          vignetteIntensity: 0.18,
-        ),
+        // ── Фон ────────────────────────────────────────────────────────────
+        const PiligrimBackground(cinematic: true),
         const Positioned.fill(child: _AuthAtmosphere()),
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
-          height: 280,
+          height: 260,
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
                 colors: [
-                  PiligrimColors.ember.withValues(alpha: 0.08),
-                  PiligrimColors.steppe.withValues(alpha: 0.03),
+                  PiligrimColors.ember.withValues(alpha: 0.07),
                   PiligrimColors.clear,
                 ],
-                stops: const [0.0, 0.5, 1.0],
               ),
             ),
           ),
         ),
-        SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(28, 48, 28, keyboardHeight + 32),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // ── Логотип ──────────────────────────────────────────
-                    SvgPicture.asset(
-                      'assets/images/star_totem (1).svg',
-                      width: 28,
-                      height: 28,
-                      colorFilter: const ColorFilter.mode(
-                        PiligrimColors.sky,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 24,
-                      color: PiligrimColors.sky.withValues(alpha: 0.25),
-                    ),
-                    const SizedBox(height: 10),
-                    SvgPicture.asset(
-                      'assets/images/piligrim.svg',
-                      width: 140,
-                      colorFilter: const ColorFilter.mode(
-                        PiligrimColors.sky,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
 
-                    // ── Форма авторизации ─────────────────────────────────
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Подпись
-                        Text(
-                          _awaitingCode
-                              ? 'Код отправлен на ${_phoneCtrl.text.trim()}'
-                              : 'Сначала нужно авторизоваться',
-                          style: PiligrimTextStyles.body.copyWith(
-                            color: PiligrimColors.sky.withValues(alpha: 0.45),
-                            fontSize: 13,
-                            height: 1.55,
-                          ),
-                        ).animate().fadeIn(duration: 400.ms),
-                        if (_error != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            _error!,
-                            style: PiligrimTextStyles.body.copyWith(
-                              fontSize: 13,
-                              color: PiligrimColors.ember,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 14),
-                        // Поле ввода
-                        TextField(
-                          controller: _awaitingCode ? _codeCtrl : _phoneCtrl,
-                          keyboardType: _awaitingCode
-                              ? TextInputType.number
-                              : TextInputType.phone,
-                          maxLength: _awaitingCode ? 4 : null,
-                          inputFormatters: _awaitingCode
-                              ? [FilteringTextInputFormatter.digitsOnly]
-                              : [
-                                  FilteringTextInputFormatter.allow(
-                                      RegExp(r'[\d+\s\-()]')),
-                                ],
-                          style: PiligrimTextStyles.body.copyWith(
-                            color: PiligrimColors.sky,
-                            fontSize: 16,
-                            letterSpacing: _awaitingCode ? 4 : 0,
-                          ),
-                          cursorColor: PiligrimColors.water,
-                          decoration: InputDecoration(
-                            hintText: _awaitingCode ? '0000' : '+7 7XX XXX XX XX',
-                            hintStyle: PiligrimTextStyles.body.copyWith(
-                              color: PiligrimColors.sky.withValues(alpha: 0.30),
-                              fontSize: 15,
-                              letterSpacing: 0,
-                            ),
-                            counterText: '',
-                            filled: true,
-                            fillColor: PiligrimColors.earthWarm.withValues(alpha: 0.35),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(
-                                color: PiligrimColors.sky.withValues(alpha: 0.12),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(
-                                color: PiligrimColors.water,
-                                width: 1,
-                              ),
-                            ),
-                          ),
+        // ── Единая центрированная композиция ─────────────────────────────
+        SafeArea(
+          child: SingleChildScrollView(
+            // Когда клавиатура поднимается — добавляем отступ, чтобы
+            // поле и кнопка не скрывались за ней.
+            padding: EdgeInsets.fromLTRB(
+              24,
+              0,
+              24,
+              keyboardHeight > 0 ? keyboardHeight + 16 : 0,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: availableHeight),
+              child: Column(
+                // center распределяет свободное пространство поровну сверху
+                // и снизу. SizedBox(80) в конце смещает всю группу на 40px
+                // выше геометрического центра — без Spacer (он ломает ScrollView).
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Бренд-блок ─────────────────────────────────────────
+                  const Center(child: _BrandPillar()),
+
+                  const SizedBox(height: 20),
+
+                  // Короткий типографский орнамент — соединяет бренд с формой,
+                  // не делит экран на зоны
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 1,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            PiligrimColors.clear,
+                            PiligrimColors.sky.withValues(alpha: 0.14),
+                            PiligrimColors.clear,
+                          ],
                         ),
-                        const SizedBox(height: 14),
-                        // Кнопка
-                        EmberCta(
-                          label: _submitting
-                              ? 'Подождите…'
-                              : (_awaitingCode ? 'ПОДТВЕРДИТЬ' : 'ПОЛУЧИТЬ КОД'),
-                          showTrailingArrow: false,
-                          onTap: _submitting
-                              ? null
-                              : (_awaitingCode ? _confirmCode : _requestCode),
-                        ),
-                        // Изменить номер
-                        if (_awaitingCode) ...[
-                          const SizedBox(height: 12),
-                          Center(
-                            child: PiligrimTap(
-                              onTap: () => setState(() {
-                                _awaitingCode = false;
-                                _codeCtrl.clear();
-                                _error = null;
-                              }),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                child: Text(
-                                  'Изменить номер',
-                                  style: PiligrimTextStyles.caption.copyWith(
-                                    color: PiligrimColors.sky.withValues(alpha: 0.30),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                      ],
+                      ),
                     ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Форма ──────────────────────────────────────────────
+
+                  // Мини-заголовок
+                  AnimatedSwitcher(
+                    duration: 280.ms,
+                    child: Text(
+                      _awaitingCode ? 'ВВЕДИТЕ КОД' : 'НАЧАТЬ ПУТЬ',
+                      key: ValueKey('headline_$_awaitingCode'),
+                      textAlign: TextAlign.center,
+                      style: PiligrimTextStyles.caption.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.35),
+                        fontSize: 9,
+                        letterSpacing: 6,
+                        fontWeight: FontWeight.w300,
+                        height: 1.0,
+                      ),
+                    ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
+
+                  if (_awaitingCode) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _phoneCtrl.text.trim(),
+                      textAlign: TextAlign.center,
+                      style: PiligrimTextStyles.caption.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.28),
+                        fontSize: 11,
+                        letterSpacing: 0.5,
+                      ),
+                    ).animate().fadeIn(duration: 350.ms, delay: 280.ms),
                   ],
-                ),
+
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: PiligrimTextStyles.caption.copyWith(
+                        fontSize: 12,
+                        color: PiligrimColors.ember,
+                        height: 1.5,
+                        letterSpacing: 0.2,
+                      ),
+                    ).animate().fadeIn(duration: 250.ms),
+                  ],
+
+                  const SizedBox(height: 14),
+
+                  // Поле ввода
+                  TextField(
+                    controller: _awaitingCode ? _codeCtrl : _phoneCtrl,
+                    keyboardType: _awaitingCode
+                        ? TextInputType.number
+                        : TextInputType.phone,
+                    maxLength: _awaitingCode ? 4 : null,
+                    inputFormatters: _awaitingCode
+                        ? [FilteringTextInputFormatter.digitsOnly]
+                        : [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[\d+\s\-()]')),
+                          ],
+                    textAlign:
+                        _awaitingCode ? TextAlign.center : TextAlign.start,
+                    style: PiligrimTextStyles.body.copyWith(
+                      color: PiligrimColors.sky,
+                      fontSize: 16,
+                      letterSpacing: _awaitingCode ? 6 : 0,
+                    ),
+                    cursorColor: PiligrimColors.water,
+                    decoration: InputDecoration(
+                      hintText:
+                          _awaitingCode ? '0  0  0  0' : '+7 7XX XXX XX XX',
+                      hintStyle: PiligrimTextStyles.body.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.25),
+                        fontSize: 15,
+                        letterSpacing: 0,
+                      ),
+                      counterText: '',
+                      filled: true,
+                      fillColor:
+                          PiligrimColors.earthWarm.withValues(alpha: 0.32),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 15),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: PiligrimColors.sky.withValues(alpha: 0.10),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: PiligrimColors.water,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
+
+                  const SizedBox(height: 10),
+
+                  // Кнопка — та же ширина, что и поле
+                  EmberCta(
+                    label: _submitting
+                        ? 'Подождите…'
+                        : (_awaitingCode ? 'ПОДТВЕРДИТЬ' : 'ПОЛУЧИТЬ КОД'),
+                    showTrailingArrow: false,
+                    small: true,
+                    labelFontSize: 13,
+                    onTap: _submitting
+                        ? null
+                        : (_awaitingCode ? _confirmCode : _requestCode),
+                  ).animate().fadeIn(duration: 400.ms, delay: 360.ms),
+
+                  if (!_awaitingCode) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Номер используется только\nдля бронирований и участия в событиях',
+                      textAlign: TextAlign.center,
+                      style: PiligrimTextStyles.caption.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.20),
+                        fontSize: 11,
+                        height: 1.6,
+                        letterSpacing: 0.2,
+                      ),
+                    ).animate().fadeIn(duration: 400.ms, delay: 420.ms),
+                  ],
+
+                  if (_awaitingCode) ...[
+                    const SizedBox(height: 14),
+                    Center(
+                      child: PiligrimTap(
+                        onTap: () => setState(() {
+                          _awaitingCode = false;
+                          _codeCtrl.clear();
+                          _error = null;
+                        }),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: Text(
+                            'Изменить номер',
+                            style: PiligrimTextStyles.caption.copyWith(
+                              color:
+                                  PiligrimColors.sky.withValues(alpha: 0.28),
+                              fontSize: 12,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ).animate().fadeIn(duration: 300.ms),
+                  ],
+
+                  // Смещение вверх: group center = screen center − 40px
+                  const SizedBox(height: 80),
+                ],
               ),
             ),
           ),
@@ -272,6 +330,73 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
   }
 }
 
+// ── Бренд-блок: ✦ → ось → PILIGRIM → MODERN NOMAD ──────────────────────────
+// Размеры откалиброваны под единую композицию с формой:
+// звезда 40px, ось 72px, лого 190px.
+class _BrandPillar extends StatelessWidget {
+  const _BrandPillar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Звезда: 40px — держит верх, не доминирует
+        SvgPicture.asset(
+          'assets/images/star_totem (1).svg',
+          width: 40,
+          height: 40,
+          colorFilter: ColorFilter.mode(
+            PiligrimColors.sky.withValues(alpha: 0.85),
+            BlendMode.srcIn,
+          ),
+        ).animate().fadeIn(duration: 600.ms, delay: 80.ms),
+
+        // Ось: 72px — пропорциональна новым размерам
+        Container(
+          width: 1,
+          height: 72,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                PiligrimColors.sky.withValues(alpha: 0.22),
+                PiligrimColors.sky.withValues(alpha: 0.05),
+              ],
+            ),
+          ),
+        ).animate().fadeIn(duration: 700.ms, delay: 160.ms),
+
+        // Логотип: 190px — главный элемент, не перевешивает композицию
+        SvgPicture.asset(
+          'assets/images/piligrim.svg',
+          width: 190,
+          colorFilter: ColorFilter.mode(
+            PiligrimColors.sky.withValues(alpha: 0.88),
+            BlendMode.srcIn,
+          ),
+        ).animate().fadeIn(duration: 600.ms, delay: 280.ms),
+
+        const SizedBox(height: 16),
+
+        // Философия бренда
+        Text(
+          'MODERN NOMAD',
+          style: PiligrimTextStyles.caption.copyWith(
+            color: PiligrimColors.sky.withValues(alpha: 0.28),
+            fontSize: 9,
+            letterSpacing: 7,
+            fontWeight: FontWeight.w300,
+            height: 1.0,
+          ),
+        ).animate().fadeIn(duration: 500.ms, delay: 400.ms),
+      ],
+    );
+  }
+}
+
+// ── Атмосферные слои фона ────────────────────────────────────────────────────
 class _AuthAtmosphere extends StatelessWidget {
   const _AuthAtmosphere();
 
@@ -286,27 +411,27 @@ class _AuthAtmosphere extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: const [0.0, 0.35, 0.72, 1.0],
+                stops: const [0.0, 0.40, 0.75, 1.0],
                 colors: [
-                  PiligrimColors.ember.withValues(alpha: 0.06),
+                  PiligrimColors.ember.withValues(alpha: 0.05),
                   PiligrimColors.clear,
-                  PiligrimColors.earthWarm.withValues(alpha: 0.12),
-                  PiligrimColors.earthSurface.withValues(alpha: 0.55),
+                  PiligrimColors.earthWarm.withValues(alpha: 0.10),
+                  PiligrimColors.earthSurface.withValues(alpha: 0.50),
                 ],
               ),
             ),
           ),
           Positioned(
-            left: -60,
-            top: MediaQuery.sizeOf(context).height * 0.12,
+            left: -80,
+            top: MediaQuery.sizeOf(context).height * 0.10,
             child: Container(
-              width: 220,
-              height: 220,
+              width: 240,
+              height: 240,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    PiligrimColors.steppe.withValues(alpha: 0.10),
+                    PiligrimColors.steppe.withValues(alpha: 0.08),
                     PiligrimColors.clear,
                   ],
                 ),
@@ -314,31 +439,19 @@ class _AuthAtmosphere extends StatelessWidget {
             ),
           ),
           Positioned(
-            right: -40,
-            bottom: MediaQuery.sizeOf(context).height * 0.18,
+            right: -50,
+            bottom: MediaQuery.sizeOf(context).height * 0.16,
             child: Container(
-              width: 180,
-              height: 180,
+              width: 200,
+              height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    PiligrimColors.ember.withValues(alpha: 0.07),
+                    PiligrimColors.ember.withValues(alpha: 0.06),
                     PiligrimColors.clear,
                   ],
                 ),
-              ),
-            ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(0.5, -0.2),
-                radius: 1.1,
-                colors: [
-                  PiligrimColors.clear,
-                  PiligrimColors.shadow.withValues(alpha: 0.35),
-                ],
               ),
             ),
           ),
