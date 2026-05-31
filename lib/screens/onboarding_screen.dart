@@ -9,8 +9,8 @@ import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/ember_cta.dart';
 import '../widgets/piligrim_background.dart';
+import '../widgets/path_cta.dart';
 import '../widgets/piligrim_tap.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -179,17 +179,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 48),
 
                 // ── CTA — «Начать путь» ──────────────────────────────────────
-                _loading
-                    ? const _TotemPulseLoader()
-                    : EmberCta(
-                        label: 'НАЧАТЬ ПУТЬ',
-                        showTrailingArrow: false,
-                        onTap: _onStart,
-                      )
-                        .animate()
-                        .fadeIn(delay: 540.ms, duration: 600.ms)
-                        .slideY(begin: 0.06, end: 0, duration: 600.ms,
-                            curve: Curves.easeOutCubic),
+                PathCta(
+                  label: _loading ? 'ЗАГРУЖАЕМ...' : 'НАЧАТЬ ПУТЬ',
+                  onTap: _loading ? null : _onStart,
+                )
+                    .animate()
+                    .fadeIn(delay: 540.ms, duration: 600.ms)
+                    .slideY(begin: 0.06, end: 0, duration: 600.ms,
+                        curve: Curves.easeOutCubic),
                 const SizedBox(height: 20),
 
                 // ── Подсказка «пропустить» ───────────────────────────────────

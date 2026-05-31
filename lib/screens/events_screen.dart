@@ -360,17 +360,6 @@ class _EventListCard extends StatelessWidget {
     return 'от $formatted ₸';
   }
 
-  String _dateBadgeText() {
-    final d = event.startsAt;
-    final m = const [
-      'ЯНВ', 'ФЕВ', 'МАР', 'АПР', 'МАЙ', 'ИЮН',
-      'ИЮЛ', 'АВГ', 'СЕН', 'ОКТ', 'НОЯ', 'ДЕК',
-    ][d.month - 1];
-    final hh = d.hour.toString().padLeft(2, '0');
-    final mm = d.minute.toString().padLeft(2, '0');
-    return '${d.day} $m · $hh:$mm';
-  }
-
   @override
   Widget build(BuildContext context) {
     final isOpen = event.format == ApiEventFormat.open;
@@ -416,13 +405,6 @@ class _EventListCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-
-                // Water-pill даты (top-left)
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: _DateBadge(text: _dateBadgeText()),
                 ),
 
                 // Format-badge (top-right) + кнопка редактирования рядом для админа
@@ -499,41 +481,6 @@ class _EventListCard extends StatelessWidget {
     Navigator.of(context).push(PiligrimPageRoute<void>(
       builder: (_) => EventEditScreen(event: event),
     ));
-  }
-}
-
-// Water-pill даты на обложке мероприятия.
-class _DateBadge extends StatelessWidget {
-  const _DateBadge({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: PiligrimColors.cardOverlay,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: PiligrimColors.water.withValues(alpha: 0.38),
-          width: 0.75,
-        ),
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.fade,
-        softWrap: false,
-        textAlign: TextAlign.center,
-        style: PiligrimTextStyles.micro.copyWith(
-          color: PiligrimColors.sky.withValues(alpha: 0.92),
-          letterSpacing: 0.6,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
   }
 }
 
@@ -950,143 +897,159 @@ class _PhotoReportChip extends StatelessWidget {
   }
 }
 
-// Карточка новости — steppe-accent line, steppe-dot перед title,
-// тонкий sky-divider между датой и body.
-class _NewsCard extends StatelessWidget {
+// Карточка новости — редакционный стиль: image full-bleed, текст на фоне приложения.
+class _NewsCard extends StatefulWidget {
   const _NewsCard({required this.post, required this.isAdmin});
   final PiligrimNewsPost post;
   final bool isAdmin;
 
   @override
+  State<_NewsCard> createState() => _NewsCardState();
+}
+
+class _NewsCardState extends State<_NewsCard> {
+  bool _expanded = false;
+
+  static const _previewLines = 3;
+  static const _previewThreshold = 120;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: PiligrimColors.divider),
-        boxShadow: PiligrimShadows.card,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Stack(
-          clipBehavior: Clip.hardEdge,
+    final post = widget.post;
+    final hasImage = post.imageUrl != null && post.imageUrl!.isNotEmpty;
+    final bodyLong = post.body.length > _previewThreshold;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Обложка full-bleed с градиентом, как у карточек событий
+        if (hasImage)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 1.8,
+                  child: PiligrimNetworkOrAssetImage(
+                    source: post.imageUrl!,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x00000000),
+                          Color(0x00000000),
+                          Color(0x880E0B09),
+                          Color(0xCC0E0B09),
+                        ],
+                        stops: [0.0, 0.4, 0.75, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                if (widget.isAdmin)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: _AdminEditButton(
+                      onTap: () => _openNewsEdit(context, post),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 14),
+
+        // Заголовок со steppe-dot
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-              child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (post.imageUrl != null &&
-                          post.imageUrl!.isNotEmpty) ...[
-                        ClipRRect(
-                          borderRadius: PiligrimRadius.smAll,
-                          child: Stack(
-                            children: [
-                              PiligrimNetworkOrAssetImage(
-                                source: post.imageUrl!,
-                                width: double.infinity,
-                                height: 180,
-                                fit: BoxFit.cover,
-                              ),
-                              // Лёгкий gradient bottom-overlay для глубины
-                              Positioned(
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                height: 60,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        PiligrimColors.earthDeep
-                                            .withValues(alpha: 0.0),
-                                        PiligrimColors.earthDeep
-                                            .withValues(alpha: 0.55),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-                      // Title со steppe-dot префиксом
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 9, right: 8),
-                            child: Container(
-                              width: 4,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: PiligrimColors.steppe
-                                    .withValues(alpha: 0.78),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              post.title,
-                              style: PiligrimTextStyles.heading.copyWith(
-                                fontSize: 17,
-                                height: 1.3,
-                                color: PiligrimColors.sky,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Дата + mini hairline-divider
-                      Row(
-                        children: [
-                          Text(
-                            formatShortDateRu(post.publishedAt),
-                            style: PiligrimTextStyles.caption.copyWith(
-                              color: PiligrimColors.water
-                                  .withValues(alpha: 0.85),
-                              fontSize: 12,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            width: 20,
-                            height: 1,
-                            color: PiligrimColors.sky.withValues(alpha: 0.10),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        post.body,
-                        style: PiligrimTextStyles.body.copyWith(
-                          fontSize: 14,
-                          height: 1.6,
-                          color: PiligrimColors.sky.withValues(alpha: 0.88),
-                        ),
-                      ),
-                    ],
-              ),
-            ),
-            // Кнопка редактирования — показывается только администратору
-            if (isAdmin)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: _AdminEditButton(
-                  onTap: () => _openNewsEdit(context, post),
+              padding: const EdgeInsets.only(top: 9, right: 8),
+              child: Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: PiligrimColors.steppe.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
+            ),
+            Expanded(
+              child: Text(
+                post.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: PiligrimTextStyles.heading.copyWith(
+                  fontSize: 18,
+                  height: 1.28,
+                  color: PiligrimColors.sky,
+                ),
+              ),
+            ),
+            if (widget.isAdmin && !hasImage)
+              _AdminEditButton(onTap: () => _openNewsEdit(context, post)),
           ],
         ),
-      ),
+
+        const SizedBox(height: 6),
+
+        // Дата
+        Text(
+          formatShortDateRu(post.publishedAt),
+          style: PiligrimTextStyles.caption.copyWith(
+            color: PiligrimColors.water.withValues(alpha: 0.85),
+            fontSize: 12,
+            letterSpacing: 0.3,
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // Превью тела — 3 строки, раскрывается по кнопке
+        Text(
+          post.body,
+          maxLines: _expanded ? null : _previewLines,
+          overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          style: PiligrimTextStyles.body.copyWith(
+            fontSize: 14,
+            height: 1.62,
+            color: PiligrimColors.sky.withValues(alpha: 0.72),
+          ),
+        ),
+
+        if (bodyLong && !_expanded)
+          GestureDetector(
+            onTap: () => setState(() => _expanded = true),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Читать далее →',
+                style: PiligrimTextStyles.caption.copyWith(
+                  color: PiligrimColors.water,
+                  fontSize: 13,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ),
+
+        // Hairline-разделитель между карточками
+        Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: Container(
+            height: 0.5,
+            color: PiligrimColors.sky.withValues(alpha: 0.08),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1222,7 +1185,7 @@ class _NewsLoadingSkeleton extends StatelessWidget {
           for (var i = 0; i < 2; i++)
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
-              child: _SkeletonRow(height: 110, delayMs: i * 120),
+              child: _SkeletonRow(height: 220, delayMs: i * 120),
             ),
         ],
       ),

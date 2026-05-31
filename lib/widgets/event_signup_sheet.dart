@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../data/models/api_event.dart';
 import '../providers/events_provider.dart';
-import 'piligrim_tap.dart';
+import 'path_cta.dart';
 
 /// Отображает модальное окно (bottom sheet) для записи на мероприятие
 Future<void> showEventSignupSheet(
@@ -184,56 +184,9 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                SizedBox(
-                  height: 52,
-                  child: PiligrimTap(
-                    onTap: _submitting || _guestsCount < 1 ? null : _submit,
-                    borderRadius: BorderRadius.circular(12),
-                    scaleDown: 0.97,
-                    releaseDuration: const Duration(milliseconds: 280),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: (_submitting || _guestsCount < 1)
-                            ? null
-                            : const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  PiligrimColors.steppe,
-                                  PiligrimColors.emberDeep,
-                                ],
-                              ),
-                        color: (_submitting || _guestsCount < 1)
-                            ? PiligrimColors.earthDeep
-                            : null,
-                        boxShadow: (_submitting || _guestsCount < 1)
-                            ? null
-                            : [
-                                BoxShadow(
-                                  color: PiligrimColors.shadow
-                                      .withValues(alpha: 0.28),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 5),
-                                ),
-                                BoxShadow(
-                                  color: PiligrimColors.ember
-                                      .withValues(alpha: 0.12),
-                                  blurRadius: 10,
-                                  spreadRadius: -2,
-                                ),
-                              ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _submitting ? 'Отправляем…' : 'ЗАПИСАТЬСЯ',
-                        style: PiligrimTextStyles.button.copyWith(
-                          fontSize: 15,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
+                PathCta(
+                  label: _submitting ? 'ЗАПИСЫВАЕМ...' : 'ЗАПИСАТЬСЯ',
+                  onTap: _submitting || _guestsCount < 1 ? null : _submit,
                 ),
               ],
             ),

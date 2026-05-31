@@ -12,6 +12,7 @@ import '../widgets/event_photo_report_gallery.dart';
 import '../widgets/event_signup_sheet.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
+import '../widgets/path_cta.dart';
 import '../core/auth_guard.dart';
 import '../widgets/piligrim_tap.dart';
 
@@ -127,7 +128,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 140),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     Text(
@@ -305,26 +306,58 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               ),
             ],
           ),
-        ],
-      ),
-      bottomNavigationBar: event.isPast
-          ? null
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                child: _EventSignupCta(
-                  isFull: event.maxPlaces > 0 && event.occupiedPlaces >= event.maxPlaces,
-                  onTap: () async {
-                    if (!await guardAuth(context)) return;
-                    if (!context.mounted) return;
-                    await showEventSignupSheet(
-                      context,
-                      event: event,
-                    );
-                  },
-                ),
+          if (!event.isPast)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _CtaOverlay(
+                event: event,
+                onTap: () async {
+                  if (!await guardAuth(context)) return;
+                  if (!context.mounted) return;
+                  await showEventSignupSheet(context, event: event);
+                },
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CtaOverlay extends StatelessWidget {
+  const _CtaOverlay({required this.event, required this.onTap});
+  final ApiEvent event;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isFull = event.maxPlaces > 0 &&
+        event.occupiedPlaces >= event.maxPlaces;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            PiligrimColors.earth.withValues(alpha: 0.0),
+            PiligrimColors.earth.withValues(alpha: 0.88),
+            PiligrimColors.earth,
+          ],
+          stops: const [0.0, 0.28, 1.0],
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+          child: PathCta(
+            label: isFull ? 'МЕСТ НЕТ' : 'ЗАПИСАТЬСЯ',
+            onTap: isFull ? null : onTap,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -381,103 +414,6 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
-// Главный CTA «ЗАПИСАТЬСЯ» — water gradient + rim-highlight + water-tinted shadow.
-// По мотиву EmberCta, но в холодном water-цвете (сервисное действие, не финальное).
-class _EventSignupCta extends StatelessWidget {
-  const _EventSignupCta({
-    required this.onTap,
-    this.isFull = false,
-  });
-
-  final VoidCallback? onTap;
-  final bool isFull;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: PiligrimTap(
-        onTap: isFull ? null : onTap,
-        borderRadius: BorderRadius.circular(12),
-        scaleDown: isFull ? 1.0 : 0.965,
-        releaseDuration: const Duration(milliseconds: 320),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: isFull
-                ? PiligrimColors.earthDeep.withValues(alpha: 0.8)
-                : null,
-            gradient: isFull
-                ? null
-                : const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      PiligrimColors.steppe,
-                      PiligrimColors.emberDeep,
-                    ],
-                  ),
-            border: isFull
-                ? Border.all(
-                    color: PiligrimColors.steppe.withValues(alpha: 0.3),
-                    width: 1,
-                  )
-                : null,
-            boxShadow: isFull
-                ? null
-                : [
-                    BoxShadow(
-                      color: PiligrimColors.shadow.withValues(alpha: 0.28),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                    BoxShadow(
-                      color: PiligrimColors.ember.withValues(alpha: 0.12),
-                      blurRadius: 10,
-                      spreadRadius: -2,
-                    ),
-                  ],
-          ),
-          child: Stack(
-            children: [
-              Center(
-                child: Text(
-                  isFull ? 'МЕСТ НЕТ' : 'ЗАПИСАТЬСЯ',
-                  style: PiligrimTextStyles.button.copyWith(
-                    fontSize: 14.5,
-                    letterSpacing: 1.6,
-                    color: isFull
-                        ? PiligrimColors.sky.withValues(alpha: 0.4)
-                        : PiligrimColors.sky,
-                  ),
-                ),
-              ),
-              if (!isFull)
-                Positioned(
-                  top: 0,
-                  left: 18,
-                  right: 18,
-                  child: Container(
-                    height: 0.75,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(1),
-                      gradient: LinearGradient(
-                        colors: [
-                          PiligrimColors.sky.withValues(alpha: 0.0),
-                          PiligrimColors.sky.withValues(alpha: 0.22),
-                          PiligrimColors.sky.withValues(alpha: 0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _PhotoReportSkeleton extends StatelessWidget {
   const _PhotoReportSkeleton();

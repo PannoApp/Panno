@@ -157,13 +157,33 @@ class _BookingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final badge = _StatusBadge.forStatus(booking.status);
+    final time = _trimTime(booking.time);
+    final detailLine = [time, _formatHeroesCount(booking.guestsCount)].join('  ·  ');
 
-    return Container(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
       decoration: BoxDecoration(
-        color: PiligrimColors.earthDeep,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: PiligrimColors.divider),
-        boxShadow: PiligrimShadows.card,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            PiligrimColors.earthWarm.withValues(alpha: 0.16),
+            PiligrimColors.earth.withValues(alpha: 0.06),
+          ],
+        ),
+        border: Border.all(
+          color: PiligrimColors.steppe.withValues(alpha: 0.14),
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: PiligrimColors.steppe.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -190,27 +210,28 @@ class _BookingCard extends StatelessWidget {
               color: PiligrimColors.sky.withValues(alpha: 0.10),
             ),
             const SizedBox(height: 10),
-
-            // Детали
-            _DetailRow(
-              icon: 'assets/images/sun.svg',
-              text: booking.time,
-            ),
-            const SizedBox(height: 6),
-            _DetailRow(
-              icon: 'assets/images/shaman.svg',
-              text: _formatHeroesCount(booking.guestsCount),
-            ),
             if (booking.zone != null) ...[
-              const SizedBox(height: 6),
-              _DetailRow(
-                icon: 'assets/images/star_totem (1).svg',
-                text: _localizeZone(booking.zone!),
+              Text(
+                _localizeZone(booking.zone!),
+                style: PiligrimTextStyles.heading.copyWith(
+                  fontSize: 14,
+                  color: PiligrimColors.sky,
+                  letterSpacing: 0.2,
+                ),
               ),
+              const SizedBox(height: 5),
             ],
+            Text(
+              detailLine,
+              style: PiligrimTextStyles.body.copyWith(
+                fontSize: 12,
+                color: PiligrimColors.sky.withValues(alpha: 0.42),
+              ),
+            ),
           ],
         ),
       ),
+    ),
     )
         .animate(delay: (index * 60).ms)
         .fadeIn(duration: 400.ms)
@@ -235,6 +256,12 @@ class _BookingCard extends StatelessWidget {
     }
   }
 
+  String _trimTime(String time) {
+    final parts = time.split(':');
+    if (parts.length >= 2) return '${parts[0]}:${parts[1]}';
+    return time;
+  }
+
   String _localizeZone(String zone) {
     switch (zone.toLowerCase()) {
       case 'main':
@@ -246,41 +273,6 @@ class _BookingCard extends StatelessWidget {
       default:
         return zone;
     }
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Строка деталей с иконкой
-// ─────────────────────────────────────────────────────────────────────────────
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.icon, required this.text});
-
-  final String icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SvgPicture.asset(
-          icon,
-          width: 14,
-          height: 14,
-          colorFilter: ColorFilter.mode(
-            PiligrimColors.water.withValues(alpha: 0.5),
-            BlendMode.srcIn,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          text,
-          style: PiligrimTextStyles.body.copyWith(
-            fontSize: 13,
-            color: PiligrimColors.sky.withValues(alpha: 0.65),
-          ),
-        ),
-      ],
-    );
   }
 }
 
@@ -321,21 +313,24 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: PiligrimTextStyles.caption.copyWith(
-          fontSize: 9.5,
-          color: color,
-          letterSpacing: 1.2,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         ),
-      ),
+        const SizedBox(width: 6),
+        Text(
+          label.toUpperCase(),
+          style: PiligrimTextStyles.caption.copyWith(
+            fontSize: 9.5,
+            color: color,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
     );
   }
 }

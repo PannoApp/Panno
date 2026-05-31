@@ -16,6 +16,7 @@ import '../data/models/core_info.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../providers/core_info_provider.dart';
+import '../widgets/path_cta.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_delete_account_dialog.dart';
 import '../widgets/piligrim_section_header.dart';
@@ -411,33 +412,9 @@ class _HeroHeaderState extends State<_HeroHeader> {
                 const SizedBox(height: 16),
 
                 if (!widget.isLoggedIn)
-                  PiligrimTap(
-                    borderRadius: BorderRadius.circular(8),
+                  PathCta(
+                    label: 'НАЧАТЬ ПУТЬ',
                     onTap: widget.onStartJourney,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 9),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            PiligrimColors.steppe.withValues(alpha: 0.25),
-                            PiligrimColors.steppe.withValues(alpha: 0.1),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: PiligrimColors.steppe.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Text(
-                        'НАЧАТЬ ПУТЬ',
-                        style: PiligrimTextStyles.button.copyWith(
-                          color: PiligrimColors.steppe,
-                          fontSize: 12,
-                          letterSpacing: 2.0,
-                        ),
-                      ),
-                    ),
                   ).animate().fadeIn(delay: 400.ms, duration: 600.ms),
               ],
             ),
