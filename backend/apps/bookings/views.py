@@ -464,12 +464,12 @@ class TelegramWebhookView(View):
                 cache.delete(cache_key)
 
                 from datetime import datetime
+                from zoneinfo import ZoneInfo
                 from django.utils import timezone
-                import pytz
                 from decimal import Decimal
                 from apps.events.models import Event
 
-                tz = pytz.timezone('Asia/Almaty')
+                tz = ZoneInfo('Asia/Almaty')
                 naive_dt = datetime.strptime(datetime_str, '%d.%m.%Y %H:%M')
                 dt_obj = timezone.make_aware(naive_dt, timezone=tz)
 
@@ -866,12 +866,12 @@ class TelegramWebhookView(View):
 
         elif state == 'waiting_for_event_datetime':
             from datetime import datetime
+            from zoneinfo import ZoneInfo
             from django.utils import timezone
-            import pytz
 
             try:
                 naive_dt = datetime.strptime(text, '%d.%m.%Y %H:%M')
-                tz = pytz.timezone('Asia/Almaty')
+                tz = ZoneInfo('Asia/Almaty')
                 timezone.make_aware(naive_dt, timezone=tz)
             except ValueError:
                 _tg_post('sendMessage', {

@@ -11,7 +11,7 @@ from rest_framework.test import APITestCase
 import sys
 from unittest.mock import MagicMock as _MagicMock
 
-from .models import Category, Dish, Tag, Allergen
+from apps.menu.models import Category, Dish, Tag, Allergen
 
 # ffmpeg доступен только внутри Docker-образа (собранного с ffmpeg-python).
 # Заглушаем его здесь, чтобы apps.menu.tasks импортировался без нативного бинарника.
@@ -567,7 +567,7 @@ class ProcessDishVideoTaskTest(TestCase):
         self.dish.refresh_from_db()
 
     def test_handles_nonexistent_dish_silently(self):
-        from .tasks import process_dish_video
+        from apps.menu.tasks import process_dish_video
         result = process_dish_video.apply(args=[99999]).get()
         self.assertIsNone(result)
 
@@ -589,7 +589,7 @@ class ProcessDishVideoTaskTest(TestCase):
                           return_value='/fake/src.mp4'):
             with patch.object(self.dish.video_processed, 'save'):
                 with patch('apps.menu.models.Dish.objects.get', return_value=self.dish):
-                    from .tasks import process_dish_video
+                    from apps.menu.tasks import process_dish_video
                     process_dish_video.apply(args=[self.dish.pk]).get()
 
         self.dish.refresh_from_db()
@@ -619,7 +619,7 @@ class ProcessDishVideoTaskTest(TestCase):
         with patch.object(type(self.dish.video), 'path', new_callable=PropertyMock,
                           return_value='/fake/src.mp4'):
             with patch('apps.menu.models.Dish.objects.get', return_value=self.dish):
-                from .tasks import process_dish_video
+                from apps.menu.tasks import process_dish_video
                 # max_retries=2; apply() при Retry поднимает исключение — перехватываем
                 try:
                     process_dish_video.apply(args=[self.dish.pk]).get()

@@ -100,7 +100,6 @@ Singleton-модель — в базе всегда ровно одна запи
 | БД | PostgreSQL 16 + PgBouncer |
 | Кэш / Брокер | Redis 7 |
 | Очереди | Celery 5.3 |
-| Мониторинг очередей | Flower 2.x (веб-интерфейс Celery) |
 | Push | Firebase Admin SDK (FCM) |
 | Медиафайлы | Локально (dev) / S3-совместимое хранилище (MinIO/AWS) |
 | Деплой | Docker Compose |
@@ -147,16 +146,3 @@ docker compose exec backend python manage.py createsuperuser
 
 Админка: `http://localhost:8000/admin/`
 
----
-
-## Мониторинг Celery (Flower)
-
-После запуска `docker compose up` откройте **http://localhost:5555**.
-
-Flower показывает:
-- активных воркеров и их статус
-- очередь задач в реальном времени
-- историю выполненных / упавших задач
-- детали каждого запуска (аргументы, результат, время выполнения)
-
-Flower запускается как отдельный сервис `flower` в `docker-compose.yml` и автоматически подключается к тому же Redis-брокеру, что и воркеры.

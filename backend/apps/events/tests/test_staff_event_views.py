@@ -14,7 +14,7 @@ from apps.events.models import Event
 
 User = get_user_model()
 
-LIST_URL = '/api/v1/events/staff/events/'
+LIST_URL = '/api/v1/events/admin/events/'
 
 
 def _detail(pk):

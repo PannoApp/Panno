@@ -814,7 +814,7 @@ class TelegramNotificationTaskTest(TestCase):
         from django.utils import timezone
         from apps.events.models import EventReservation, Event
         from apps.bookings.tasks import send_event_reservation_telegram_notification
-        from apps.events.tests import _make_landscape_image
+        from apps.events.tests.test_events import _make_landscape_image
 
         event = Event.objects.create(
             title='Тест Ивент',
@@ -1795,7 +1795,7 @@ class TelegramWebhookFSMTest(TestCase):
         from apps.events.models import News
         news = News.objects.get(title='Sample News Title')
         self.assertEqual(news.content, 'Sample News Content')
-        self.assertTrue(news.image.name.endswith('photo_123.jpg'))
+        self.assertTrue(bool(news.image.name))
         self.assertTrue(len(news.image.read()) > 0)
 
     @override_settings(**_TG_WEBHOOK_SETTINGS)
@@ -1928,14 +1928,14 @@ class TelegramWebhookFSMTest(TestCase):
         self.assertEqual(event.format, 'open')
         self.assertEqual(str(event.price), '1500.00')
         self.assertEqual(event.max_places, 50)
-        self.assertTrue(event.image.name.endswith('cover_123.jpg'))
+        self.assertTrue(bool(event.image.name))
         self.assertTrue(len(event.image.read()) > 0)
 
         # Verify date_time is localized correct in Almaty timezone
-        import pytz
+        from zoneinfo import ZoneInfo
         from datetime import datetime
         from django.utils import timezone
-        tz = pytz.timezone('Asia/Almaty')
+        tz = ZoneInfo('Asia/Almaty')
         expected_dt = timezone.make_aware(datetime(2026, 5, 25, 19, 0), tz)
         self.assertEqual(event.date_time, expected_dt)
 

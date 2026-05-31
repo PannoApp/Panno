@@ -13,7 +13,7 @@ from apps.events.models import News
 
 User = get_user_model()
 
-LIST_URL = '/api/v1/events/staff/news/'
+LIST_URL = '/api/v1/events/admin/news/'
 
 
 def _detail(pk):

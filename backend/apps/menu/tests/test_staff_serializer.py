@@ -114,7 +114,7 @@ class StaffDishSerializerTest(TestCase):
         serializer = StaffDishSerializer(dish, context={'request': _make_request()})
         url = serializer.data['image_url']
         self.assertIsNotNone(url)
-        self.assertTrue(url.startswith('http://'), f'Expected absolute URL, got: {url}')
+        self.assertTrue(url.startswith(('http://', 'https://')), f'Expected absolute URL, got: {url}')
 
     # ------------------------------------------------------------------
     # test_video_field_is_optional_on_create
@@ -186,4 +186,4 @@ class StaffDishSerializerTest(TestCase):
         serializer = StaffDishSerializer(dish, context={'request': _make_request()})
         url = serializer.data['video_url']
         self.assertIsNotNone(url)
-        self.assertTrue(url.startswith('http://'), f'Expected absolute URL, got: {url}')
+        self.assertTrue(url.startswith(('http://', 'https://')), f'Expected absolute URL, got: {url}')

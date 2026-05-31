@@ -255,34 +255,6 @@ services:
           memory: 256m
           cpus: '0.5'
 
-  # Flower — веб-интерфейс мониторинга Celery
-  flower:
-    build: .
-    container_name: celery_flower
-    restart: unless-stopped
-    # FLOWER_USER/FLOWER_PASSWORD задаются в .env — защита от несанкционированного доступа.
-    # Если переменные не заданы, Flower запускается без аутентификации (только для dev).
-    command: >
-      sh -c "
-        if [ -n \"$${FLOWER_USER:-}\" ] && [ -n \"$${FLOWER_PASSWORD:-}\" ]; then
-          celery -A config flower --port=5555 --basic_auth=$${FLOWER_USER}:$${FLOWER_PASSWORD}
-        else
-          celery -A config flower --port=5555
-        fi
-      "
-    ports:
-      - "5555:5555"
-    env_file:
-      - .env
-    depends_on:
-      - redis
-      - worker
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-          cpus: '0.5'
-
 volumes:
   pg_data:
   minio_data:
