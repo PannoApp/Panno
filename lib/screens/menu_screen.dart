@@ -19,7 +19,6 @@ import '../providers/auth_provider.dart';
 import '../providers/menu_provider.dart';
 import 'dish_edit_screen.dart';
 import '../widgets/dish_detail_sheet.dart';
-import '../widgets/dish_elements.dart';
 import '../widgets/dish_video_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
@@ -1234,6 +1233,9 @@ class _ClassicDishCard extends StatelessWidget {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           builder: (_) => ClassicDishDetailSheet(dish: dish),
         ),
         child: ClipRRect(
@@ -1345,17 +1347,6 @@ class _ClassicDishCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (dish.tags.isNotEmpty) ...[
-                          Wrap(
-                            spacing: 5,
-                            runSpacing: 4,
-                            children: dish.tags
-                                .take(3)
-                                .map((t) => DishCardTagChip(tag: t))
-                                .toList(),
-                          ),
-                          const SizedBox(height: 6),
-                        ],
                         Text(
                           dish.name,
                           style: PiligrimTextStyles.heading.copyWith(

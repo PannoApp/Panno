@@ -179,6 +179,9 @@ class _DishVideoCardState extends State<DishVideoCard>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => DishDetailSheet(dish: widget.dish),
     );
   }
@@ -295,17 +298,6 @@ class _DishVideoCardState extends State<DishVideoCard>
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-            if (widget.dish.tags.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: widget.dish.tags
-                    .take(3)
-                    .map((t) => DishCardTagChip(tag: t))
-                    .toList(),
               ),
             ],
             const SizedBox(height: 14),

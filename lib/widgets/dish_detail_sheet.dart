@@ -369,8 +369,6 @@ class _DishDetailSheetState extends State<DishDetailSheet> {
                     const SizedBox(height: 24),
                     _DishAllergensBlock(allergens: dish.allergens),
                   ],
-
-                  const _DishAtmosphericBottom(),
                 ],
               ),
             ),
@@ -385,61 +383,6 @@ class _DishDetailSheetState extends State<DishDetailSheet> {
 // Фото-лента и видео-лента используют один и тот же экран.
 class ClassicDishDetailSheet extends DishDetailSheet {
   const ClassicDishDetailSheet({super.key, required super.dish});
-}
-
-// ── Атмосферное завершение экрана ────────────────────────────────────────────
-// Тонкая fade-линия + spiral-орнамент + тёплый нижний свет.
-// Исключает тяжёлый чёрный обрыв после последнего блока контента.
-// ─────────────────────────────────────────────────────────────────────────────
-class _DishAtmosphericBottom extends StatelessWidget {
-  const _DishAtmosphericBottom();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 32),
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            PiligrimColors.ember.withValues(alpha: 0.05),
-          ],
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            height: 1,
-            margin: const EdgeInsets.symmetric(horizontal: 32),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  PiligrimColors.steppe.withValues(alpha: 0.20),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SvgPicture.asset(
-            'assets/images/spiral.svg',
-            width: 16,
-            height: 16,
-            colorFilter: ColorFilter.mode(
-              PiligrimColors.steppe.withValues(alpha: 0.14),
-              BlendMode.srcIn,
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
 }
 
 // ── История — cinematic left-accent block ────────────────────────────────────
