@@ -14,6 +14,7 @@ import '../data/repositories/menu_repository.dart';
 import '../providers/menu_provider.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tap.dart';
+import '../widgets/piligrim_toast.dart';
 
 /// Экран создания и редактирования блюда.
 class DishEditScreen extends StatefulWidget {
@@ -211,27 +212,11 @@ class _DishEditScreenState extends State<DishEditScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              errorMessage,
-              style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
-            ),
-            backgroundColor: PiligrimColors.earthDeep,
-          ),
-        );
+        PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Не удалось сохранить блюдо: $e',
-              style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
-            ),
-            backgroundColor: PiligrimColors.earthDeep,
-          ),
-        );
+        PiligrimToast.show(context, 'Не удалось сохранить блюдо: $e', type: PiligrimToastType.error);
       }
     } finally {
       if (mounted) {
@@ -291,27 +276,11 @@ class _DishEditScreenState extends State<DishEditScreen> {
                   errorMessage = 'Ошибка сервера при удалении: ${e.response!.statusCode}';
                 }
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        errorMessage,
-                        style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
-                      ),
-                      backgroundColor: PiligrimColors.earthDeep,
-                    ),
-                  );
+                  PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Ошибка при удалении: $e',
-                        style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
-                      ),
-                      backgroundColor: PiligrimColors.earthDeep,
-                    ),
-                  );
+                  PiligrimToast.show(context, 'Ошибка при удалении: $e', type: PiligrimToastType.error);
                 }
               } finally {
                 if (mounted) {

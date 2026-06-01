@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../core/theme.dart';
 import '../data/models/api_dish.dart';
+import '../data/repositories/menu_repository.dart';
 import 'dish_elements.dart';
 
 // Дефолтные цвета кинематографического фона (лента / sheet fallback).
@@ -147,13 +148,40 @@ class DishClassicThumbnailFallback extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DishDetailSheet — единый экран блюда (фото-лента и видео-лента).
+// При открытии дозагружает полные данные блюда (теги, аллергены),
+// т.к. list-эндпоинт может не включать вложенные объекты.
 // ─────────────────────────────────────────────────────────────────────────────
-class DishDetailSheet extends StatelessWidget {
+class DishDetailSheet extends StatefulWidget {
   const DishDetailSheet({super.key, required this.dish});
   final ApiDish dish;
 
   @override
+  State<DishDetailSheet> createState() => _DishDetailSheetState();
+}
+
+class _DishDetailSheetState extends State<DishDetailSheet> {
+  late ApiDish _dish;
+
+  @override
+  void initState() {
+    super.initState();
+    _dish = widget.dish;
+    // Дозагружаем полные данные если теги или аллергены пустые.
+    if (_dish.tags.isEmpty && _dish.allergens.isEmpty) {
+      _fetchFull();
+    }
+  }
+
+  Future<void> _fetchFull() async {
+    try {
+      final full = await MenuRepository().fetchDish(_dish.id);
+      if (mounted) setState(() => _dish = full);
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final dish = _dish;
     final bottomPad = MediaQuery.viewPaddingOf(context).bottom;
     final topInset = MediaQuery.paddingOf(context).top;
     final screenH = MediaQuery.sizeOf(context).height;

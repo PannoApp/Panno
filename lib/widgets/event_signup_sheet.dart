@@ -5,6 +5,7 @@ import '../core/theme.dart';
 import '../data/models/api_event.dart';
 import '../providers/events_provider.dart';
 import 'path_cta.dart';
+import 'piligrim_toast.dart';
 
 /// Отображает модальное окно (bottom sheet) для записи на мероприятие
 Future<void> showEventSignupSheet(
@@ -51,27 +52,18 @@ class _EventSignupSheetState extends State<_EventSignupSheet> {
           );
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Вы записаны на «${widget.event.title}». Подтверждение придёт от ресторана.',
-            style: PiligrimTextStyles.body.copyWith(fontSize: 14),
-          ),
-          backgroundColor: PiligrimColors.earth,
-          behavior: SnackBarBehavior.floating,
-        ),
+      PiligrimToast.show(
+        context,
+        'Вы записаны на «${widget.event.title}». Подтверждение придёт от ресторана.',
+        type: PiligrimToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       final err = context.read<EventsProvider>().reserveError;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            err ?? 'Не удалось записаться. Попробуйте позже.',
-            style: PiligrimTextStyles.body.copyWith(fontSize: 14),
-          ),
-          backgroundColor: PiligrimColors.earthDeep,
-        ),
+      PiligrimToast.show(
+        context,
+        err ?? 'Не удалось записаться. Попробуйте позже.',
+        type: PiligrimToastType.error,
       );
     } finally {
       if (mounted) setState(() => _submitting = false);

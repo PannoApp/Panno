@@ -11,6 +11,7 @@ import '../data/repositories/events_repository.dart';
 import '../providers/events_provider.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tap.dart';
+import '../widgets/piligrim_toast.dart';
 
 /// Экран создания / редактирования мероприятия.
 /// [event] == null → режим создания нового мероприятия.
@@ -143,13 +144,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
     if (_isCreating &&
         _selectedDateTime != null &&
         _selectedDateTime!.isBefore(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Нельзя создавать мероприятие на прошедшую дату',
-          style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
-        ),
-        backgroundColor: PiligrimColors.earthDeep,
-      ));
+      PiligrimToast.show(context, 'Нельзя создавать мероприятие на прошедшую дату', type: PiligrimToastType.error);
       return;
     }
     setState(() => _isSaving = true);
@@ -198,18 +193,11 @@ class _EventEditScreenState extends State<EventEditScreen> {
         errorMessage = 'Ошибка сервера: ${e.response?.statusCode ?? ""} ${e.message ?? ""}';
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(errorMessage, style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky)),
-          backgroundColor: PiligrimColors.earthDeep,
-        ));
+        PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Не удалось сохранить мероприятие: $e',
-              style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky)),
-          backgroundColor: PiligrimColors.earthDeep,
-        ));
+        PiligrimToast.show(context, 'Не удалось сохранить мероприятие: $e', type: PiligrimToastType.error);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -689,19 +677,11 @@ class _EventEditScreenState extends State<EventEditScreen> {
                   errorMessage = 'Ошибка сервера при удалении: ${e.response!.statusCode}';
                 }
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(errorMessage,
-                        style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky)),
-                    backgroundColor: PiligrimColors.earthDeep,
-                  ));
+                  PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Ошибка при удалении: $e',
-                        style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky)),
-                    backgroundColor: PiligrimColors.earthDeep,
-                  ));
+                  PiligrimToast.show(context, 'Ошибка при удалении: $e', type: PiligrimToastType.error);
                 }
               } finally {
                 if (mounted) setState(() => _isSaving = false);

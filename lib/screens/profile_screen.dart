@@ -19,6 +19,7 @@ import '../providers/core_info_provider.dart';
 import '../widgets/path_cta.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_delete_account_dialog.dart';
+import '../widgets/piligrim_toast.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
 import '../core/piligrim_route.dart';
@@ -80,14 +81,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: PiligrimColors.earthDeep,
-          content: Text(
-            auth.error ?? 'Не удалось сохранить настройки',
-            style: PiligrimTextStyles.body.copyWith(fontSize: 13),
-          ),
-        ),
+      PiligrimToast.show(
+        context,
+        auth.error ?? 'Не удалось сохранить настройки',
+        type: PiligrimToastType.error,
       );
     }
   }
@@ -103,14 +100,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
       final message =
           context.read<AuthProvider>().error ?? 'Не удалось удалить аккаунт';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: PiligrimColors.earthDeep,
-          content: Text(
-            message,
-            style: PiligrimTextStyles.body.copyWith(fontSize: 13),
-          ),
-        ),
+      PiligrimToast.show(
+        context,
+        message,
+        type: PiligrimToastType.error,
       );
     }
   }
@@ -119,14 +112,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: PiligrimColors.earth,
-            content: Text(
-              'Не удалось открыть ссылку',
-              style: PiligrimTextStyles.body.copyWith(fontSize: 13),
-            ),
-          ),
+        PiligrimToast.show(
+          context,
+          'Не удалось открыть ссылку',
+          type: PiligrimToastType.error,
         );
       }
     }

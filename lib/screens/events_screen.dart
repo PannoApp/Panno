@@ -17,6 +17,7 @@ import '../widgets/error_view.dart';
 import '../widgets/event_cover_image.dart'
     show EventCoverImage, PiligrimNetworkOrAssetImage;
 import '../widgets/piligrim_background.dart';
+import '../widgets/piligrim_toast.dart';
 import 'event_detail_screen.dart';
 import 'event_edit_screen.dart';
 import 'event_photo_report_screen.dart';
@@ -692,12 +693,11 @@ class _PastEventCard extends StatelessWidget {
                 await context.read<EventsProvider>().deleteArchivedEvent(event.id);
               } catch (_) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Не удалось удалить мероприятие',
-                        style: PiligrimTextStyles.body
-                            .copyWith(color: PiligrimColors.sky)),
-                    backgroundColor: PiligrimColors.earthDeep,
-                  ));
+                  PiligrimToast.show(
+                    context,
+                    'Не удалось удалить мероприятие',
+                    type: PiligrimToastType.error,
+                  );
                 }
               }
             },

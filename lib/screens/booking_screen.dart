@@ -12,6 +12,7 @@ import '../providers/booking_provider.dart';
 import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/path_cta.dart';
+import '../widgets/piligrim_toast.dart';
 import '../widgets/piligrim_cta.dart';
 import '../widgets/piligrim_tap.dart';
 import '../core/piligrim_route.dart';
@@ -163,14 +164,10 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
       );
     } else if (booking.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: PiligrimColors.earthDeep,
-          content: Text(
-            booking.error!,
-            style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
-          ),
-        ),
+      PiligrimToast.show(
+        context,
+        booking.error!,
+        type: PiligrimToastType.error,
       );
     }
   }

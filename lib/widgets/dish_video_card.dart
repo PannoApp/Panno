@@ -297,6 +297,17 @@ class _DishVideoCardState extends State<DishVideoCard>
                 ),
               ),
             ],
+            if (widget.dish.tags.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: widget.dish.tags
+                    .take(3)
+                    .map((t) => DishCardTagChip(tag: t))
+                    .toList(),
+              ),
+            ],
             const SizedBox(height: 14),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,

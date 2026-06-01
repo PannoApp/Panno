@@ -1,6 +1,5 @@
 // MenuRepository — HTTP-запросы к API меню (/menu/categories/, /menu/tags/, /menu/dishes/)
 // Паттерн аналогичен EventsRepository: DioClient.instance.dio по умолчанию.
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -95,13 +94,19 @@ class MenuRepository {
     return (dishes: paginated.results, nextCursor: paginated.nextCursor);
   }
 
+  /// Загружает полные данные одного блюда по id, включая теги и аллергены.
+  Future<ApiDish> fetchDish(int id) async {
+    final response = await _dio.get<Map<String, dynamic>>('/menu/dishes/$id/');
+    return ApiDish.fromJson(response.data!);
+  }
+
   // ── Admin CRUD ─────────────────────────────────────────────────────────────
 
   /// Все блюда для стафф/администраторов, включая is_active=false.
   /// Обрабатывает как плоский список, так и paginated-ответ.
   Future<List<ApiDish>> fetchAdminDishes({int page = 1}) async {
     final response = await _dio.get<dynamic>(
-      '/menu/admin/dishes/',
+      '/menu/staff/dishes/',
       queryParameters: {'page': page},
     );
     final data = response.data;
@@ -127,7 +132,7 @@ class MenuRepository {
   }) async {
     final data = await _buildFormData(fields, image, video);
     final response = await _dio.post<Map<String, dynamic>>(
-      '/menu/admin/dishes/',
+      '/menu/staff/dishes/',
       data: data,
     );
     return ApiDish.fromJson(response.data!);
@@ -145,13 +150,13 @@ class MenuRepository {
     if (image != null || video != null) {
       final data = await _buildFormData(fields, image, video);
       response = await _dio.patch<Map<String, dynamic>>(
-        '/menu/admin/dishes/$id/',
+        '/menu/staff/dishes/$id/',
         data: data,
       );
     } else {
       final jsonFields = _encodeListFields(fields);
       response = await _dio.patch<Map<String, dynamic>>(
-        '/menu/admin/dishes/$id/',
+        '/menu/staff/dishes/$id/',
         data: jsonFields,
       );
     }
@@ -160,7 +165,7 @@ class MenuRepository {
 
   /// Удаляет блюдо. Ожидает 204 No Content.
   Future<void> deleteDish(int id) async {
-    await _dio.delete<void>('/menu/admin/dishes/$id/');
+    await _dio.delete<void>('/menu/staff/dishes/$id/');
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -186,16 +191,11 @@ class MenuRepository {
     return FormData.fromMap(map);
   }
 
-  /// Заменяет List-значения на JSON-строки с суффиксом _json.
+  /// Возвращает копию fields без изменений.
+  /// Списки (tags, allergens) передаются как есть:
+  /// — FormData: Dio создаёт повторяющиеся поля (tags=1&tags=2), DRF парсит корректно.
+  /// — JSON: Dio сериализует как {"tags": [1, 2]}, DRF тоже понимает.
   Map<String, dynamic> _encodeListFields(Map<String, dynamic> fields) {
-    final result = <String, dynamic>{};
-    for (final entry in fields.entries) {
-      if (entry.value is List) {
-        result['${entry.key}_json'] = jsonEncode(entry.value);
-      } else {
-        result[entry.key] = entry.value;
-      }
-    }
-    return result;
+    return Map<String, dynamic>.from(fields);
   }
 }

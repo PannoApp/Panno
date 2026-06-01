@@ -13,6 +13,7 @@ import '../widgets/event_signup_sheet.dart';
 import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/path_cta.dart';
+import '../widgets/piligrim_toast.dart';
 import '../core/auth_guard.dart';
 import '../widgets/piligrim_tap.dart';
 
@@ -281,17 +282,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                         );
                                   } catch (_) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(SnackBar(
-                                        content: Text(
-                                          'Не удалось удалить фото',
-                                          style: PiligrimTextStyles.body
-                                              .copyWith(
-                                                  color: PiligrimColors.sky),
-                                        ),
-                                        backgroundColor:
-                                            PiligrimColors.earthDeep,
-                                      ));
+                                      PiligrimToast.show(
+                                        context,
+                                        'Не удалось удалить фото',
+                                        type: PiligrimToastType.error,
+                                      );
                                     }
                                   }
                                 },

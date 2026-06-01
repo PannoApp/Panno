@@ -13,6 +13,7 @@ import '../data/repositories/events_repository.dart';
 import '../providers/events_provider.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tap.dart';
+import '../widgets/piligrim_toast.dart';
 
 /// Экран управления фотоотчётом прошедшего мероприятия.
 /// Администратор может добавлять и удалять фотографии.
@@ -73,12 +74,11 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
       if (mounted) context.read<EventsProvider>().loadArchived();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Не удалось загрузить фото',
-              style:
-                  PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky)),
-          backgroundColor: PiligrimColors.earthDeep,
-        ));
+        PiligrimToast.show(
+          context,
+          'Не удалось загрузить фото',
+          type: PiligrimToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _isUploading = false);
@@ -130,12 +130,11 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Не удалось удалить фото',
-              style:
-                  PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky)),
-          backgroundColor: PiligrimColors.earthDeep,
-        ));
+        PiligrimToast.show(
+          context,
+          'Не удалось удалить фото',
+          type: PiligrimToastType.error,
+        );
       }
     }
   }
