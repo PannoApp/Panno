@@ -14,11 +14,29 @@ dependencies:
   sensors_plus: ^7.0.0
   url_launcher: ^6.3.2
   shared_preferences: ^2.5.5
+  # HTTP-клиент с поддержкой JWT-интерцептора и retry
+  dio: ^5.7.0
+  # Безопасное хранение JWT-токенов (keychain/keystore)
+  flutter_secure_storage: ^9.2.2
+  # State management — минимальная надстройка над InheritedNotifier
+  provider: ^6.1.2
+  # Firebase: базовая инициализация
+  firebase_core: ^3.6.0
+  # Firebase: FCM push-уведомления (бэкенд уже использует FCM)
+  firebase_messaging: ^15.1.3
+  # Воспроизведение видео для ленты блюд
+  video_player: ^2.9.1
+  # Кэшированная загрузка изображений из API с плейсхолдерами
+  cached_network_image: ^3.4.1
+  # Генерация UUID для Idempotency-Key в booking/event reservation
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  # Мокирование Dio и сервисов без кодогенерации
+  mocktail: ^1.0.4
 
 flutter:
   uses-material-design: true

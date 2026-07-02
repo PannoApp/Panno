@@ -1,0 +1,27 @@
+---
+description: PILIGRIM brand UI — palette, typography, tap, ambient
+globs: lib/widgets/**,lib/core/theme.dart,lib/core/home_visual_style.dart,lib/screens/**
+alwaysApply: false
+---
+
+# Cinematic brand UI
+
+## Colors & typography
+- UI: `PiligrimColors`, `PiligrimTextStyles`, `piligrimTheme`.
+- Font: Museo Sans 300/700 only — no new families / Google Fonts.
+
+## Interaction & surfaces
+- Brand taps: `PiligrimTap`, not default `InkWell` ripples.
+- Cards: reuse `piligrimCardDecoration()` from `piligrim_card.dart` before new decorations.
+- Warm CTAs: `EmberCta` / ember palette — avoid generic Material button restyling.
+
+## Home & atmosphere
+- Home: calm cinematic layers (`PiligrimBackground`, ambient/hero widgets) — no neon, no glass unless `kHomeLayeredBlurGlass` is intentionally enabled.
+- Heavy `CustomPaint`: prefer `RepaintBoundary`; decorative overlays: `IgnorePointer`.
+- Preserve existing motion/parallax structure unless the task is explicitly about performance or animation.
+
+## Reuse before create
+Search `lib/widgets/` (`piligrim_*`, `home_*`, `ember_*`, `ErrorView`) before adding a new component.
+
+## Splash
+Splash uses explicit `AnimationController` + `Interval` — do not casually migrate it to `flutter_animate`.

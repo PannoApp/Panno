@@ -957,7 +957,9 @@
     const url  = base + endpoint;
 
     const headers = { 'Content-Type': 'application/json' };
-    if (accessToken) headers['Authorization'] = 'Bearer ' + accessToken;
+    // Публичные auth-эндпоинты не требуют токена; просроченный токен вызовет 401 даже на AllowAny
+    const PUBLIC_ENDPOINTS = ['/api/v1/users/auth/request-sms/', '/api/v1/users/auth/verify-sms/'];
+    if (accessToken && !PUBLIC_ENDPOINTS.includes(endpoint)) headers['Authorization'] = 'Bearer ' + accessToken;
     Object.assign(headers, extraHeaders);
 
     const reqInfo = { method, url, headers: { ...headers }, body: body || undefined };

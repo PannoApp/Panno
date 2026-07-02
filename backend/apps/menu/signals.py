@@ -6,6 +6,26 @@ from .models import Allergen, Category, Dish, Tag
 from utils.cache import safe_cache_get, safe_cache_set, safe_cache_delete
 
 
+@receiver(post_save, sender=Dish)
+def trigger_video_processing(sender, instance, **kwargs):
+    """
+    Запускает Celery-задачу транскодирования видео при сохранении блюда.
+
+    Условия постановки задачи в очередь:
+    - у блюда есть загруженное видео;
+    - статус НЕ является PROCESSING или READY (чтобы не дублировать работу).
+    """
+    if not instance.video:
+        return
+
+    # Пропускаем, если видео уже обрабатывается или успешно готово
+    if instance.video_status not in (
+        Dish.VideoStatus.PROCESSING, Dish.VideoStatus.READY
+    ):
+        from .tasks import process_dish_video
+        process_dish_video.delay(instance.pk)
+
+
 def _bump_dishes_version():
     """
     Инкрементирует счётчик версии кэша блюд.

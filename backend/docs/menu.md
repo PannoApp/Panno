@@ -13,6 +13,41 @@ Category (Категория)
 
 ## Эндпоинты
 
+### GET /api/v1/menu/feed/
+
+Видеолента блюд с курсорной пагинацией. Возвращает только активные блюда с `video_status=ready`.
+
+**Авторизация:** не нужна
+
+**Query-параметры:**
+
+| Параметр | Тип | Описание |
+|---|---|---|
+| `cursor` | string | Непрозрачный курсор из поля `next` предыдущего ответа |
+
+**Ответ 200:**
+```json
+{
+  "next": "http://localhost:8000/api/v1/menu/feed/?cursor=cD0y",
+  "previous": null,
+  "results": [
+    {
+      "id": 3,
+      "name": "Стейк Рибай",
+      "video_url": "http://localhost:8000/media/dishes/videos/processed/dish_3_processed.mp4",
+      "video_status": "ready",
+      ...
+    }
+  ]
+}
+```
+
+Пагинация — курсорная (`VideoCursorPagination`): page_size=5, сортировка по `id`.  
+Курсор гарантирует стабильный обход при одновременных вставках (в отличие от page-number).  
+Кэш **не применяется** — курсор кодирует позицию конкретного запроса.
+
+---
+
 ### GET /api/v1/menu/categories/
 
 Возвращает все категории, отсортированные по полю `order`.
@@ -67,6 +102,8 @@ Category (Категория)
       "allergens": [{ "id": 1, "name": "Глютен" }],
       "image": "/media/dishes/images/steak.jpg",
       "video": "/media/dishes/videos/steak.mp4",
+      "video_url": "http://localhost:8000/media/dishes/videos/processed/dish_1_processed.mp4",
+      "video_status": "ready",
       "weight": 350,
       "story": "Рибай — классика американского стейкхауса...",
       "is_active": true
@@ -111,20 +148,43 @@ Category (Категория)
 | `tags` | M2M → Tag | Теги (может быть пустым) |
 | `allergens` | M2M → Allergen | Аллергены (может быть пустым) |
 | `image` | image | Фото блюда (обязательное) |
-| `video` | file | Видео для ленты (необязательное) |
+| `video` | file | Оригинальное видео, загружаемое администратором (необязательное) |
+| `video_processed` | file | Транскодированное видео H.264/720×1280 (заполняется Celery, не редактируется вручную) |
+| `video_status` | enum | Статус обработки: `pending` / `processing` / `ready` / `failed` |
 | `weight` | int | Вес порции в граммах (необязательное) |
 | `story` | text | История блюда — для расширенной карточки (необязательное) |
 | `is_active` | bool | Если `false` — блюдо скрыто из API |
+
+#### Жизненный цикл видео
+
+```
+Администратор загружает video
+        ↓
+  post_save сигнал
+        ↓
+  video_status = pending
+  → Celery: process_dish_video.delay(dish_id)
+        ↓
+  video_status = processing
+  FFmpeg: scale 720×1280, H.264 CRF=28, AAC 128k, faststart
+        ↓ (успех)          ↓ (ошибка, max 2 retry)
+  video_processed = файл   video_status = failed
+  video_status = ready
+```
+
+`video_url` в ответе API — абсолютный URL к `video_processed`. Возвращает `null`, пока видео не готово.
 
 ## Файлы модуля
 
 ```
 apps/menu/
-├── models.py       # Category, Tag, Allergen, Dish
+├── models.py       # Category, Tag, Allergen, Dish (+ VideoStatus enum)
 ├── serializers.py  # CategorySerializer, TagSerializer, AllergenSerializer, DishSerializer
-├── views.py        # CategoryListView, DishListView
-├── filters.py      # DishFilter (category_id, tag_id)
-└── urls.py         # Маршруты /api/v1/menu/...
+├── views.py        # CategoryListView, DishListView, VideoFeedView
+├── filters.py      # DishFilter (category_id, tag_ids, search)
+├── tasks.py        # process_dish_video — Celery-задача FFmpeg транскодирования
+├── signals.py      # trigger_video_processing, кэш-инвалидация
+└── urls.py         # /categories/, /dishes/, /feed/
 ```
 
 ## Кэширование
@@ -144,6 +204,9 @@ apps/menu/
 
 - Блюда с `is_active=False` не возвращаются API — скрывать блюдо нужно через Django-админку, не удалять.
 - Сортировка блюд: сначала по `category__order`, затем по `id` внутри категории.
-- `video` — необязательное поле. Клиент должен проверять на `null` перед воспроизведением.
+- `video` — необязательное поле. Клиент должен проверять `video_url` на `null` перед воспроизведением (воспроизводить нужно `video_url`, а не `video`).
 - `price` приходит строкой (`"4500.00"`), а не числом — стандартное поведение `DecimalField` в DRF.
 - Категории и теги управляются только через Django-админку, публичного эндпоинта на создание нет.
+- `video_status` индексируется в БД. Составной индекс `(is_active, video_status)` ускоряет запросы видеоленты.
+- FFmpeg устанавливается внутри Docker-образа (`apt-get install ffmpeg`). В production на S3 задаче нужно сначала скачать оригинальный файл во временный каталог перед транскодированием.
+- При загрузке нового `video` в уже существующее блюдо задача ставится в очередь повторно только если `video_status` не `processing` и не `ready`. Чтобы принудительно переобработать — сбросить статус в `pending` через Django Shell или Django Admin.

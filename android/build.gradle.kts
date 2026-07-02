@@ -1,3 +1,14 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Classpath для плагина Google Services (обработка google-services.json)
+        classpath("com.google.gms:google-services:4.4.2")
+    }
+}
+
 allprojects {
     repositories {
         google()

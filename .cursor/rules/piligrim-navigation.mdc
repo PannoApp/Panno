@@ -1,0 +1,27 @@
+---
+description: RootShell tabs, push routes, auth guard — navigation invariants
+globs: lib/main.dart,lib/screens/**,lib/core/auth_guard.dart,lib/core/push_navigation.dart,lib/core/home_data.dart
+alwaysApply: false
+---
+
+# Navigation
+
+## Tabs (`RootShell`, `lib/main.dart`)
+`IndexedStack` order is fixed:
+0 Home · 1 Menu · 2 Interior · 3 Events · 4 Profile
+
+Keep labels/icons aligned with `PiligrimNavBar` and `test/navigation_test.dart`.
+
+## Push, not tabs
+`Navigator.push(MaterialPageRoute(...))` for detail/booking/auth/history flows.
+
+- Booking from home: `kNavOpenBooking` in `home_data.dart` → push `BookingScreen`, not a new tab.
+- Auth-gated actions: `guardAuth(context)` from `lib/core/auth_guard.dart`.
+
+## Push notifications
+`PushNavigationHandler` in `RootShell`: `event` → tab 3; `booking` → push `BookingScreen`.
+
+## Do not
+- Add `go_router`, named routes, or AutoRoute.
+- Put `BookingScreen` in bottom nav without explicit request.
+- Nest per-tab navigators unless asked.

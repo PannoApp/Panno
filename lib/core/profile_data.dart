@@ -50,27 +50,8 @@ class MapTarget {
 }
 
 const kRestaurantAddress = 'Астана, ул. Туран 24, НП «Шала»';
-const kRestaurantCoords = '51.128207,71.430544'; // заглушка — уточнить с рестораном
 const kRestaurantPhone = '+7 (700) 000-00-00';
 const kRestaurantVersion = '1.0.0 (build 1)';
-
-const kMapTargets = [
-  MapTarget(
-    label: '2ГИС',
-    url: 'https://2gis.ru/astana/geo/$kRestaurantCoords',
-    totemAsset: 'assets/images/splash_path (1).svg',
-  ),
-  MapTarget(
-    label: 'Google',
-    url: 'https://maps.google.com/?q=$kRestaurantCoords',
-    totemAsset: 'assets/images/star_totem (1).svg',
-  ),
-  MapTarget(
-    label: 'Яндекс',
-    url: 'yandexmaps://maps.yandex.ru/?pt=$kRestaurantCoords&z=16',
-    totemAsset: 'assets/images/wheel_totem (1).svg',
-  ),
-];
 
 class Messenger {
   const Messenger({

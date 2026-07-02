@@ -44,16 +44,16 @@ class AllergenAdmin(ContentManagerMixin, ModelAdmin):
 
 @admin.register(Dish)
 class DishAdmin(ContentManagerMixin, ModelAdmin):
-    # Колонки в общем списке
-    list_display = ('name', 'category', 'price', 'is_active', 'image_preview_list')
+    # Колонки в общем списке; video_status позволяет сразу видеть этап обработки видео
+    list_display = ('name', 'category', 'price', 'is_active', 'video_status', 'image_preview_list')
     # Фильтры в правой панели
     list_filter = ('category', 'is_active', 'tags', 'allergens')
     # Поиск по имени и описанию
     search_fields = ('name', 'description')
     # Поля, которые можно редактировать прямо из списка
     list_editable = ('is_active', 'price')
-    # Поля только для чтения (для отображения медиа)
-    readonly_fields = ('image_preview_detail', 'video_preview_detail')
+    # Поля только для чтения: медиа-превью и статус обработки видео (меняется Celery, не вручную)
+    readonly_fields = ('image_preview_detail', 'video_preview_detail', 'video_status')
     # Удобный интерфейс выбора для полей ManyToMany
     filter_horizontal = ('tags', 'allergens')
 
@@ -66,7 +66,8 @@ class DishAdmin(ContentManagerMixin, ModelAdmin):
             'fields': ('tags', 'allergens')
         }),
         ('Медиа', {
-            'fields': ('image', 'image_preview_detail', 'video', 'video_preview_detail')
+            # video_status — только для чтения; отображает текущий этап транскодирования Celery
+            'fields': ('image', 'image_preview_detail', 'video', 'video_preview_detail', 'video_status')
         }),
     )
 
