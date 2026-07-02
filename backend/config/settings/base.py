@@ -28,6 +28,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 # Стандартные приложения Django
 INSTALLED_APPS = [
 
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,6 +50,9 @@ INSTALLED_APPS = [
     'apps.events.apps.EventsConfig',
     'apps.core.apps.CoreConfig',
     'apps.notifications.apps.NotificationsConfig',
+
+    # Автоудаление файлов при замене/удалении объектов (последним — требование пакета)
+    'django_cleanup.apps.CleanupConfig',
 ]
 
 MIDDLEWARE = [
@@ -63,8 +67,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
-
 from corsheaders.defaults import default_headers
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'idempotency-key',
@@ -75,7 +77,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [], # Позже можно добавить os.path.join(BASE_DIR, 'templates')
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -166,6 +168,7 @@ if USE_S3:
             "BACKEND": "storages.backends.s3.S3Storage",
             "OPTIONS": {
                 "location": "media", # Все медиа-файлы будут в папке /media/ внутри бакета
+                "url_protocol": env('AWS_S3_URL_PROTOCOL', default='https:'), # http: для локального MinIO
             },
         },
         "staticfiles": {
@@ -176,10 +179,10 @@ if USE_S3:
     # URL для медиа-файлов
     if AWS_S3_CUSTOM_DOMAIN:
         MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    elif AWS_S3_ENDPOINT_URL:
+        MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/'
     else:
-        # Если эндпоинт указан (MinIO), используем его, иначе стандартный S3 URL
-        base_url = AWS_S3_ENDPOINT_URL.replace('http://minio', 'http://localhost') if AWS_S3_ENDPOINT_URL else f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
-        MEDIA_URL = f'{base_url}/media/'
+        MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com/media/'
 
 else:
     # Локальное хранилище (если S3 не настроен)
@@ -214,6 +217,8 @@ FIREBASE_CREDENTIALS_PATH = env('FIREBASE_CREDENTIALS_PATH', default='')
 # ==========================================
 TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_CHAT_ID = env('TELEGRAM_CHAT_ID', default='')
+# Секрет для верификации входящих webhook-запросов от Telegram (X-Telegram-Bot-Api-Secret-Token)
+TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='')
 
 
 # Настройки Django REST Framework
@@ -330,16 +335,20 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+CELERY_TASK_ROUTES = {
+    'apps.menu.tasks.process_dish_video': {'queue': 'video'},
+}
+
 # ==========================================
 # Push-уведомления: ограничения
 # ==========================================
 
 # Максимум маркетинговых пушей на пользователя в неделю (category != None)
-PUSH_WEEKLY_LIMIT = int(os.getenv('PUSH_WEEKLY_LIMIT', 3))
+PUSH_WEEKLY_LIMIT = env.int('PUSH_WEEKLY_LIMIT', default=3)
 
 # Разрешённое окно отправки маркетинговых пушей (часы, локальное время сервера)
-PUSH_ALLOWED_HOUR_START = int(os.getenv('PUSH_ALLOWED_HOUR_START', 9))
-PUSH_ALLOWED_HOUR_END   = int(os.getenv('PUSH_ALLOWED_HOUR_END', 21))
+PUSH_ALLOWED_HOUR_START = env.int('PUSH_ALLOWED_HOUR_START', default=9)
+PUSH_ALLOWED_HOUR_END   = env.int('PUSH_ALLOWED_HOUR_END', default=21)
 
 # ==========================================
 # Логирование
@@ -386,3 +395,99 @@ LOGGING = {
         },
     },
 }
+
+# ==========================================
+# Jazzmin — тема админ-панели
+# ==========================================
+
+JAZZMIN_SETTINGS = {
+    "site_title": "Пилигрим",
+    "site_header": "Пилигрим — Панель управления",
+    "site_brand": "Пилигрим",
+    "welcome_sign": "Добро пожаловать в панель управления",
+    "copyright": "Piligrim Restaurant",
+
+    # Глобальный поиск по моделям
+    "search_model": ["users.User", "menu.Dish", "bookings.TableBooking"],
+
+    # Иконки FontAwesome 5 Free
+    "icons": {
+        "auth":                          "fas fa-users-cog",
+        "users.user":                    "fas fa-user",
+        "menu.category":                 "fas fa-th-large",
+        "menu.dish":                     "fas fa-utensils",
+        "menu.tag":                      "fas fa-tag",
+        "menu.allergen":                 "fas fa-exclamation-triangle",
+        "events.event":                  "fas fa-calendar-alt",
+        "events.news":                   "fas fa-newspaper",
+        "events.eventreservation":       "fas fa-ticket-alt",
+        "bookings.tablebooking":         "fas fa-chair",
+        "notifications.userdevice":      "fas fa-mobile-alt",
+        "notifications.pushcampaign":    "fas fa-bell",
+        "core.restaurantinfo":           "fas fa-store",
+        "core.interiorphoto":            "fas fa-images",
+        "core.appversion":               "fas fa-code-branch",
+    },
+
+    # Порядок разделов в сайдбаре
+    "order_with_respect_to": [
+        "bookings",
+        "events",
+        "menu",
+        "core",
+        "users",
+        "notifications",
+    ],
+
+    # Скрыть стандартный раздел auth — используем кастомные роли через users.User
+    "hide_apps": ["auth"],
+
+    "show_ui_builder": False,
+    "navigation_expanded": True,
+    "show_sidebar": True,
+    "autosize_content": True,
+
+    "topmenu_links": [
+        {"name": "Сайт",     "url": "/",          "new_window": True},
+        {"name": "API Docs", "url": "/api/docs/", "new_window": True},
+        {"name": "Выйти",    "url": "/admin/logout/", "new_window": False},
+    ],
+    "usermenu_links": [
+        {"name": "API Docs", "url": "/api/docs/", "new_window": True},
+        {"name": "Выйти",    "url": "/admin/logout/", "new_window": False},
+    ],
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text":      False,
+    "footer_small_text":      False,
+    "body_small_text":        False,
+    "brand_small_text":       False,
+    "brand_colour":           "navbar-dark",
+    "accent":                 "accent-danger",
+    "navbar":                 "navbar-dark",
+    "no_navbar_border":       True,
+    "navbar_fixed":           True,
+    "layout_boxed":           False,
+    "footer_fixed":           False,
+    "sidebar_fixed":          True,
+    "sidebar":                "sidebar-dark-maroon",
+    "sidebar_nav_small_text":     False,
+    "sidebar_disable_expand":     False,
+    "sidebar_nav_child_indent":   True,
+    "sidebar_nav_compact_style":  False,
+    "sidebar_nav_legacy_style":   False,
+    "sidebar_nav_flat_style":     False,
+    "theme": "flatly",
+    "button_classes": {
+        "primary":   "btn-primary",
+        "secondary": "btn-secondary",
+        "info":      "btn-info",
+        "warning":   "btn-warning",
+        "danger":    "btn-danger",
+        "success":   "btn-success",
+    },
+}
+
+LOGIN_REDIRECT_URL = '/admin/'
+

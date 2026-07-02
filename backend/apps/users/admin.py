@@ -1,5 +1,7 @@
-from django.contrib.admin import ModelAdmin
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
+from django import forms
 from utils.permissions import _has_role
 from .models import User
 
@@ -22,16 +24,41 @@ class AdminOnlyMixin:
         return _has_role(request.user, 'admin')
 
 
-@admin.register(User)
-class UserAdmin(AdminOnlyMixin, ModelAdmin):
-    list_display    = ('phone', 'first_name', 'last_name', 'role', 'is_staff', 'is_active', 'date_joined')
-    list_filter     = ('role', 'is_staff', 'is_active')
-    search_fields   = ('phone', 'first_name', 'last_name')
-    readonly_fields = ('date_joined',)
-    exclude         = ('groups', 'user_permissions')
+class CustomUserChangeForm(UserChangeForm):
+    class Meta(UserChangeForm.Meta):
+        model = User
 
-    def save_model(self, request, obj, form, change):
-        # Синхронизация is_staff выполняется автоматически в User.save().
-        # Явный вызов здесь избыточен, но оставлен для читаемости —
-        # редактор Admin видит намерение прямо в этом методе.
-        super().save_model(request, obj, form, change)
+
+class CustomUserCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ('phone', 'role', 'is_active', 'is_staff', 'is_superuser')
+
+
+@admin.register(User)
+class UserAdmin(AdminOnlyMixin, BaseUserAdmin):
+    form = CustomUserChangeForm
+    add_form = CustomUserCreationForm
+
+    list_display    = ('phone', 'first_name', 'last_name', 'role', 'telegram_id', 'is_staff', 'is_active', 'date_joined')
+    list_filter     = ('role', 'is_staff', 'is_active')
+    search_fields   = ('phone', 'first_name', 'last_name', 'telegram_id')
+    ordering        = ('phone',)
+
+    fieldsets = (
+        (None, {'fields': ('phone', 'password')}),
+        ('Персональная информация', {'fields': ('first_name', 'last_name', 'role', 'telegram_id')}),
+        ('Права доступа', {'fields': ('is_active', 'is_staff', 'is_superuser')}),
+        ('Настройки уведомлений', {'fields': ('notifications_enabled', 'notify_events', 'notify_promotions', 'notify_closed_events')}),
+        ('Важные даты', {'fields': ('last_login', 'date_joined')}),
+    )
+
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('phone', 'role', 'is_active', 'is_staff', 'is_superuser'),
+        }),
+    )
+
+    readonly_fields = ('date_joined', 'last_login')
+    filter_horizontal = ()

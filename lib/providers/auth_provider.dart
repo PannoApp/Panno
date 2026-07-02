@@ -41,6 +41,7 @@ class AuthProvider extends ChangeNotifier {
   int eventsCount = 0;
 
   bool get isLoggedIn => currentUser != null;
+  bool get isAdmin => currentUser?.isAdmin ?? false;
 
   /// Совместимость с экранами на [HeroUser].
   HeroUser get user {
@@ -48,10 +49,12 @@ class AuthProvider extends ChangeNotifier {
     if (profile == null) return kAnonymousHero;
     final name =
         profile.displayName.isEmpty ? profile.phone : profile.displayName;
+    final journey = _formatJourneyStart(profile.dateJoined);
     return HeroUser(
       name: name.isEmpty ? 'Герой без имени' : name,
       phone: profile.phone,
-      journeyStartLabel: _formatJourneyStart(profile.dateJoined),
+      journeyStartValue: journey.$1,
+      journeyStartLabel: journey.$2,
       eventsCount: eventsCount,
     );
   }
@@ -128,22 +131,38 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Читаем refresh-токен ДО очистки, чтобы уведомить сервер.
+    final refresh = await _tokenStorage.readRefresh();
+
+    // Немедленно очищаем локальную сессию — не ждём сервер.
+    await _tokenStorage.clearTokens();
+    currentUser = null;
+    isNewUser = false;
+    eventsCount = 0;
+    notifyListeners();
+
+    // Уведомляем сервер в фоне — UI уже обновился.
+    if (refresh != null && refresh.isNotEmpty) {
+      _authService.logout(refresh).catchError((_) {});
+    }
+  }
+
+  /// Удаляет аккаунт на сервере, затем очищает локальную сессию.
+  Future<void> deleteAccount() async {
     isLoading = true;
     error = null;
     notifyListeners();
 
     try {
-      final refresh = await _tokenStorage.readRefresh();
-      if (refresh != null && refresh.isNotEmpty) {
-        await _authService.logout(refresh);
-      }
-    } catch (_) {
-      // Всегда очищаем локальную сессию.
-    } finally {
+      await _authService.deleteAccount();
       await _tokenStorage.clearTokens();
       currentUser = null;
       isNewUser = false;
       eventsCount = 0;
+    } catch (e) {
+      error = dioErrorMessage(e);
+      rethrow;
+    } finally {
       isLoading = false;
       notifyListeners();
     }
@@ -194,8 +213,16 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     if (currentUser == null) return;
 
-    isLoading = true;
+    final previous = currentUser!;
     error = null;
+
+    // Optimistic update — UI reacts immediately, no network wait
+    currentUser = previous.copyWith(
+      notifyEvents: events,
+      notifyPromotions: promotions,
+      notifyClosedEvents: closedEvents,
+      notificationsEnabled: notificationsEnabled,
+    );
     notifyListeners();
 
     try {
@@ -209,10 +236,10 @@ class AuthProvider extends ChangeNotifier {
 
       currentUser = await _profileRepository.updateProfile(body);
     } catch (e) {
+      currentUser = previous;
       error = dioErrorMessage(e);
       rethrow;
     } finally {
-      isLoading = false;
       notifyListeners();
     }
   }
@@ -243,22 +270,27 @@ class AuthProvider extends ChangeNotifier {
   }
 }
 
-String? _formatJourneyStart(DateTime? dt) {
-  if (dt == null) return null;
-  const months = [
-    '',
-    'Январь',
-    'Февраль',
-    'Март',
-    'Апрель',
-    'Май',
-    'Июнь',
-    'Июль',
-    'Август',
-    'Сентябрь',
-    'Октябрь',
-    'Ноябрь',
-    'Декабрь',
-  ];
-  return '${months[dt.month]} ${dt.year}';
+(String, String) _formatJourneyStart(DateTime? dt) {
+  final date = dt ?? DateTime.now();
+  final now = DateTime.now();
+
+  final totalDays = now.difference(date).inDays;
+
+  final years = now.year - date.year - (now.month < date.month || (now.month == date.month && now.day < date.day) ? 1 : 0);
+  if (years >= 1) {
+    if (years == 1) return ('1', 'Год с нами');
+    if (years <= 4) return ('$years', 'Года с нами');
+    return ('$years', 'Лет с нами');
+  }
+
+  final months = now.month - date.month + (now.year - date.year) * 12 - (now.day < date.day ? 1 : 0);
+  if (months >= 1) {
+    if (months == 1) return ('1', 'Месяц с нами');
+    if (months <= 4) return ('$months', 'Месяца с нами');
+    return ('$months', 'Месяцев с нами');
+  }
+
+  if (totalDays == 1) return ('1', 'День с нами');
+  if (totalDays >= 2 && totalDays <= 4) return ('$totalDays', 'Дня с нами');
+  return ('$totalDays', 'Дней с нами');
 }

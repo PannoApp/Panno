@@ -65,7 +65,6 @@ docker compose ps
 - `django_backend` — API на порту 8000
 - `celery_worker` — фоновые задачи
 - `celery_beat` — планировщик задач
-- `celery_flower` — мониторинг Celery (порт 5555)
 
 Применить миграции (только первый раз или после изменений моделей):
 ```bash
@@ -84,7 +83,6 @@ docker compose exec backend python manage.py createsuperuser
 | Django Admin | http://localhost:8000/admin/ |
 | Swagger API docs | http://localhost:8000/api/docs/ |
 | ReDoc | http://localhost:8000/api/redoc/ |
-| Flower (Celery) | http://localhost:5555 |
 
 ---
 

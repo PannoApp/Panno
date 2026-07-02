@@ -6,6 +6,8 @@ from django.dispatch import receiver
 from .models import Event, EventReservation, News
 from utils.cache import safe_cache_get, safe_cache_set
 
+from django.utils import timezone
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,8 +38,10 @@ def notify_on_reservation_created(sender, instance, created, **kwargs):
 
     event = instance.event
     title = "Вы записаны на мероприятие"
-    body = f"{event.title} — {event.date_time.strftime('%d.%m.%Y %H:%M')}"
+    local_dt = timezone.localtime(event.date_time)
+    body = f"{event.title} — {local_dt.strftime('%d.%m.%Y %H:%M')}"
 
+    # Отправка PUSH-уведомления пользователю
     from apps.notifications.tasks import send_push_notification
     try:
         send_push_notification.delay(
@@ -51,3 +55,14 @@ def notify_on_reservation_created(sender, instance, created, **kwargs):
         logger.error(
             "Celery broker unavailable — push for reservation=%s not queued", instance.pk
         )
+
+    # Отправка уведомления менеджеру в Telegram
+    from apps.bookings.tasks import send_event_reservation_telegram_notification
+    try:
+        send_event_reservation_telegram_notification.delay(instance.pk)
+        logger.info("Telegram notification queued: reservation=%s", instance.pk)
+    except Exception:
+        logger.error(
+            "Celery broker unavailable — telegram notification for reservation=%s not queued", instance.pk
+        )
+

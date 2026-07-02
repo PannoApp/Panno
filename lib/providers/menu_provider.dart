@@ -28,10 +28,17 @@ class MenuProvider extends ChangeNotifier {
   bool isLoadingMore = false;
   bool hasMore = true;
   String? error;
+  bool isBootstrapping = false;
+  String? bootstrapError;
 
   int _page = 1;
   int? activeCategoryId;
   String searchQuery = '';
+  final List<int> activeTagIds = [];
+  List<ApiTag> _allSeenTags = [];
+
+  // Все теги с сервера (загружаются один раз при инициализации меню).
+  List<ApiTag> allTags = const [];
 
   // ── Состояние видео-ленты (cursor pagination) ──────────────────────────────
 
@@ -50,6 +57,16 @@ class MenuProvider extends ChangeNotifier {
   MenuViewMode _mode = MenuViewMode.feed;
   bool _loaded = false;
 
+  bool _globalMuted = true;
+  bool get globalMuted => _globalMuted;
+  void toggleGlobalMute() {
+    _globalMuted = !_globalMuted;
+    notifyListeners();
+  }
+
+  /// Индекс карточки в ленте после перехода из классического меню (см. [openFeedAtDish]).
+  int? feedStartIndex;
+
   Timer? _debounce;
 
   // ── Геттеры ────────────────────────────────────────────────────────────────
@@ -57,8 +74,10 @@ class MenuProvider extends ChangeNotifier {
   MenuViewMode get mode => _mode;
   bool get loaded => _loaded;
 
-  // Уникальные теги из всех загруженных блюд — для динамических фильтр-чипов.
+  // Теги для фильтр-чипов: серверный список если загружен, иначе производный из блюд.
   List<ApiTag> get availableTags {
+    if (allTags.isNotEmpty) return allTags;
+    if (activeTagIds.isNotEmpty && _allSeenTags.isNotEmpty) return _allSeenTags;
     final seen = <int>{};
     final result = <ApiTag>[];
     for (final dish in dishes) {
@@ -74,17 +93,37 @@ class MenuProvider extends ChangeNotifier {
   // Загружает сохранённый режим из SharedPreferences, затем параллельно
   // запрашивает категории, первую страницу блюд и первую страницу ленты.
   Future<void> load() async {
+    isBootstrapping = true;
+    bootstrapError = null;
+    notifyListeners();
+
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('menu_mode');
     _mode = saved == 'classic' ? MenuViewMode.classic : MenuViewMode.feed;
     _loaded = true;
     notifyListeners();
 
-    await Future.wait([
-      loadCategories(),
-      loadDishes(refresh: true),
-      loadFeed(refresh: true),
-    ]);
+    try {
+      await Future.wait([
+        loadCategories(),
+        loadTags(),
+        loadDishes(refresh: true),
+        loadFeed(refresh: true),
+      ]);
+    } finally {
+      isBootstrapping = false;
+      _syncBootstrapError();
+      notifyListeners();
+    }
+  }
+
+  void _syncBootstrapError() {
+    final hasDishes = dishes.isNotEmpty || feedDishes.isNotEmpty;
+    if (hasDishes) {
+      bootstrapError = null;
+      return;
+    }
+    bootstrapError = error ?? feedError;
   }
 
   // ── Категории ──────────────────────────────────────────────────────────────
@@ -94,6 +133,15 @@ class MenuProvider extends ChangeNotifier {
       categories = await _repository.fetchCategories();
     } catch (_) {
       categories = const [];
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadTags() async {
+    try {
+      allTags = await _repository.fetchTags();
+    } catch (_) {
+      allTags = const [];
     }
     notifyListeners();
   }
@@ -124,10 +172,25 @@ class MenuProvider extends ChangeNotifier {
     try {
       final result = await _repository.fetchDishes(
         categoryId: activeCategoryId,
+        tagIds: activeTagIds.isEmpty ? null : activeTagIds,
         search: searchQuery.isEmpty ? null : searchQuery,
         page: _page,
       );
       dishes = [...dishes, ...result.dishes];
+
+      // Обновляем список всех виденных тегов только когда фильтр пуст,
+      // чтобы чипы не исчезали при активации фильтрации.
+      if (activeTagIds.isEmpty) {
+        final seen = <int>{};
+        final resultTags = <ApiTag>[];
+        for (final dish in dishes) {
+          for (final tag in dish.tags) {
+            if (seen.add(tag.id)) resultTags.add(tag);
+          }
+        }
+        _allSeenTags = resultTags;
+      }
+
       hasMore = result.hasMore;
       _page++;
     } catch (e) {
@@ -136,6 +199,7 @@ class MenuProvider extends ChangeNotifier {
     } finally {
       isLoading = false;
       isLoadingMore = false;
+      if (!isBootstrapping) _syncBootstrapError();
       notifyListeners();
     }
   }
@@ -169,11 +233,43 @@ class MenuProvider extends ChangeNotifier {
       hasMoreFeed = false;
     } finally {
       isLoadingFeed = false;
+      if (!isBootstrapping) _syncBootstrapError();
       notifyListeners();
     }
   }
 
-  Future<void> retry() => load();
+  Future<void> retry() async {
+    bootstrapError = null;
+    error = null;
+    feedError = null;
+    await load();
+  }
+
+  // ── С главной (Путь героя / быстрые действия) ───────────────────────────────
+
+  /// Полное меню: видео-лента, без фильтра категории (ТЗ: лента по умолчанию).
+  Future<void> openMenuBrowseAll() async {
+    await setMode(MenuViewMode.feed);
+    setCategory(null);
+  }
+
+  /// «Путь героя» в меню: классический режим + категория по подстроке имени (RU).
+  Future<void> openMenuPathCategory(String nameHintRu) async {
+    await setMode(MenuViewMode.classic);
+    final hint = nameHintRu.toLowerCase().trim();
+    if (hint.isEmpty) {
+      setCategory(null);
+      return;
+    }
+    int? id;
+    for (final c in categories) {
+      if (c.name.toLowerCase().contains(hint)) {
+        id = c.id;
+        break;
+      }
+    }
+    setCategory(id);
+  }
 
   // ── Фильтры ────────────────────────────────────────────────────────────────
 
@@ -181,6 +277,23 @@ class MenuProvider extends ChangeNotifier {
   void setCategory(int? id) {
     if (activeCategoryId == id) return;
     activeCategoryId = id;
+    activeTagIds.clear();
+    _allSeenTags.clear();
+    loadDishes(refresh: true);
+  }
+
+  void toggleTag(int tagId) {
+    if (activeTagIds.contains(tagId)) {
+      activeTagIds.remove(tagId);
+    } else {
+      activeTagIds.add(tagId);
+    }
+    loadDishes(refresh: true);
+  }
+
+  void clearTags() {
+    if (activeTagIds.isEmpty) return;
+    activeTagIds.clear();
     loadDishes(refresh: true);
   }
 
@@ -204,6 +317,23 @@ class MenuProvider extends ChangeNotifier {
       mode == MenuViewMode.classic ? 'classic' : 'feed',
     );
     notifyListeners();
+  }
+
+  /// Классическое меню → полноэкранное видео блюда в режиме «Видео».
+  Future<void> openFeedAtDish(int dishId) async {
+    await setMode(MenuViewMode.feed);
+    var idx = feedDishes.indexWhere((d) => d.id == dishId);
+    if (idx < 0) {
+      await loadFeed(refresh: true);
+      idx = feedDishes.indexWhere((d) => d.id == dishId);
+    }
+    feedStartIndex = idx >= 0 ? idx : 0;
+    notifyListeners();
+  }
+
+  void clearFeedStartIndex() {
+    if (feedStartIndex == null) return;
+    feedStartIndex = null;
   }
 
   @override

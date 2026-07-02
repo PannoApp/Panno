@@ -44,7 +44,7 @@ UserProfile _sampleProfile() => const UserProfile(
       notificationsEnabled: true,
     );
 
-CoreInfo _coreInfo({bool depositRequired = false}) => CoreInfo(
+CoreInfo _coreInfo({bool depositRequired = false, String? bookingDepositNote}) => CoreInfo(
       address: 'Астана',
       workingHours: '10:00–22:00',
       isOpenNow: true,
@@ -52,6 +52,7 @@ CoreInfo _coreInfo({bool depositRequired = false}) => CoreInfo(
       socialLinks: const [],
       heroSlides: const [],
       bookingDepositRequired: depositRequired,
+      bookingDepositNote: bookingDepositNote,
       visitRules: const [],
       privacyPolicy: 'Политика',
     );
@@ -139,7 +140,10 @@ void main() {
     });
 
     testWidgets('Если depositRequired=true → предупреждение видно', (tester) async {
-      core.coreInfo = _coreInfo(depositRequired: true);
+      core.coreInfo = _coreInfo(
+        depositRequired: true,
+        bookingDepositNote: 'Для выбранного стола может потребоваться депозит. Менеджер направит вас на звонок.',
+      );
 
       await tester.pumpWidget(buildApp());
       await settle(tester);
@@ -153,7 +157,7 @@ void main() {
     testWidgets('При успешном submitBooking() → success state отображается',
         (tester) async {
       auth.currentUser = _sampleProfile();
-      when(() => mockRepo.createBooking(any())).thenAnswer((_) async {});
+      when(() => mockRepo.createBooking(any(), idempotencyKey: any(named: 'idempotencyKey'))).thenAnswer((_) async {});
 
       await tester.pumpWidget(buildApp());
       await settle(tester); // postFrameCallback заполняет имя + телефон

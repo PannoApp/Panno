@@ -2,6 +2,7 @@ from django.core.cache import cache
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from rest_framework.generics import get_object_or_404
+from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from .models import RestaurantInfo, AppVersion, InteriorPhoto
 from .serializers import RestaurantInfoSerializer, AppVersionSerializer, InteriorPhotoSerializer
@@ -88,12 +89,15 @@ class InteriorPhotoListView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
+        return InteriorPhoto.objects.all().order_by('zone', 'order')
+
+    def list(self, request, *args, **kwargs):
         # Галерея меняется редко — кэшируем на 1 час.
         # Инвалидация через post_save/post_delete-сигнал в apps/core/signals.py.
         # При недоступном Redis — fallback к прямому запросу в БД.
-        photos = safe_cache_get('interior_photos')
-        if photos is None:
-            # Сортировка: сначала по зоне (алфавит), внутри зоны — по полю order
-            photos = list(InteriorPhoto.objects.all().order_by('zone', 'order'))
-            safe_cache_set('interior_photos', photos, timeout=_CACHE_1H)
-        return photos
+        cached = safe_cache_get('interior_photos')
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        safe_cache_set('interior_photos', response.data, timeout=_CACHE_1H)
+        return response

@@ -16,6 +16,7 @@ dependencies:
   shared_preferences: ^2.5.5
   # HTTP-клиент с поддержкой JWT-интерцептора и retry
   dio: ^5.7.0
+  http_parser: ^4.0.0
   # Безопасное хранение JWT-токенов (keychain/keystore)
   flutter_secure_storage: ^9.2.2
   # State management — минимальная надстройка над InheritedNotifier
@@ -26,10 +27,20 @@ dependencies:
   firebase_messaging: ^15.1.3
   # Воспроизведение видео для ленты блюд
   video_player: ^2.9.1
+  # Атмосферное фоновое аудио на экране интерьера
+  audioplayers: ^6.1.0
+  # WebView для встроенного просмотра 3D-тура
+  webview_flutter: ^4.10.0
+  # Кэширование видеофайлов на диске (избегаем повторных сетевых запросов)
+  flutter_cache_manager: ^3.4.1
   # Кэшированная загрузка изображений из API с плейсхолдерами
   cached_network_image: ^3.4.1
   # Генерация UUID для Idempotency-Key в booking/event reservation
   uuid: ^4.5.1
+  # Выбор фото из галереи / камеры для загрузки блюд
+  image_picker: ^1.1.2
+  # Кадрирование выбранного фото перед загрузкой
+  image_cropper: ^8.0.2
 
 dev_dependencies:
   flutter_test:
@@ -44,6 +55,8 @@ flutter:
   assets:
     # Все SVG и интерьерные PNG из одной папки (в т.ч. interior_hero_4…21).
     - assets/images/
+    # Атмосферные аудиофайлы для экрана интерьера
+    - assets/audio/
 
   fonts:
     - family: MuseoSans

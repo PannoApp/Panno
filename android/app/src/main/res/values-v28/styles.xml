@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="UCropTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Запрещаем рисование в области выреза дисплея (чёлки).
+             Кнопки тулбара UCrop не будут перекрываться нотчем на Android 9+. -->
+        <item name="android:windowLayoutInDisplayCutoutMode">never</item>
+    </style>
+</resources>

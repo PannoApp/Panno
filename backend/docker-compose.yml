@@ -55,6 +55,48 @@ services:
       db:
         condition: service_healthy
 
+  # MinIO — S3-совместимое объектное хранилище для медиафайлов
+  minio:
+    image: minio/minio:latest
+    container_name: minio_storage
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # MinIO Console UI (http://localhost:9001)
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '1.0'
+
+  # Одноразовый init-контейнер: создаёт бакет и открывает публичный read-доступ
+  createbuckets:
+    image: minio/mc:latest
+    container_name: minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $${AWS_ACCESS_KEY_ID} $${AWS_SECRET_ACCESS_KEY} &&
+        mc mb --ignore-existing local/$${AWS_STORAGE_BUCKET_NAME} &&
+        mc anonymous set download local/$${AWS_STORAGE_BUCKET_NAME} &&
+        echo 'Bucket ready.' && exit 0
+      "
+    env_file:
+      - .env
+
   # Redis (для кэша и брокера Celery)
   redis:
     image: redis:7-alpine
@@ -110,6 +152,8 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -127,6 +171,7 @@ services:
     command: >
       celery -A config worker
       --loglevel=info
+      --queues=celery
       --concurrency=4
       --max-tasks-per-child=1000
       --time-limit=300
@@ -143,11 +188,47 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     deploy:
       resources:
         limits:
           memory: 512m
           cpus: '1.0'
+
+  # Celery Video Worker (изолированная очередь для FFmpeg-транскодирования)
+  # Отдельный воркер чтобы тяжёлые задачи обработки видео не блокировали SMS/push/booking
+  video-worker:
+    build: .
+    container_name: celery_video_worker
+    restart: unless-stopped
+    command: >
+      celery -A config worker
+      --loglevel=info
+      --queues=video
+      --concurrency=2
+      --max-tasks-per-child=50
+      --time-limit=960
+      --soft-time-limit=900
+    volumes:
+      - .:/app/backend
+      - ./logs:/app/backend/logs
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '2.0'
 
   # Celery Beat (планировщик периодических задач)
   beat:
@@ -174,33 +255,6 @@ services:
           memory: 256m
           cpus: '0.5'
 
-  # Flower — веб-интерфейс мониторинга Celery
-  flower:
-    build: .
-    container_name: celery_flower
-    restart: unless-stopped
-    # FLOWER_USER/FLOWER_PASSWORD задаются в .env — защита от несанкционированного доступа.
-    # Если переменные не заданы, Flower запускается без аутентификации (только для dev).
-    command: >
-      sh -c "
-        if [ -n \"$${FLOWER_USER:-}\" ] && [ -n \"$${FLOWER_PASSWORD:-}\" ]; then
-          celery -A config flower --port=5555 --basic_auth=$${FLOWER_USER}:$${FLOWER_PASSWORD}
-        else
-          celery -A config flower --port=5555
-        fi
-      "
-    ports:
-      - "5555:5555"
-    env_file:
-      - .env
-    depends_on:
-      - redis
-      - worker
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-          cpus: '0.5'
-
 volumes:
   pg_data:
+  minio_data:

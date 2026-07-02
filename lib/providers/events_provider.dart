@@ -1,17 +1,19 @@
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../core/dio_errors.dart';
 import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
 import '../data/models/api_event.dart';
+import '../data/models/api_event_photo.dart';
 import '../data/repositories/events_repository.dart';
 
-/// Афиша, архив и новости с API + fallback на моки.
 class EventsProvider extends ChangeNotifier {
   EventsProvider({EventsRepository? repository})
       : _repository = repository ?? EventsRepository();
 
   final EventsRepository _repository;
+  final Map<int, String> _idempotencyKeys = {};
 
   List<ApiEvent> upcoming = const [];
   List<ApiEvent> archived = const [];
@@ -21,15 +23,17 @@ class EventsProvider extends ChangeNotifier {
   bool isLoadingArchived = false;
   bool isLoadingNews = false;
   bool isReserving = false;
+  bool isLoadingPhotoReport = false;
 
   String? upcomingError;
   String? archivedError;
   String? newsError;
   String? reserveError;
+  String? photoReportError;
 
-  bool _usedMockFallback = false;
-
-  bool get usedMockFallback => _usedMockFallback;
+  List<ApiEventPhoto> _photoReport = const [];
+  List<ApiEventPhoto> get photoReport => List.unmodifiable(_photoReport);
+  int? _photoReportEventId;
 
   Future<void> loadUpcoming() async {
     if (isLoadingUpcoming) return;
@@ -39,11 +43,9 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       upcoming = upcomingApiSorted(await _repository.fetchUpcoming());
-      _usedMockFallback = false;
     } catch (e) {
       upcomingError = dioErrorMessage(e);
-      upcoming = upcomingApiSorted(mockEventsAsApi());
-      _usedMockFallback = true;
+      upcoming = const [];
     } finally {
       isLoadingUpcoming = false;
       notifyListeners();
@@ -60,8 +62,7 @@ class EventsProvider extends ChangeNotifier {
       archived = pastApiSorted(await _repository.fetchArchived());
     } catch (e) {
       archivedError = dioErrorMessage(e);
-      archived = pastApiSorted(mockEventsAsApi());
-      _usedMockFallback = true;
+      archived = const [];
     } finally {
       isLoadingArchived = false;
       notifyListeners();
@@ -78,7 +79,7 @@ class EventsProvider extends ChangeNotifier {
       news = await _repository.fetchNews();
     } catch (e) {
       newsError = dioErrorMessage(e);
-      news = List.unmodifiable(mockNewsPosts());
+      news = const [];
     } finally {
       isLoadingNews = false;
       notifyListeners();
@@ -95,16 +96,60 @@ class EventsProvider extends ChangeNotifier {
 
   Future<void> retry() => load();
 
+  Future<void> retryNews() => loadNews();
+
+  Future<void> retryArchived() => loadArchived();
+
+  Future<void> loadPhotoReport(int eventId) async {
+    if (_photoReportEventId != eventId) {
+      _photoReport = const [];
+      photoReportError = null;
+    }
+    _photoReportEventId = eventId;
+
+    isLoadingPhotoReport = true;
+    photoReportError = null;
+    notifyListeners();
+
+    try {
+      _photoReport = await _repository.fetchPhotoReport(eventId);
+      photoReportError = null;
+    } catch (e) {
+      photoReportError = dioErrorMessage(e);
+      _photoReport = const [];
+    } finally {
+      isLoadingPhotoReport = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deletePhotoFromReport(int eventId, int photoId) async {
+    await _repository.deletePhotoFromReport(eventId, photoId);
+    _photoReport = _photoReport.where((p) => p.id != photoId).toList();
+    notifyListeners();
+  }
+
+  Future<void> deleteArchivedEvent(int eventId) async {
+    await _repository.deleteEvent(eventId);
+    archived = archived.where((e) => e.id != eventId).toList();
+    notifyListeners();
+  }
+
   Future<void> reserveEvent(int eventId, int guestsCount) async {
     isReserving = true;
     reserveError = null;
     notifyListeners();
 
+    final idempotencyKey =
+        _idempotencyKeys.putIfAbsent(eventId, () => const Uuid().v4());
+
     try {
       await _repository.createReservation(
         eventId: eventId,
         guestsCount: guestsCount,
+        idempotencyKey: idempotencyKey,
       );
+      _idempotencyKeys.remove(eventId);
     } catch (e) {
       reserveError = dioErrorMessage(e);
       rethrow;

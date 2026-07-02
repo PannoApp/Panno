@@ -40,8 +40,17 @@ def process_dish_video(self, dish_id: int):
     dish.video_status = Dish.VideoStatus.PROCESSING
     dish.save(update_fields=['video_status'])
 
-    # Путь к оригинальному файлу (при S3 нужно сначала скачать во временный файл)
-    src_path = dish.video.path
+    # Для FileSystemStorage получаем путь напрямую.
+    # S3Storage не поддерживает .path — скачиваем во временный файл.
+    src_tmp_path = None
+    try:
+        src_path = dish.video.path
+    except NotImplementedError:
+        ext = os.path.splitext(dish.video.name)[1]
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as src_tmp:
+            src_tmp.write(dish.video.read())
+            src_tmp_path = src_tmp.name
+        src_path = src_tmp_path
 
     # Создаём временный файл для результата; FFmpeg запишет в него транскодированное видео
     with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
@@ -79,11 +88,12 @@ def process_dish_video(self, dish_id: int):
     except ffmpeg.Error as exc:
         # Декодируем stderr FFmpeg для диагностики в логах
         logger.error("FFmpeg error dish %s: %s", dish_id, exc.stderr.decode())
-        dish.video_status = Dish.VideoStatus.FAILED
-        dish.save(update_fields=['video_status'])
+        Dish.objects.filter(pk=dish.pk).update(video_status=Dish.VideoStatus.FAILED)
         # Повторяем задачу через 60 секунд (максимум max_retries раз)
         raise self.retry(exc=exc, countdown=60)
 
     finally:
-        # Удаляем временный файл в любом случае, чтобы не засорять диск
+        # Удаляем временные файлы в любом случае, чтобы не засорять диск
         os.unlink(out_path)
+        if src_tmp_path:
+            os.unlink(src_tmp_path)

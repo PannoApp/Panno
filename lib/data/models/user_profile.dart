@@ -11,6 +11,8 @@ class UserProfile {
     required this.notifyClosedEvents,
     required this.notificationsEnabled,
     this.dateJoined,
+    this.isStaff = false,
+    this.role = '',
   });
 
   final int id;
@@ -22,8 +24,11 @@ class UserProfile {
   final bool notifyClosedEvents;
   final bool notificationsEnabled;
   final DateTime? dateJoined;
+  final bool isStaff;
+  final String role;
 
   String get displayName => '$firstName $lastName'.trim();
+  bool get isAdmin => isStaff;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
@@ -46,6 +51,8 @@ class UserProfile {
         defaultValue: true,
       ),
       dateJoined: _parseDateJoined(json['date_joined'] ?? json['dateJoined']),
+      isStaff: json['is_staff'] as bool? ?? false,
+      role: json['role'] as String? ?? '',
     );
   }
 
@@ -65,6 +72,8 @@ class UserProfile {
         'notify_closed_events': notifyClosedEvents,
         'notifications_enabled': notificationsEnabled,
         if (dateJoined != null) 'date_joined': dateJoined!.toIso8601String(),
+        'is_staff': isStaff,
+        'role': role,
       };
 
   UserProfile copyWith({
@@ -73,6 +82,8 @@ class UserProfile {
     bool? notifyClosedEvents,
     bool? notificationsEnabled,
     DateTime? dateJoined,
+    bool? isStaff,
+    String? role,
   }) {
     return UserProfile(
       id: id,
@@ -84,6 +95,8 @@ class UserProfile {
       notifyClosedEvents: notifyClosedEvents ?? this.notifyClosedEvents,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       dateJoined: dateJoined ?? this.dateJoined,
+      isStaff: isStaff ?? this.isStaff,
+      role: role ?? this.role,
     );
   }
 }

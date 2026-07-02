@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/home_data.dart';
+import '../core/piligrim_route.dart';
 import '../core/theme.dart';
 import '../data/repositories/core_repository.dart';
 import '../main.dart';
@@ -196,7 +197,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (auth.isNewUser) {
       auth.isNewUser = false;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        PiligrimPageRoute(builder: (_) => const OnboardingScreen()),
       );
       return;
     }
@@ -232,19 +233,22 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           _buildBackgroundLayer(),
           Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildStarTotem(),
-                const SizedBox(height: 8),
-                _buildPathLine(),
-                const SizedBox(height: 16),
-                _buildLogo(),
-                const SizedBox(height: 20),
-                _buildTagline(),
-                const SizedBox(height: 18),
-                _buildConcept(),
-              ],
+            child: Transform.translate(
+              offset: const Offset(0, -6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildStarTotem(),
+                  const SizedBox(height: 8),
+                  _buildPathLine(),
+                  const SizedBox(height: 20),
+                  _buildLogo(),
+                  const SizedBox(height: 20),
+                  _buildTagline(),
+                  const SizedBox(height: 20),
+                  _buildConcept(),
+                ],
+              ),
             ),
           ),
           _buildBottomLabel(),
@@ -255,19 +259,54 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _buildBackgroundLayer() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment(0.0, -0.3),
-          radius: 1.2,
-          colors: [
-            Color(0xFF4A4744),
-            PiligrimColors.earth,
-            PiligrimColors.earthDeep,
-          ],
-          stops: [0.0, 0.5, 1.0],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                PiligrimColors.earthDeep,
+                PiligrimColors.earth,
+                PiligrimColors.earthWarm,
+                PiligrimColors.earthDeep,
+              ],
+              stops: [0.0, 0.36, 0.72, 1.0],
+            ),
+          ),
         ),
-      ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                PiligrimColors.ember.withValues(alpha: 0.15),
+                PiligrimColors.steppe.withValues(alpha: 0.05),
+                PiligrimColors.clear,
+              ],
+              stops: const [0.0, 0.40, 0.80],
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                PiligrimColors.earthDeep.withValues(alpha: 0.34),
+                PiligrimColors.clear,
+                PiligrimColors.clear,
+                PiligrimColors.earthDeep.withValues(alpha: 0.52),
+              ],
+              stops: const [0.0, 0.30, 0.60, 1.0],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -287,7 +326,7 @@ class _SplashScreenState extends State<SplashScreen>
         width: 48,
         height: 48,
         colorFilter: const ColorFilter.mode(
-          PiligrimColors.water,
+          PiligrimColors.sky,
           BlendMode.srcIn,
         ),
       ),
@@ -315,7 +354,7 @@ class _SplashScreenState extends State<SplashScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              PiligrimColors.water,
+              PiligrimColors.steppe,
               PiligrimColors.divider,
             ],
           ),
@@ -355,7 +394,7 @@ class _SplashScreenState extends State<SplashScreen>
           Text(
             'дәстүрдің дәмі',
             style: PiligrimTextStyles.caption.copyWith(
-              color: PiligrimColors.water,
+              color: PiligrimColors.steppe.withValues(alpha: 0.90),
               letterSpacing: 2.5,
               fontSize: 11,
             ),
@@ -380,17 +419,17 @@ class _SplashScreenState extends State<SplashScreen>
     return FadeTransition(
       opacity: _conceptOpacity,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
+        padding: const EdgeInsets.symmetric(horizontal: 52),
         child: Text(
           kModernNomadConcept,
           textAlign: TextAlign.center,
           maxLines: 4,
           overflow: TextOverflow.ellipsis,
           style: PiligrimTextStyles.body.copyWith(
-            fontSize: 12,
-            height: 1.4,
+            fontSize: 11.5,
+            height: 1.5,
             fontWeight: FontWeight.w300,
-            color: PiligrimColors.sky.withValues(alpha: 0.5),
+            color: PiligrimColors.sky.withValues(alpha: 0.52),
           ),
         ),
       ),
@@ -398,8 +437,9 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _buildBottomLabel() {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Positioned(
-      bottom: 48,
+      bottom: bottomInset > 0 ? bottomInset + 16.0 : 48.0,
       left: 0,
       right: 0,
       child: FadeTransition(
@@ -407,8 +447,8 @@ class _SplashScreenState extends State<SplashScreen>
         child: Text(
           'PILIGRIM',
           style: PiligrimTextStyles.caption.copyWith(
-            color: PiligrimColors.sky.withValues(alpha: 0.2),
-            letterSpacing: 8,
+            color: PiligrimColors.sky.withValues(alpha: 0.24),
+            letterSpacing: 7.5,
             fontSize: 10,
           ),
           textAlign: TextAlign.center,
@@ -420,7 +460,7 @@ class _SplashScreenState extends State<SplashScreen>
   // Отклоняемый баннер — показывается когда min ≤ current < latest
   Widget _buildUpdateBanner() {
     return Positioned(
-      top: MediaQuery.of(context).padding.top + 12,
+      top: MediaQuery.paddingOf(context).top + 12,
       left: 16,
       right: 16,
       child: Material(
@@ -460,7 +500,14 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               GestureDetector(
                 onTap: () => setState(() => _showUpdateBanner = false),
-                child: const Icon(Icons.close, size: 16, color: PiligrimColors.navInactive),
+                child: const Text(
+                  '×',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: PiligrimColors.navInactive,
+                    height: 1.0,
+                  ),
+                ),
               ),
             ],
           ),

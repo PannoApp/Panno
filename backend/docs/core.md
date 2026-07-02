@@ -33,18 +33,20 @@
   "hero_slides": [
     {
       "id": 1,
-      "image": "https://cdn.example.com/media/core/hero/slide1.jpg",
+      "image": "https://cdn.example.com/media/core/hero/f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6.jpg",
       "order": 0
     }
   ],
-  "hero_video_url": "https://cdn.example.com/media/core/hero.mp4",
-  "visit_rules": "Дресс-код: smart casual. Дети до 12 лет...",
+  "visit_rules": [
+    {"title": "Дресс-код", "body": "Деловой casual..."},
+    {"title": "Дети", "body": "Приветствуются до 21:00..."}
+  ],
   "privacy_policy": "Настоящая политика...",
   "terms_of_service": "Пользуясь приложением..."
 }
 ```
 
-Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram`, `hero_video_url`, `concept_description` могут быть пустой строкой, если не заполнены в админке. `hero_slides` возвращает пустой список `[]`, если изображения не загружены.
+Поля `tour_link`, `twogis_link`, `phone`, `whatsapp`, `telegram`, `instagram`, `concept_description` могут быть пустой строкой, если не заполнены в админке. `hero_slides` возвращает пустой список `[]`, если изображения не загружены.
 
 ## Модель RestaurantInfo
 
@@ -62,9 +64,8 @@
 | `telegram` | string | Контакт в Telegram |
 | `instagram` | string | Ссылка/никнейм Instagram |
 | `concept_description` | text | Краткое описание концепции ресторана (главный экран приложения) |
-| `hero_slides` | array | Список изображений-слайдов для главного экрана |
-| `hero_video_url` | URL | Ссылка на заглавное видео (YouTube, CDN и т.п.; пустая строка если не задана) |
-| `visit_rules` | text | Правила посещения ресторана |
+| `hero_slides` | array | Список изображений-слайдов для главного экрана. Каждый слайд: `{id, image, order}`. Поле `image` — **абсолютный URL** к JPEG, автоматически обрезанному до 16:9. Имя файла — UUID hex (32 символа). При замене или удалении слайда старый файл удаляется из хранилища автоматически (django-cleanup). |
+| `visit_rules` | array | Правила посещения — список `{title, body}`, отсортированных по `order`. Управляется через inline в Django Admin. |
 | `privacy_policy` | text | Политика обработки персональных данных |
 | `terms_of_service` | text | Пользовательское соглашение |
 
@@ -106,6 +107,42 @@
 | `latest_version` | string | Последняя доступная версия — ниже этой версии показывается баннер "доступно обновление" |
 | `store_url` | URL | Ссылка на страницу приложения в App Store / Google Play |
 | `updated_at` | datetime | Дата последнего обновления записи (auto) |
+
+---
+
+## Эндпоинт
+
+### GET /api/v1/core/interior/
+
+Возвращает все фотографии интерьера, сгруппированные по зонам.
+
+**Авторизация:** не нужна
+
+**Ответ 200:**
+```json
+[
+  {
+    "id": 1,
+    "zone": "main_hall",
+    "zone_display": "Главный зал",
+    "image": "https://piligrim.kz/media/interior/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6.jpg",
+    "caption": "Главный зал, 40 мест",
+    "order": 0
+  },
+  {
+    "id": 2,
+    "zone": "bar",
+    "zone_display": "Бар",
+    "image": "https://piligrim.kz/media/interior/b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6.jpg",
+    "caption": "",
+    "order": 0
+  }
+]
+```
+
+Результаты отсортированы по `zone ASC`, затем `order ASC`. Поле `image` — **абсолютный URL**. Фотографии интерьера не обрезаются автоматически — отображаются fullscreen с `BoxFit.contain` во Flutter. Управление исключительно через Django-админку. При замене фото или удалении объекта старый файл удаляется из хранилища автоматически (django-cleanup).
+
+**Зоны (`zone`):** `main_hall`, `bar`, `private`, `terrace`, `other`.
 
 ---
 

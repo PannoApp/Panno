@@ -1,5 +1,5 @@
 ---
-description: PILIGRIM scope — minimal diffs, fixed stack, trust docs/flutter
+description: 
 alwaysApply: true
 ---
 
@@ -23,4 +23,26 @@ Flutter app: repo root (`lib/`, `pubspec.yaml`). Backend: `backend/` — only to
 - `CLAUDE.md` Flutter section may be stale — prefer `docs/flutter` + code.
 
 ## Copy
-- User-facing text: Russian, calm premium tone (путь / герой / традиции).
+
+User-facing text must be Russian, calm and premium.
+
+Avoid:
+- over-poetic wording;
+- mystical/dramatic language;
+- theatrical ritual phrasing;
+- marketing pressure;
+- emoji.
+
+Prefer:
+- clear hospitality language;
+- short helpful messages;
+- light brand tone;
+- calm confidence.
+
+Brand words like "путь", "герой", "традиции" may be used lightly,
+but never force them into:
+- system messages;
+- errors;
+- destructive dialogs;
+- onboarding copy;
+- retry states.

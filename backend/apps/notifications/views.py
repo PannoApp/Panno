@@ -6,7 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsContentManager
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from .models import UserDevice, PushCampaign
-from .serializers import UserDeviceSerializer, BulkPushSerializer
+from django.conf import settings
+from .serializers import UserDeviceSerializer, BulkPushSerializer, SendPushViaBotSerializer
 
 
 @extend_schema(tags=['Notifications'])
@@ -167,20 +168,6 @@ class BulkPushView(views.APIView):
                 .values_list('user_id', flat=True)
                 .distinct()
             )
-        elif segment == 'by_city':
-            # Геолокационный сегмент: пользователи, у которых поле city совпадает с переданным
-            city = data.get('city', '').strip()
-            if not city:
-                return Response({'city': ['Обязательно для сегмента by_city.']}, status=400)
-            raw_ids = list(
-                User.objects.filter(city__iexact=city).values_list('id', flat=True)
-            )
-            # Оставляем только тех, у кого есть хотя бы одно FCM-устройство.
-            user_ids = list(
-                UserDevice.objects.filter(user_id__in=raw_ids)
-                .values_list('user_id', flat=True)
-                .distinct()
-            )
         else:
             user_ids = []
 
@@ -206,3 +193,77 @@ class BulkPushView(views.APIView):
             {'queued': len(user_ids), 'segment': segment},
             status=status.HTTP_202_ACCEPTED,
         )
+
+
+class SendPushViaBotView(views.APIView):
+    permission_classes = []  # Public endpoint, validation relies on secret token and manager role
+
+    @extend_schema(
+        tags=['Notifications'],
+        summary='Рассылка push-уведомления через Telegram-бот',
+        description='Принимает запрос от Telegram-бота для массовой рассылки push-уведомлений всем зарегистрированным устройствам.',
+        request=SendPushViaBotSerializer,
+        responses={
+            202: OpenApiResponse(description='Рассылка успешно поставлена в очередь'),
+            400: OpenApiResponse(description='Ошибка валидации данных'),
+            403: OpenApiResponse(description='Доступ запрещен (неверный токен вебхука или менеджер не найден/не имеет прав)'),
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        secret = getattr(settings, 'TELEGRAM_WEBHOOK_SECRET', '')
+        if secret and request.headers.get('X-Telegram-Bot-Api-Secret-Token', '') != secret:
+            return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = SendPushViaBotSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        manager_telegram_id = serializer.validated_data['manager_telegram_id']
+        title = serializer.validated_data['title']
+        body = serializer.validated_data['body']
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        try:
+            manager = User.objects.get(telegram_id=manager_telegram_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Manager not found'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Разрешено только активным пользователям (is_active=True)
+        # с ролью admin или content_manager (или is_superuser)
+        is_allowed = (
+            manager.is_active and
+            (manager.is_superuser or manager.role in ('admin', 'content_manager'))
+        )
+        if not is_allowed:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        user_ids = list(
+            UserDevice.objects.values_list('user_id', flat=True).distinct()
+        )
+
+        category = serializer.validated_data.get('category') or ''
+
+        campaign = PushCampaign.objects.create(
+            title=title,
+            body=body,
+            category=category,
+            segment='all',
+            total_users=len(user_ids),
+        )
+
+        from .tasks import send_bulk_push_notification
+        send_bulk_push_notification.delay(
+            user_ids=user_ids,
+            title=title,
+            body=body,
+            data={'campaign_id': str(campaign.pk)},
+            category=category,
+            campaign_id=campaign.pk,
+        )
+
+        return Response(
+            {'queued': len(user_ids), 'campaign_id': campaign.pk},
+            status=status.HTTP_202_ACCEPTED
+        )
+

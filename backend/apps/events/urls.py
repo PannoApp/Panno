@@ -1,13 +1,21 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from .views import (
     UpcomingEventsListView,
     ArchivedEventsListView,
     NewsListView,
     EventReservationCreateView,
-    UserEventReservationsListView
+    UserEventReservationsListView,
+    EventPhotoReportListView,
+    StaffEventViewSet,
+    StaffNewsViewSet,
 )
 
 app_name = 'events'
+
+router = DefaultRouter()
+router.register(r'admin/events', StaffEventViewSet, basename='staff-event')
+router.register(r'admin/news', StaffNewsViewSet, basename='staff-news')
 
 urlpatterns = [
     # Список будущих мероприятий
@@ -19,4 +27,10 @@ urlpatterns = [
 
     path('reservations/create/', EventReservationCreateView.as_view(), name='reservation-create'),
     path('reservations/my/', UserEventReservationsListView.as_view(), name='reservation-list'),
+
+    # Фотоотчёт прошедшего мероприятия
+    path('<int:event_id>/photo-report/', EventPhotoReportListView.as_view(), name='event-photo-report'),
+
+    # Staff CRUD
+    path('', include(router.urls)),
 ]

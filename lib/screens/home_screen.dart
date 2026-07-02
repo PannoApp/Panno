@@ -1,20 +1,24 @@
 // Home Screen — «Карта путешествия» PILIGRIM
 // Кинематографичный, тихий luxury; без glass / неона (piligrim_design_spec.md)
 //
-// Виджеты: home_hero_section, home_cinematic_ambient, home_totem_path,
+// ТЗ §4.1 (brand/TZ Piligrim App.md): hero и/или видео-визуал, концепция Modern Nomad,
+// бронь (Ember CTA), меню и маршрут под блоком «Путь героя», анонс события, часы и статус.
+//
+// Виджеты: home_hero_section, home_cinematic_ambient,
 //   home_action_block, home_event_block, home_status_line
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import '../core/theme.dart';
 import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/home_cinematic_ambient.dart';
 import '../widgets/home_hero_section.dart';
 import '../widgets/home_hero_intro_block.dart';
-import '../widgets/home_totem_path.dart';
 import '../widgets/home_action_block.dart';
 import '../widgets/home_event_block.dart';
+import '../widgets/error_view.dart';
 import '../widgets/home_status_line.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -81,14 +85,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final core = context.watch<CoreInfoProvider>();
     final size = MediaQuery.sizeOf(context);
     final heroHeight =
-        (size.height * 0.58).clamp(310.0, size.height * 0.62);
+        (size.height * 0.68).clamp(330.0, size.height * 0.72).roundToDouble();
     final heroUrls = core.heroImageUrls;
     final hoursLine = core.workingHoursNote?.isNotEmpty == true
         ? '${core.workingHoursDisplay} · ${core.workingHoursNote}'
         : core.workingHoursDisplay;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1B19),
+      backgroundColor: PiligrimColors.earthSurface,
       extendBodyBehindAppBar: true,
       extendBody: true,
       body: Stack(
@@ -124,9 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
           CustomScrollView(
             controller: _scrollCtrl,
             clipBehavior: Clip.none,
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
+            physics: null,
             slivers: [
               SliverToBoxAdapter(
                 child: RepaintBoundary(
@@ -151,31 +153,31 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const RepaintBoundary(child: HomeHeroIntroBlock()),
-                    RepaintBoundary(
-                      child: HomeActionBlock(onNavigate: widget.onNavigate),
+                    const RepaintBoundary(
+                      child: HomeActionBlock(bottomPadding: 0),
                     ),
+                    RepaintBoundary(
+                      child: HomeStatusLine(
+                        isOpen: core.isOpenNow,
+                        hoursLabel: hoursLine,
+                      ),
+                    ),
+                    if (core.error != null && !core.isLoading)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                        child: PiligrimInlineError(
+                          title: 'Данные не обновились',
+                          message: core.error!,
+                          onRetry: () => core.retry(),
+                        ),
+                      ),
                   ],
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 40)),
-              SliverToBoxAdapter(
-                child: RepaintBoundary(
-                  child: HomeTotemPathRow(onNavigate: widget.onNavigate),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 48)),
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
               SliverToBoxAdapter(
                 child: RepaintBoundary(
                   child: HomeEventBlock(onNavigate: widget.onNavigate),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 48)),
-              SliverToBoxAdapter(
-                child: RepaintBoundary(
-                  child: HomeStatusLine(
-                    isOpen: core.isOpenNow,
-                    hoursLabel: hoursLine,
-                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 120)),

@@ -1,52 +1,10 @@
 import re
-from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import models
 
-
-def validate_hero_image(image):
-    """
-    Проверяет, что загружаемое фото пригодно для hero-слайдера:
-    - формат JPEG или PNG
-    - минимальное разрешение 800 × 450 px
-    - соотношение сторон от 1.5:1 до 2.4:1 (ландшафт, близко к 16:9)
-    - размер файла не более 5 МБ
-    """
-    # Размер файла
-    max_bytes = 5 * 1024 * 1024
-    if hasattr(image, 'size') and image.size > max_bytes:
-        raise ValidationError(
-            f'Файл слишком большой ({image.size // (1024*1024)} МБ). Максимум — 5 МБ.'
-        )
-
-    # Формат
-    name = getattr(image, 'name', '') or ''
-    if not name.lower().endswith(('.jpg', '.jpeg', '.png')):
-        raise ValidationError('Допустимые форматы: JPEG (.jpg) и PNG (.png).')
-
-    # Размеры и соотношение сторон
-    try:
-        from PIL import Image as PilImage
-        img = PilImage.open(image)
-        w, h = img.size
-        if w < 800 or h < 450:
-            raise ValidationError(
-                f'Слишком маленькое изображение ({w}×{h} px). '
-                'Минимум — 800×450 px.'
-            )
-        ratio = w / h
-        if not (1.5 <= ratio <= 2.4):
-            raise ValidationError(
-                f'Неподходящее соотношение сторон ({w}:{h} ≈ {ratio:.2f}:1). '
-                'Нужно горизонтальное фото близко к 16:9 (соотношение от 1.5:1 до 2.4:1).'
-            )
-        # Сбрасываем указатель, чтобы Django смог сохранить файл после валидации
-        image.seek(0)
-    except ValidationError:
-        raise
-    except Exception:
-        # Если Pillow недоступен или файл повреждён — пропускаем размерную проверку
-        pass
+from utils.image_processing import AutoCropImageMixin
+from utils.upload_paths import interior_image_upload, hero_image_upload
+from utils.validators import validate_hero_image
 
 
 class RestaurantInfo(models.Model):
@@ -99,33 +57,113 @@ class RestaurantInfo(models.Model):
     instagram = models.CharField("Instagram", max_length=100, blank=True)
 
     concept_description = models.TextField("Описание концепции", blank=True, default='')
-    hero_video_url = models.URLField("URL заглавного видео", max_length=500, blank=True, default='')
 
-    visit_rules = models.TextField("Правила посещения", blank=True)
     privacy_policy = models.TextField("Политика обработки ПД", blank=True)
     terms_of_service = models.TextField("Пользовательское соглашение", blank=True)
 
     @property
     def is_open_now(self) -> bool:
         """
-        Парсит working_hours вида "Пн–Вс: 12:00–00:00" и возвращает True,
+        Парсит working_hours вида "Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00" и возвращает True,
         если текущее локальное время входит в указанный диапазон.
         Возвращает None при невозможности разобрать строку.
         """
         if not self.working_hours:
             return None
-        match = re.search(r'(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})', self.working_hours)
-        if not match:
-            return None
-        open_h, open_m, close_h, close_m = (int(x) for x in match.groups())
-        now = timezone.localtime(timezone.now()).time()
+
+        # Нормализуем строку: приводим к нижнему регистру, заменяем длинные тире на дефисы
+        normalized = self.working_hours.lower()
+        normalized = normalized.replace('–', '-').replace('—', '-')
+        
+        # Разделяем на сегменты по запятым, точкам с запятой или переносам строк
+        segments = re.split(r'[,;\n]', normalized)
+        
         from datetime import time
-        open_t = time(open_h, open_m)
-        close_t = time(close_h, close_m)
-        if close_t <= open_t:
-            # Переход через полночь (например 20:00–02:00)
-            return now >= open_t or now < close_t
-        return open_t <= now < close_t
+        
+        # Получаем текущее локальное время и день недели
+        now_dt = timezone.localtime(timezone.now())
+        
+        # Поддержка мокнутого времени в тестах
+        if hasattr(now_dt, 'time') and callable(now_dt.time):
+            current_time = now_dt.time()
+        else:
+            current_time = now_dt
+            
+        if hasattr(now_dt, 'weekday') and callable(now_dt.weekday):
+            current_weekday = now_dt.weekday()
+        else:
+            current_weekday = getattr(now_dt, 'weekday', 0)
+            if not isinstance(current_weekday, int):
+                current_weekday = 0
+        
+        WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+        
+        parsed_any = False
+        is_open = False
+        
+        for segment in segments:
+            segment = segment.strip()
+            if not segment:
+                continue
+                
+            # Ищем диапазон времени HH:MM-HH:MM
+            time_match = re.search(r'(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})', segment)
+            if not time_match:
+                continue
+                
+            parsed_any = True
+            
+            open_h, open_m, close_h, close_m = (int(x) for x in time_match.groups())
+            open_t = time(open_h, open_m)
+            close_t = time(close_h, close_m)
+            
+            # Извлекаем часть с днями недели, убрав время и двоеточия
+            days_part = segment.replace(time_match.group(0), "").strip().strip(":")
+            
+            days = set()
+            
+            # Ищем диапазоны дней недели (например, пн-пт)
+            day_ranges = re.findall(r'(пн|вт|ср|чт|пт|сб|вс)\s*-\s*(пн|вт|ср|чт|пт|сб|вс)', days_part)
+            for start_day, end_day in day_ranges:
+                start_idx = WEEKDAYS.index(start_day)
+                end_idx = WEEKDAYS.index(end_day)
+                if start_idx <= end_idx:
+                    days.update(range(start_idx, end_idx + 1))
+                else:
+                    days.update(range(start_idx, 7))
+                    days.update(range(0, end_idx + 1))
+                # Удаляем распознанный диапазон
+                days_part = days_part.replace(f"{start_day}-{end_day}", "")
+                
+            # Ищем отдельные дни
+            individual_days = re.findall(r'(пн|вт|ср|чт|пт|сб|вс)', days_part)
+            for d in individual_days:
+                days.add(WEEKDAYS.index(d))
+                
+            # Если нет упоминаний никаких дней недели вообще в исходном сегменте,
+            # считаем, что этот интервал применяется ко всем дням недели
+            has_any_weekday_word = any(w in segment for w in WEEKDAYS)
+            if not has_any_weekday_word:
+                days = set(range(7))
+                
+            # Проверяем, попадает ли текущее время в интервал работы
+            if close_t <= open_t:
+                # Пересечение полуночи
+                in_segment = (
+                    (current_weekday in days and current_time >= open_t) or
+                    ((current_weekday - 1) % 7 in days and current_time < close_t)
+                )
+            else:
+                # В пределах одного дня
+                in_segment = (current_weekday in days and open_t <= current_time < close_t)
+                
+            if in_segment:
+                is_open = True
+                
+        if not parsed_any:
+            return None
+            
+        return is_open
 
     class Meta:
         verbose_name = "Информация о ресторане"
@@ -150,6 +188,30 @@ class RestaurantInfo(models.Model):
         return obj
 
 
+class VisitRule(models.Model):
+    """
+    Правило посещения ресторана. Привязано к RestaurantInfo (singleton).
+    Отображается в Flutter-приложении в разделе «Правила посещения».
+    """
+    restaurant_info = models.ForeignKey(
+        RestaurantInfo,
+        on_delete=models.CASCADE,
+        related_name='visit_rules',
+        verbose_name="Ресторан",
+    )
+    title = models.CharField("Название", max_length=100)
+    body = models.TextField("Текст")
+    order = models.PositiveIntegerField("Порядок", default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = "Правило посещения"
+        verbose_name_plural = "Правила посещения"
+
+    def __str__(self):
+        return self.title
+
+
 class InteriorPhoto(models.Model):
     """
     Фотография интерьера ресторана для галереи во вкладке «Интерьер».
@@ -165,7 +227,14 @@ class InteriorPhoto(models.Model):
     ]
 
     zone    = models.CharField("Зона", max_length=20, choices=ZONE_CHOICES, default='main_hall')
-    image   = models.ImageField("Фото", upload_to='interior/')
+    image   = models.ImageField(
+        "Фото",
+        upload_to=interior_image_upload,
+        help_text=(
+            "Фото отображается fullscreen без обрезки. "
+            "Рекомендуется горизонтальная ориентация, минимум 1200 px по ширине."
+        ),
+    )
     caption = models.CharField("Подпись (необязательно)", max_length=255, blank=True)
 
     # Порядок отображения внутри зоны — меньше = раньше
@@ -197,7 +266,8 @@ class AppVersion(models.Model):
         return f"{self.platform}: min={self.min_version}, latest={self.latest_version}"
 
 
-class HeroSlide(models.Model):
+class HeroSlide(AutoCropImageMixin, models.Model):
+    _image_ratio = 16 / 9
     """
     Слайды для заглавного экрана (карусель).
     """
@@ -209,9 +279,12 @@ class HeroSlide(models.Model):
     )
     image = models.ImageField(
         "Изображение",
-        upload_to='core/hero/',
+        upload_to=hero_image_upload,
         validators=[validate_hero_image],
-        help_text="JPEG или PNG, горизонтальное, минимум 800×450 px, не более 5 МБ.",
+        help_text=(
+            "Любой формат и ориентация — автоматически обрезается до 16:9 "
+            "и конвертируется в JPEG. Минимум 800×450 px, не более 10 МБ."
+        ),
     )
     order = models.PositiveIntegerField("Порядок", default=0)
 

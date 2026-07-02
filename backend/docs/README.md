@@ -9,7 +9,6 @@
 | PostgreSQL | — | Основная БД |
 | Redis | — | Кэш OTP-кодов, брокер Celery |
 | Celery | 5.x | Фоновые задачи (push-уведомления) |
-| Flower | 2.x | Веб-мониторинг задач Celery |
 | Firebase Admin SDK | 6.x | Отправка FCM push-уведомлений |
 | drf-spectacular | 0.29 | Генерация OpenAPI 3.0 документации |
 | Simple JWT | 5.x | JWT авторизация |
@@ -65,21 +64,6 @@ docker-compose run --rm --no-deps backend \
 # Сгенерировать openapi.yaml
 python manage.py spectacular --file openapi.yaml
 ```
-
-## Мониторинг задач Celery (Flower)
-
-После запуска `docker compose up` Flower доступен на **http://localhost:5555**.
-
-| Что видно | Описание |
-|---|---|
-| Workers | Список воркеров и их состояние (online / offline) |
-| Tasks | Очередь активных и ожидающих задач |
-| History | История выполненных задач с результатом и временем |
-| Details | Аргументы, traceback и runtime каждого запуска |
-
-Flower запускается как отдельный Docker-сервис (`flower`) и подключается к тому же Redis-брокеру, что и воркеры. Никаких дополнительных настроек не требуется.
-
----
 
 ## Swagger UI
 

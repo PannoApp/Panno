@@ -89,4 +89,12 @@ firebase.json
 .env.device.json
 
 # Claude
-CLAUDE.MD
+CLAUDE.md
+
+# Локальные материалы / ТЗ — не в git
+brand/Piligrim_brandbook_1,Piligrim_brandbook_2,Piligrim_brandbook_3/
+brand/TZ Piligrim App.md
+.cursor/rules/TZ Piligrim App.mdc
+.claude/skills/piligrim-premium-polish/SKILL.md
+.claude/skills/piligrim-premium-polish/references/common_violations.md
+.claude/skills/piligrim-premium-polish/references/premium_checklist.md

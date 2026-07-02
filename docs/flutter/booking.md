@@ -120,7 +120,7 @@ static const zones = ['Главный зал', 'Терраса', 'Приват']
 
 ## Idempotency-Key
 
-Файл: [lib/data/repositories/booking_repository.dart](../../lib/data/repositories/booking_repository.dart)
+Файлы: [lib/providers/booking_provider.dart](../../lib/providers/booking_provider.dart) и [lib/data/repositories/booking_repository.dart](../../lib/data/repositories/booking_repository.dart)
 
 ### Зачем нужен
 
@@ -128,21 +128,21 @@ static const zones = ['Главный зал', 'Терраса', 'Приват']
 
 ### Где генерируется
 
-Ключ генерируется непосредственно перед каждым HTTP-запросом в `BookingRepository.createBooking()`:
+Ключ генерируется один раз при первой попытке отправки формы в `BookingProvider.submitBooking()` и сохраняется в состоянии провайдера:
 
 ```dart
-static const _uuid = Uuid();   // пакет uuid
+_idempotencyKey ??= const Uuid().v4();
 
-await _dio.post<Map<String, dynamic>>(
-  '/bookings/',
-  data: req.toJson(),
-  options: Options(
-    headers: {'Idempotency-Key': _uuid.v4()},
-  ),
-);
+try {
+  await _repository.createBooking(
+    req,
+    idempotencyKey: _idempotencyKey!,
+  );
+  // ...
+}
 ```
 
-Каждый вызов `createBooking` получает новый UUID v4. Это означает, что **защита от дублей работает только в рамках одной попытки** (retry на уровне сети). Если пользователь нажимает кнопку повторно — генерируется новый ключ, и это считается новым запросом.
+Это означает, что **защита от дублей работает при всех сетевых повторах (retries)** для одной и той же заполненной формы. Если пользователь нажимает кнопку повторно (например, после ошибки таймаута) — используется тот же сохранённый ключ, и бекенд возвращает статус исходной операции. Ключ сбрасывается (`_idempotencyKey = null`) только после успешной отправки заявки или при принудительном сбросе формы.
 
 ---
 
@@ -224,3 +224,80 @@ Badge рендерится как контейнер с:
 |---|---|---|
 | `id` | `int` | Идентификатор записи на бекенде |
 | `status` | `String` | Текущий статус (`pending`/`confirmed`/`completed`/`canceled`) |
+
+---
+
+## Экран успешного бронирования (BookingSuccessScreen)
+
+Файл: [lib/screens/booking_success_screen.dart](../../lib/screens/booking_success_screen.dart)
+
+После успешной отправки заявки (`booking.isSuccess == true`) `BookingScreen._submit()` выполняет `Navigator.push` на `BookingSuccessScreen`. Форма очищается **до** навигации — повторная отправка исключена.
+
+### Конструктор
+
+```dart
+BookingSuccessScreen({
+  required String date,         // «ДД.ММ.ГГГГ» — форматированная дата
+  required String time,         // «ЧЧ:ММ» — форматированное время
+  required int heroesCount,     // количество гостей
+  String? zone,                 // читаемое название зала («Главный зал» / «Терраса» / «Приват»)
+  required bool depositRequired,// признак из CoreInfo.bookingDepositRequired
+})
+```
+
+### Что рендерит экран
+
+| Элемент | Описание |
+|---|---|
+| Тотем `bird_totem` | Spring-анимация: scale (600 мс, `elasticOut`) + rotate (600 мс, `easeOut`) |
+| Заголовок «ПУТЬ ЗАБРОНИРОВАН» | fadeIn + slideY, задержка 200 мс |
+| Подзаголовок | «Ваша заявка успешно отправлена проводникам», задержка 300 мс |
+| Карточка деталей | Дата/время, кол-во героев (склонение), зона (если выбрана) |
+| Список «Сценарий после отправки» | 3 шага (+ 4-й при `depositRequired == true`) |
+| Кнопки навигации | «МОИ БРОНИРОВАНИЯ» и «НА ГЛАВНУЮ» |
+
+### Склонение heroes count
+
+Метод `_formatHeroesCount(int count)` возвращает:
+- `«1 герой»` — если `count % 10 == 1 && count % 100 != 11`
+- `«2–4 героя»` — если `count % 10` ∈ [2, 4] и не попадает в 11–14
+- `«N героев»` — иначе
+
+### Навигация с экрана
+
+| Кнопка | Действие |
+|---|---|
+| «МОИ БРОНИРОВАНИЯ» | `Navigator.pushReplacement` → `BookingHistoryScreen` (форма убирается из стека) |
+| «НА ГЛАВНУЮ» | `Navigator.popUntil((r) => r.isFirst)` → корневой маршрут (`RootShell`) |
+
+### Условный шаг при депозите
+
+Когда `depositRequired == true`, в список «Сценарий после отправки» добавляется 4-й пункт:
+> «Для выбранного стола нужен депозит — менеджер направит вас на звонок.»
+
+---
+
+## Баннер депозита и звонок менеджеру
+
+Файл: [lib/screens/booking_screen.dart](../../lib/screens/booking_screen.dart), строки 401–468.
+
+### Условие показа
+
+Баннер рендерится **внутри формы** бронирования, между полем «Комментарий» и кнопкой отправки:
+
+```dart
+if (depositRequired) ...[
+  // блок баннера
+]
+```
+
+Значение `depositRequired` берётся из `context.watch<CoreInfoProvider>().coreInfo?.bookingDepositRequired ?? false`.
+
+### Содержимое баннера
+
+1. **Иконка** `Icons.info_outline_rounded` + **текст** из `CoreInfoProvider.coreInfo?.bookingDepositNote` (фолбэк: `'Для выбранного стола может потребоваться депозит. Уточните у менеджера.'`).
+2. **Кнопка «ПОЗВОНИТЬ МЕНЕДЖЕРУ»** — вызывает `launchUrl(Uri.parse('tel:$phone'))`, где `phone = context.read<CoreInfoProvider>().coreInfo?.phone ?? ''`. Кнопка не показывается если `phone` пустой (вызов `launchUrl` не выполняется).
+
+### Источник данных на бекенде
+
+Поля `booking_deposit_required` и `booking_deposit_note` хранятся в модели `RestaurantInfo` (`backend/apps/core/models.py`) и возвращаются через `GET /api/v1/core/info/`. Оплата депозита через приложение не предусмотрена — только переадресация на звонок.

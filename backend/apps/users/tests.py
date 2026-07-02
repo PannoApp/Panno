@@ -308,6 +308,16 @@ class VerifySMSViewTest(APITestCase):
         # Second attempt with same OTP should succeed (we re-set OTP above)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_inactive_user_returns_403(self):
+        User.objects.create_user(phone=self.PHONE, is_active=False)
+        cache.set(f'otp_{self.PHONE}', self.OTP, 180)
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
+            'phone': self.PHONE, 'otp': self.OTP,
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('error', response.data)
+        self.assertEqual(response.data['error'], 'Ваш аккаунт заблокирован.')
+
 
 # ---------------------------------------------------------------------------
 # GET/PATCH /api/users/profile/
@@ -366,6 +376,56 @@ class UserProfileViewTest(APITestCase):
     def test_patch_unauthenticated_returns_401(self):
         response = self.client.patch('/api/v1/users/profile/', {'first_name': 'X'})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+# ---------------------------------------------------------------------------
+# UserProfileSerializer — поля is_staff и role
+# ---------------------------------------------------------------------------
+
+class UserProfileSerializerTest(APITestCase):
+    """Проверяем, что is_staff и role корректно отдаются и защищены от записи."""
+
+    PROFILE_URL = '/api/v1/users/profile/'
+
+    def _auth(self, user):
+        refresh = RefreshToken.for_user(user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    def test_profile_response_includes_is_staff(self):
+        """Staff-пользователь получает is_staff=True в ответе."""
+        # Модель синхронизирует is_staff из role при save(), поэтому задаём role
+        staff = User.objects.create_user(phone='+77009990001', role='admin')
+        self._auth(staff)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_staff'])
+
+    def test_profile_response_includes_role(self):
+        """Staff-пользователь с ролью admin получает role='admin' в ответе."""
+        staff = User.objects.create_user(phone='+77009990002')
+        staff.role = 'admin'
+        staff.save()
+        self._auth(staff)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['role'], 'admin')
+
+    def test_profile_response_regular_user(self):
+        """Обычный пользователь получает is_staff=False и role='' (не null)."""
+        regular = User.objects.create_user(phone='+77009990003')
+        self._auth(regular)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['is_staff'])
+        self.assertEqual(response.data['role'], '')
+
+    def test_profile_role_readonly(self):
+        """PATCH с role='admin' игнорируется — поле только для чтения."""
+        regular = User.objects.create_user(phone='+77009990004')
+        self._auth(regular)
+        self.client.patch(self.PROFILE_URL, {'role': 'admin'})
+        regular.refresh_from_db()
+        self.assertEqual(regular.role, '')
 
 
 # ---------------------------------------------------------------------------
@@ -712,6 +772,40 @@ class LogoutViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class DeleteAccountViewTest(APITestCase):
+    URL = '/api/v1/users/account/'
+
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77007654321')
+        self.refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {self.refresh.access_token}',
+        )
+
+    def test_delete_account_returns_204_and_removes_user(self):
+        user_id = self.user.id
+        response = self.client.delete(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(pk=user_id).exists())
+
+    def test_delete_account_without_auth_returns_401(self):
+        self.client.credentials()
+        response = self.client.delete(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_delete_staff_account_returns_403(self):
+        staff = User.objects.create_user(
+            phone='+77001112233',
+            role='hall_manager',
+        )
+        refresh = RefreshToken.for_user(staff)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+        response = self.client.delete(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('error', response.data)
+        self.assertTrue(User.objects.filter(pk=staff.pk).exists())
+
+
 # ---------------------------------------------------------------------------
 # JWT-настройки: проверяем TTL токенов для разных окружений
 # ---------------------------------------------------------------------------
@@ -810,3 +904,27 @@ class PasswordValidatorsAbsentTest(TestCase):
             user.has_usable_password(),
             msg='create_user должен вызывать set_unusable_password() — пароли не используются.',
         )
+
+
+class CustomAdminLogoutTest(TestCase):
+    """
+    Проверяет, что GET и POST запросы к /admin/logout/
+    вызывают выход из системы и перенаправляют на страницу логина.
+    """
+
+    def setUp(self):
+        self.admin = User.objects.create_user(phone='+77009999999', is_staff=True, role='admin')
+
+    def test_admin_logout_via_get_redirects_and_logs_out(self):
+        # Логинимся
+        self.client.force_login(self.admin)
+
+        # Выполняем GET-запрос к logout
+        response = self.client.get('/admin/logout/')
+        # Ожидаем редирект (302) на /admin/ или /admin/login/
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url == '/admin/' or response.url.startswith('/admin/login/'))
+
+        # Проверяем, что пользователь разлогинен
+        self.assertNotIn('_auth_user_id', self.client.session)
+

@@ -1,19 +1,22 @@
 from django.core.cache import cache
-from rest_framework import generics
-from rest_framework.permissions import AllowAny
+from rest_framework import generics, viewsets
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.filters import SearchFilter
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
-from .models import Dish, Category
-from .serializers import DishSerializer, CategorySerializer
+from .models import Dish, Category, Tag, Allergen
+from .serializers import DishSerializer, CategorySerializer, TagSerializer, AllergenSerializer, StaffDishSerializer
 from utils.pagination import VideoFeedPagination, VideoCursorPagination
 from utils.cache import safe_cache_get, safe_cache_set
+from utils.permissions import IsStaffOrAdmin
 from .filters import DishFilter
 
-# TTL кэша категорий (меняются редко) и страниц блюд (меняются чаще)
+# TTL кэша (категории и теги меняются редко, блюда чаще)
 _CACHE_CATEGORIES = 3600
+_CACHE_TAGS       = 3600
 _CACHE_DISHES     = 300
 
 
@@ -28,14 +31,52 @@ class CategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
+        return Category.objects.all().order_by('order')
+
+    def list(self, request, *args, **kwargs):
         # Категории меняются редко — кэшируем на 1 час.
         # Инвалидация через post_save/post_delete-сигнал в apps/menu/signals.py.
         # При недоступном Redis — fallback к прямому запросу в БД.
-        categories = safe_cache_get('menu_categories')
-        if categories is None:
-            categories = list(Category.objects.all().order_by('order'))
-            safe_cache_set('menu_categories', categories, timeout=_CACHE_CATEGORIES)
-        return categories
+        cached = safe_cache_get('menu_categories')
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        safe_cache_set('menu_categories', response.data, timeout=_CACHE_CATEGORIES)
+        return response
+
+
+@extend_schema(
+    tags=['Menu'],
+    summary='Список аллергенов',
+    description='Возвращает все аллергены, отсортированные по имени.',
+    responses={200: AllergenSerializer(many=True)},
+)
+class AllergenListView(generics.ListAPIView):
+    serializer_class = AllergenSerializer
+    permission_classes = [AllowAny]
+    queryset = Allergen.objects.all().order_by('name')
+
+
+@extend_schema(
+    tags=['Menu'],
+    summary='Список тегов меню',
+    description='Возвращает все теги блюд, отсортированные по имени.',
+    responses={200: TagSerializer(many=True)},
+)
+class TagListView(generics.ListAPIView):
+    serializer_class = TagSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return Tag.objects.all().order_by('name')
+
+    def list(self, request, *args, **kwargs):
+        cached = safe_cache_get('menu_tags')
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        safe_cache_set('menu_tags', response.data, timeout=_CACHE_TAGS)
+        return response
 
 
 @extend_schema(
@@ -148,3 +189,26 @@ class VideoFeedView(generics.ListAPIView):
             .prefetch_related('tags', 'allergens')
             .order_by('id')
         )
+
+
+@extend_schema(tags=['Staff: Menu'])
+class StaffDishViewSet(viewsets.ModelViewSet):
+    """CRUD блюд для staff/admin. Видит все блюда включая неактивные."""
+    queryset = (
+        Dish.objects
+        .select_related('category')
+        .prefetch_related('tags', 'allergens')
+        .order_by('category__order', 'id')
+    )
+    serializer_class = StaffDishSerializer
+    permission_classes = [IsAuthenticated, IsStaffOrAdmin]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
+
+    def perform_update(self, serializer):
+        # Если передан новый видеофайл — сбрасываем статус в PENDING,
+        # чтобы сигнал trigger_video_processing сработал даже при video_status='ready'.
+        if serializer.validated_data.get('video'):
+            serializer.save(video_status=Dish.VideoStatus.PENDING)
+        else:
+            serializer.save()

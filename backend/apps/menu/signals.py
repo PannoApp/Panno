@@ -54,3 +54,5 @@ def invalidate_on_dish_change(sender, **kwargs):
 def invalidate_on_related_change(sender, **kwargs):
     """Инкрементирует версию кэша блюд при изменении тегов или аллергенов."""
     _bump_dishes_version()
+    if sender is Tag:
+        safe_cache_delete('menu_tags')

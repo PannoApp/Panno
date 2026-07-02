@@ -30,6 +30,16 @@
 
 ---
 
+## 🖼️ Медиафайлы (фото и видео)
+
+- **Все поля `image`** во всех эндпоинтах возвращают **абсолютный URL** (`https://...`). Никогда не относительный путь. Используй значение напрямую в `CachedNetworkImage`.
+- **Все изображения** автоматически обрезаются до **16:9** при загрузке через Django Admin (кроме фотоотчётов мероприятий и фото интерьера, которые отображаются fullscreen).
+- **Формат:** JPEG, max 1200px по ширине, 85% качество.
+- **`video_url`** — аналогично, всегда абсолютный URL. Показывай плеер только при `video_status == "ready"`.
+- **`MEDIA_ORIGIN`** для Flutter (сборка через `--dart-define`): `https://piligrim.kz` (продакшн), `http://10.0.2.2:8000` (Android эмулятор), `http://localhost:8000` (iOS симулятор).
+
+---
+
 ## 🔐 1. Авторизация и Профиль
 
 Авторизация работает без паролей, только через SMS (OTP код).
@@ -118,7 +128,15 @@ Future<void> logout() async {
 }
 ```
 
-### 1.5 Профиль пользователя
+### 1.5 Удаление аккаунта
+`DELETE /api/v1/users/account/` (Требует авторизации)
+- **Response (204):** тело пустое — аккаунт и связанные данные удалены на сервере. Очисти локальные JWT и покажи неавторизованный экран.
+- **Response (401):** не передан или недействителен access-токен.
+- **Response (403):** удаление через приложение запрещено (например, staff-аккаунт).
+
+> **Важно:** удаление безвозвратное (профиль, брони, записи на события, FCM-устройства). Отдельный logout после успешного DELETE не нужен — только очистка локального хранилища.
+
+### 1.6 Профиль пользователя
 - **Получить профиль:** `GET /api/v1/users/profile/`
   ```json
   {
@@ -165,9 +183,22 @@ Future<void> logout() async {
 
 ### 2.1 Категории
 `GET /api/v1/menu/categories/`
-- Возвращает список категорий (отсортированных по порядку). Использовать для верхнего таб-бара.
+- Возвращает **плоский массив** категорий (отсортированных по `order`). Использовать для верхнего таб-бара.
+- **Без пагинации** — ответ: `[{"id": 1, "name": "Горячие", "order": 1}, ...]`
 
-### 2.2 Список блюд (классическое меню)
+### 2.2 Теги
+`GET /api/v1/menu/tags/`
+- Возвращает **плоский массив** всех тегов, отсортированных по имени.
+- **Без пагинации** — ответ: `[{"id": 1, "name": "Вегетарианское"}, {"id": 2, "name": "Острое"}, ...]`
+- Загружать при инициализации меню (параллельно с категориями) для наполнения фильтр-чипов.
+
+### 2.2.1 Аллергены
+`GET /api/v1/menu/allergens/` (Без авторизации)
+- Возвращает **плоский массив** всех аллергенов, отсортированных по имени.
+- **Без пагинации** — ответ: `[{"id": 1, "name": "Глютен"}, {"id": 2, "name": "Лактоза"}, {"id": 3, "name": "Орехи"}, ...]`
+- Загружать при инициализации admin-панели редактирования блюда (для чекбоксов выбора аллергенов).
+
+### 2.3 Список блюд (классическое меню)
 `GET /api/v1/menu/dishes/`
 - По умолчанию отдает **5 блюд** на страницу. Пагинация — страничная (`?page=2`).
 - **Query параметры:**
@@ -176,10 +207,9 @@ Future<void> logout() async {
   - `?search=бургер` — поиск по названию и описанию
   - `?page=2` — следующая страница
 - **Ответ:** Содержит полные данные о блюде. Поля:
-  - `image` — URL фото блюда
-  - `video` — URL оригинального файла (сырое видео, может отсутствовать)
-  - `video_url` — URL **обработанного** видео (H.264 720×1280, готово к стримингу); `null` если видео ещё не прошло транскодирование. **Используй это поле** для воспроизведения
-  - `video_status` — статус обработки видео (см. таблицу ниже)
+  - `image` — **абсолютный URL** фото блюда (JPEG 16:9, max 1200px). Всегда `https://...`, никогда не относительный путь.
+  - `video_url` — **абсолютный URL** обработанного видео (H.264 720×1280); `null` если видео ещё не прошло транскодирование. **Используй это поле** для воспроизведения. Поле `video` (сырой оригинал) больше не возвращается.
+  - `video_status` — статус обработки видео (см. таблицу ниже). Воспроизводить видео только при `video_status == "ready"`.
   - `weight` — вес блюда в граммах (`null` если не задан)
   - `story` — история блюда (для экрана расширенного описания; пустая строка если не задана)
 
@@ -247,14 +277,44 @@ if (nextUrl != null) {
 - **Push-напоминания:** За 1–2 часа до визита пользователь получает push-напоминание о брони (сервисное, отключить нельзя).
 
 ### 3.1.1 Логика депозита
-Перед открытием формы бронирования запроси `GET /api/v1/core/info/` и проверь:
+
+`CoreInfo` (загружается при старте через `GET /api/v1/core/info/`) содержит:
+- `bookingDepositRequired` — признак необходимости депозита
+- `bookingDepositNote` — текст для отображения (может быть пустым)
+- `phone` — номер заведения для кнопки звонка
+
+Баннер отображается **внутри формы** бронирования (не как отдельный диалог), между полем «Комментарий» и кнопкой отправки:
+
 ```dart
-if (info.bookingDepositRequired) {
-  // Показать баннер/диалог с текстом info.bookingDepositNote
-  // и кнопкой «Позвонить менеджеру» (tel: ссылка на info.phone)
+if (coreInfo.bookingDepositRequired) {
+  // Показать контейнер с текстом coreInfo.bookingDepositNote
+  // и кнопкой «ПОЗВОНИТЬ МЕНЕДЖЕРУ»
+  final uri = Uri.parse('tel:${coreInfo.phone}');
+  if (await canLaunchUrl(uri)) await launchUrl(uri);
 }
 ```
-Оплата депозита через приложение не принимается — только перенаправление на звонок.
+
+Оплата депозита через приложение не принимается — только переадресация на звонок менеджеру.
+
+### 3.1.2 Экран успеха после отправки заявки
+
+После успешного `POST /api/v1/bookings/` форма очищается и происходит `Navigator.push` на `BookingSuccessScreen`:
+
+```dart
+Navigator.of(context).push(
+  MaterialPageRoute(
+    builder: (_) => BookingSuccessScreen(
+      date: dateText,         // «ДД.ММ.ГГГГ»
+      time: timeText,         // «ЧЧ:ММ»
+      heroesCount: count,
+      zone: zoneText,         // читаемое название или null
+      depositRequired: coreInfo.bookingDepositRequired,
+    ),
+  ),
+);
+```
+
+С экрана успеха пользователь может перейти в историю броней («МОИ БРОНИРОВАНИЯ») или на главную («НА ГЛАВНУЮ»).
 
 ### 3.2 Моя история броней
 `GET /api/v1/bookings/`
@@ -317,13 +377,15 @@ if (info.bookingDepositRequired) {
         "order": 1
       }
     ],
-    "hero_video_url": "https://cdn.example.com/media/core/hero.mp4",
     "tour_link": "https://...",
     "twogis_link": "https://2gis.kz/...",
     "google_maps_link": "https://maps.google.com/?q=...",
     "yandex_maps_link": "https://yandex.kz/maps/?text=...",
     "feedback_url": "https://wa.me/77001234567",
-    "visit_rules": "Дресс-код: smart casual...",
+    "visit_rules": [
+      {"title": "Дресс-код", "body": "Деловой casual..."},
+      {"title": "Дети", "body": "Приветствуются до 21:00..."}
+    ],
     "privacy_policy": "Текст политики обработки ПД...",
     "terms_of_service": "Текст пользовательского соглашения..."
   }
@@ -336,12 +398,11 @@ if (info.bookingDepositRequired) {
 | `is_open_now` | `true` / `false` — вычисляется по `working_hours` в реальном времени (часовой пояс Asia/Almaty) |
 | `concept_description` | Краткое описание концепции ресторана (для главного экрана). Пустая строка если не заполнено. |
 | `hero_slides` | Массив изображений-слайдов для главного экрана (может быть пустым списком `[]`). Каждый объект содержит `id`, `image` (URL) и `order`. |
-| `hero_video_url` | URL заглавного видео (YouTube, CDN). Пустая строка если не задано. |
 | `phone` | Телефон ресторана |
 | `whatsapp` | WhatsApp-контакт (ссылка или номер) |
 | `telegram` | Telegram (username или ссылка) |
 | `instagram` | Instagram handle |
-| `visit_rules` | Правила посещения (для экрана "О ресторане") |
+| `visit_rules` | Правила посещения — массив объектов `{"title": "...", "body": "..."}`, отсортированных по полю `order`. Пустой список `[]` если не заполнено. |
 | `privacy_policy` | Политика обработки персональных данных (для экрана согласия) |
 | `terms_of_service` | Пользовательское соглашение |
 | `tour_link` | URL для WebView 3D-тура (`null` если не задано) |
@@ -381,6 +442,28 @@ if (info.bookingDepositRequired) {
 **Зоны:** `main_hall` (Главный зал), `bar` (Бар), `private` (Приватная комната), `terrace` (Терраса), `other` (Другое).
 Без пагинации — фотографий обычно немного, загружай весь список сразу.
 
+#### Обработка `tour_link` на стороне Flutter
+
+`tour_link` приходит как `String | null` из `GET /api/v1/core/info/`.
+Доступен в приложении как `CoreInfoProvider.coreInfo?.tourLink`.
+
+| Значение | Поведение |
+|----------|-----------|
+| `null` или пустая строка | Кнопка «3D-тур» не отображается на экране «Интерьер» |
+| Непустая строка | Показывается кнопка `_TourButton`; нажатие вызывает `launchUrl(uri, mode: LaunchMode.externalApplication)` |
+
+`webview_flutter` не используется — тур открывается в системном браузере (полностью поддерживает WebGL/сферические панорамы). Если открытие невозможно (браузер не установлен) — показывается SnackBar с ошибкой.
+
+#### Поля `zone_display` и `caption` из `/core/interior/`
+
+| Поле | Использование |
+|------|---------------|
+| `zone` | Ключ фильтрации (slug: `main_hall`, `terrace` и т.д.) |
+| `zone_display` | Отображаемое название зоны в фильтре и в подписях фото |
+| `caption` | Подпись фотографии в fullscreen-просмотрщике (может быть пустой строкой) |
+
+На экране «Интерьер» реализован горизонтальный фильтр по уникальным зонам из полученных данных. Первый фильтр — «Все» (показывает весь список). По тапу на фото открывается `InteriorPhotoViewer` с `InteractiveViewer` (pinch-to-zoom 1.0–4.0) и листанием через `PageView`.
+
 ### 5.2 Версия приложения (Force Update)
 `GET /api/v1/core/app-version/?platform=ios` или `?platform=android` (Без авторизации)
 - Вызывать при запуске приложения, до отображения главного экрана.
@@ -412,7 +495,339 @@ if (info.bookingDepositRequired) {
 
 ---
 
-## 🔁 6. Идемпотентность (защита от дублей при ретраях)
+## 🛠️ 6. Admin Panel (Staff Only)
+
+Функционал доступен только пользователям с `is_staff=true`. Флаг возвращается в `GET /api/v1/users/profile/`.
+
+### 6.1 Определение роли на клиенте
+
+```dart
+// После успешного логина загрузи профиль
+final profile = await userRepository.getProfile(); // GET /api/v1/users/profile/
+if (profile.isStaff) {
+  // Показать кнопку/вкладку «Управление меню» в profile screen
+}
+```
+
+`is_staff` — булево поле в ответе профиля. Кнопка входа в admin UI показывается только при `true`. Обычный авторизованный пользователь (`is_staff=false`) не видит admin-элементов.
+
+---
+
+### 6.2 Список всех блюд (включая неактивные)
+`GET /api/v1/menu/admin/dishes/` (Staff only)
+
+Возвращает все блюда без пагинации, включая `is_active=false`.
+
+```dart
+final resp = await dio.get('/api/v1/menu/admin/dishes/');
+// resp.data — List<dynamic>, каждый элемент содержит image_url, is_active и т.д.
+```
+
+---
+
+### 6.3 Создать блюдо
+`POST /api/v1/menu/admin/dishes/` (Staff only)  
+**Content-Type: `multipart/form-data`** — обязателен, так как передаётся `image`.
+
+```dart
+Future<void> createDish({
+  required String name,
+  required String price,
+  required int categoryId,
+  required File imageFile,
+  String? description,
+  String? story,
+  int? weight,
+  bool isActive = true,
+  List<int> tagIds = const [],
+  List<int> allergenIds = const [],
+}) async {
+  final formData = FormData.fromMap({
+    'name': name,
+    'price': price,
+    'category': categoryId,
+    'description': description ?? '',
+    'story': story ?? '',
+    if (weight != null) 'weight': weight,
+    'is_active': isActive,
+    'image': await MultipartFile.fromFile(
+      imageFile.path,
+      filename: path.basename(imageFile.path),
+    ),
+    // Списки передаются как повторяющиеся поля
+    for (final id in tagIds) 'tags': id,
+    for (final id in allergenIds) 'allergens': id,
+  });
+
+  await dio.post('/api/v1/menu/admin/dishes/', data: formData);
+}
+```
+
+> **Автообрезка изображений:** загружай фото в любом формате (PNG, HEIC, JPEG, любое соотношение сторон) — бэкенд автоматически обрежет до 16:9, сконвертирует в JPEG (max 1200px, quality 85) и сохранит с UUID-именем. Оригинальное имя файла не сохраняется. В ответе `image_url` вернёт абсолютный URL обрезанного файла.
+
+---
+
+### 6.4 Полное обновление блюда (с заменой фото)
+`PUT /api/v1/menu/admin/dishes/{id}/` (Staff only)  
+**Content-Type: `multipart/form-data`**
+
+Аналогично созданию — передавать все поля + `image` если нужно заменить фото.
+
+```dart
+final formData = FormData.fromMap({
+  'name': updatedName,
+  'price': updatedPrice,
+  'category': categoryId,
+  'is_active': isActive,
+  'image': await MultipartFile.fromFile(newImageFile.path),
+  // ... остальные поля
+});
+
+await dio.put('/api/v1/menu/admin/dishes/$dishId/', data: formData);
+```
+
+---
+
+### 6.5 Частичное обновление блюда (без замены фото)
+`PATCH /api/v1/menu/admin/dishes/{id}/` (Staff only)
+
+**Без `image`** → отправлять `application/json` (не multipart):
+
+```dart
+// Обновить только цену и статус активности
+await dio.patch(
+  '/api/v1/menu/admin/dishes/$dishId/',
+  data: {'price': '5500.00', 'is_active': false},
+  options: Options(contentType: 'application/json'),
+);
+```
+
+**С новым `image`** → использовать `multipart/form-data` (как в PUT).
+
+---
+
+### 6.6 Удалить блюдо
+`DELETE /api/v1/menu/admin/dishes/{id}/` (Staff only)
+
+```dart
+await dio.delete('/api/v1/menu/admin/dishes/$dishId/');
+// Response 204 — тело пустое. Файлы (image, video) удаляются автоматически на сервере.
+```
+
+---
+
+### 6.7 Загрузка видео к блюду
+
+`PATCH /api/v1/menu/admin/dishes/{id}/` (Staff only)  
+**Content-Type: `multipart/form-data`** — обязателен при передаче видеофайла.
+
+Поддерживаемые форматы: MP4, MOV (QuickTime), M4V. Любой другой тип → `400`.
+
+```dart
+Future<void> uploadDishVideo({
+  required int dishId,
+  required File videoFile,
+}) async {
+  final formData = FormData.fromMap({
+    'video': await MultipartFile.fromFile(
+      videoFile.path,
+      filename: path.basename(videoFile.path),
+      contentType: DioMediaType('video', 'mp4'),
+    ),
+  });
+
+  await dio.patch(
+    '/api/v1/menu/admin/dishes/$dishId/',
+    data: formData,
+    // Не передавать ContentType.json — форма с файлом!
+  );
+  // Ответ 200: video_status == "pending"
+}
+```
+
+После `PATCH` бэкенд возвращает `video_status: "pending"`. Транскодирование происходит асинхронно в Celery. Flutter должен опрашивать детальный эндпоинт до получения `ready` или `failed`:
+
+```dart
+Future<String> waitForVideoReady(int dishId) async {
+  while (true) {
+    await Future.delayed(const Duration(seconds: 5));
+    final resp = await dio.get('/api/v1/menu/admin/dishes/$dishId/');
+    final status = resp.data['video_status'] as String;
+    if (status == 'ready' || status == 'failed') return status;
+  }
+}
+```
+
+**Статусы видео:**
+
+| Статус | Что показывать |
+|---|---|
+| `pending` | Прогресс-индикатор «Видео в очереди...» |
+| `processing` | Прогресс-индикатор «Транскодирование...» |
+| `ready` | Плеер с `video_url` |
+| `failed` | Сообщение об ошибке + кнопка повторной загрузки |
+
+Ориентировочное время транскодирования: до 30 сек видео — 5–15 сек; 1–3 мин видео — 30–90 сек.
+
+---
+
+### 6.8 Events & News CRUD (Staff Only)
+
+Контент-менеджеры и администраторы могут создавать, редактировать и удалять мероприятия и новости напрямую из мобильного приложения.
+
+**Base URLs:**
+- Мероприятия: `/api/v1/events/admin/events/`
+- Новости: `/api/v1/events/admin/news/`
+
+Все эндпоинты требуют `Authorization: Bearer <access_token>` и `is_staff=true`. Пагинация отключена — возвращается плоский список.
+
+---
+
+#### Мероприятия (EventEditScreen)
+
+**Список всех мероприятий (включая неактивные):**
+```dart
+final resp = await dio.get('/api/v1/events/admin/events/');
+// resp.data — List<dynamic>, отсортирован по убыванию date_time
+```
+
+**Создать мероприятие** (`multipart/form-data`, `image` обязателен):
+```dart
+Future<void> createEvent({
+  required String title,
+  required String description,
+  required DateTime dateTime,
+  required File imageFile,
+  String format = 'open',    // 'open' | 'closed'
+  String? price,             // null = вход свободный
+  int maxPlaces = 0,         // 0 = без ограничений
+  bool isActive = true,
+}) async {
+  final formData = FormData.fromMap({
+    'title': title,
+    'description': description,
+    'date_time': dateTime.toIso8601String(),
+    'format': format,
+    if (price != null) 'price': price,
+    'max_places': maxPlaces,
+    'is_active': isActive,
+    'image': await MultipartFile.fromFile(
+      imageFile.path,
+      filename: path.basename(imageFile.path),
+    ),
+  });
+  await dio.post('/api/v1/events/admin/events/', data: formData);
+}
+```
+
+**Частичное обновление** (без смены обложки — JSON, со сменой — multipart):
+```dart
+// Скрыть мероприятие (JSON)
+await dio.patch(
+  '/api/v1/events/admin/events/$eventId/',
+  data: {'is_active': false},
+  options: Options(contentType: 'application/json'),
+);
+
+// Заменить обложку (multipart)
+final formData = FormData.fromMap({
+  'image': await MultipartFile.fromFile(newImage.path),
+});
+await dio.patch('/api/v1/events/admin/events/$eventId/', data: formData);
+```
+
+**Удалить мероприятие:**
+```dart
+await dio.delete('/api/v1/events/admin/events/$eventId/');
+// 204 — тело пустое. Обложка удаляется из storage автоматически.
+```
+
+**Поля ответа** (`StaffEventSerializer`):
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | int | ID |
+| `title` | string | Заголовок |
+| `description` | text | Описание |
+| `date_time` | datetime | ISO 8601 с timezone |
+| `image` | file | write-only при upload |
+| `image_url` | string | Абсолютный URL обложки (read) |
+| `format` | string | `"open"` или `"closed"` |
+| `price` | decimal / null | `null` = вход свободный |
+| `is_active` | bool | Видимость в публичных эндпоинтах |
+| `max_places` | int | `0` = без ограничений |
+| `occupied_places` | int | Вычисляемое (read) |
+| `created_at` | datetime | Дата создания (read) |
+
+---
+
+#### Новости (NewsEditScreen)
+
+**Список всех новостей:**
+```dart
+final resp = await dio.get('/api/v1/events/admin/news/');
+// resp.data — List<dynamic>, отсортирован по убыванию created_at
+```
+
+**Создать новость** (`image` необязателен):
+```dart
+Future<void> createNews({
+  required String title,
+  required String content,
+  File? imageFile,  // null — новость без картинки допустима
+}) async {
+  final map = <String, dynamic>{
+    'title': title,
+    'content': content,
+  };
+  if (imageFile != null) {
+    map['image'] = await MultipartFile.fromFile(imageFile.path);
+  }
+
+  // Если есть изображение — multipart; иначе можно JSON
+  if (imageFile != null) {
+    await dio.post('/api/v1/events/admin/news/', data: FormData.fromMap(map));
+  } else {
+    await dio.post(
+      '/api/v1/events/admin/news/',
+      data: {'title': title, 'content': content},
+      options: Options(contentType: 'application/json'),
+    );
+  }
+}
+```
+
+**Удалить новость:**
+```dart
+await dio.delete('/api/v1/events/admin/news/$newsId/');
+// 204 — изображение удаляется из storage автоматически.
+```
+
+**Поля ответа** (`StaffNewsSerializer`):
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | int | ID |
+| `title` | string | Заголовок |
+| `content` | text | Текст новости |
+| `image` | file | write-only при upload |
+| `image_url` | string / null | Абсолютный URL изображения (read); `null` если нет фото |
+| `created_at` | datetime | Дата публикации (read) |
+
+---
+
+### 6.9 Коды ошибок Admin API
+
+| Код | Причина |
+|---|---|
+| `400` | Нет `image` при создании мероприятия или блюда; недопустимый `format` у события; неподдерживаемый тип видеофайла |
+| `401` | Токен не передан или истёк |
+| `403` | Пользователь не авторизован или `is_staff=false` |
+| `404` | Объект с указанным `id` не существует |
+
+---
+
+## 🔁 7. Идемпотентность (защита от дублей при ретраях)
 
 POST-запросы на создание брони и записи на мероприятие **обязательно** требуют заголовок `Idempotency-Key`.
 
@@ -445,7 +860,7 @@ final response = await dio.post(
 
 ---
 
-## 🛑 7. Обработка ошибок в приложении (Важно)
+## 🛑 8. Обработка ошибок в приложении (Важно)
 
 1. **401 Unauthorized**: Access-токен истёк.
    - *Действие:* Вызови `POST /api/v1/users/auth/token/refresh/` с сохранённым refresh-токеном. Если refresh тоже вернул 401 — разлогинь пользователя и отправь на экран SMS-входа. Подробная схема — в разделе 1.3.

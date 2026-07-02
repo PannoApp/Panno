@@ -5,7 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/push_navigation.dart';
-import '../../core/theme.dart';
+import '../../widgets/piligrim_toast.dart';
 import 'api_client.dart';
 
 typedef FcmTokenProvider = Future<String?> Function();
@@ -91,18 +91,10 @@ class FcmService {
     final ctx = _navigatorKey?.currentContext;
     if (ctx == null || !ctx.mounted) return;
 
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(
-        backgroundColor: PiligrimColors.earthDeep,
-        content: Text(
-          body.isEmpty ? title : '$title\n$body',
-          style: PiligrimTextStyles.body.copyWith(
-            fontSize: 13,
-            color: PiligrimColors.sky,
-          ),
-        ),
-        duration: const Duration(seconds: 4),
-      ),
+    PiligrimToast.show(
+      ctx,
+      body.isEmpty ? title : '$title\n$body',
+      duration: const Duration(seconds: 4),
     );
   }
 

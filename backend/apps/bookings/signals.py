@@ -56,6 +56,8 @@ def notify_on_status_change(sender, instance, created, **kwargs):
     if old_status == instance.status:
         return
 
+    instance._original_status = instance.status
+
     # Для подтверждения подставляем конкретную дату и время визита
     if instance.status == 'confirmed':
         date_str = instance.date.strftime('%d.%m.%Y')

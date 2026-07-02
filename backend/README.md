@@ -59,12 +59,13 @@ REST API для мобильного приложения ресторана. Dj
 |-------|-----|----------|------|
 | GET | `/api/bookings/` | Список моих броней | JWT |
 | POST | `/api/bookings/` | Создать бронь | JWT |
+| POST | `/api/bookings/telegram-webhook/` | Webhook для Telegram inline-кнопок | — |
 
 Поля брони: имя гостя, дата, время, количество гостей (1–50), комментарий.
 
 Статусы: `pending` → `confirmed` / `canceled` / `completed`
 
-При смене статуса бронирования пользователю автоматически уходит push-уведомление (через Celery + FCM).
+При создании брони в Telegram-чат менеджеров уходит уведомление с кнопками **✅ Подтвердить** / **❌ Отменить** — статус меняется прямо из чата без входа в админку. При смене статуса пользователю автоматически уходит push-уведомление (Celery + FCM).
 
 ---
 
@@ -99,7 +100,6 @@ Singleton-модель — в базе всегда ровно одна запи
 | БД | PostgreSQL 16 + PgBouncer |
 | Кэш / Брокер | Redis 7 |
 | Очереди | Celery 5.3 |
-| Мониторинг очередей | Flower 2.x (веб-интерфейс Celery) |
 | Push | Firebase Admin SDK (FCM) |
 | Медиафайлы | Локально (dev) / S3-совместимое хранилище (MinIO/AWS) |
 | Деплой | Docker Compose |
@@ -128,6 +128,10 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 USE_S3=False
 
 FIREBASE_CREDENTIALS_PATH=/app/firebase-credentials.json
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TELEGRAM_WEBHOOK_SECRET=
 ```
 
 ---
@@ -142,16 +146,3 @@ docker compose exec backend python manage.py createsuperuser
 
 Админка: `http://localhost:8000/admin/`
 
----
-
-## Мониторинг Celery (Flower)
-
-После запуска `docker compose up` откройте **http://localhost:5555**.
-
-Flower показывает:
-- активных воркеров и их статус
-- очередь задач в реальном времени
-- историю выполненных / упавших задач
-- детали каждого запуска (аргументы, результат, время выполнения)
-
-Flower запускается как отдельный сервис `flower` в `docker-compose.yml` и автоматически подключается к тому же Redis-брокеру, что и воркеры.

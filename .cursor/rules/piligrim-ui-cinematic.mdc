@@ -6,6 +6,71 @@ alwaysApply: false
 
 # Cinematic brand UI
 
+Modern Nomad ≠ literal tribal/stone/decorative UI. PILIGRIM should feel premium, cinematic, restrained, Apple-level refined.
+
+## Restraint over decoration
+
+Do not interpret Modern Nomad literally.
+
+Avoid:
+- decorative stones;
+- blob icons;
+- random totem symbols;
+- tribal badges;
+- ornamental UI;
+- concept-art elements;
+- excessive glow;
+- heavy gradients;
+- gaming/cyber/neon aesthetics.
+
+Totem icons are allowed only where they already exist in approved navigation/brand assets.
+Do not invent new decorative totems for:
+- error states;
+- empty states;
+- destructive dialogs;
+- modals;
+- buttons;
+- cards.
+
+For premium UI prefer:
+- typography;
+- spacing;
+- soft surfaces;
+- subtle gradients;
+- restrained motion;
+- negative space;
+over decorative illustrations.
+
+## Error, empty and destructive states
+
+Error states, empty states and destructive dialogs must be calm, minimal and functional.
+
+Do not use:
+- warning triangles;
+- material wifi-off icons;
+- stone/blob/totem illustrations;
+- gaming glyphs;
+- aggressive red/orange alerts;
+- overdesigned luxury modals.
+
+Use:
+- short Russian copy;
+- clear action button;
+- restrained surface;
+- enough negative space;
+- subtle brand accent only when needed.
+
+Delete-account dialogs should feel:
+- calm;
+- premium;
+- clear;
+- irreversible but not dramatic.
+
+Retry/error states should feel:
+- quiet;
+- helpful;
+- non-alarming.
+
 ## Colors & typography
 - UI: `PiligrimColors`, `PiligrimTextStyles`, `piligrimTheme`.
 - Font: Museo Sans 300/700 only — no new families / Google Fonts.

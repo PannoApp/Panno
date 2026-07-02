@@ -44,6 +44,12 @@ class AllergenAdmin(ContentManagerMixin, ModelAdmin):
 
 @admin.register(Dish)
 class DishAdmin(ContentManagerMixin, ModelAdmin):
+    class Media:
+        js = ('menu/js/admin_media_helper.js',)
+        css = {
+            'all': ('menu/css/admin_media_helper.css',)
+        }
+
     # Колонки в общем списке; video_status позволяет сразу видеть этап обработки видео
     list_display = ('name', 'category', 'price', 'is_active', 'video_status', 'image_preview_list')
     # Фильтры в правой панели
@@ -60,10 +66,13 @@ class DishAdmin(ContentManagerMixin, ModelAdmin):
     # Группировка полей внутри карточки блюда
     fieldsets = (
         ('Основная информация', {
-            'fields': ('name', 'description', 'price', 'category', 'is_active')
+            'fields': ('name', 'description', 'price', 'category', 'weight', 'is_active')
         }),
         ('Характеристики', {
             'fields': ('tags', 'allergens')
+        }),
+        ('История блюда', {
+            'fields': ('story',)
         }),
         ('Медиа', {
             # video_status — только для чтения; отображает текущий этап транскодирования Celery
@@ -81,13 +90,36 @@ class DishAdmin(ContentManagerMixin, ModelAdmin):
     # Метод для большой картинки внутри карточки блюда
     def image_preview_detail(self, obj):
         if obj.image:
-            return mark_safe(f'<img src="{obj.image.url}" width="300" style="border-radius: 10px;" />')
+            return mark_safe(f'<img src="{obj.image.url}" width="300" style="border-radius: 10px; display: block;" />')
         return "Нет фото"
     image_preview_detail.short_description = 'Предпросмотр фото'
 
-    # Метод для видеоплеера внутри карточки блюда
+    # Метод для видеоплеера внутри карточки блюда с сеткой безопасной зоны
     def video_preview_detail(self, obj):
         if obj.video:
-            return mark_safe(f'<video width="300" controls><source src="{obj.video.url}" type="video/mp4">Ваш браузер не поддерживает видео.</video>')
+            return mark_safe(f'''
+                <div class="video-preview-wrapper" style="position: relative; width: 300px; display: inline-block; border-radius: 10px; overflow: hidden; background: #000;">
+                    <video id="video-preview-element" width="300" controls style="display: block;">
+                        <source src="{obj.video.url}" type="video/mp4">
+                        Ваш браузер не поддерживает видео.
+                    </video>
+                    <div class="video-safe-zone-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; border: 2px dashed rgba(255, 0, 0, 0.4); box-sizing: border-box;">
+                        <div class="video-overlay-text top-scrim" style="position: absolute; top: 0; left: 0; right: 0; height: 15%; background: rgba(255, 0, 0, 0.15); color: #fff; font-size: 10px; padding: 2px; text-align: center; border-bottom: 1px dotted red; font-family: sans-serif;">Зона статус-бара / звука (15%)</div>
+                        <div class="video-overlay-text side-safe-left" style="position: absolute; top: 15%; left: 0; width: 10%; bottom: 35%; background: rgba(255, 165, 0, 0.15); border-right: 1px dotted orange;"></div>
+                        <div class="video-overlay-text side-safe-right" style="position: absolute; top: 15%; right: 0; width: 10%; bottom: 35%; background: rgba(255, 165, 0, 0.15); border-left: 1px dotted orange;"></div>
+                        <div class="video-overlay-text main-safe-zone" style="position: absolute; top: 15%; left: 10%; right: 10%; bottom: 35%; display: flex; align-items: center; justify-content: center; color: #00ff00; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 2px #000; font-family: sans-serif;">БЕЗОПАСНАЯ ЗОНА (Центр)</div>
+                        <div class="video-overlay-text bottom-scrim" style="position: absolute; bottom: 0; left: 0; right: 0; height: 35%; background: rgba(255, 0, 0, 0.15); color: #fff; font-size: 10px; padding: 2px; text-align: center; border-top: 1px dotted red; display: flex; align-items: center; justify-content: center; font-family: sans-serif;">Зона описания / цены (35%)</div>
+                    </div>
+                </div>
+                <div style="margin-top: 5px;">
+                    <label><input type="checkbox" id="toggle-video-overlay" checked style="vertical-align: middle; margin-right: 5px;">Показывать сетку безопасной зоны приложения</label>
+                </div>
+                <script>
+                    document.getElementById('toggle-video-overlay')?.addEventListener('change', function(e) {{
+                        const overlay = this.closest('div').previousElementSibling.querySelector('.video-safe-zone-overlay');
+                        if (overlay) overlay.style.display = this.checked ? 'block' : 'none';
+                    }});
+                </script>
+            ''')
         return "Нет видео"
     video_preview_detail.short_description = 'Предпросмотр видео'

@@ -1,6 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:uuid/uuid.dart';
-
 import '../models/api_booking.dart';
 import '../models/booking_request.dart';
 import '../paginated_response.dart';
@@ -10,14 +8,17 @@ class BookingRepository {
   BookingRepository({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
 
   final Dio _dio;
-  static const _uuid = Uuid();
 
-  Future<void> createBooking(BookingRequest req) async {
+  Future<void> createBooking(
+    BookingRequest req, {
+    required String idempotencyKey,
+  }) async {
+    // Получаем Idempotency-Key извне, чтобы он сохранялся при сетевых повторах (retries)
     await _dio.post<Map<String, dynamic>>(
       '/bookings/',
       data: req.toJson(),
       options: Options(
-        headers: {'Idempotency-Key': _uuid.v4()},
+        headers: {'Idempotency-Key': idempotencyKey},
       ),
     );
   }

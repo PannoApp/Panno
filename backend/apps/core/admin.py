@@ -2,7 +2,7 @@ from django.contrib.admin import ModelAdmin, TabularInline
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from utils.permissions import _has_role
-from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide
+from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide, VisitRule
 
 
 def _is_content_or_admin(user):
@@ -13,6 +13,15 @@ def _is_content_or_admin(user):
 def _is_admin_only(user):
     """Только администратор (или суперпользователь)."""
     return _has_role(user, 'admin')
+
+
+class VisitRuleInline(TabularInline):
+    model = VisitRule
+    extra = 1
+    fields = ('title', 'body', 'order')
+    ordering = ('order',)
+    verbose_name = "Правило"
+    verbose_name_plural = "Правила посещения"
 
 
 class HeroSlideInline(TabularInline):
@@ -53,18 +62,18 @@ class RestaurantInfoAdmin(ModelAdmin):
             'fields': ('twogis_link', 'google_maps_link', 'yandex_maps_link', 'tour_link'),
         }),
         ('Контент главной', {
-            'fields': ('concept_description', 'hero_video_url'),
+            'fields': ('concept_description',),
         }),
         ('Бронирование', {
             'fields': ('booking_deposit_required', 'booking_deposit_note'),
         }),
         ('Юридические тексты', {
-            'fields': ('visit_rules', 'privacy_policy', 'terms_of_service'),
-            'classes': ('collapse',),  # Скрыто по умолчанию — редко редактируется
+            'fields': ('privacy_policy', 'terms_of_service'),
+            'classes': ('collapse',),
         }),
     )
 
-    inlines = [HeroSlideInline]
+    inlines = [VisitRuleInline, HeroSlideInline]
 
     # Доступ по ролям
     def has_module_permission(self, request):

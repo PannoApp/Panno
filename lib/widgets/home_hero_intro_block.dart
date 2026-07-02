@@ -53,13 +53,15 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Без hairline (flutter-dev): только воздух между hero и текстом.
+          const SizedBox(height: 32),
           SvgPicture.asset(
             'assets/images/piligrim.svg',
-            height: 28,
+            height: 42,
             colorFilter: const ColorFilter.mode(
               PiligrimColors.sky,
               BlendMode.srcIn,
@@ -68,7 +70,7 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
               .animate()
               .fadeIn(duration: 1100.ms, curve: Curves.easeOut),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 36),
 
           SizedBox(
             height: 76,
@@ -100,15 +102,16 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
               .animate()
               .fadeIn(delay: 200.ms, duration: 1200.ms, curve: Curves.easeOut),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
 
           Text(
             kModernNomadConcept,
             style: PiligrimTextStyles.body.copyWith(
-              fontSize: 12.5,
-              height: 1.5,
+              fontSize: 13.5,
+              height: 1.6,
               fontWeight: FontWeight.w300,
-              color: PiligrimColors.sky.withValues(alpha: 0.82),
+              letterSpacing: 0.35,
+              color: PiligrimColors.sky.withValues(alpha: 0.78),
             ),
           )
               .animate()

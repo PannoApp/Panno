@@ -1,6 +1,7 @@
 // Данные экрана Профиль / Контакты — отделены от UI
 // Согласно ТЗ раздел 4.5 и brand concept «Герой»
 import 'package:flutter/material.dart';
+import 'theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Герой приложения
@@ -9,6 +10,7 @@ class HeroUser {
   const HeroUser({
     required this.name,
     required this.phone,
+    this.journeyStartValue,
     this.journeyStartLabel,
     this.bookingsCount = 0,
     this.eventsCount = 0,
@@ -16,6 +18,7 @@ class HeroUser {
 
   final String name;
   final String phone;
+  final String? journeyStartValue;
   final String? journeyStartLabel;
   final int bookingsCount;
   final int eventsCount;
@@ -30,7 +33,8 @@ const kAnonymousHero = HeroUser(name: '', phone: '');
 const kDemoUser = HeroUser(
   name: 'Герой без имени',
   phone: '+7 ··· ··· ·· ··',
-  journeyStartLabel: 'Март 2024',
+  journeyStartValue: '2',
+  journeyStartLabel: 'Года с нами',
   bookingsCount: 0,
   eventsCount: 0,
 );
@@ -58,32 +62,32 @@ class Messenger {
     required this.label,
     required this.url,
     required this.color,
-    required this.totemAsset,
+    required this.iconAsset,
   });
   final String label;
   final String url;
   final Color color;
-  final String totemAsset;
+  final String iconAsset;
 }
 
 const kMessengers = [
   Messenger(
     label: 'WhatsApp',
     url: 'https://wa.me/77000000000',
-    color: Color(0xFF25D366),
-    totemAsset: 'assets/images/luk.svg',
+    color: PiligrimColors.steppe,
+    iconAsset: 'assets/images/whatsappsvg.svg',
   ),
   Messenger(
     label: 'Telegram',
     url: 'https://t.me/piligrim_astana',
-    color: Color(0xFF2AABEE),
-    totemAsset: 'assets/images/cobyz.svg',
+    color: PiligrimColors.steppe,
+    iconAsset: 'assets/images/telegramsvg.svg',
   ),
   Messenger(
     label: 'Instagram',
     url: 'https://instagram.com/piligrim.astana',
-    color: Color(0xFFE1306C),
-    totemAsset: 'assets/images/zerno.svg',
+    color: PiligrimColors.steppe,
+    iconAsset: 'assets/images/instagramsvg.svg',
   ),
 ];
 

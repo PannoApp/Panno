@@ -1,12 +1,38 @@
+import io
 from datetime import time as dt_time
 from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
+from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import RestaurantInfo, AppVersion, InteriorPhoto
+from .models import RestaurantInfo, AppVersion, InteriorPhoto, HeroSlide
+
+
+# Minimal 1×1 PNG — достаточно для полей без AutoCropImageMixin
+_PNG = (
+    b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01'
+    b'\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00'
+    b'\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18'
+    b'\xd8N\x00\x00\x00\x00IEND\xaeB`\x82'
+)
+
+
+def _make_image(name='img.png'):
+    return SimpleUploadedFile(name, _PNG, content_type='image/png')
+
+
+def _make_landscape_image(name='landscape.png'):
+    """16×9 PNG для моделей с AutoCropImageMixin (ratio >= 1.5:1)."""
+    from PIL import Image
+    img = Image.new('RGB', (16, 9), color=(128, 128, 128))
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return SimpleUploadedFile(name, buf.read(), content_type='image/png')
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +135,7 @@ class RestaurantInfoIsOpenNowTest(TestCase):
     def _mock_local_time(self, hour, minute):
         mock_dt = MagicMock()
         mock_dt.time.return_value = dt_time(hour, minute)
+        mock_dt.weekday.return_value = 0
         return mock_dt
 
     def test_returns_none_when_working_hours_empty(self):
@@ -161,6 +188,46 @@ class RestaurantInfoIsOpenNowTest(TestCase):
         info = self._make_info('Пн–Вс: 20:00–02:00')
         self.assertFalse(info.is_open_now)
 
+    def _mock_local_time_with_weekday(self, weekday, hour, minute):
+        mock_dt = MagicMock()
+        mock_dt.time.return_value = dt_time(hour, minute)
+        mock_dt.weekday.return_value = weekday
+        return mock_dt
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_multi_range_working_hours(self, mock_now, mock_localtime):
+        info = self._make_info('Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00')
+        
+        # Friday (4) at 23:30 (should be closed)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(4, 23, 30)
+        self.assertFalse(info.is_open_now)
+        
+        # Saturday (5) at 23:30 (should be open)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(5, 23, 30)
+        self.assertTrue(info.is_open_now)
+        
+        # Sunday (6) at 00:30 (should be closed)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(6, 0, 30)
+        self.assertFalse(info.is_open_now)
+
+    @patch('apps.core.models.timezone.localtime')
+    @patch('apps.core.models.timezone.now')
+    def test_multi_range_midnight_crossing(self, mock_now, mock_localtime):
+        info = self._make_info('Пн–Пт: 12:00–02:00, Сб–Вс: 12:00–04:00')
+        
+        # Saturday (5) at 01:00 (Friday's shift crosses into Saturday, should be open)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(5, 1, 0)
+        self.assertTrue(info.is_open_now)
+        
+        # Saturday (5) at 03:00 (should be closed)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(5, 3, 0)
+        self.assertFalse(info.is_open_now)
+        
+        # Sunday (6) at 03:00 (Saturday's shift crosses into Sunday, should be open)
+        mock_localtime.return_value = self._mock_local_time_with_weekday(6, 3, 0)
+        self.assertTrue(info.is_open_now)
+
 
 # ---------------------------------------------------------------------------
 # RestaurantInfo hero media + concept fields
@@ -181,22 +248,11 @@ class RestaurantInfoHeroFieldsTest(APITestCase):
         self.assertIn('hero_slides', response.data)
         self.assertEqual(response.data['hero_slides'], [])
 
-    def test_hero_video_url_defaults_to_empty_string(self):
-        response = self.client.get('/api/v1/core/info/')
-        self.assertIn('hero_video_url', response.data)
-        self.assertEqual(response.data['hero_video_url'], '')
-
     def test_concept_description_reflects_saved_value(self):
         self.info.concept_description = 'Modern Nomad — кухня кочевников'
         self.info.save()
         response = self.client.get('/api/v1/core/info/')
         self.assertEqual(response.data['concept_description'], 'Modern Nomad — кухня кочевников')
-
-    def test_hero_video_url_reflects_saved_value(self):
-        self.info.hero_video_url = 'https://cdn.example.com/hero.mp4'
-        self.info.save()
-        response = self.client.get('/api/v1/core/info/')
-        self.assertEqual(response.data['hero_video_url'], 'https://cdn.example.com/hero.mp4')
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +261,7 @@ class RestaurantInfoHeroFieldsTest(APITestCase):
 
 class AppVersionViewTest(APITestCase):
     def setUp(self):
+        AppVersion.objects.all().delete()
         AppVersion.objects.create(
             platform='ios',
             min_version='1.0.0',
@@ -840,3 +897,69 @@ class CoreRedisResilienceTest(APITestCase):
             response = self.client.get('/api/v1/core/interior/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+
+
+# ---------------------------------------------------------------------------
+# File cleanup (django-cleanup)
+# ---------------------------------------------------------------------------
+
+class CoreFileCleanupTest(TestCase):
+    """
+    django-cleanup удаляет медиафайлы из хранилища при замене поля
+    или удалении объекта.  Покрывает InteriorPhoto и HeroSlide.
+    """
+
+    # --- InteriorPhoto (plain ImageField, без AutoCropImageMixin) ---
+
+    def test_interior_photo_old_file_deleted_on_update(self):
+        photo = InteriorPhoto.objects.create(image=_make_image('a.png'), zone='main_hall')
+        old_name = photo.image.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            photo.image = _make_image('b.png')
+            photo.save()
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_interior_photo_file_deleted_on_instance_delete(self):
+        photo = InteriorPhoto.objects.create(image=_make_image(), zone='main_hall')
+        name = photo.image.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            photo.delete()
+
+        self.assertFalse(default_storage.exists(name))
+
+    # --- HeroSlide (AutoCropImageMixin: сохраняет обработанный JPEG) ---
+
+    def test_hero_slide_old_file_deleted_on_update(self):
+        info = RestaurantInfo.load()
+        slide = HeroSlide.objects.create(
+            image=_make_landscape_image('s1.png'), restaurant_info=info, order=0
+        )
+        # После AutoCropImageMixin .update() экземпляр хранит старое имя — нужен refresh
+        slide.refresh_from_db()
+        old_name = slide.image.name
+        self.assertTrue(default_storage.exists(old_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            slide.image = _make_landscape_image('s2.png')
+            slide.save()
+
+        self.assertFalse(default_storage.exists(old_name))
+
+    def test_hero_slide_file_deleted_on_instance_delete(self):
+        info = RestaurantInfo.load()
+        slide = HeroSlide.objects.create(
+            image=_make_landscape_image(), restaurant_info=info, order=0
+        )
+        slide.refresh_from_db()
+        name = slide.image.name
+        self.assertTrue(default_storage.exists(name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            slide.delete()
+
+        self.assertFalse(default_storage.exists(name))

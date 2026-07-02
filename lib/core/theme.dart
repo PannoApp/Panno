@@ -5,60 +5,133 @@ import 'package:flutter/material.dart';
 // ЦВЕТА БРЕНДА (названы по-казахски — часть идентичности)
 // ─────────────────────────────────────────────────────────────────────────────
 abstract final class PiligrimColors {
-  /// Қара жер — Чёрная земля — основной тёмный фон
-  static const Color earth = Color(0xFF3D3A38);
+  // ─── БАЗОВЫЕ ЗЕМЛИСТЫЕ ТОНА (Premium Obsidian & Clay) ───
 
-  /// Қара жер (глубокий) — фон навбара, более тёмный слой
-  static const Color earthDeep = Color(0xFF2A2826);
+  /// Қара жер — Чёрная земля — основной тёмный фон.
+  /// Насыщенный обсидиановый уголь с тёплым подтоном сырой земли.
+  static const Color earth = Color(0xFF15120F);
 
-  /// Қара жер (тёплый) — утеплённый базовый фон для «Живого очага»
-  static const Color earthWarm = Color(0xFF45403C);
+  /// Қара жер (глубокий) — фон навбара, глубочайший слой.
+  /// Базальтовая бездна для максимального разделения слоев.
+  static const Color earthDeep = Color(0xFF0E0C0B);
 
-  /// Мөлдір су — Прозрачная вода — главный акцентный цвет
-  static const Color water = Color(0xFF7BA5B8);
+  /// Қара жер (тёплый) — утеплённый базовый фон для «Живого очага».
+  /// Оттенок обжаренной глины, создающий уютное свечение.
+  static const Color earthWarm = Color(0xFF201B18);
 
-  /// Мөлдір су (pressed) — нажатое состояние акцента
-  static const Color waterMuted = Color(0xFF5A8FA8);
+  /// Чуть теплее earth — scaffold-фон под параллакс-слоями.
+  static const Color earthSurface = Color(0xFF181513);
 
-  /// Сары дала — Жёлтая степь — тёплый второстепенный акцент
-  static const Color steppe = Color(0xFFC4956A);
+  // ─── НАВИГАЦИОННЫЙ БАР (Obsidian Layers) ───
 
-  /// Піскен жеміс — Спелый плод — красный, CTA финального действия
-  static const Color fruit = Color(0xFF8B1A1A);
+  /// Нижняя навбар — основной фон
+  static const Color navBarBase = Color(0xFF13100E);
 
-  /// Жалын — Огонь — медно-оранжевый, мотив огня на активных CTA
-  /// Согласно ТЗ: «мягкие переходы оранжевого по краю активных кнопок»
-  static const Color ember = Color(0xFFC87340);
+  /// Нижняя навбар — верхний край градиента
+  static const Color navBarTop = Color(0xFF1E1A17);
 
-  /// Жалын (тёмный) — тёмно-медный, для градиентных кнопок
-  static const Color emberDeep = Color(0xFF9A4E22);
+  /// Нижняя навбар — верхняя кромка (тонкое премиальное свечение)
+  static const Color navBarRim = Color(0x14F2ECE1);
 
-  /// Modern Nomad Premium — мягкий крем (вместо холодного белого)
-  static const Color nomadCream = Color(0xFFE0D8CC);
+  // ─── АКЦЕНТНЫЙ ГОЛУБОЙ (Glacier Turquoise) ───
+
+  /// Мөлдір су — Прозрачная вода — главный акцентный цвет.
+  /// Чистый минеральный бирюзово-голубой, ассоциирующийся с ледниками Тянь-Шаня.
+  static const Color water = Color(0xFF659FB5);
+
+  /// Мөлдір су (pressed) — нажатое состояние акцента.
+  /// Более глубокий сланцево-синий оттенок.
+  static const Color waterMuted = Color(0xFF4C7B8E);
+
+  // ─── ВТОРОСТЕПЕННЫЕ И ТЕПЛЫЕ АКЦЕНТЫ (Champagne Gold & Copper) ───
+
+  /// Сары дала — Жёлтая степь — тёплый второстепенный акцент.
+  /// Благородная матовая латунь / шампанское золото вместо блеклой охры.
+  static const Color steppe = Color(0xFFCFA073);
+
+  /// Жалын — Огонь — медно-оранжевый, мотив огня на активных CTA.
+  /// Живая светящаяся терракота для мягкого контраста.
+  static const Color ember = Color(0xFFD9793E);
+
+  /// Жалын (тёмный) — тёмно-медный, для градиентных кнопок.
+  /// Выдержанная бронза.
+  static const Color emberDeep = Color(0xFFB05D2A);
+
+  /// Піскен жеміс — Спелый плод — красный, CTA финального действия.
+  /// Глубокий гранатовый / рубиновый оттенок.
+  static const Color fruit = Color(0xFFA63434);
+
+  // ─── СВЕТЛЫЕ ТОНА И ТЕКСТ (Satin Alabaster & Silk Linen) ───
+
+  /// Modern Nomad Premium — мягкий крем (вместо холодного белого).
+  /// Шёлковый алебастр — чистый, дорогой светлый тон с едва заметным теплом.
+  static const Color nomadCream = Color(0xFFF2ECE1);
 
   /// Ақ аспан — светлый акцент на тёмном (крем luxury)
   static const Color sky = nomadCream;
 
-  /// Ақ аспан (тёплый) — чуть глубже для вторичных светлых плоскостей
-  static const Color skyWarm = Color(0xFFD4CABF);
+  /// Ақ аспан (тёплый) — чуть глубже для вторичных светлых плоскостей.
+  /// Мягкий нежный лён.
+  static const Color skyWarm = Color(0xFFDFD7CA);
 
   /// Разделители на тёмном фоне
-  static const Color divider = Color(0x24E0D8CC);
+  static const Color divider = Color(0x1FF2ECE1);
 
   /// Текст на тёмном фоне
   static const Color textLight = nomadCream;
 
-  /// Текст на светлом фоне
-  static const Color textDark = Color(0xFF3D3A38);
+  /// Текст на светлом фоне.
+  /// Глубокий кофейно-базальтовый для идеальной читаемости.
+  static const Color textDark = Color(0xFF2C2825);
 
   /// Неактивные элементы навигации
-  static const Color navInactive = Color(0x8FE0D8CC);
+  static const Color navInactive = Color(0x8FF2ECE1);
 
-  /// Прозрачный служебный цвет (вместо Colors.transparent)
+  /// Прозрачный служебный цвет
   static const Color clear = Color(0x00000000);
 
-  /// Базовый цвет тени (вместо Colors.black)
+  /// Цвет успешного/завершённого статуса
+  static const Color success = Color(0xFF5A9A6A);
+
+  /// Базовый цвет тени
   static const Color shadow = Color(0xFF000000);
+
+  // ─── OVERLAYS & SCRIMS (Phase 1 — visual consistency tokens) ───
+
+  /// Тёплый тёмный скрим — базовый цвет для photo-gradient stops в карточках блюд.
+  /// Используется с .withValues(alpha: x) для создания многоступенчатых cinematic градиентов.
+  static const Color imageScrim = Color(0xFF1C1510);
+
+  /// Backdrop бейджей поверх фото — earthDeep @65%.
+  /// Единый фон для CategoryPillBadge, DateBadge, FormatBadge.
+  static const Color cardOverlay = Color(0xA60E0C0B);
+
+  /// Нейтральный фон glass chip/пилюли — earthDeep @40%.
+  /// Для чипов на тёмном фоне без фотографии под ним.
+  static const Color glassChip = Color(0x660E0C0B);
+
+  /// Янтарное тёплое ядро — центр радиального glow для пустых состояний.
+  static const Color glowAmber = Color(0xFF2E1A10);
+
+  /// Тёплая матовая поверхность — левый старт gradient-кнопок (тур, меню-раздел).
+  static const Color surfaceToast = Color(0xFF2E2420);
+
+  /// Более тёплая поверхность — правый конец gradient-кнопок.
+  static const Color surfaceClay = Color(0xFF3A2C22);
+
+  // ─── ТЕГИ МЕНЮ (Gemstone Pastels, согласованные с бэкендом) ───
+
+  /// Острое блюдо
+  static const Color tagSpicy = Color(0xFFD67845);
+
+  /// Вегетарианское
+  static const Color tagVegetarian = Color(0xFF72A176);
+
+  /// Содержит алкоголь
+  static const Color tagAlcohol = Color(0xFF866E99);
+
+  /// Халяль
+  static const Color tagHalal = Color(0xFF6A9994);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,8 +253,8 @@ final ThemeData piligrimTheme = ThemeData(
   hoverColor: PiligrimColors.clear,
   colorScheme: const ColorScheme.dark(
     surface: PiligrimColors.earth,
-    primary: PiligrimColors.water,
-    secondary: PiligrimColors.steppe,
+    primary: PiligrimColors.steppe,
+    secondary: PiligrimColors.ember,
     error: PiligrimColors.fruit,
     onSurface: PiligrimColors.textLight,
     onPrimary: PiligrimColors.textLight,
@@ -224,8 +297,8 @@ final ThemeData piligrimTheme = ThemeData(
   ),
   outlinedButtonTheme: OutlinedButtonThemeData(
     style: OutlinedButton.styleFrom(
-      foregroundColor: PiligrimColors.water,
-      side: const BorderSide(color: PiligrimColors.water, width: 1.0),
+      foregroundColor: PiligrimColors.steppe,
+      side: const BorderSide(color: PiligrimColors.steppe, width: 1.0),
       textStyle: PiligrimTextStyles.button,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -241,6 +314,173 @@ final ThemeData piligrimTheme = ThemeData(
     elevation: 0,
   ),
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ОТСТУПЫ — базовая сетка 8px, 8×N
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class PiligrimSpacing {
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+  static const double xxl = 48;
+
+  /// Горизонтальный padding секций
+  static const double section = 24;
+
+  /// Вертикальный gap между карточками
+  static const double cardGap = 16;
+
+  /// Воздух под status bar на основных вкладках (кроме Профиля).
+  static const double tabContentTopInset = 16;
+
+  /// Editorial-метка в шапке меню (текст ~11px).
+  static const double tabEditorialMarkHeight = 11;
+
+  /// Зазор между меткой и переключателем «Видео / Фото».
+  static const double tabEditorialMarkGap = 8;
+
+  /// Video feed: плотнее между «MENU» и строкой chip / toggle.
+  static const double menuFeedMarkToControlsGap = 4;
+
+  /// Доп. отступ chip категории ниже строки MENU (не прилипать к метке).
+  static const double menuFeedCategoryBadgeExtraTop = 8;
+
+  /// Зазор между chip категории и mute под ним.
+  static const double menuFeedCategoryToMuteGap = 9;
+
+  /// Cinematic bottom-up scrim: начинается на 15% высоты, плавный editorial falloff,
+  /// ~85% непрозрачности у нижнего края — текст читаем даже на ярких кадрах.
+  static const BoxDecoration menuFeedVideoCardGradient = BoxDecoration(
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      stops: [0.0, 0.15, 0.32, 0.50, 0.65, 0.80, 1.0],
+      colors: [
+        Color(0x00000000),
+        Color(0x07000000),
+        Color(0x18000000),
+        Color(0x3E000000),
+        Color(0x6E000000),
+        Color(0xA5000000),
+        Color(0xD9000000),
+      ],
+    ),
+  );
+
+  /// Визуальный диаметр mute (secondary control, ~−30% от исходных 36).
+  static const double menuFeedMuteSize = 25;
+
+  /// Иконка mute в video feed.
+  static const double menuFeedMuteIconSize = 13;
+
+  /// Непрозрачность фона mute — мягкий, не перетягивает внимание.
+  static const double menuFeedMuteBackgroundOpacity = 0.38;
+
+  /// Минимальная зона тапа (визуал остаётся [menuFeedMuteSize]).
+  static const double menuFeedMuteTapExtent = 40;
+
+  /// Y pill категории на видео — чуть ниже switcher, с воздухом от «MENU».
+  static double menuFeedCategoryBadgeTop(BuildContext context) =>
+      PiligrimLayout.safeTop(context) +
+      tabContentTopInset +
+      tabEditorialMarkHeight +
+      menuFeedMarkToControlsGap +
+      menuFeedCategoryBadgeExtraTop;
+
+  /// Высота оверлея шапки меню ниже safe area.
+  static const double menuHeaderExtentBelowSafeArea =
+      tabContentTopInset +
+      tabEditorialMarkHeight +
+      tabEditorialMarkGap +
+      36 +
+      14;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYOUT — safe area + единый top spacing вкладок
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class PiligrimLayout {
+  static double safeTop(BuildContext context) =>
+      MediaQuery.paddingOf(context).top;
+
+  /// Y-координата начала контента: safe area + [PiligrimSpacing.tabContentTopInset].
+  static double tabContentTop(BuildContext context) =>
+      safeTop(context) + PiligrimSpacing.tabContentTopInset;
+
+  static EdgeInsets tabContentPaddingFromLTRB(
+    BuildContext context, {
+    double left = 20,
+    double right = 20,
+    double bottom = 0,
+  }) =>
+      EdgeInsets.fromLTRB(
+        left,
+        tabContentTop(context),
+        right,
+        bottom,
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// СКРУГЛЕНИЯ — мягкая геометрия согласно design spec
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class PiligrimRadius {
+  static const double sm = 8;
+  static const double md = 12;
+  /// Радиус основной CTA-кнопки (EmberCta и аналоги).
+  static const double button = 10;
+  static const double card = 14;
+  static const double lg = 20;
+
+  static const Radius smR = Radius.circular(sm);
+  static const Radius mdR = Radius.circular(md);
+  static const Radius buttonR = Radius.circular(button);
+  static const Radius cardR = Radius.circular(card);
+  static const Radius lgR = Radius.circular(lg);
+
+  static const BorderRadius smAll = BorderRadius.all(smR);
+  static const BorderRadius mdAll = BorderRadius.all(mdR);
+  static const BorderRadius buttonAll = BorderRadius.all(buttonR);
+  static const BorderRadius cardAll = BorderRadius.all(cardR);
+  static const BorderRadius lgAll = BorderRadius.all(lgR);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ТЕНИ — три уровня depth для карточек, вторичных элементов и навбара
+// ─────────────────────────────────────────────────────────────────────────────
+abstract final class PiligrimShadows {
+  /// Стандартная тень карточки — блюда, мероприятия, новости.
+  static const List<BoxShadow> card = [
+    BoxShadow(
+      color: Color(0x38000000),
+      blurRadius: 16,
+      offset: Offset(0, 4),
+      spreadRadius: 0,
+    ),
+  ];
+
+  /// Мягкая тень — вторичные элементы, кнопки.
+  static const List<BoxShadow> soft = [
+    BoxShadow(
+      color: Color(0x28000000),
+      blurRadius: 8,
+      offset: Offset(0, 2),
+      spreadRadius: 0,
+    ),
+  ];
+
+  /// Тень навбара (направлена вверх) — отделяет контент от нижней панели.
+  static const List<BoxShadow> nav = [
+    BoxShadow(
+      color: Color(0x18000000),
+      blurRadius: 8,
+      offset: Offset(0, -3),
+      spreadRadius: 0,
+    ),
+  ];
+}
 
 // Текущая версия приложения — сравнивается с minVersion/latestVersion из API
 const String kAppVersion = '1.0.0';

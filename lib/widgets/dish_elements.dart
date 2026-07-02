@@ -9,6 +9,7 @@ import '../core/theme.dart';
 import '../data/models/api_dish.dart';
 import '../data/models/api_tag.dart';
 import 'piligrim_info_section.dart';
+import 'piligrim_shimmer.dart';
 
 /// Нижний информационный блок для Reel-карточки блюда.
 class DishCardBottomInfo extends StatelessWidget {
@@ -77,6 +78,54 @@ class DishCardBottomInfo extends StatelessWidget {
   }
 }
 
+/// Premium minimal tag row для detail sheets.
+/// Тёплый монохромный стиль — restaurant metadata, не app chips.
+class DishDetailTagsRow extends StatelessWidget {
+  const DishDetailTagsRow({super.key, required this.tags});
+
+  final List<ApiTag> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tags.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 7,
+      runSpacing: 6,
+      children: tags.map((t) => _DishDetailTagChip(tag: t)).toList(),
+    );
+  }
+}
+
+class _DishDetailTagChip extends StatelessWidget {
+  const _DishDetailTagChip({required this.tag});
+
+  final ApiTag tag;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: PiligrimColors.water.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: PiligrimColors.water.withValues(alpha: 0.22),
+          width: 0.75,
+        ),
+      ),
+      child: Text(
+        tag.name.toUpperCase(),
+        style: PiligrimTextStyles.sectionLabel.copyWith(
+          fontSize: 10,
+          letterSpacing: 1.6,
+          height: 1.3,
+          color: PiligrimColors.water.withValues(alpha: 0.65),
+        ),
+      ),
+    );
+  }
+}
+
 /// Чип тега блюда с иконкой и цветом.
 /// Принимает ApiTag из API; стиль подбирается по имени из реестра в menu_data.dart.
 /// Неизвестные теги отображаются с дефолтным стилем без обновления приложения.
@@ -89,11 +138,14 @@ class DishCardTagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = tagStyleFor(tag.name);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: style.color.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: style.color.withValues(alpha: 0.4)),
+        border: Border.all(
+          color: style.color.withValues(alpha: 0.4),
+          width: 0.75,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -126,58 +178,36 @@ class DishCardPriceTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: PiligrimColors.steppe.withValues(alpha: 0.2),
+        color: PiligrimColors.earthDeep.withValues(alpha: 0.84),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: PiligrimColors.steppe.withValues(alpha: 0.5),
+          color: PiligrimColors.steppe.withValues(alpha: 0.58),
+          width: 0.75,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: PiligrimColors.steppe.withValues(alpha: 0.28),
+            blurRadius: 14,
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: PiligrimColors.shadow.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         '${price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
         style: PiligrimTextStyles.button.copyWith(
           color: PiligrimColors.steppe,
           fontSize: 14,
-          letterSpacing: 0.3,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
         ),
       ),
-    );
-  }
-}
-
-class DishCardSwipeHint extends StatelessWidget {
-  const DishCardSwipeHint({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SvgPicture.asset(
-          'assets/images/spiral.svg',
-          width: 12,
-          height: 12,
-          colorFilter: ColorFilter.mode(
-            PiligrimColors.steppe.withValues(alpha: 0.7),
-            BlendMode.srcIn,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          'Свайп вправо — история блюда',
-          style: PiligrimTextStyles.caption.copyWith(
-            color: PiligrimColors.sky.withValues(alpha: 0.55),
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Icon(
-          Icons.chevron_right_rounded,
-          size: 14,
-          color: PiligrimColors.steppe.withValues(alpha: 0.7),
-        ),
-      ],
     );
   }
 }
@@ -198,11 +228,14 @@ class DishInfoChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = accent ? PiligrimColors.steppe : PiligrimColors.water;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 0.75,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -261,26 +294,26 @@ class DishThumbnail extends StatelessWidget {
     super.key,
     required this.imageUrl,
     required this.fallback,
-    this.height = 180,
+    this.aspectRatio = 16 / 9,
   });
 
   final String? imageUrl;
   final Widget fallback;
-  final double height;
+  final double aspectRatio;
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrl == null || imageUrl!.isEmpty) return SizedBox(height: height, child: fallback);
-
-    return SizedBox(
-      height: height,
-      child: CachedNetworkImage(
-        imageUrl: imageUrl!,
-        fit: BoxFit.cover,
-        // При загрузке и при ошибке показываем кинематографический фон
-        placeholder: (_, __) => fallback,
-        errorWidget: (_, __, ___) => fallback,
-      ),
+    return AspectRatio(
+      aspectRatio: aspectRatio,
+      child: imageUrl == null || imageUrl!.isEmpty
+          ? fallback
+          : CachedNetworkImage(
+              imageUrl: imageUrl!,
+              fit: BoxFit.cover,
+              // При загрузке и при ошибке показываем кинематографический фон
+              placeholder: (_, __) => const PiligrimShimmer(),
+              errorWidget: (_, __, ___) => fallback,
+            ),
     );
   }
 }

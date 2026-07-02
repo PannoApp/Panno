@@ -1,5 +1,8 @@
 from django.core.cache import cache
-from rest_framework import generics
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, viewsets, status
+from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
@@ -7,8 +10,13 @@ from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParamete
 from drf_spectacular.types import OpenApiTypes
 from utils.idempotency import IdempotencyMixin
 from utils.pagination import StandardPagination
-from .models import Event, News, EventReservation
-from .serializers import EventSerializer, NewsSerializer, EventReservationSerializer
+from utils.permissions import IsStaffOrAdmin
+from .models import Event, News, EventReservation, EventPhotoReport
+from .serializers import (
+    EventSerializer, NewsSerializer, EventReservationSerializer,
+    EventPhotoReportSerializer, StaffEventSerializer, StaffNewsSerializer,
+    StaffPhotoReportCreateSerializer,
+)
 
 # Предстоящие/прошедшие события зависят от текущего времени — короткий TTL,
 # чтобы список обновлялся автоматически когда событие «наступает».
@@ -59,7 +67,7 @@ class UpcomingEventsListView(generics.ListAPIView):
         # TTL=60 сек — список автоматически обновится когда событие «наступит».
         # При сохранении Event signals.py инкрементирует версию для мгновенной инвалидации.
         version   = cache.get_or_set('events_upcoming_cache_version', 1, timeout=None)
-        cache_key = f'events_upcoming:{version}:{request.query_params.urlencode()}'
+        cache_key = f'events_upcoming:{version}:{request.get_host()}:{request.query_params.urlencode()}'
         cached    = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -89,7 +97,7 @@ class ArchivedEventsListView(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         # Архив тоже зависит от текущего времени — аналогичный TTL=60 сек.
         version   = cache.get_or_set('events_archived_cache_version', 1, timeout=None)
-        cache_key = f'events_archived:{version}:{request.query_params.urlencode()}'
+        cache_key = f'events_archived:{version}:{request.get_host()}:{request.query_params.urlencode()}'
         cached    = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -114,7 +122,7 @@ class NewsListView(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         # Новости — статичный контент, кэшируем на 5 минут.
         version   = cache.get_or_set('events_news_cache_version', 1, timeout=None)
-        cache_key = f'events_news:{version}:{request.query_params.urlencode()}'
+        cache_key = f'events_news:{version}:{request.get_host()}:{request.query_params.urlencode()}'
         cached    = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -187,3 +195,79 @@ class UserEventReservationsListView(generics.ListAPIView):
         if getattr(self, 'swagger_fake_view', False):
             return EventReservation.objects.none()
         return EventReservation.objects.filter(user=self.request.user).select_related('event')
+
+
+@extend_schema(
+    tags=['Events'],
+    summary='Фотоотчёт прошедшего мероприятия',
+    description=(
+        'Возвращает список фотографий фотоотчёта для указанного мероприятия. '
+        'Доступно только для прошедших событий (date_time в прошлом). '
+        'Если мероприятие ещё не прошло или фотоотчёт не загружен — возвращается пустой список.'
+    ),
+    parameters=[
+        OpenApiParameter(
+            name='event_id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.PATH,
+            description='ID мероприятия',
+        ),
+    ],
+    responses={200: EventPhotoReportSerializer(many=True)},
+)
+class EventPhotoReportListView(generics.ListAPIView):
+    serializer_class = EventPhotoReportSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return EventPhotoReport.objects.filter(
+            event_id=self.kwargs['event_id'],
+            event__date_time__lt=timezone.now(),
+        )
+
+
+@extend_schema(tags=['Staff: Events'])
+class StaffEventViewSet(viewsets.ModelViewSet):
+    queryset = Event.objects.prefetch_related('reservations').order_by('-date_time')
+    serializer_class = StaffEventSerializer
+    permission_classes = [IsAuthenticated, IsStaffOrAdmin]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
+
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='photos',
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def add_photo(self, request, pk=None):
+        """Загружает фото в фотоотчёт прошедшего мероприятия."""
+        event = self.get_object()
+        serializer = StaffPhotoReportCreateSerializer(
+            data=request.data, context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(event=event)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=['delete'],
+        url_path=r'photos/(?P<photo_pk>[^/.]+)',
+        url_name='photo-delete',
+    )
+    def delete_photo(self, request, pk=None, photo_pk=None):
+        """Удаляет фото из фотоотчёта мероприятия."""
+        photo = get_object_or_404(EventPhotoReport, pk=photo_pk, event__pk=pk)
+        photo.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(tags=['Staff: Events'])
+class StaffNewsViewSet(viewsets.ModelViewSet):
+    queryset = News.objects.all().order_by('-created_at')
+    serializer_class = StaffNewsSerializer
+    permission_classes = [IsAuthenticated, IsStaffOrAdmin]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = None
+    # destroy наследуется; django-cleanup удаляет файл при замене/удалении через on_commit

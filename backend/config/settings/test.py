@@ -17,11 +17,15 @@ CACHES = {
 
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
-DEFAULT_FILE_STORAGE = 'django.core.files.storage.InMemoryStorage'
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
 # Используем in-memory брокер, чтобы .delay() не требовал запущенного Redis
 CELERY_BROKER_URL = 'memory://'
-CELERY_TASK_ALWAYS_EAGER = False
+# Задачи выполняются синхронно — результат доступен сразу в тестах
+CELERY_TASK_ALWAYS_EAGER = True
 
 # Отключаем глобальный throttling в тестах: тесты не должны получать 429
 # из-за накопившихся запросов в LocMemCache между вызовами.
@@ -30,3 +34,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [],
     'DEFAULT_THROTTLE_RATES': {},
 }
+
+# Отключаем отправку реальных Telegram уведомлений в тестах
+TELEGRAM_BOT_TOKEN = ''
+TELEGRAM_CHAT_ID = ''

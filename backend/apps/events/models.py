@@ -1,7 +1,12 @@
 from django.db import models
 from django.conf import settings
 
-class Event(models.Model):
+from utils.image_processing import AutoCropImageMixin
+from utils.upload_paths import event_image_upload, news_image_upload, event_report_image_upload
+
+
+class Event(AutoCropImageMixin, models.Model):
+    _image_ratio = 16 / 9
     """
     Модель для хранения информации о мероприятиях (Афиша).
     """
@@ -16,8 +21,12 @@ class Event(models.Model):
         verbose_name="Дата и время проведения"
     )
     image = models.ImageField(
-        upload_to="events/images/", 
-        verbose_name="Обложка"
+        upload_to=event_image_upload,
+        verbose_name="Обложка",
+        help_text=(
+            "Любой формат и ориентация — фото автоматически обрезается до 16:9 "
+            "и конвертируется в JPEG. Рекомендуемый минимум: 1200×675 px."
+        ),
     )
     FORMAT_CHOICES = [
         ('open', 'Открытое'),
@@ -40,6 +49,11 @@ class Event(models.Model):
         default=True,
         verbose_name="Активно"
     )
+    max_places = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Количество разрешенных мест",
+        help_text="0 означает отсутствие ограничений на количество мест"
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата создания"
@@ -55,11 +69,20 @@ class Event(models.Model):
             models.Index(fields=['is_active', 'date_time'], name='event_active_date_idx'),
         ]
 
+    @property
+    def occupied_places(self):
+        """
+        Вычисляет количество занятых мест на мероприятии.
+        Суммирует количество гостей во всех записях на это мероприятие.
+        """
+        return self.reservations.aggregate(total=models.Sum('guests_count'))['total'] or 0
+
     def __str__(self):
         return f"{self.title} ({self.date_time})"
 
 
-class News(models.Model):
+class News(AutoCropImageMixin, models.Model):
+    _image_ratio = 16 / 9
     """
     Модель для хранения новостей заведения.
     """
@@ -71,10 +94,14 @@ class News(models.Model):
         verbose_name="Текст новости"
     )
     image = models.ImageField(
-        upload_to="news/images/", 
-        verbose_name="Изображение", 
-        null=True, 
-        blank=True
+        upload_to=news_image_upload,
+        verbose_name="Изображение",
+        null=True,
+        blank=True,
+        help_text=(
+            "Необязательное. Любой формат — автоматически обрезается до 16:9 "
+            "и конвертируется в JPEG. Рекомендуемый минимум: 1200×675 px."
+        ),
     )
     created_at = models.DateTimeField(
         auto_now_add=True, 
@@ -128,3 +155,39 @@ class EventReservation(models.Model):
     def __str__(self):
         # Если у юзера нет имени, будет выводиться его email/телефон
         return f"Запись: {self.user} на {self.event.title}"
+
+
+class EventPhotoReport(models.Model):
+    """
+    Фотоотчёт прошедшего мероприятия.
+    """
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name='photo_reports',
+        verbose_name='Мероприятие',
+    )
+    image = models.ImageField(
+        upload_to=event_report_image_upload,
+        verbose_name='Фотография',
+        help_text=(
+            "Фото отображается fullscreen без обрезки. "
+            "Рекомендуется горизонтальная ориентация, минимум 1200 px по ширине."
+        ),
+    )
+    order = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name='Порядок отображения',
+    )
+    uploaded_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата загрузки',
+    )
+
+    class Meta:
+        verbose_name = 'Фото отчёта'
+        verbose_name_plural = 'Фотоотчёты мероприятий'
+        ordering = ['order', 'uploaded_at']
+
+    def __str__(self):
+        return f"Фото #{self.pk} для «{self.event.title}»"

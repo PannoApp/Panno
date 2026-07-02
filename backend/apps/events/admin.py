@@ -2,7 +2,15 @@ from django.contrib.admin import ModelAdmin
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from utils.permissions import _has_role
-from .models import Event, News, EventReservation
+from .models import Event, News, EventReservation, EventPhotoReport
+
+
+class EventPhotoReportInline(admin.TabularInline):
+    model = EventPhotoReport
+    extra = 3
+    fields = ('image', 'order')
+    verbose_name = 'Фото отчёта'
+    verbose_name_plural = 'Фотоотчёт'
 
 
 def _is_content_or_admin(user):
@@ -17,7 +25,8 @@ class EventReservationAdmin(ModelAdmin):
     list_display = ('event', 'guest_name', 'guest_phone', 'guests_count', 'created_at')
     list_filter = ('event',)
     search_fields = ('user__phone', 'user__first_name', 'user__last_name', 'event__title')
-    readonly_fields = ('created_at',)
+    readonly_fields = ('guest_name', 'guest_phone', 'created_at')
+    fields = ('event', 'user', 'guest_name', 'guest_phone', 'guests_count', 'created_at')
 
     @admin.display(description='Имя гостя')
     def guest_name(self, obj):
@@ -61,7 +70,7 @@ class EventAdmin(ModelAdmin):
     
     # Возможность быстро включать/выключать мероприятие из списка
     list_editable = ('is_active',)
-    
+    inlines = [EventPhotoReportInline]
     readonly_fields = ('image_preview_big',)
 
     def has_module_permission(self, request):

@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -425,24 +425,6 @@ class BulkPushViewTest(APITestCase):
         queued_ids = kwargs['user_ids']
         self.assertIn(user_with_device.pk, queued_ids)
 
-    @patch('apps.notifications.tasks.send_bulk_push_notification')
-    def test_by_city_excludes_users_without_devices(self, mock_task):
-        """
-        Сегмент by_city: пользователи без FCM-устройств не учитываются в queued.
-        """
-        from django.contrib.auth import get_user_model
-        U = get_user_model()
-        user_with_dev = U.objects.create_user(phone='+77009001001', city='Алматы')
-        UserDevice.objects.create(user=user_with_dev, fcm_token='tok_city_filter')
-        U.objects.create_user(phone='+77009001002', city='Алматы')  # без устройства
-
-        self._auth(self.admin)
-        response = self.client.post('/api/v1/notifications/bulk-push/', {
-            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Алматы',
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        # queued должен содержать только пользователя с устройством
-        self.assertEqual(response.data['queued'], 1)
 
 
 # ---------------------------------------------------------------------------
@@ -458,19 +440,20 @@ class PushWeeklyLimitTest(TestCase):
     @patch('apps.notifications.tasks.cache')
     @patch('apps.notifications.tasks.messaging')
     def test_push_within_limit_is_sent(self, mock_msg, mock_cache):
-        mock_cache.get.return_value = 0
+        mock_cache.incr.return_value = 1
         mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
         from apps.notifications.tasks import send_push_notification
         send_push_notification(self.user.pk, 'T', 'B', category='events')
         mock_msg.send_each_for_multicast.assert_called_once()
-        mock_cache.set.assert_called_once()
+        mock_cache.add.assert_called_once()
+        mock_cache.incr.assert_called_once()
 
     @patch('apps.notifications.tasks.cache')
     @patch('apps.notifications.tasks.messaging')
     def test_push_over_limit_is_skipped(self, mock_msg, mock_cache):
-        mock_cache.get.return_value = 3  # already at limit
+        mock_cache.incr.return_value = 4  # already at limit
         from apps.notifications.tasks import send_push_notification
         send_push_notification(self.user.pk, 'T', 'B', category='events')
         mock_msg.send_each_for_multicast.assert_not_called()
@@ -478,7 +461,6 @@ class PushWeeklyLimitTest(TestCase):
     @patch('apps.notifications.tasks.cache')
     @patch('apps.notifications.tasks.messaging')
     def test_service_push_ignores_limit(self, mock_msg, mock_cache):
-        mock_cache.get.return_value = 99  # way over limit
         mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
@@ -486,7 +468,7 @@ class PushWeeklyLimitTest(TestCase):
         # category=None → service push, no limit check
         send_push_notification(self.user.pk, 'T', 'B', category=None)
         mock_msg.send_each_for_multicast.assert_called_once()
-        mock_cache.get.assert_not_called()
+        mock_cache.incr.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +493,7 @@ class PushTimeWindowTest(TestCase):
     def test_push_within_window_is_sent(self, mock_tz, mock_msg, mock_cache):
         mock_tz.localtime.return_value = self._make_local_dt(10)
         mock_tz.now.return_value = self._make_local_dt(10)
-        mock_cache.get.return_value = 0
+        mock_cache.incr.return_value = 1
         mock_msg.send_each_for_multicast.return_value = MagicMock(
             success_count=1, failure_count=0, responses=[]
         )
@@ -660,68 +642,6 @@ class NotificationsEnabledFlagTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Сегмент by_city (ТЗ блок 6 — геолокация)
-# ---------------------------------------------------------------------------
-
-class BulkPushByCitySegmentTest(APITestCase):
-    def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_user(phone='+77031000001', role='content_manager', is_staff=True)
-        self.almaty_user = User.objects.create_user(phone='+77031000002', city='Алматы')
-        self.astana_user = User.objects.create_user(phone='+77031000003', city='Астана')
-        self.no_city_user = User.objects.create_user(phone='+77031000004')
-        # После добавления фильтрации по UserDevice пользователи без устройств
-        # не попадают в рассылку — регистрируем устройства для тестовых пользователей
-        UserDevice.objects.create(user=self.almaty_user, fcm_token='tok_almaty')
-        UserDevice.objects.create(user=self.astana_user, fcm_token='tok_astana')
-
-    def _auth(self):
-        refresh = RefreshToken.for_user(self.admin)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
-
-    @patch('apps.notifications.tasks.send_bulk_push_notification')
-    def test_by_city_segment_filters_by_city(self, mock_task):
-        """Сегмент by_city возвращает только пользователей с совпадающим городом."""
-        self._auth()
-        response = self.client.post('/api/v1/notifications/bulk-push/', {
-            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Алматы',
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        # Только almaty_user попадает в выборку
-        self.assertEqual(response.data['queued'], 1)
-
-    @patch('apps.notifications.tasks.send_bulk_push_notification')
-    def test_by_city_segment_exact_match_only(self, mock_task):
-        """Пользователи другого города не попадают в выборку."""
-        self._auth()
-        response = self.client.post('/api/v1/notifications/bulk-push/', {
-            'title': 'T', 'body': 'B', 'segment': 'by_city', 'city': 'Астана',
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        self.assertEqual(response.data['queued'], 1)  # только astana_user
-
-    @patch('apps.notifications.tasks.send_bulk_push_notification')
-    def test_by_city_without_city_param_returns_400(self, mock_task):
-        """Без параметра city возвращается 400."""
-        self._auth()
-        response = self.client.post('/api/v1/notifications/bulk-push/', {
-            'title': 'T', 'body': 'B', 'segment': 'by_city',
-        }, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('city', response.data)
-
-    def test_city_field_saved_via_profile_patch(self):
-        """Поле city сохраняется через PATCH /api/v1/users/profile/."""
-        from rest_framework_simplejwt.tokens import RefreshToken as RT
-        refresh = RT.for_user(self.almaty_user)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
-        response = self.client.patch('/api/v1/users/profile/', {'city': 'Шымкент'}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.almaty_user.refresh_from_db()
-        self.assertEqual(self.almaty_user.city, 'Шымкент')
-
-
-# ---------------------------------------------------------------------------
 # Retry-конфигурация Celery-тасок
 # ---------------------------------------------------------------------------
 
@@ -822,3 +742,69 @@ class FirebaseStartupValidationTest(TestCase):
                     config.ready()
             finally:
                 firebase_admin._apps.update(saved_apps)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/notifications/send-push-via-bot/
+# ---------------------------------------------------------------------------
+
+class SendPushViaBotViewTest(APITestCase):
+    def setUp(self):
+        # We need an admin/content_manager with telegram_id
+        self.manager = User.objects.create_user(phone='+77009000010', role='content_manager', telegram_id='123456')
+        self.regular = User.objects.create_user(phone='+77009000011', role='', telegram_id='654321')
+        self.hall_manager = User.objects.create_user(phone='+77009000012', role='hall_manager', telegram_id='999999')
+        # Some target users with devices
+        self.user1 = User.objects.create_user(phone='+77009000013')
+        self.user2 = User.objects.create_user(phone='+77009000014')
+        UserDevice.objects.create(user=self.user1, fcm_token='tok_bot_1')
+        UserDevice.objects.create(user=self.user2, fcm_token='tok_bot_2')
+
+    @override_settings(TELEGRAM_WEBHOOK_SECRET='super-secret')
+    def test_missing_secret_token_returns_403(self):
+        response = self.client.post('/api/v1/notifications/send-push-via-bot/', {
+            'manager_telegram_id': '123456', 'title': 'T', 'body': 'B'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @override_settings(TELEGRAM_WEBHOOK_SECRET='super-secret')
+    def test_invalid_secret_token_returns_403(self):
+        self.client.credentials(HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN='wrong-secret')
+        response = self.client.post('/api/v1/notifications/send-push-via-bot/', {
+            'manager_telegram_id': '123456', 'title': 'T', 'body': 'B'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @override_settings(TELEGRAM_WEBHOOK_SECRET='super-secret')
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_valid_secret_token_and_manager_returns_202(self, mock_task):
+        self.client.credentials(HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN='super-secret')
+        response = self.client.post('/api/v1/notifications/send-push-via-bot/', {
+            'manager_telegram_id': '123456', 'title': 'T', 'body': 'B'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(response.data['queued'], 2)
+        mock_task.delay.assert_called_once()
+
+    @override_settings(TELEGRAM_WEBHOOK_SECRET='')
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_no_secret_configured_returns_202(self, mock_task):
+        response = self.client.post('/api/v1/notifications/send-push-via-bot/', {
+            'manager_telegram_id': '123456', 'title': 'T', 'body': 'B'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_regular_user_telegram_id_returns_403(self, mock_task):
+        response = self.client.post('/api/v1/notifications/send-push-via-bot/', {
+            'manager_telegram_id': '654321', 'title': 'T', 'body': 'B'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @patch('apps.notifications.tasks.send_bulk_push_notification')
+    def test_hall_manager_user_telegram_id_returns_403(self, mock_task):
+        response = self.client.post('/api/v1/notifications/send-push-via-bot/', {
+            'manager_telegram_id': '999999', 'title': 'T', 'body': 'B'
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+

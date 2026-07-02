@@ -6,6 +6,7 @@ from .throttles import PhoneSMSThrottle, SafeScopedRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import update_last_login
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 
 from .serializers import RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer, LogoutSerializer
@@ -151,6 +152,12 @@ class VerifySMSView(APIView):
             )
 
         user, created = User.objects.get_or_create(phone=phone)
+        if not user.is_active:
+            return Response(
+                {'error': 'Ваш аккаунт заблокирован.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        update_last_login(None, user)
         refresh = RefreshToken.for_user(user)
 
         return Response({
@@ -258,3 +265,44 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+@extend_schema(tags=['Auth'])
+class DeleteAccountView(APIView):
+    """
+    Безвозвратное удаление аккаунта текущего пользователя (Guideline 5.1.1).
+    Связанные брони, записи на события и FCM-устройства удаляются каскадом.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Удалить аккаунт текущего пользователя',
+        description=(
+            'Безвозвратно удаляет учётную запись и связанные персональные данные.\n\n'
+            'После успешного ответа клиент должен очистить локальные JWT-токены '
+            'и показать экран неавторизованного пользователя.\n\n'
+            'Учётные записи персонала (`is_staff`) через приложение удалить нельзя.'
+        ),
+        responses={
+            204: OpenApiResponse(description='Аккаунт удалён, тело пустое'),
+            401: _error_401,
+            403: OpenApiResponse(
+                description='Удаление запрещено (например, staff-аккаунт)',
+                examples=[
+                    OpenApiExample(
+                        'Запрещено',
+                        value={'error': 'Этот аккаунт нельзя удалить через приложение.'},
+                    )
+                ],
+            ),
+        },
+    )
+    def delete(self, request):
+        user = request.user
+        if user.is_staff or user.is_superuser:
+            return Response(
+                {'error': 'Этот аккаунт нельзя удалить через приложение.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
