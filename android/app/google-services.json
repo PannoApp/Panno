@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "359980698696",
+    "project_id": "piligrim-app",
+    "storage_bucket": "piligrim-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:359980698696:android:c223d5cb04f6fd1d9c1c7d",
+        "android_client_info": {
+          "package_name": "com.piligrim.piligrim"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBRlbn2n-nGlnYoGUmXTBXD97UZPIzLo2Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
