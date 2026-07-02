@@ -1,10 +1,18 @@
 // Афиша и новости — ТЗ: лента мероприятий (ближайшие первыми), карточка, запись, архив, новости
 // Визуал и тон: piligrim_design_spec.md (§6 карточки, §8 герой, §9 мероприятия / «АУА»)
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
+import '../data/api_event_display.dart';
 import '../data/events_news_data.dart';
+import '../data/models/api_event.dart';
+import '../providers/core_info_provider.dart';
+import '../providers/events_provider.dart';
+import '../widgets/error_view.dart';
+import '../widgets/event_cover_image.dart';
 import '../widgets/piligrim_background.dart';
 import 'event_detail_screen.dart';
 import '../widgets/piligrim_tap.dart';
@@ -24,127 +32,15 @@ class _EventsScreenState extends State<EventsScreen> {
   bool _archiveOpen = false;
   int _heroIndex = 0;
 
-  late final List<PiligrimEvent> _allEvents;
-  late final List<PiligrimNewsPost> _news;
-
-  @override
-  void initState() {
-    super.initState();
-    _allEvents = buildMockEvents();
-    _news = mockNewsPosts();
-  }
-
-  void _openPhotoReport(PiligrimEvent e) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: PiligrimColors.earthDeep,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Фотоотчёт',
-                style: PiligrimTextStyles.heading.copyWith(color: PiligrimColors.sky),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                e.title,
-                style: PiligrimTextStyles.caption.copyWith(
-                  color: PiligrimColors.water,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Подборка кадров с вечера — полная галерея появится в каналах PILIGRIM. Здесь герой видит атмосферу в духе бренда: тёплый свет, детали стола.',
-                style: PiligrimTextStyles.body.copyWith(
-                  fontSize: 13,
-                  color: PiligrimColors.sky.withValues(alpha: 0.85),
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Builder(
-                builder: (context) {
-                  final extras =
-                      PiligrimInteriorAssets.galleryExtrasExcluding(e.coverAssetPath);
-                  Widget galleryThumb(String asset) {
-                    return Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              Image.asset(asset, fit: BoxFit.cover),
-                              Positioned(
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                height: 28,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        PiligrimColors.earth.withValues(alpha: 0.0),
-                                        PiligrimColors.earth.withValues(alpha: 0.7),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      galleryThumb(e.coverAssetPath),
-                      const SizedBox(width: 8),
-                      galleryThumb(extras[0]),
-                      const SizedBox(width: 8),
-                      galleryThumb(extras[1]),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text(
-                    'Закрыть',
-                    style: PiligrimTextStyles.body.copyWith(
-                      color: PiligrimColors.water,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final upcoming = upcomingEventsSorted(_allEvents);
-    final past = pastEventsSorted(_allEvents);
+    return Consumer<EventsProvider>(
+      builder: (context, events, _) {
+        final upcoming = events.upcoming;
+        final past = events.archived;
+        final news = events.news;
 
-    return Scaffold(
+        return Scaffold(
       backgroundColor: PiligrimColors.earth,
       extendBodyBehindAppBar: true,
       extendBody: true,
@@ -213,15 +109,54 @@ class _EventsScreenState extends State<EventsScreen> {
                           onChanged: (v) => setState(() => _view = v),
                         ),
                         const SizedBox(height: 14),
-                        _AfishaHero(
-                          selectedIndex: _heroIndex,
-                          onChanged: (index) => setState(() => _heroIndex = index),
-                        ),
+                        Builder(builder: (context) {
+                          // Берём URL-слайды из CoreInfo; если ещё не загружены — фоллбэк на локальные PNG
+                          final coreInfo = context.watch<CoreInfoProvider>().coreInfo;
+                          final imageUrls =
+                              (coreInfo?.heroImageUrls.isNotEmpty == true)
+                                  ? coreInfo!.heroImageUrls
+                                  : PiligrimInteriorAssets.triptychInteriorAmbient;
+                          return _AfishaHero(
+                            selectedIndex: _heroIndex,
+                            onChanged: (index) => setState(() => _heroIndex = index),
+                            imageUrls: imageUrls,
+                          );
+                        }),
                       ],
                     ),
                   ),
                 ),
                 if (_view == _AfichaView.events) ...[
+                  if (events.isLoadingUpcoming && upcoming.isEmpty)
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: PiligrimColors.water,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (events.upcomingError != null && upcoming.isEmpty)
+                    SliverErrorView(
+                      message: events.upcomingError!,
+                      onRetry: () => context.read<EventsProvider>().retry(),
+                    ),
+                  if (events.usedMockFallback && upcoming.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        child: Text(
+                          'Офлайн-режим: показаны демо-события',
+                          style: PiligrimTextStyles.caption.copyWith(
+                            fontSize: 11,
+                            color: PiligrimColors.steppe.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    ),
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     sliver: SliverToBoxAdapter(
@@ -245,10 +180,14 @@ class _EventsScreenState extends State<EventsScreen> {
                             padding: const EdgeInsets.only(bottom: 14),
                             child: _EventListCard(
                               event: e,
+                              coverFallbackIndex: i,
                               onOpen: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute<void>(
-                                    builder: (_) => EventDetailScreen(event: e),
+                                    builder: (_) => EventDetailScreen(
+                                      event: e,
+                                      coverFallbackIndex: i,
+                                    ),
                                   ),
                                 );
                               },
@@ -278,12 +217,7 @@ class _EventsScreenState extends State<EventsScreen> {
                             final e = past[i];
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
-                              child: _PastEventCard(
-                                event: e,
-                                onPhotoReport: e.hasPhotoReport
-                                    ? () => _openPhotoReport(e)
-                                    : null,
-                              ),
+                              child: _PastEventCard(event: e),
                             );
                           },
                           childCount: past.length,
@@ -309,13 +243,13 @@ class _EventsScreenState extends State<EventsScreen> {
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, i) {
-                          final n = _news[i];
+                          final n = news[i];
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 14),
                             child: _NewsCard(post: n),
                           );
                         },
-                        childCount: _news.length,
+                        childCount: news.length,
                       ),
                     ),
                   ),
@@ -325,6 +259,8 @@ class _EventsScreenState extends State<EventsScreen> {
             ),
         ],
       ),
+        );
+      },
     );
   }
 }
@@ -375,15 +311,18 @@ class _AfishaHero extends StatefulWidget {
   const _AfishaHero({
     required this.selectedIndex,
     required this.onChanged,
+    required this.imageUrls,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onChanged;
+  // Список URL (сетевых или asset-путей) для слайдов
+  final List<String> imageUrls;
 
-  static int get _slideCount => PiligrimInteriorAssets.allInteriorPngs.length;
+  int get _slideCount => imageUrls.length;
 
-  static _HeroItem itemForSlide(int index) {
-    final image = PiligrimInteriorAssets.allInteriorPngs[index];
+  _HeroItem itemForSlide(int index) {
+    final image = imageUrls[index];
     const titles = [
       'Атмосфера зала',
       'Ритуал вечера',
@@ -426,19 +365,35 @@ class _AfishaHeroState extends State<_AfishaHero> {
   @override
   void initState() {
     super.initState();
-    final maxI = _AfishaHero._slideCount - 1;
+    final maxI = widget._slideCount - 1;
     final page = widget.selectedIndex.clamp(0, maxI < 0 ? 0 : maxI);
     _controller = PageController(
       viewportFraction: 0.94,
       initialPage: page,
     );
+    // Предзагружаем первые 3 слайда сразу после первого кадра
+    WidgetsBinding.instance.addPostFrameCallback((_) => _preload(page));
+  }
+
+  // Предзагрузка текущего + соседних слайдов через CachedNetworkImageProvider
+  void _preload(int current) {
+    if (!mounted) return;
+    final urls = widget.imageUrls;
+    for (var offset = -1; offset <= 1; offset++) {
+      final i = current + offset;
+      if (i < 0 || i >= urls.length) continue;
+      final url = urls[i];
+      if (url.startsWith('http')) {
+        precacheImage(CachedNetworkImageProvider(url), context);
+      }
+    }
   }
 
   @override
   void didUpdateWidget(covariant _AfishaHero oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedIndex != widget.selectedIndex) {
-      final maxI = _AfishaHero._slideCount - 1;
+      final maxI = widget._slideCount - 1;
       final target = widget.selectedIndex.clamp(0, maxI < 0 ? 0 : maxI);
       _controller.animateToPage(
         target,
@@ -455,7 +410,7 @@ class _AfishaHeroState extends State<_AfishaHero> {
   }
 
   void _goTo(int index) {
-    final maxI = _AfishaHero._slideCount - 1;
+    final maxI = widget._slideCount - 1;
     final i = index.clamp(0, maxI < 0 ? 0 : maxI);
     _controller.animateToPage(
       i,
@@ -467,7 +422,7 @@ class _AfishaHeroState extends State<_AfishaHero> {
 
   @override
   Widget build(BuildContext context) {
-    final total = _AfishaHero._slideCount;
+    final total = widget._slideCount;
     final idx = widget.selectedIndex.clamp(0, total > 0 ? total - 1 : 0);
     return Column(
       children: [
@@ -476,9 +431,12 @@ class _AfishaHeroState extends State<_AfishaHero> {
           child: PageView.builder(
             itemCount: total,
             controller: _controller,
-            onPageChanged: widget.onChanged,
+            onPageChanged: (page) {
+              widget.onChanged(page);
+              _preload(page); // предзагружаем соседей при свайпе
+            },
             itemBuilder: (context, index) {
-              final item = _AfishaHero.itemForSlide(index);
+              final item = widget.itemForSlide(index);
               final active = idx == index;
               return _HeroSlide(
                 item: item,
@@ -567,7 +525,24 @@ class _HeroSlide extends StatelessWidget {
                 curve: Curves.easeInOut,
                 builder: (context, value, child) =>
                     Transform.scale(scale: value, child: child),
-                child: Image.asset(item.imageAsset, fit: BoxFit.cover),
+                // Сетевой URL (из API) — CachedNetworkImage; локальный asset (fallback) — Image.asset
+                child: item.imageAsset.startsWith('http')
+                    ? CachedNetworkImage(
+                        imageUrl: item.imageAsset,
+                        fit: BoxFit.cover,
+                        // Ограничиваем размер декодирования: слайдер ~194px, 2x DPR → 800px достаточно
+                        memCacheWidth: 800,
+                        memCacheHeight: 500,
+                        fadeInDuration: const Duration(milliseconds: 180),
+                        placeholder: (_, __) => const ColoredBox(
+                          color: PiligrimColors.earthDeep,
+                        ),
+                        errorWidget: (_, __, ___) => Image.asset(
+                          PiligrimInteriorAssets.triptychInteriorAmbient[0],
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Image.asset(item.imageAsset, fit: BoxFit.cover),
               ),
               DecoratedBox(
                 decoration: BoxDecoration(
@@ -742,15 +717,19 @@ class _SegButton extends StatelessWidget {
 class _EventListCard extends StatelessWidget {
   const _EventListCard({
     required this.event,
+    required this.coverFallbackIndex,
     required this.onOpen,
   });
 
-  final PiligrimEvent event;
+  final ApiEvent event;
+  final int coverFallbackIndex;
   final VoidCallback onOpen;
 
   String _subtitle() {
-    final fmt = event.format.labelRu.toLowerCase();
-    final price = event.priceFromRub != null ? ' · от ${event.priceFromRub} ₽' : '';
+    final fmt = event.formatLabelRu.toLowerCase();
+    final price = event.priceFrom != null
+        ? ' · от ${'${event.priceFrom}'.replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸'
+        : '';
     return '$fmt$price';
   }
 
@@ -777,9 +756,9 @@ class _EventListCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.asset(
-                        event.coverAssetPath,
-                        fit: BoxFit.cover,
+                      EventCoverImage(
+                        imageUrl: event.coverUrl,
+                        fallbackAsset: event.fallbackCoverAsset(coverFallbackIndex),
                       ),
                       Positioned(
                         left: 0,
@@ -925,15 +904,11 @@ class _ArchiveHeader extends StatelessWidget {
   }
 }
 
-// Карточка прошедшего мероприятия (название, дата, ссылка на фотоотчёт)
+// Карточка прошедшего мероприятия (название, дата)
 class _PastEventCard extends StatelessWidget {
-  const _PastEventCard({
-    required this.event,
-    this.onPhotoReport,
-  });
+  const _PastEventCard({required this.event});
 
-  final PiligrimEvent event;
-  final VoidCallback? onPhotoReport;
+  final ApiEvent event;
 
   @override
   Widget build(BuildContext context) {
@@ -961,31 +936,6 @@ class _PastEventCard extends StatelessWidget {
               color: PiligrimColors.sky.withValues(alpha: 0.35),
             ),
           ),
-          if (onPhotoReport != null) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: onPhotoReport,
-                style: TextButton.styleFrom(
-                  foregroundColor: PiligrimColors.water,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  'Фотоотчёт',
-                  style: PiligrimTextStyles.body.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: PiligrimColors.water,
-                    decoration: TextDecoration.underline,
-                    decorationColor: PiligrimColors.water.withValues(alpha: 0.5),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

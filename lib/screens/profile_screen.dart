@@ -4,14 +4,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../core/ambient_preset.dart';
+import '../core/auth_guard.dart';
 import '../core/theme.dart';
 import '../core/profile_data.dart';
-import '../core/home_data.dart';
+import '../data/models/core_info.dart';
+import '../providers/auth_provider.dart';
+import '../providers/booking_provider.dart';
+import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
+import 'booking_history_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,15 +26,56 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Состояние toggles (в реальном приложении — через SharedPreferences / Provider)
-  final Map<String, bool> _notifState = {
-    'events': true,
-    'promo': false,
-    'private': true,
-  };
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (context.read<AuthProvider>().isLoggedIn) {
+        context.read<BookingProvider>().loadHistory();
+      }
+    });
+  }
 
-  // Демо-пользователь (замените на реальный state)
-  final HeroUser _user = kDemoUser;
+  bool _notifValue(AuthProvider auth, String id) {
+    final user = auth.currentUser;
+    if (user == null) return false;
+    return switch (id) {
+      'events' => user.notifyEvents,
+      'promo' => user.notifyPromotions,
+      'private' => user.notifyClosedEvents,
+      _ => false,
+    };
+  }
+
+  Future<void> _handleNotifToggle(String id, bool value) async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) return;
+
+    try {
+      switch (id) {
+        case 'global':
+          await auth.updateNotificationPreferences(notificationsEnabled: value);
+        case 'events':
+          await auth.updateNotificationPreferences(events: value);
+        case 'promo':
+          await auth.updateNotificationPreferences(promotions: value);
+        case 'private':
+          await auth.updateNotificationPreferences(closedEvents: value);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: PiligrimColors.earthDeep,
+          content: Text(
+            auth.error ?? 'Не удалось сохранить настройки',
+            style: PiligrimTextStyles.body.copyWith(fontSize: 13),
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> _launch(String url) async {
     final uri = Uri.parse(url);
@@ -50,30 +96,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: PiligrimColors.earth,
-      body: Stack(
-        children: [
-          const Positioned.fill(
-            child: PiligrimBackground(
-              textureOpacity: 0.45,
-              vignetteIntensity: 0.25,
-            ),
-          ),
+    final core = context.watch<CoreInfoProvider>();
+    final coreInfo = core.coreInfo;
 
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            clipBehavior: Clip.none,
-            slivers: [
-              // ── Хедер-карта Героя ───────────────────────────────────
-              SliverToBoxAdapter(child: _HeroHeader(user: _user)),
-
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // История
-                    _StatsRow(user: _user),
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final user = auth.user;
+        return Scaffold(
+          backgroundColor: PiligrimColors.earth,
+          body: Stack(
+            children: [
+              const Positioned.fill(
+                child: PiligrimBackground(
+                  textureOpacity: 0.45,
+                  vignetteIntensity: 0.25,
+                ),
+              ),
+              CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                clipBehavior: Clip.none,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _HeroHeader(
+                      user: user,
+                      onStartJourney: () async {
+                        await guardAuth(context);
+                      },
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _StatsRow(user: user),
                     const SizedBox(height: 28),
 
                     // Push-уведомления
@@ -83,19 +138,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 12),
                     _NotificationsCard(
-                      state: _notifState,
-                      onToggle: (id, val) =>
-                          setState(() => _notifState[id] = val),
+                      enabled: auth.isLoggedIn,
+                      globalEnabled:
+                          auth.currentUser?.notificationsEnabled ?? true,
+                      isOn: (id) => _notifValue(auth, id),
+                      onToggle: _handleNotifToggle,
                     ),
-                    const SizedBox(height: 28),
-
-                    // Атмосфера приложения
-                    const PiligrimSectionHeader(
-                      label: 'АТМОСФЕРА ПРИЛОЖЕНИЯ',
-                      icon: 'assets/images/spiral.svg',
-                    ),
-                    const SizedBox(height: 12),
-                    const _AmbientPresetCard(),
                     const SizedBox(height: 28),
 
                     // Контакты
@@ -104,7 +152,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: 'assets/images/splash_path (1).svg',
                     ),
                     const SizedBox(height: 12),
-                    _ContactsCard(onLaunch: _launch),
+                    _ContactsCard(
+                      coreInfo: coreInfo,
+                      onLaunch: _launch,
+                    ),
                     const SizedBox(height: 28),
 
                     // Часы работы
@@ -122,18 +173,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: 'assets/images/shaman.svg',
                     ),
                     const SizedBox(height: 12),
-                    _RulesCard(),
+                    _RulesCard(
+                      rules: coreInfo?.visitRules.isNotEmpty == true
+                          ? coreInfo!.visitRules
+                          : null,
+                    ),
                     const SizedBox(height: 28),
 
+                    // Выход из аккаунта
+                        if (auth.isLoggedIn) ...[
+                          const SizedBox(height: 8),
+                          _LogoutButton(
+                            onTap: () async {
+                              await context.read<AuthProvider>().logout();
+                            },
+                          ),
+                          const SizedBox(height: 28),
+                        ],
+
                     // Юридическое + версия
-                    _LegalFooter(onLaunch: _launch),
-                  ]),
-                ),
+                        _LegalFooter(
+                          privacyUrl: coreInfo?.privacyPolicy,
+                          coreInfo: coreInfo,
+                          onLaunch: _launch,
+                        ),
+                      ]),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -142,8 +214,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // HERO HEADER
 // ─────────────────────────────────────────────────────────────────────────────
 class _HeroHeader extends StatefulWidget {
-  const _HeroHeader({required this.user});
+  const _HeroHeader({
+    required this.user,
+    required this.onStartJourney,
+  });
+
   final HeroUser user;
+  final Future<void> Function() onStartJourney;
 
   @override
   State<_HeroHeader> createState() => _HeroHeaderState();
@@ -219,41 +296,11 @@ class _HeroHeaderState extends State<_HeroHeader>
             ),
           ),
 
-          // Вертикальная декоративная линия
+          // Основной контент — в одной сетке с секциями ниже (20px)
           Positioned(
-            left: 26,
-            top: top + 20,
-            child: Column(
-              children: [
-                SvgPicture.asset(
-                  'assets/images/star_totem (1).svg',
-                  width: 10,
-                  height: 10,
-                  colorFilter: ColorFilter.mode(
-                    PiligrimColors.water.withValues(alpha: 0.4),
-                    BlendMode.srcIn,
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 110,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [PiligrimColors.water, PiligrimColors.clear],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ).animate().fadeIn(delay: 300.ms, duration: 600.ms),
-
-          // Основной контент
-          Positioned(
-            left: 52,
-            right: 24,
-            bottom: 30,
+            left: 20,
+            right: 20,
+            bottom: 28,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -338,6 +385,7 @@ class _HeroHeaderState extends State<_HeroHeader>
                 if (!authorized)
                   PiligrimTap(
                     borderRadius: BorderRadius.circular(8),
+                    onTap: widget.onStartJourney,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 9),
@@ -409,13 +457,21 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bookingsCount =
+        context.watch<BookingProvider>().history.length;
+
     return Row(
       children: [
         _StatCard(
-          value: '${user.bookingsCount}',
+          value: '$bookingsCount',
           label: 'Бронирований',
           totemAsset: 'assets/images/moon_totem (1).svg',
           delay: 0.ms,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const BookingHistoryScreen(),
+            ),
+          ),
         ),
         const SizedBox(width: 10),
         _StatCard(
@@ -445,6 +501,7 @@ class _StatCard extends StatelessWidget {
     required this.totemAsset,
     required this.delay,
     this.small = false,
+    this.onTap,
   });
 
   final String value;
@@ -452,11 +509,15 @@ class _StatCard extends StatelessWidget {
   final String totemAsset;
   final Duration delay;
   final bool small;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
+      child: PiligrimTap(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap ?? () {},
+        child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         decoration: BoxDecoration(
           color: PiligrimColors.earthDeep,
@@ -505,6 +566,7 @@ class _StatCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       )
           .animate(delay: delay)
           .fadeIn(duration: 500.ms)
@@ -518,198 +580,78 @@ class _StatCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _NotificationsCard extends StatelessWidget {
   const _NotificationsCard({
-    required this.state,
+    required this.enabled,
+    required this.globalEnabled,
+    required this.isOn,
     required this.onToggle,
   });
 
-  final Map<String, bool> state;
-  final void Function(String id, bool val) onToggle;
+  final bool enabled;
+  // Глобальный флаг из UserProfile.notificationsEnabled
+  final bool globalEnabled;
+  final bool Function(String id) isOn;
+  final Future<void> Function(String id, bool value) onToggle;
 
   @override
   Widget build(BuildContext context) {
+    if (!enabled) {
+      return _BrandCard(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Войдите, чтобы управлять уведомлениями',
+            style: PiligrimTextStyles.body.copyWith(
+              fontSize: 13,
+              color: PiligrimColors.sky.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+      );
+    }
+
     return _BrandCard(
       child: Column(
-        children: kNotifCategories.asMap().entries.map((entry) {
-          final i = entry.key;
-          final cat = entry.value;
-          final isOn = state[cat.id] ?? false;
-          return Column(
-            children: [
-              _NotifRow(
-                category: cat,
-                isOn: isOn,
-                onChanged: (val) => onToggle(cat.id, val),
-              ),
-              if (i < kNotifCategories.length - 1)
-                const Divider(
-                  height: 1,
-                  color: PiligrimColors.divider,
-                  indent: 48,
-                ),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// Карточка выбора атмосферы (темы) интерфейса: Calm, Ember, Mystic
-class _AmbientPresetCard extends StatelessWidget {
-  const _AmbientPresetCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final current = AmbientPresetScope.of(context);
-    final ctrl = AmbientPresetScope.controllerOf(context);
-
-    return _BrandCard(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Выберите атмосферу интерфейса',
-              style: PiligrimTextStyles.caption.copyWith(
-                color: PiligrimColors.sky.withValues(alpha: 0.45),
-                fontSize: 11,
-                letterSpacing: 0.7,
-              ),
+        children: [
+          // Главный переключатель — отражает notifications_enabled с сервера
+          _NotifRow(
+            category: const NotifCategory(
+              id: 'global',
+              label: 'Уведомления',
+              subtitle: 'Включить все push-уведомления',
+              iconAsset: 'assets/images/moon_totem (1).svg',
             ),
-            const SizedBox(height: 12),
-            ...AppAmbientPreset.values.map((preset) {
-              final active = preset == current;
-              final accent = switch (preset) {
-                AppAmbientPreset.calm => PiligrimColors.water,
-                AppAmbientPreset.ember => PiligrimColors.steppe,
-                AppAmbientPreset.mystic => PiligrimColors.sky,
-              };
-              final previewTop = switch (preset) {
-                AppAmbientPreset.calm => PiligrimColors.water.withValues(alpha: 0.6),
-                AppAmbientPreset.ember => PiligrimColors.ember.withValues(alpha: 0.75),
-                AppAmbientPreset.mystic => PiligrimColors.water.withValues(alpha: 0.35),
-              };
-              final previewBottom = switch (preset) {
-                AppAmbientPreset.calm => PiligrimColors.sky.withValues(alpha: 0.3),
-                AppAmbientPreset.ember => PiligrimColors.steppe.withValues(alpha: 0.35),
-                AppAmbientPreset.mystic => PiligrimColors.earthDeep.withValues(alpha: 0.9),
-              };
-
-              final title = switch (preset) {
-                AppAmbientPreset.calm => 'CALM · ВОДА',
-                AppAmbientPreset.ember => 'EMBER · ОГОНЬ',
-                AppAmbientPreset.mystic => 'MYSTIC · ГЛУБИНА',
-              };
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: PiligrimTap(
-                  borderRadius: BorderRadius.circular(11),
-                  onTap: () => ctrl.setPreset(preset),
-                  child: AnimatedContainer(
-                    duration: 230.ms,
-                    curve: Curves.easeOut,
-                    padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(11),
-                      color: active
-                          ? accent.withValues(alpha: 0.14)
-                          : PiligrimColors.earth,
-                      border: Border.all(
-                        color: active
-                            ? accent.withValues(alpha: 0.8)
-                            : PiligrimColors.divider,
-                        width: active ? 1.2 : 1,
+            isOn: globalEnabled,
+            onChanged: (val) => onToggle('global', val),
+          ),
+          const Divider(height: 1, color: PiligrimColors.divider, indent: 48),
+          // Категории — задизаблены визуально и функционально при globalEnabled=false
+          Opacity(
+            opacity: globalEnabled ? 1.0 : 0.4,
+            child: Column(
+              children: kNotifCategories.asMap().entries.map((entry) {
+                final i = entry.key;
+                final cat = entry.value;
+                final on = isOn(cat.id);
+                return Column(
+                  children: [
+                    _NotifRow(
+                      category: cat,
+                      isOn: on,
+                      onChanged:
+                          globalEnabled ? (val) => onToggle(cat.id, val) : null,
+                    ),
+                    if (i < kNotifCategories.length - 1)
+                      const Divider(
+                        height: 1,
+                        color: PiligrimColors.divider,
+                        indent: 48,
                       ),
-                      boxShadow: active
-                          ? [
-                              BoxShadow(
-                                color: accent.withValues(alpha: 0.2),
-                                blurRadius: 14,
-                                spreadRadius: -3,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 54,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [previewTop, previewBottom],
-                            ),
-                            border: Border.all(
-                              color: accent.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Center(
-                            child: SvgPicture.asset(
-                              'assets/images/spiral.svg',
-                              width: 14,
-                              height: 14,
-                              colorFilter: ColorFilter.mode(
-                                accent.withValues(alpha: active ? 0.95 : 0.55),
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: PiligrimTextStyles.body.copyWith(
-                                  fontSize: 12.8,
-                                  color: active
-                                      ? accent
-                                      : PiligrimColors.sky.withValues(alpha: 0.6),
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                preset.subtitle,
-                                style: PiligrimTextStyles.caption.copyWith(
-                                  fontSize: 10.2,
-                                  color: active
-                                      ? accent.withValues(alpha: 0.78)
-                                      : PiligrimColors.sky.withValues(alpha: 0.36),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        AnimatedOpacity(
-                          duration: 220.ms,
-                          opacity: active ? 1 : 0.35,
-                          child: SvgPicture.asset(
-                            'assets/images/star_totem (1).svg',
-                            width: 12,
-                            height: 12,
-                            colorFilter: ColorFilter.mode(
-                              active ? accent : PiligrimColors.sky.withValues(alpha: 0.28),
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -725,7 +667,7 @@ class _NotifRow extends StatelessWidget {
 
   final NotifCategory category;
   final bool isOn;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -767,7 +709,7 @@ class _NotifRow extends StatelessWidget {
           ),
           // Брендовый toggle
           GestureDetector(
-            onTap: () => onChanged(!isOn),
+            onTap: onChanged != null ? () => onChanged!(!isOn) : null,
             child: AnimatedContainer(
               duration: 250.ms,
               width: 44,
@@ -818,15 +760,109 @@ class _NotifRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONTACTS CARD
-// ─────────────────────────────────────────────────────────────────────────────
-class _ContactsCard extends StatelessWidget {
-  const _ContactsCard({required this.onLaunch});
+({Color color, String totemAsset}) _messengerStyle(String label) {
+  final lower = label.toLowerCase();
+  if (lower.contains('whatsapp')) {
+    return (color: const Color(0xFF25D366), totemAsset: 'assets/images/wheel_totem (1).svg');
+  }
+  if (lower.contains('telegram') || lower.contains('tg')) {
+    return (color: const Color(0xFF2AABEE), totemAsset: 'assets/images/bird_totem (1).svg');
+  }
+  if (lower.contains('instagram')) {
+    return (color: const Color(0xFFE1306C), totemAsset: 'assets/images/star_totem (1).svg');
+  }
+  return (color: PiligrimColors.water, totemAsset: 'assets/images/splash_path (1).svg');
+}
+
+class _MessengerChip extends StatelessWidget {
+  const _MessengerChip({
+    required this.label,
+    required this.url,
+    required this.color,
+    required this.totemAsset,
+    required this.onLaunch,
+  });
+
+  final String label;
+  final String url;
+  final Color color;
+  final String totemAsset;
   final Future<void> Function(String url) onLaunch;
 
   @override
   Widget build(BuildContext context) {
+    return Expanded(
+      child: PiligrimTap(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => onLaunch(url),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            children: [
+              SvgPicture.asset(
+                totemAsset,
+                width: 22,
+                height: 22,
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: PiligrimTextStyles.caption.copyWith(
+                  fontSize: 10,
+                  color: color.withValues(alpha: 0.85),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTACTS CARD
+// ─────────────────────────────────────────────────────────────────────────────
+class _ContactsCard extends StatelessWidget {
+  const _ContactsCard({
+    required this.coreInfo,
+    required this.onLaunch,
+  });
+
+  final CoreInfo? coreInfo;
+  final Future<void> Function(String url) onLaunch;
+
+  @override
+  Widget build(BuildContext context) {
+    final address = coreInfo?.address.isNotEmpty == true
+        ? coreInfo!.address
+        : kRestaurantAddress;
+    final phone = coreInfo?.phone.isNotEmpty == true
+        ? coreInfo!.phone
+        : kRestaurantPhone;
+    // Список карт — только те, у которых есть ссылка из CoreInfo
+    final mapLinks = [
+      if (coreInfo?.twogisLink != null)
+        (label: '2ГИС', url: coreInfo!.twogisLink!, asset: 'assets/images/splash_path (1).svg'),
+      if (coreInfo?.googleMapsLink != null)
+        (label: 'Google', url: coreInfo!.googleMapsLink!, asset: 'assets/images/star_totem (1).svg'),
+      if (coreInfo?.yandexMapsLink != null)
+        (label: 'Яндекс', url: coreInfo!.yandexMapsLink!, asset: 'assets/images/wheel_totem (1).svg'),
+    ];
+
+    final messengers = coreInfo?.socialLinks.isNotEmpty == true
+        ? coreInfo!.socialLinks
+        : null;
+
     return _BrandCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,7 +885,7 @@ class _ContactsCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    kRestaurantAddress,
+                    address,
                     style: PiligrimTextStyles.body.copyWith(
                       fontSize: 13,
                       color: PiligrimColors.sky.withValues(alpha: 0.75),
@@ -861,63 +897,64 @@ class _ContactsCard extends StatelessWidget {
             ),
           ),
 
-          // Кнопки карт
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Row(
-              children: kMapTargets.map((t) {
-                return Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      right: t == kMapTargets.last ? 0 : 8,
-                    ),
-                    child: PiligrimTap(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => onLaunch(t.url),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 9),
-                        decoration: BoxDecoration(
-                          color: PiligrimColors.steppe.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: PiligrimColors.steppe.withValues(alpha: 0.3),
+          // Кнопки карт — скрываем если все ссылки null
+          if (mapLinks.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: mapLinks.map((t) {
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        right: t == mapLinks.last ? 0 : 8,
+                      ),
+                      child: PiligrimTap(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => onLaunch(t.url),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: PiligrimColors.steppe.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: PiligrimColors.steppe.withValues(alpha: 0.3),
+                            ),
                           ),
-                        ),
-                        child: Column(
-                          children: [
-                            SvgPicture.asset(
-                              t.totemAsset,
-                              width: 16,
-                              height: 16,
-                              colorFilter: const ColorFilter.mode(
-                                PiligrimColors.steppe,
-                                BlendMode.srcIn,
+                          child: Column(
+                            children: [
+                              SvgPicture.asset(
+                                t.asset,
+                                width: 16,
+                                height: 16,
+                                colorFilter: const ColorFilter.mode(
+                                  PiligrimColors.steppe,
+                                  BlendMode.srcIn,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              t.label,
-                              style: PiligrimTextStyles.caption.copyWith(
-                                fontSize: 10,
-                                color: PiligrimColors.steppe.withValues(alpha: 0.8),
-                                letterSpacing: 0.5,
+                              const SizedBox(height: 3),
+                              Text(
+                                t.label,
+                                style: PiligrimTextStyles.caption.copyWith(
+                                  fontSize: 10,
+                                  color: PiligrimColors.steppe.withValues(alpha: 0.8),
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
 
           const Divider(height: 1, color: PiligrimColors.divider),
 
           // Телефон
           PiligrimTap(
-            onTap: () => onLaunch('tel:$kRestaurantPhone'),
+            onTap: () => onLaunch('tel:$phone'),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
@@ -933,7 +970,7 @@ class _ContactsCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    kRestaurantPhone,
+                    phone,
                     style: PiligrimTextStyles.body.copyWith(
                       fontSize: 14,
                       color: PiligrimColors.water,
@@ -970,50 +1007,25 @@ class _ContactsCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Row(
-                  children: kMessengers.map((m) {
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: m == kMessengers.last ? 0 : 10,
-                        ),
-                        child: PiligrimTap(
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: () => onLaunch(m.url),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 11),
-                            decoration: BoxDecoration(
-                              color: m.color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: m.color.withValues(alpha: 0.25),
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                SvgPicture.asset(
-                                  m.totemAsset,
-                                  width: 22,
-                                  height: 22,
-                                  colorFilter: ColorFilter.mode(
-                                    m.color,
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  m.label,
-                                  style: PiligrimTextStyles.caption.copyWith(
-                                    fontSize: 10,
-                                    color: m.color.withValues(alpha: 0.85),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                  children: (messengers != null
+                          ? messengers.map((link) {
+                              final style = _messengerStyle(link.label);
+                              return _MessengerChip(
+                                label: link.label,
+                                url: link.url,
+                                color: style.color,
+                                totemAsset: style.totemAsset,
+                                onLaunch: onLaunch,
+                              );
+                            })
+                          : kMessengers.map((m) => _MessengerChip(
+                                label: m.label,
+                                url: m.url,
+                                color: m.color,
+                                totemAsset: m.totemAsset,
+                                onLaunch: onLaunch,
+                              )))
+                      .toList(),
                 ),
               ],
             ),
@@ -1046,7 +1058,6 @@ class _HoursCardState extends State<_HoursCard>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
-    if (kRestaurantInfo.isOpen) _pulseCtrl.repeat(reverse: true);
   }
 
   @override
@@ -1057,7 +1068,17 @@ class _HoursCardState extends State<_HoursCard>
 
   @override
   Widget build(BuildContext context) {
-    final open = kRestaurantInfo.isOpen;
+    final core = context.watch<CoreInfoProvider>();
+    final open = core.isOpenNow;
+    if (open) {
+      if (!_pulseCtrl.isAnimating) _pulseCtrl.repeat(reverse: true);
+    } else if (_pulseCtrl.isAnimating) {
+      _pulseCtrl.stop();
+      _pulseCtrl.value = 0;
+    }
+    final hoursText = core.workingHoursNote?.isNotEmpty == true
+        ? '${core.workingHoursDisplay}\n${core.workingHoursNote}'
+        : core.workingHoursDisplay;
     return _BrandCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1102,7 +1123,7 @@ class _HoursCardState extends State<_HoursCard>
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${kRestaurantInfo.scheduleLabel}  ·  ${kRestaurantInfo.hoursLabel}',
+                  hoursText,
                   style: PiligrimTextStyles.caption,
                 ),
               ],
@@ -1128,6 +1149,11 @@ class _HoursCardState extends State<_HoursCard>
 // RULES CARD — раскрываемые пункты
 // ─────────────────────────────────────────────────────────────────────────────
 class _RulesCard extends StatefulWidget {
+  const _RulesCard({this.rules});
+
+  /// Если null или пусто — fallback на [kVisitRules].
+  final List<VisitRuleItem>? rules;
+
   @override
   State<_RulesCard> createState() => _RulesCardState();
 }
@@ -1135,11 +1161,30 @@ class _RulesCard extends StatefulWidget {
 class _RulesCardState extends State<_RulesCard> {
   int? _expanded;
 
+  List<({String title, String body, String iconAsset})> get _items {
+    final api = widget.rules;
+    if (api != null && api.isNotEmpty) {
+      return api
+          .map(
+            (r) => (
+              title: r.title,
+              body: r.body,
+              iconAsset: 'assets/images/shaman.svg',
+            ),
+          )
+          .toList();
+    }
+    return kVisitRules
+        .map((r) => (title: r.title, body: r.body, iconAsset: r.iconAsset))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final items = _items;
     return _BrandCard(
       child: Column(
-        children: kVisitRules.asMap().entries.map((entry) {
+        children: items.asMap().entries.map((entry) {
           final i = entry.key;
           final rule = entry.value;
           final isOpen = _expanded == i;
@@ -1212,7 +1257,7 @@ class _RulesCardState extends State<_RulesCard> {
                       )
                     : const SizedBox.shrink(),
               ),
-              if (i < kVisitRules.length - 1)
+              if (i < items.length - 1)
                 const Divider(
                   height: 1,
                   color: PiligrimColors.divider,
@@ -1232,11 +1277,22 @@ class _RulesCardState extends State<_RulesCard> {
 // LEGAL FOOTER
 // ─────────────────────────────────────────────────────────────────────────────
 class _LegalFooter extends StatelessWidget {
-  const _LegalFooter({required this.onLaunch});
+  const _LegalFooter({
+    required this.onLaunch,
+    this.privacyUrl,
+    this.coreInfo,
+  });
+
   final Future<void> Function(String url) onLaunch;
+  final String? privacyUrl;
+  final CoreInfo? coreInfo;
 
   @override
   Widget build(BuildContext context) {
+    final privacy = privacyUrl?.isNotEmpty == true
+        ? privacyUrl!
+        : 'https://piligrim.kz/privacy';
+
     return Column(
       children: [
         // Центральный тотем-разделитель
@@ -1256,21 +1312,25 @@ class _LegalFooter extends StatelessWidget {
         _BrandCard(
           child: Column(
             children: [
-              _LegalRow(
-                label: 'Пользовательское соглашение',
-                onTap: () => onLaunch('https://piligrim.kz/terms'),
-              ),
-              const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
+              if (coreInfo?.termsOfService != null) ...[
+                _LegalRow(
+                  label: 'Пользовательское соглашение',
+                  onTap: () => onLaunch(coreInfo!.termsOfService!),
+                ),
+                const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
+              ],
               _LegalRow(
                 label: 'Политика конфиденциальности',
-                onTap: () => onLaunch('https://piligrim.kz/privacy'),
+                onTap: () => onLaunch(privacy),
               ),
-              const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
-              _LegalRow(
-                label: 'Обратная связь',
-                accent: true,
-                onTap: () => onLaunch('mailto:hello@piligrim.kz'),
-              ),
+              if (coreInfo?.feedbackUrl != null) ...[
+                const Divider(height: 1, color: PiligrimColors.divider, indent: 16),
+                _LegalRow(
+                  label: 'Обратная связь',
+                  accent: true,
+                  onTap: () => onLaunch(coreInfo!.feedbackUrl!),
+                ),
+              ],
             ],
           ),
         ),
@@ -1303,6 +1363,40 @@ class _LegalFooter extends StatelessWidget {
     )
         .animate()
         .fadeIn(delay: 250.ms, duration: 600.ms);
+  }
+}
+
+class _LogoutButton extends StatelessWidget {
+  const _LogoutButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _BrandCard(
+      child: PiligrimTap(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Text(
+                'Выйти из аккаунта',
+                style: PiligrimTextStyles.body.copyWith(
+                  fontSize: 13,
+                  color: PiligrimColors.ember.withValues(alpha: 0.85),
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.logout_rounded,
+                size: 16,
+                color: PiligrimColors.ember.withValues(alpha: 0.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -1,15 +1,25 @@
 // DishVideoCard — полноэкранная карточка в стиле Reels / TikTok
 // «Каждое блюдо — отдельное приключение» (brandbook, стр. 17)
-// Видео заменено кинематографическим градиентным плейсхолдером;
-// архитектура готова к подключению VideoPlayerController
+// Блок 5: переключение на ApiDish, VideoPlayerController при наличии videoUrl.
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:video_player/video_player.dart';
 import '../core/theme.dart';
-import '../core/menu_data.dart';
+import '../data/models/api_dish.dart';
 import 'dish_elements.dart';
 import 'piligrim_tap.dart';
+
+// Дефолтные цвета кинематографического фона (используются когда нет видео и нет imageUrl)
+const _kDefaultCinematicColors = [
+  Color(0xFF1A0E08),
+  Color(0xFF2E1A10),
+  Color(0xFF1A0E08),
+];
+
+// Дефолтный тотем на карточке (если у блюда нет категории в локальных данных)
+const _kDefaultTotem = 'assets/images/bird_totem (1).svg';
 
 class DishVideoCard extends StatefulWidget {
   const DishVideoCard({
@@ -19,7 +29,7 @@ class DishVideoCard extends StatefulWidget {
     this.onSwipeRight,
   });
 
-  final Dish dish;
+  final ApiDish dish;
   final bool isActive;
   final VoidCallback? onSwipeRight;
 
@@ -30,6 +40,7 @@ class DishVideoCard extends StatefulWidget {
 class _DishVideoCardState extends State<DishVideoCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _ambientCtrl;
+  VideoPlayerController? _videoCtrl;
   double _dragX = 0;
 
   @override
@@ -39,6 +50,34 @@ class _DishVideoCardState extends State<DishVideoCard>
       vsync: this,
       duration: const Duration(seconds: 8),
     )..repeat(reverse: true);
+
+    // Инициализируем видео только если у блюда есть ссылка
+    if (widget.dish.videoUrl != null) {
+      _initVideo(widget.dish.videoUrl!);
+    }
+  }
+
+  // Асинхронная инициализация VideoPlayerController.
+  // После готовности: зацикливаем и воспроизводим если карточка активна.
+  Future<void> _initVideo(String url) async {
+    final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
+    try {
+      await ctrl.initialize();
+      ctrl.setLooping(true);
+      // Перестройка при изменении буферизации / состояния воспроизведения
+      ctrl.addListener(() {
+        if (mounted) setState(() {});
+      });
+      if (!mounted) {
+        ctrl.dispose();
+        return;
+      }
+      setState(() => _videoCtrl = ctrl);
+      if (widget.isActive) ctrl.play();
+    } catch (_) {
+      // При ошибке загрузки — остаёмся на cinematic gradient
+      ctrl.dispose();
+    }
   }
 
   @override
@@ -46,14 +85,17 @@ class _DishVideoCardState extends State<DishVideoCard>
     super.didUpdateWidget(old);
     if (widget.isActive && !old.isActive) {
       _ambientCtrl.repeat(reverse: true);
-    } else if (!widget.isActive) {
+      _videoCtrl?.play();
+    } else if (!widget.isActive && old.isActive) {
       _ambientCtrl.stop();
+      _videoCtrl?.pause(); // пауза, не dispose — для быстрого возобновления
     }
   }
 
   @override
   void dispose() {
     _ambientCtrl.dispose();
+    _videoCtrl?.dispose();
     super.dispose();
   }
 
@@ -90,112 +132,118 @@ class _DishVideoCardState extends State<DishVideoCard>
         child: AnimatedBuilder(
           animation: _ambientCtrl,
           builder: (_, child) {
-          final t = _ambientCtrl.value;
-          final glow = 0.6 +
-              0.25 * math.sin(t * math.pi * 1.7) +
-              0.15 * math.sin(t * math.pi * 3.3);
+            final t = _ambientCtrl.value;
+            final glow = 0.6 +
+                0.25 * math.sin(t * math.pi * 1.7) +
+                0.15 * math.sin(t * math.pi * 3.3);
 
-          return Stack(
+            final videoReady = _videoCtrl != null &&
+                _videoCtrl!.value.isInitialized;
 
-            fit: StackFit.expand,
-            children: [
-              // ── 1. Кинематографический фон (заглушка видео) ────────
-              _CinematicBackground(
-                colors: widget.dish.gradientColors,
-                breathValue: t,
-                glowValue: glow,
-              ),
-
-              // ── 2. Декоративный тотем (медленно вращается) ─────────
-              Positioned(
-                right: -60,
-                top: size.height * 0.1,
-                child: Transform.rotate(
-                  angle: t * 2 * math.pi * 0.15,
-                  child: SvgPicture.asset(
-                    widget.dish.totemAsset,
-                    width: 220,
-                    height: 220,
-                    colorFilter: ColorFilter.mode(
-                      Colors.white.withValues(alpha: 0.04 + glow * 0.03),
-                      BlendMode.srcIn,
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // ── 1. Видео или кинематографический фон ──────────────
+                if (videoReady)
+                  // Растягиваем видео на весь экран с сохранением пропорций
+                  FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _videoCtrl!.value.size.width,
+                      height: _videoCtrl!.value.size.height,
+                      child: VideoPlayer(_videoCtrl!),
                     ),
+                  )
+                else
+                  _CinematicBackground(
+                    colors: _kDefaultCinematicColors,
+                    breathValue: t,
+                    glowValue: glow,
                   ),
-                ),
-              ),
 
-              // ── 3. Тонкий «плёночный» grain сверху ────────────────
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.35),
-                        Colors.transparent,
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.75),
-                      ],
-                      stops: const [0, 0.2, 0.55, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-
-              // ── 4. Правый edge-hint «свайп вправо» ─────────────────
-              if (_dragX > 0)
+                // ── 2. Декоративный тотем (медленно вращается) ─────────
                 Positioned(
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: 60,
-                  child: AnimatedOpacity(
-                    opacity: (_dragX / 200).clamp(0.0, 0.8),
-                    duration: 80.ms,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            Colors.transparent,
-                            PiligrimColors.steppe.withValues(alpha: 0.35),
-                          ],
-                        ),
+                  right: -60,
+                  top: size.height * 0.1,
+                  child: Transform.rotate(
+                    angle: t * 2 * math.pi * 0.15,
+                    child: SvgPicture.asset(
+                      _kDefaultTotem,
+                      width: 220,
+                      height: 220,
+                      colorFilter: ColorFilter.mode(
+                        Colors.white.withValues(alpha: 0.04 + glow * 0.03),
+                        BlendMode.srcIn,
                       ),
                     ),
                   ),
                 ),
 
-              // ── 5. Нижний инфо-блок ────────────────────────────────
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: DishCardBottomInfo(dish: widget.dish),
-              ),
-
-              // ── 6. Правый action-бар ───────────────────────────────
-              Positioned(
-                right: 14,
-                bottom: 160,
-                child: DishCardActionBar(dish: widget.dish),
-              ),
-
-              // ── 7. Хинт «свайп → история» (появляется на секунду) ─
-              if (widget.isActive)
-                Positioned(
-                  left: 20,
-                  bottom: 170,
-                  child: const DishCardSwipeHint()
-                      .animate(delay: 1800.ms)
-                      .fadeIn(duration: 600.ms)
-                      .then(delay: 2000.ms)
-                      .fadeOut(duration: 500.ms),
+                // ── 3. Тонкий «плёночный» grain сверху ────────────────
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.35),
+                          Colors.transparent,
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.75),
+                        ],
+                        stops: const [0, 0.2, 0.55, 1.0],
+                      ),
+                    ),
+                  ),
                 ),
-            ],
-          );
+
+                // ── 4. Правый edge-hint «свайп вправо» ─────────────────
+                if (_dragX > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 60,
+                    child: AnimatedOpacity(
+                      opacity: (_dragX / 200).clamp(0.0, 0.8),
+                      duration: 80.ms,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.transparent,
+                              PiligrimColors.steppe.withValues(alpha: 0.35),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // ── 5. Нижний инфо-блок ────────────────────────────────
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: DishCardBottomInfo(dish: widget.dish),
+                ),
+
+                // ── 6. Хинт «свайп → история» (появляется на секунду) ─
+                if (widget.isActive)
+                  Positioned(
+                    left: 20,
+                    bottom: 170,
+                    child: const DishCardSwipeHint()
+                        .animate(delay: 1800.ms)
+                        .fadeIn(duration: 600.ms)
+                        .then(delay: 2000.ms)
+                        .fadeOut(duration: 500.ms),
+                  ),
+              ],
+            );
           },
         ),
       ),
@@ -204,7 +252,7 @@ class _DishVideoCardState extends State<DishVideoCard>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Кинематографический фон
+// Кинематографический фон (используется как fallback когда нет видео)
 // ─────────────────────────────────────────────────────────────────────────────
 class _CinematicBackground extends StatelessWidget {
   const _CinematicBackground({
@@ -271,8 +319,7 @@ class _CinemaPainter extends CustomPainter {
 
     // Fine grain noise
     final rng = math.Random(42);
-    final noisePaint = Paint()
-      ..style = PaintingStyle.fill;
+    final noisePaint = Paint()..style = PaintingStyle.fill;
     for (int i = 0; i < 600; i++) {
       noisePaint.color =
           Colors.white.withValues(alpha: rng.nextDouble() * 0.015);
@@ -311,11 +358,16 @@ class _CinemaPainter extends CustomPainter {
 // ─────────────────────────────────────────────────────────────────────────────
 class _DishDetailSheet extends StatelessWidget {
   const _DishDetailSheet({required this.dish});
-  final Dish dish;
+  final ApiDish dish;
 
   @override
   Widget build(BuildContext context) {
-    final cat = categoryById(dish.categoryId);
+    // Статичный cinematic-фон для превью в детальном листе
+    const fallbackBg = _CinematicBackground(
+      colors: _kDefaultCinematicColors,
+      breathValue: 0.5,
+      glowValue: 0.8,
+    );
 
     return DraggableScrollableSheet(
       initialChildSize: 0.88,
@@ -339,24 +391,23 @@ class _DishDetailSheet extends StatelessWidget {
               ),
             ),
 
-            // Мини-визуал блюда
+            // Превью блюда: сетевое изображение или cinematic gradient
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: SizedBox(
-                  height: 180,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _CinematicBackground(
-                        colors: dish.gradientColors,
-                        breathValue: 0.5,
-                        glowValue: 0.8,
-                      ),
-                      Center(
+                child: Stack(
+                  children: [
+                    DishThumbnail(
+                      imageUrl: dish.imageUrl,
+                      fallback: fallbackBg,
+                      height: 180,
+                    ),
+                    // Декоративный тотем поверх превью
+                    Positioned.fill(
+                      child: Center(
                         child: SvgPicture.asset(
-                          dish.totemAsset,
+                          _kDefaultTotem,
                           width: 80,
                           height: 80,
                           colorFilter: ColorFilter.mode(
@@ -365,8 +416,8 @@ class _DishDetailSheet extends StatelessWidget {
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -377,42 +428,12 @@ class _DishDetailSheet extends StatelessWidget {
                 controller: controller,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                 children: [
-                  // Категория + название
-                  Row(
-                    children: [
-                      SvgPicture.asset(
-                        cat.totemAsset,
-                        width: 14,
-                        height: 14,
-                        colorFilter: ColorFilter.mode(
-                          cat.accentColor,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        cat.title.toUpperCase(),
-                        style: PiligrimTextStyles.caption.copyWith(
-                          color: cat.accentColor.withValues(alpha: 0.8),
-                          fontSize: 10,
-                          letterSpacing: 2.0,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
+                  // Название блюда
                   Text(
                     dish.name,
                     style: PiligrimTextStyles.title.copyWith(
                       color: PiligrimColors.sky,
                       fontSize: 22,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    dish.nameSub,
-                    style: PiligrimTextStyles.caption.copyWith(
-                      color: PiligrimColors.steppe.withValues(alpha: 0.7),
                     ),
                   ),
 
@@ -421,7 +442,10 @@ class _DishDetailSheet extends StatelessWidget {
                   // Вес + цена
                   Row(
                     children: [
-                      DishInfoChip(label: dish.weight, icon: 'assets/images/stone.svg'),
+                      DishInfoChip(
+                        label: dish.weight,
+                        icon: 'assets/images/stone.svg',
+                      ),
                       const SizedBox(width: 8),
                       DishInfoChip(
                         label: '${dish.price} ₸',
@@ -438,8 +462,7 @@ class _DishDetailSheet extends StatelessWidget {
                     Wrap(
                       spacing: 7,
                       runSpacing: 6,
-                      children:
-                          dish.tags.map((t) => DishCardTagChip(tag: t)).toList(),
+                      children: dish.tags.map((t) => DishCardTagChip(tag: t)).toList(),
                     ),
                     const SizedBox(height: 20),
                   ],
@@ -471,10 +494,6 @@ class _DishDetailSheet extends StatelessWidget {
                       content: dish.allergens.join(' · '),
                     ),
 
-                  const SizedBox(height: 24),
-
-                  // CTA
-                  DishBookingCta(dish: dish),
                 ],
               ),
             ),

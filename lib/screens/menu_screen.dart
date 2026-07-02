@@ -1,20 +1,23 @@
 // Экран Меню — «Основной путь»
 // Режим 1: Видео-лента (Reels-style PageView)
-// Режим 2: Классическое меню с поиском и фильтрами
-// Состояние режима сохраняется через SharedPreferences
+// Режим 2: Классическое меню с поиском, фильтрами и инфинит-скроллом
+// Состояние режима и данные управляются через MenuProvider (блок 5).
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../core/theme.dart';
+import 'package:provider/provider.dart';
 import '../core/menu_data.dart';
+import '../core/theme.dart';
+import '../data/models/api_category.dart';
+import '../data/models/api_dish.dart';
+import '../data/models/api_tag.dart';
+import '../providers/menu_provider.dart';
 import '../widgets/dish_elements.dart';
 import '../widgets/dish_video_card.dart';
+import '../widgets/error_view.dart';
 import '../widgets/piligrim_background.dart';
-import '../widgets/piligrim_info_section.dart';
 import '../widgets/piligrim_tap.dart';
-
-enum MenuMode { feed, classic }
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -25,40 +28,15 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen>
     with AutomaticKeepAliveClientMixin {
-  MenuMode _mode = MenuMode.feed;
-  bool _loaded = false;
-
   @override
   bool get wantKeepAlive => true;
 
   @override
-  void initState() {
-    super.initState();
-    _loadMode();
-  }
-
-  Future<void> _loadMode() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('menu_mode');
-    if (mounted) {
-      setState(() {
-        _mode = saved == 'classic' ? MenuMode.classic : MenuMode.feed;
-        _loaded = true;
-      });
-    }
-  }
-
-  Future<void> _setMode(MenuMode mode) async {
-    if (_mode == mode) return;
-    setState(() => _mode = mode);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('menu_mode', mode == MenuMode.classic ? 'classic' : 'feed');
-  }
-
-  @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (!_loaded) return const SizedBox.shrink();
+    final menuProvider = context.watch<MenuProvider>();
+
+    if (!menuProvider.loaded) return const SizedBox.shrink();
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
@@ -80,7 +58,7 @@ class _MenuScreenState extends State<MenuScreen>
               opacity: anim,
               child: child,
             ),
-            child: _mode == MenuMode.feed
+            child: menuProvider.mode == MenuViewMode.feed
                 ? const _VideoFeedSection(key: ValueKey('feed'))
                 : const _ClassicMenuSection(key: ValueKey('classic')),
           ),
@@ -91,8 +69,8 @@ class _MenuScreenState extends State<MenuScreen>
             left: 0,
             right: 0,
             child: _MenuHeader(
-              mode: _mode,
-              onModeChanged: _setMode,
+              mode: menuProvider.mode,
+              onModeChanged: context.read<MenuProvider>().setMode,
             ),
           ),
         ],
@@ -106,8 +84,8 @@ class _MenuScreenState extends State<MenuScreen>
 // ─────────────────────────────────────────────────────────────────────────────
 class _MenuHeader extends StatelessWidget {
   const _MenuHeader({required this.mode, required this.onModeChanged});
-  final MenuMode mode;
-  final ValueChanged<MenuMode> onModeChanged;
+  final MenuViewMode mode;
+  final ValueChanged<MenuViewMode> onModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -128,39 +106,35 @@ class _MenuHeader extends StatelessWidget {
           ),
         ),
         child: Row(
-            children: [
-              // Логотип / заголовок секции
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SvgPicture.asset(
-                    'assets/images/bird_totem (1).svg',
-                    width: 18,
-                    height: 18,
-                    colorFilter: ColorFilter.mode(
-                      PiligrimColors.steppe.withValues(alpha: 0.6),
-                      BlendMode.srcIn,
-                    ),
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SvgPicture.asset(
+                  'assets/images/bird_totem (1).svg',
+                  width: 18,
+                  height: 18,
+                  colorFilter: ColorFilter.mode(
+                    PiligrimColors.steppe.withValues(alpha: 0.6),
+                    BlendMode.srcIn,
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'МЕНЮ',
-                    style: PiligrimTextStyles.caption.copyWith(
-                      color: PiligrimColors.water.withValues(alpha: 0.6),
-                      letterSpacing: 3.0,
-                      fontSize: 10,
-                    ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'МЕНЮ',
+                  style: PiligrimTextStyles.caption.copyWith(
+                    color: PiligrimColors.water.withValues(alpha: 0.6),
+                    letterSpacing: 3.0,
+                    fontSize: 10,
                   ),
-                ],
-              ),
-
-              const Spacer(),
-
-              // Переключатель «Путь» / «Свиток»
-              _ModeSwitcher(mode: mode, onChanged: onModeChanged),
-            ],
-          ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            _ModeSwitcher(mode: mode, onChanged: onModeChanged),
+          ],
         ),
+      ),
     );
   }
 }
@@ -168,8 +142,8 @@ class _MenuHeader extends StatelessWidget {
 // Переключатель режимов меню: кнопки «Путь» (видео) и «Свиток» (классика)
 class _ModeSwitcher extends StatelessWidget {
   const _ModeSwitcher({required this.mode, required this.onChanged});
-  final MenuMode mode;
-  final ValueChanged<MenuMode> onChanged;
+  final MenuViewMode mode;
+  final ValueChanged<MenuViewMode> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -186,15 +160,15 @@ class _ModeSwitcher extends StatelessWidget {
           _ModeTab(
             label: 'Путь',
             icon: 'assets/images/bird_totem (1).svg',
-            active: mode == MenuMode.feed,
-            onTap: () => onChanged(MenuMode.feed),
+            active: mode == MenuViewMode.feed,
+            onTap: () => onChanged(MenuViewMode.feed),
             radius: const BorderRadius.horizontal(left: Radius.circular(9)),
           ),
           _ModeTab(
             label: 'Свиток',
             icon: 'assets/images/spiral.svg',
-            active: mode == MenuMode.classic,
-            onTap: () => onChanged(MenuMode.classic),
+            active: mode == MenuViewMode.classic,
+            onTap: () => onChanged(MenuViewMode.classic),
             radius: const BorderRadius.horizontal(right: Radius.circular(9)),
           ),
         ],
@@ -203,7 +177,7 @@ class _ModeSwitcher extends StatelessWidget {
   }
 }
 
-// Одна вкладка переключателя режима (иконка + текст)
+// Одна вкладка переключателя режима
 class _ModeTab extends StatelessWidget {
   const _ModeTab({
     required this.label,
@@ -240,7 +214,9 @@ class _ModeTab extends StatelessWidget {
               width: 13,
               height: 13,
               colorFilter: ColorFilter.mode(
-                active ? PiligrimColors.water : PiligrimColors.sky.withValues(alpha: 0.3),
+                active
+                    ? PiligrimColors.water
+                    : PiligrimColors.sky.withValues(alpha: 0.3),
                 BlendMode.srcIn,
               ),
             ),
@@ -284,6 +260,34 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
 
   @override
   Widget build(BuildContext context) {
+    final menuProvider = context.watch<MenuProvider>();
+    final dishes = menuProvider.dishes;
+
+    // Пока блюда загружаются — показываем индикатор
+    if (menuProvider.isLoading && dishes.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: PiligrimColors.water),
+      );
+    }
+
+    if (menuProvider.error != null && dishes.isEmpty) {
+      return ErrorView(
+        message: menuProvider.error!,
+        onRetry: () => context.read<MenuProvider>().retry(),
+      );
+    }
+
+    if (dishes.isEmpty) {
+      return Center(
+        child: Text(
+          'Меню скоро появится',
+          style: PiligrimTextStyles.body.copyWith(
+            color: PiligrimColors.sky.withValues(alpha: 0.3),
+          ),
+        ),
+      );
+    }
+
     return Stack(
       children: [
         PageView.builder(
@@ -291,11 +295,10 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
           scrollDirection: Axis.vertical,
           physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
           onPageChanged: (i) => setState(() => _currentPage = i),
-          itemCount: kDishes.length,
+          itemCount: dishes.length,
           itemBuilder: (_, i) => DishVideoCard(
-            dish: kDishes[i],
+            dish: dishes[i],
             isActive: i == _currentPage,
-            onSwipeRight: null, // handled inside card
           ),
         ),
 
@@ -306,7 +309,7 @@ class _VideoFeedSectionState extends State<_VideoFeedSection> {
           bottom: 0,
           child: Center(
             child: _VerticalProgressDots(
-              count: kDishes.length,
+              count: dishes.length,
               current: _currentPage,
             ),
           ),
@@ -356,44 +359,52 @@ class _ClassicMenuSection extends StatefulWidget {
 }
 
 class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
-  String _selectedCategory = 'all';
-  String _searchQuery = '';
-  final Set<DishTag> _activeFilters = {};
+  // Активные теги-фильтры хранятся по id (стабильный ключ из API)
+  final Set<int> _activeTagIds = {};
   final TextEditingController _searchCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Инфинит-скролл: при приближении к концу списка загружаем следующую страницу
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final provider = context.read<MenuProvider>();
+    if (!provider.hasMore || provider.isLoadingMore) return;
+
+    final max = _scrollCtrl.position.maxScrollExtent;
+    final pos = _scrollCtrl.position.pixels;
+    if (pos >= max - 200) {
+      provider.loadDishes();
+    }
+  }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
-  List<Dish> get _filteredDishes {
-    var dishes = dishesByCategory(_selectedCategory);
-
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      dishes = dishes
-          .where((d) =>
-              d.name.toLowerCase().contains(q) ||
-              d.description.toLowerCase().contains(q))
-          .toList();
-    }
-
-    if (_activeFilters.isNotEmpty) {
-      dishes = dishes
-          .where((d) => _activeFilters.every((f) => d.tags.contains(f)))
-          .toList();
-    }
-
-    return dishes;
+  // Клиентская фильтрация по тегам (category и search — серверная)
+  List<ApiDish> _applyTagFilter(List<ApiDish> dishes) {
+    if (_activeTagIds.isEmpty) return dishes;
+    return dishes
+        .where((d) => _activeTagIds.every((id) => d.tags.any((t) => t.id == id)))
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final menuProvider = context.watch<MenuProvider>();
     final top = MediaQuery.paddingOf(context).top;
-    final dishes = _filteredDishes;
+    final filtered = _applyTagFilter(menuProvider.dishes);
 
     return CustomScrollView(
+      controller: _scrollCtrl,
       physics: const BouncingScrollPhysics(),
       slivers: [
         // Верхний отступ под header
@@ -405,28 +416,30 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
             child: _SearchBar(
               controller: _searchCtrl,
-              onChanged: (v) => setState(() => _searchQuery = v),
+              onChanged: context.read<MenuProvider>().setSearch,
             ),
           ),
         ),
 
-        // Категории
+        // Категории из API (+ «Все блюда»)
         SliverToBoxAdapter(
           child: _CategoryTabs(
-            selected: _selectedCategory,
-            onSelect: (id) => setState(() => _selectedCategory = id),
+            categories: menuProvider.categories,
+            activeCategoryId: menuProvider.activeCategoryId,
+            onSelect: context.read<MenuProvider>().setCategory,
           ),
         ),
 
-        // Фильтры
+        // Фильтры по тегам (клиентские, динамические из API)
         SliverToBoxAdapter(
           child: _FilterChips(
-            active: _activeFilters,
+            tags: menuProvider.availableTags,
+            activeIds: _activeTagIds,
             onToggle: (tag) => setState(() {
-              if (_activeFilters.contains(tag)) {
-                _activeFilters.remove(tag);
+              if (_activeTagIds.contains(tag.id)) {
+                _activeTagIds.remove(tag.id);
               } else {
-                _activeFilters.add(tag);
+                _activeTagIds.add(tag.id);
               }
             }),
           ),
@@ -434,8 +447,19 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
 
         const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-        // Список блюд
-        if (dishes.isEmpty)
+        // Индикатор первичной загрузки
+        if (menuProvider.isLoading && filtered.isEmpty)
+          const SliverFillRemaining(
+            child: Center(
+              child: CircularProgressIndicator(color: PiligrimColors.water),
+            ),
+          )
+        else if (menuProvider.error != null && filtered.isEmpty)
+          SliverErrorView(
+            message: menuProvider.error!,
+            onRetry: () => context.read<MenuProvider>().retry(),
+          )
+        else if (filtered.isEmpty)
           SliverFillRemaining(
             child: Center(
               child: Column(
@@ -463,20 +487,37 @@ class _ClassicMenuSectionState extends State<_ClassicMenuSection> {
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (_, i) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _ClassicDishCard(
-                    dish: dishes[i],
+                    dish: filtered[i],
                     animationDelay: Duration(milliseconds: i * 50),
                   ),
                 ),
-                childCount: dishes.length,
+                childCount: filtered.length,
               ),
             ),
           ),
+
+        // Индикатор подгрузки следующей страницы
+        if (menuProvider.isLoadingMore)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: PiligrimColors.water,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          ),
+
+        // Нижний отступ (под bottom nav bar)
+        const SliverToBoxAdapter(child: SizedBox(height: 100)),
       ],
     );
   }
@@ -539,67 +580,45 @@ class _SearchBar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Категории (горизонтальный скролл)
+// Категории (горизонтальный скролл) — данные из API (ApiCategory)
 // ─────────────────────────────────────────────────────────────────────────────
 class _CategoryTabs extends StatelessWidget {
-  const _CategoryTabs({required this.selected, required this.onSelect});
-  final String selected;
-  final ValueChanged<String> onSelect;
+  const _CategoryTabs({
+    required this.categories,
+    required this.activeCategoryId,
+    required this.onSelect,
+  });
+
+  final List<ApiCategory> categories;
+  final int? activeCategoryId;
+  final ValueChanged<int?> onSelect;
 
   @override
   Widget build(BuildContext context) {
+    // «Все блюда» — специальная вкладка с id = null
+    final allActive = activeCategoryId == null;
+
     return SizedBox(
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: kDishCategories.length,
+        itemCount: categories.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final cat = kDishCategories[i];
-          final active = cat.id == selected;
-          return PiligrimTap(
+          if (i == 0) {
+            // Вкладка «Все блюда»
+            return _CategoryTab(
+              label: 'Все блюда',
+              active: allActive,
+              onTap: () => onSelect(null),
+            );
+          }
+          final cat = categories[i - 1];
+          return _CategoryTab(
+            label: cat.name,
+            active: activeCategoryId == cat.id,
             onTap: () => onSelect(cat.id),
-            borderRadius: BorderRadius.circular(8),
-            child: AnimatedContainer(
-              duration: 200.ms,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: active
-                    ? cat.accentColor.withValues(alpha: 0.18)
-                    : PiligrimColors.earthDeep,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: active
-                      ? cat.accentColor.withValues(alpha: 0.5)
-                      : PiligrimColors.divider,
-                ),
-              ),
-              child: Row(
-                children: [
-                  SvgPicture.asset(
-                    cat.totemAsset,
-                    width: 14,
-                    height: 14,
-                    colorFilter: ColorFilter.mode(
-                      active ? cat.accentColor : PiligrimColors.sky.withValues(alpha: 0.3),
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    cat.title,
-                    style: PiligrimTextStyles.caption.copyWith(
-                      fontSize: 12,
-                      color: active
-                          ? cat.accentColor
-                          : PiligrimColors.sky.withValues(alpha: 0.45),
-                      fontWeight: active ? FontWeight.w700 : FontWeight.w300,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           );
         },
       ),
@@ -607,35 +626,82 @@ class _CategoryTabs extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Фильтры
-// ─────────────────────────────────────────────────────────────────────────────
-class _FilterChips extends StatelessWidget {
-  const _FilterChips({required this.active, required this.onToggle});
-  final Set<DishTag> active;
-  final ValueChanged<DishTag> onToggle;
+class _CategoryTab extends StatelessWidget {
+  const _CategoryTab({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
 
-  static const _filters = [
-    DishTag.vegan,
-    DishTag.glutenFree,
-    DishTag.spicy,
-    DishTag.signature,
-    DishTag.halal,
-  ];
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    if (active.isEmpty && _filters.isEmpty) return const SizedBox.shrink();
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: 200.ms,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: active
+              ? PiligrimColors.water.withValues(alpha: 0.18)
+              : PiligrimColors.earthDeep,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: active
+                ? PiligrimColors.water.withValues(alpha: 0.5)
+                : PiligrimColors.divider,
+          ),
+        ),
+        child: Text(
+          label,
+          style: PiligrimTextStyles.caption.copyWith(
+            fontSize: 12,
+            color: active
+                ? PiligrimColors.water
+                : PiligrimColors.sky.withValues(alpha: 0.45),
+            fontWeight: active ? FontWeight.w700 : FontWeight.w300,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Фильтры по тегам (клиентские)
+// ─────────────────────────────────────────────────────────────────────────────
+// Динамические фильтр-чипы — теги приходят из API, не хардкодятся.
+// Новый тег в админке → сразу виден в приложении без обновления.
+class _FilterChips extends StatelessWidget {
+  const _FilterChips({
+    required this.tags,
+    required this.activeIds,
+    required this.onToggle,
+  });
+
+  final List<ApiTag> tags;
+  final Set<int> activeIds;
+  final ValueChanged<ApiTag> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tags.isEmpty) return const SizedBox.shrink();
+
     return SizedBox(
       height: 38,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-        itemCount: _filters.length,
+        itemCount: tags.length,
         separatorBuilder: (_, __) => const SizedBox(width: 6),
         itemBuilder: (_, i) {
-          final tag = _filters[i];
-          final isActive = active.contains(tag);
+          final tag = tags[i];
+          final isActive = activeIds.contains(tag.id);
+          final style = tagStyleFor(tag.name);
           return PiligrimTap(
             onTap: () => onToggle(tag),
             borderRadius: BorderRadius.circular(6),
@@ -644,32 +710,36 @@ class _FilterChips extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: isActive
-                    ? tag.color.withValues(alpha: 0.2)
+                    ? style.color.withValues(alpha: 0.2)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: isActive
-                      ? tag.color.withValues(alpha: 0.5)
+                      ? style.color.withValues(alpha: 0.5)
                       : PiligrimColors.divider,
                 ),
               ),
               child: Row(
                 children: [
                   SvgPicture.asset(
-                    tag.iconAsset,
+                    style.iconAsset,
                     width: 11,
                     height: 11,
                     colorFilter: ColorFilter.mode(
-                      isActive ? tag.color : PiligrimColors.sky.withValues(alpha: 0.3),
+                      isActive
+                          ? style.color
+                          : PiligrimColors.sky.withValues(alpha: 0.3),
                       BlendMode.srcIn,
                     ),
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    tag.label,
+                    tag.name,
                     style: PiligrimTextStyles.caption.copyWith(
                       fontSize: 11,
-                      color: isActive ? tag.color : PiligrimColors.sky.withValues(alpha: 0.35),
+                      color: isActive
+                          ? style.color
+                          : PiligrimColors.sky.withValues(alpha: 0.35),
                     ),
                   ),
                 ],
@@ -683,7 +753,7 @@ class _FilterChips extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Карточка классического меню
+// Карточка классического меню (ApiDish)
 // ─────────────────────────────────────────────────────────────────────────────
 class _ClassicDishCard extends StatelessWidget {
   const _ClassicDishCard({
@@ -691,20 +761,18 @@ class _ClassicDishCard extends StatelessWidget {
     this.animationDelay = Duration.zero,
   });
 
-  final Dish dish;
+  final ApiDish dish;
   final Duration animationDelay;
 
   @override
   Widget build(BuildContext context) {
-    final cat = categoryById(dish.categoryId);
-
     return PiligrimTap(
       borderRadius: BorderRadius.circular(14),
       onTap: () => showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => _DishDetailSheetProxy(dish: dish),
+        builder: (_) => _DishDetailSheet(dish: dish),
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -723,44 +791,22 @@ class _ClassicDishCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: Row(
             children: [
-              // Кинематографическое изображение (заглушка)
+              // Thumbnail: сетевое изображение или gradient-заглушка
               SizedBox(
                 width: 110,
                 height: 110,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CustomPaint(
-                      painter: _CinemaThumbnailPainter(
-                        colors: dish.gradientColors,
-                      ),
-                    ),
-                    Center(
-                      child: SvgPicture.asset(
-                        dish.totemAsset,
-                        width: 44,
-                        height: 44,
-                        colorFilter: ColorFilter.mode(
-                          Colors.white.withValues(alpha: 0.12),
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                    ),
-                    // Верхняя акцентная линия
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        height: 2,
-                        color: cat.accentColor.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
-                ),
+                child: dish.imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: dish.imageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => const _ClassicThumbnailFallback(),
+                        errorWidget: (_, __, ___) =>
+                            const _ClassicThumbnailFallback(),
+                      )
+                    : const _ClassicThumbnailFallback(),
               ),
 
-              // Информация
+              // Информация о блюде
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
@@ -798,22 +844,25 @@ class _ClassicDishCard extends StatelessWidget {
                       Row(
                         children: [
                           ...dish.tags.take(2).map(
-                                (tag) => Padding(
-                              padding: const EdgeInsets.only(right: 5),
-                              child: SvgPicture.asset(
-                                tag.iconAsset,
-                                width: 14,
-                                height: 14,
-                                colorFilter: ColorFilter.mode(
-                                  tag.color.withValues(alpha: 0.7),
-                                  BlendMode.srcIn,
-                                ),
+                                (tag) {
+                                  final style = tagStyleFor(tag.name);
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 5),
+                                    child: SvgPicture.asset(
+                                      style.iconAsset,
+                                      width: 14,
+                                      height: 14,
+                                      colorFilter: ColorFilter.mode(
+                                        style.color.withValues(alpha: 0.7),
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ),
-                          ),
                           const Spacer(),
                           Text(
-                            '${dish.price} ₸',
+                            '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
                             style: PiligrimTextStyles.button.copyWith(
                               color: PiligrimColors.steppe,
                               fontSize: 14,
@@ -836,43 +885,38 @@ class _ClassicDishCard extends StatelessWidget {
   }
 }
 
-// Тонкий CustomPainter для thumbnail в классическом меню
-class _CinemaThumbnailPainter extends CustomPainter {
-  const _CinemaThumbnailPainter({required this.colors});
-  final List<Color> colors;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final base = colors.isNotEmpty ? colors[0] : PiligrimColors.earthDeep;
-    final accent = colors.length > 1 ? colors[1] : base;
-
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height),
-        Paint()..color = base);
-
-    final shader = RadialGradient(
-      center: const Alignment(-0.3, -0.3),
-      radius: 1.0,
-      colors: [accent.withValues(alpha: 0.7), Colors.transparent],
-    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawRect(
-        Rect.fromLTWH(0, 0, size.width, size.height), Paint()..shader = shader);
-  }
-
-  @override
-  bool shouldRepaint(_CinemaThumbnailPainter old) => false;
-}
-
-// Прокси для показа detail sheet из классики
-// (DishDetailSheet находится в dish_video_card.dart, дублируем структуру)
-class _DishDetailSheetProxy extends StatelessWidget {
-  const _DishDetailSheetProxy({required this.dish});
-  final Dish dish;
+// Gradient-заглушка для thumbnail (когда нет imageUrl)
+class _ClassicThumbnailFallback extends StatelessWidget {
+  const _ClassicThumbnailFallback();
 
   @override
   Widget build(BuildContext context) {
-    // Переиспользуем класс из dish_video_card через bottom sheet
-    final cat = categoryById(dish.categoryId);
+    return Container(
+      color: PiligrimColors.earthDeep,
+      child: Center(
+        child: SvgPicture.asset(
+          'assets/images/bird_totem (1).svg',
+          width: 44,
+          height: 44,
+          colorFilter: ColorFilter.mode(
+            PiligrimColors.water.withValues(alpha: 0.1),
+            BlendMode.srcIn,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Детальный лист блюда (используется в классическом режиме)
+// ─────────────────────────────────────────────────────────────────────────────
+class _DishDetailSheet extends StatelessWidget {
+  const _DishDetailSheet({required this.dish});
+  final ApiDish dish;
+
+  @override
+  Widget build(BuildContext context) {
     return DraggableScrollableSheet(
       initialChildSize: 0.88,
       maxChildSize: 0.95,
@@ -884,6 +928,7 @@ class _DishDetailSheetProxy extends StatelessWidget {
         ),
         child: Column(
           children: [
+            // Handle
             Container(
               margin: const EdgeInsets.only(top: 12),
               width: 38,
@@ -893,82 +938,91 @@ class _DishDetailSheetProxy extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+
+            // Превью блюда
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: SizedBox(
+                child: DishThumbnail(
+                  imageUrl: dish.imageUrl,
+                  fallback: const _ClassicThumbnailFallback(),
                   height: 160,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CustomPaint(
-                        painter: _CinemaThumbnailPainter(colors: dish.gradientColors),
-                      ),
-                      Center(
-                        child: SvgPicture.asset(
-                          dish.totemAsset,
-                          width: 70,
-                          height: 70,
-                          colorFilter: ColorFilter.mode(
-                            Colors.white.withValues(alpha: 0.12),
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
+
+            // Контент
             Expanded(
               child: ListView(
                 controller: controller,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                 children: [
+                  // Название
+                  Text(
+                    dish.name,
+                    style: PiligrimTextStyles.title.copyWith(
+                      color: PiligrimColors.sky,
+                      fontSize: 22,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Вес + цена
                   Row(
                     children: [
-                      SvgPicture.asset(cat.totemAsset, width: 13, height: 13,
-                          colorFilter: ColorFilter.mode(cat.accentColor, BlendMode.srcIn)),
-                      const SizedBox(width: 7),
-                      Text(cat.title.toUpperCase(),
-                          style: PiligrimTextStyles.caption.copyWith(
-                            color: cat.accentColor.withValues(alpha: 0.8),
-                            fontSize: 10, letterSpacing: 2.0,
-                          )),
+                      DishInfoChip(
+                        label: dish.weight,
+                        icon: 'assets/images/stone.svg',
+                      ),
+                      const SizedBox(width: 8),
+                      DishInfoChip(
+                        label: '${dish.price.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]} ')} ₸',
+                        icon: 'assets/images/zerno.svg',
+                        accent: true,
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(dish.name, style: PiligrimTextStyles.title.copyWith(
-                    color: PiligrimColors.sky, fontSize: 22)),
-                  const SizedBox(height: 4),
-                  Text(dish.nameSub, style: PiligrimTextStyles.caption.copyWith(
-                    color: PiligrimColors.steppe.withValues(alpha: 0.7))),
-                  const SizedBox(height: 16),
-                  Row(children: [
-                    _InfoChip2(label: dish.weight, icon: 'assets/images/stone.svg'),
-                    const SizedBox(width: 8),
-                    _InfoChip2(label: '${dish.price} ₸',
-                        icon: 'assets/images/zerno.svg', accent: true),
-                  ]),
-                  const SizedBox(height: 16),
+
+                  const SizedBox(height: 20),
+
+                  // Теги
                   if (dish.tags.isNotEmpty) ...[
-                    Wrap(spacing: 7, runSpacing: 6,
-                      children: dish.tags.map((t) => _TagChip2(tag: t)).toList()),
-                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 6,
+                      children: dish.tags.map((t) => DishCardTagChip(tag: t)).toList(),
+                    ),
+                    const SizedBox(height: 20),
                   ],
-                  PiligrimInfoSection(title: 'О блюде', icon: 'assets/images/spiral.svg',
-                      content: dish.description.replaceAll('\n', ' ')),
-                  const SizedBox(height: 14),
-                  PiligrimInfoSection(title: 'История', icon: 'assets/images/cobyz.svg',
-                      content: dish.story, accent: true),
+
+                  // О блюде
+                  DishDetailSection(
+                    title: 'О блюде',
+                    icon: 'assets/images/spiral.svg',
+                    content: dish.description.replaceAll('\n', ' '),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // История
+                  DishDetailSection(
+                    title: 'История',
+                    icon: 'assets/images/cobyz.svg',
+                    content: dish.story,
+                    accent: true,
+                  ),
+
                   if (dish.allergens.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    PiligrimInfoSection(title: 'Аллергены', icon: 'assets/images/luk.svg',
-                        content: dish.allergens.join(' · ')),
+                    const SizedBox(height: 16),
+                    DishDetailSection(
+                      title: 'Аллергены',
+                      icon: 'assets/images/luk.svg',
+                      content: dish.allergens.join(' · '),
+                    ),
                   ],
-                  const SizedBox(height: 24),
-                  DishBookingCta(dish: dish),
+
                 ],
               ),
             ),
@@ -978,47 +1032,3 @@ class _DishDetailSheetProxy extends StatelessWidget {
     );
   }
 }
-
-// Локальные мини-виджеты для proxy sheet
-class _InfoChip2 extends StatelessWidget {
-  const _InfoChip2({required this.label, required this.icon, this.accent = false});
-  final String label; final String icon; final bool accent;
-  @override
-  Widget build(BuildContext context) {
-    final color = accent ? PiligrimColors.steppe : PiligrimColors.water;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(7),
-          border: Border.all(color: color.withValues(alpha: 0.3))),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        SvgPicture.asset(icon, width: 13, height: 13,
-            colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
-        const SizedBox(width: 5),
-        Text(label, style: PiligrimTextStyles.caption.copyWith(
-            color: color, fontSize: 12, fontWeight: FontWeight.w700)),
-      ]),
-    );
-  }
-}
-
-class _TagChip2 extends StatelessWidget {
-  const _TagChip2({required this.tag});
-  final DishTag tag;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-    decoration: BoxDecoration(color: tag.color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: tag.color.withValues(alpha: 0.4))),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      SvgPicture.asset(tag.iconAsset, width: 11, height: 11,
-          colorFilter: ColorFilter.mode(tag.color, BlendMode.srcIn)),
-      const SizedBox(width: 4),
-      Text(tag.label, style: PiligrimTextStyles.caption.copyWith(
-          color: tag.color, fontSize: 10)),
-    ]),
-  );
-}
-
-// _Section2 заменён на PiligrimInfoSection (lib/widgets/piligrim_info_section.dart)

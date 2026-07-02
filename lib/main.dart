@@ -1,21 +1,36 @@
 // Точка входа приложения PILIGRIM
 // Тема: piligrim_design_spec.md — тёмная тема, цвета Қара жер / Мөлдір су / Сары дала
+import 'dart:async';
+
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'core/ambient_preset.dart';
+import 'package:provider/provider.dart';
+import 'core/ambient_preset_scope.dart';
 import 'core/theme.dart';
+import 'firebase_options.dart';
+import 'core/push_navigation.dart';
+import 'data/services/fcm_service.dart';
+import 'providers/auth_provider.dart';
+import 'screens/booking_screen.dart';
+import 'providers/booking_provider.dart';
+import 'providers/core_info_provider.dart';
+import 'providers/events_provider.dart';
+import 'data/repositories/menu_repository.dart';
+import 'providers/menu_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/menu_screen.dart';
+import 'screens/interior_screen.dart';
 import 'screens/events_screen.dart';
-import 'screens/booking_screen.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/bottom_nav_bar.dart';
 
-void main() {
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Прозрачный статус-бар — органично вписывается в тёмный фон Қара жер
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -25,12 +40,35 @@ void main() {
     ),
   );
 
-  // Только портретная ориентация
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
-  ]).then((_) {
-    runApp(const PiligrimApp());
-  });
+  ]);
+
+  runApp(const PiligrimApp());
+}
+
+/// Firebase/FCM не блокируют первый кадр (splash).
+Future<void> bootstrapFirebase() async {
+  if (!DefaultFirebaseOptions.isConfigured) {
+    debugPrint(
+      'Firebase: заглушка (placeholder). Пуши отключены. '
+      'Выполните flutterfire configure для продакшена.',
+    );
+    return;
+  }
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 15));
+    await FcmService.instance
+        .initEarly(navigatorKey: rootNavigatorKey)
+        .timeout(const Duration(seconds: 5));
+    await FcmService.instance.requestPermissionIfNeeded();
+  } on TimeoutException {
+    debugPrint('Firebase bootstrap timed out — UI continues without FCM');
+  } catch (e, st) {
+    debugPrint('Firebase bootstrap skipped: $e\n$st');
+  }
 }
 
 class PiligrimApp extends StatefulWidget {
@@ -40,13 +78,21 @@ class PiligrimApp extends StatefulWidget {
   State<PiligrimApp> createState() => _PiligrimAppState();
 }
 
-class _PiligrimAppState extends State<PiligrimApp> {
-  final AmbientPresetController _ambientCtrl = AmbientPresetController();
+class _PiligrimAppState extends State<PiligrimApp>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ambientCtrl;
 
   @override
   void initState() {
     super.initState();
-    _ambientCtrl.load();
+    _ambientCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 120),
+    )..repeat();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(bootstrapFirebase());
+    });
   }
 
   @override
@@ -57,13 +103,25 @@ class _PiligrimAppState extends State<PiligrimApp> {
 
   @override
   Widget build(BuildContext context) {
-    return AmbientPresetScope(
-      controller: _ambientCtrl,
-      child: MaterialApp(
-        title: 'PILIGRIM',
-        debugShowCheckedModeBanner: false,
-        theme: piligrimTheme,
-        home: const SplashScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
+        ChangeNotifierProvider(create: (_) => CoreInfoProvider()..load()),
+        ChangeNotifierProvider(
+          create: (_) => MenuProvider(repository: MenuRepository())..load(),
+        ),
+        ChangeNotifierProvider(create: (_) => EventsProvider()..load()),
+        ChangeNotifierProvider(create: (_) => BookingProvider()),
+      ],
+      child: AmbientPresetScope(
+        controller: _ambientCtrl,
+        child: MaterialApp(
+          navigatorKey: rootNavigatorKey,
+          title: 'PILIGRIM',
+          debugShowCheckedModeBanner: false,
+          theme: piligrimTheme,
+          home: const SplashScreen(),
+        ),
       ),
     );
   }
@@ -87,6 +145,29 @@ class _RootShellState extends State<RootShell> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    PushNavigationHandler.onPushType = _onPushType;
+  }
+
+  @override
+  void dispose() {
+    if (PushNavigationHandler.onPushType == _onPushType) {
+      PushNavigationHandler.onPushType = null;
+    }
+    super.dispose();
+  }
+
+  void _onPushType(String type) {
+    if (!mounted) return;
+    switch (type) {
+      case 'event':
+        setState(() => _currentIndex = 3);
+      case 'booking':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BookingScreen()),
+        );
+      default:
+        break;
+    }
   }
 
   void _navigate(int index) {
@@ -97,7 +178,6 @@ class _RootShellState extends State<RootShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // false: иначе вместе с BackdropFilter на навбаре на части устройств размывался весь body.
       extendBody: false,
       backgroundColor: PiligrimColors.earth,
       body: IndexedStack(
@@ -105,8 +185,8 @@ class _RootShellState extends State<RootShell> {
         children: [
           HomeScreen(onNavigate: _navigate),
           const MenuScreen(),
+          const InteriorScreen(),
           const EventsScreen(),
-          const BookingScreen(),
           const ProfileScreen(),
         ],
       ),

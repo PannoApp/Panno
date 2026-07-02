@@ -241,3 +241,6 @@ final ThemeData piligrimTheme = ThemeData(
     elevation: 0,
   ),
 );
+
+// Текущая версия приложения — сравнивается с minVersion/latestVersion из API
+const String kAppVersion = '1.0.0';

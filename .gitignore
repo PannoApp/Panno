@@ -18,15 +18,11 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
@@ -42,17 +38,35 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio build artifacts
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Auto-generated Flutter plugin registrants (rebuilt by `flutter pub get`)
+**/generated_plugin_registrant.cc
+**/generated_plugin_registrant.h
+**/generated_plugin_registrant.cpp
+**/generated_plugins.cmake
+**/GeneratedPluginRegistrant.swift
+**/GeneratedPluginRegistrant.m
+android/app/src/main/java/**/GeneratedPluginRegistrant.java
+
+# Firebase — содержат API-ключи, не коммитить
+google-services.json
+GoogleService-Info.plist
+firebase.json
+lib/firebase_options.dart
+
+# Flutter env files (dart-define)
+.env.*.json
 
 # --- Brand / design sources (not for git; keep locally or in Drive) ---
 /brand/*.pdf
 /brand/**/*.pdf
 *.pdf
 
-# Brandbook SVG exports (heavy Illustrator dumps; app uses assets/images/)
+# Brandbook SVG exports
 /Piligrim_brandbook_1,Piligrim_brandbook_2,Piligrim_brandbook_3/
 
 # Duplicate totem sources (canonical copies in assets/images/)
@@ -71,6 +85,8 @@ backend/**/*.pyc
 backend/db.sqlite3
 backend/.env
 
-
 firebase.json
 .env.device.json
+
+# Claude
+CLAUDE.MD

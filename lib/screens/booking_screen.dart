@@ -2,11 +2,24 @@
 // Выбор зоны, даты, кол-ва гостей, подтверждение. Согласно ТЗ раздел 4.4
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
+import '../core/auth_guard.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
+import '../data/models/booking_request.dart';
+import '../providers/auth_provider.dart';
+import '../providers/booking_provider.dart';
+import '../providers/core_info_provider.dart';
 import '../widgets/ember_cta.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_tap.dart';
+
+// Форматирует TimeOfDay в строку HH:MM:SS для Django TimeField.
+String bookingTimeForApi(TimeOfDay time) {
+  final h = time.hour.toString().padLeft(2, '0');
+  final m = time.minute.toString().padLeft(2, '0');
+  return '$h:$m:00';
+}
 
 // Согласно brand/piligrim_design_spec.md:
 // - палитра Қара жер / Мөлдір су / Сары дала
@@ -31,14 +44,28 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime _visitDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _visitTime = const TimeOfDay(hour: 19, minute: 30);
   String? _selectedZone = 'Главный зал';
-  bool _depositRequired = false;
   bool _submitted = false;
 
-  final List<String> _zones = const [
-    'Главный зал',
-    'Терраса',
-    'Приват',
-  ];
+  // API-значения зон соответствуют backend enum: main/terrace/private
+  static const _zones = ['Главный зал', 'Терраса', 'Приват'];
+  static const _zoneApiMap = {
+    'Главный зал': 'main',
+    'Терраса': 'terrace',
+    'Приват': 'private',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      if (!auth.isLoggedIn) return;
+      _nameCtrl.text = auth.user.name;
+      final phone = auth.user.phone.replaceAll(RegExp(r'[^\d+]'), '');
+      if (phone.isNotEmpty) _phoneCtrl.text = phone;
+    });
+  }
 
   @override
   void dispose() {
@@ -94,20 +121,51 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  void _submit() {
-    FocusScope.of(context).unfocus();
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _submitted = true);
+  // Формат времени для Django TimeField: HH:MM → HH:MM:SS
+  String get _timeForApi => bookingTimeForApi(_visitTime);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: PiligrimColors.earthDeep,
-        content: Text(
-          'Заявка принята. Менеджер свяжется с вами в течение 15 минут.',
-          style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
-        ),
-      ),
+  // Формат даты для API Django DateField
+  String get _dateForApi {
+    final d = _visitDate;
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+
+    // Auth guard — редиректит на экран входа, если пользователь не авторизован
+    if (!await guardAuth(context)) return;
+    if (!mounted) return;
+
+    if (!_formKey.currentState!.validate()) return;
+
+    final booking = context.read<BookingProvider>();
+    final req = BookingRequest(
+      guestName: _nameCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
+      date: _dateForApi,
+      time: _timeForApi,
+      guestsCount: int.parse(_guestsCtrl.text),
+      zone: _selectedZone != null ? _zoneApiMap[_selectedZone] : null,
+      comment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
     );
+
+    await booking.submitBooking(req);
+    if (!mounted) return;
+
+    if (booking.isSuccess) {
+      setState(() => _submitted = true);
+    } else if (booking.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: PiligrimColors.earthDeep,
+          content: Text(
+            booking.error!,
+            style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
+          ),
+        ),
+      );
+    }
   }
 
   String get _dateLabel {
@@ -123,6 +181,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final booking = context.watch<BookingProvider>();
+    final depositRequired =
+        context.watch<CoreInfoProvider>().coreInfo?.bookingDepositRequired ?? false;
+
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
       body: Stack(
@@ -141,6 +203,17 @@ class _BookingScreenState extends State<BookingScreen> {
                 children: [
                   Row(
                     children: [
+                      PiligrimTap(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: const Padding(
+                          padding: EdgeInsets.only(right: 12),
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 18,
+                            color: PiligrimColors.sky,
+                          ),
+                        ),
+                      ),
                       SvgPicture.asset(
                         'assets/images/moon_totem (1).svg',
                         width: 28,
@@ -298,45 +371,57 @@ class _BookingScreenState extends State<BookingScreen> {
                             hint: 'Повод визита, пожелания, аллергии',
                             maxLines: 4,
                           ),
-                          const SizedBox(height: 14),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: PiligrimColors.steppe.withValues(alpha: 0.45),
-                              ),
-                            ),
-                            child: Material(
-                              color: PiligrimColors.earth.withValues(alpha: 0.4),
-                              borderRadius: BorderRadius.circular(12),
-                              child: SwitchListTile(
-                                value: _depositRequired,
-                                onChanged: (value) => setState(() => _depositRequired = value),
-                                activeThumbColor: PiligrimColors.steppe,
-                                title: Text(
-                                  'Нужен депозит для выбранного стола',
-                                  style: PiligrimTextStyles.body.copyWith(
-                                    color: PiligrimColors.sky,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Если депозит требуется, герой получит инструкцию связаться с менеджером по звонку.',
-                                  style: PiligrimTextStyles.caption.copyWith(
-                                    color: PiligrimColors.sky.withValues(alpha: 0.72),
-                                  ),
+                          if (depositRequired) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: PiligrimColors.earth.withValues(alpha: 0.4),
+                                border: Border.all(
+                                  color: PiligrimColors.steppe.withValues(alpha: 0.45),
                                 ),
                               ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline_rounded,
+                                    color: PiligrimColors.steppe,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      context.watch<CoreInfoProvider>().coreInfo?.bookingDepositNote
+                                          ?? 'Для выбранного стола может потребоваться депозит. Уточните у менеджера.',
+                                      style: PiligrimTextStyles.caption.copyWith(
+                                        color: PiligrimColors.sky.withValues(alpha: 0.85),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 18),
                           EmberGlow(
                             radius: 12,
-                            child: EmberCta(
-                              label: 'ОТПРАВИТЬ ЗАЯВКУ',
-                              iconAsset: 'assets/images/moon_totem (1).svg',
-                              onTap: _submit,
-                            ),
+                            child: booking.isSubmitting
+                                ? const SizedBox(
+                                    height: 48,
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        color: PiligrimColors.steppe,
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  )
+                                : EmberCta(
+                                    label: 'ОТПРАВИТЬ ЗАЯВКУ',
+                                    iconAsset: 'assets/images/moon_totem (1).svg',
+                                    onTap: _submit,
+                                  ),
                           ),
                           const SizedBox(height: 12),
                           Text(
@@ -356,7 +441,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         ? _FlowCard(
                             visitDate: _dateLabel,
                             visitTime: _timeLabel,
-                            depositRequired: _depositRequired,
+                            depositRequired: depositRequired,
                           )
                         : const SizedBox.shrink(),
                   ),

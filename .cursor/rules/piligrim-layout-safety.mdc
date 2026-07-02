@@ -1,0 +1,26 @@
+---
+description: extendBody, safe areas, hero — avoid layout regressions
+globs: lib/screens/**,lib/main.dart,lib/widgets/bottom_nav_bar.dart
+alwaysApply: false
+---
+
+# Layout safety
+
+## Root shell
+`RootShell`: `extendBody: false`. Bottom nav uses its own `SafeArea`. Do not enable root `extendBody: true` without explicit approval.
+
+## Full-bleed screens (Home, Events, …)
+Often: `extendBodyBehindAppBar: true`, manual top inset via `MediaQuery.paddingOf(context).top + …`.
+
+When editing layout on these screens, follow the **same file’s** existing pattern. Do not wrap the whole tab in `SafeArea` if it shrinks the hero.
+
+## Sheets & keyboard
+`showModalBottomSheet` + `isScrollControlled: true`: account for `MediaQuery.viewInsetsOf(context).bottom` (see `event_signup_sheet.dart`).
+
+## IndexedStack
+All five tabs stay mounted. After `async`, check `mounted` in post-frame callbacks.
+
+## After layout changes, verify
+- Bottom nav does not cover primary CTA.
+- Status bar readable on dark heroes.
+- If shell or tab bar changed: `flutter test test/navigation_test.dart`.

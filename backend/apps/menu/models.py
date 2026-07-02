@@ -33,29 +33,54 @@ class Allergen(models.Model):
         return self.name
 
 class Dish(models.Model):
+    # Статусы обработки видео для видеоленты
+    class VideoStatus(models.TextChoices):
+        PENDING    = 'pending',    'Ожидает обработки'
+        PROCESSING = 'processing', 'Обрабатывается'
+        READY      = 'ready',      'Готово'
+        FAILED     = 'failed',     'Ошибка'
+
     name = models.CharField("Название блюда", max_length=200)
     description = models.TextField("Описание", blank=True)
     price = models.DecimalField("Цена", max_digits=10, decimal_places=2)
-    
+
     category = models.ForeignKey(
-        Category, 
-        on_delete=models.CASCADE, 
-        related_name='dishes', 
+        Category,
+        on_delete=models.CASCADE,
+        related_name='dishes',
         verbose_name="Категория"
     )
     tags = models.ManyToManyField(Tag, blank=True, verbose_name="Теги")
     allergens = models.ManyToManyField(Allergen, blank=True, verbose_name="Аллергены")
-    
+
     image = models.ImageField("Фото", upload_to="dishes/images/")
+    # Оригинальное видео, загружаемое администратором
     video = models.FileField("Видео (для ленты)", upload_to="dishes/videos/", blank=True, null=True)
+    # Видео после транскодирования (заполняется Celery-задачей)
+    video_processed = models.FileField(
+        "Обработанное видео",
+        upload_to="dishes/videos/processed/",
+        blank=True, null=True,
+    )
+    # Текущий этап обработки видео; индексируется для быстрой фильтрации ленты
+    video_status = models.CharField(
+        max_length=20,
+        choices=VideoStatus.choices,
+        default=VideoStatus.PENDING,
+        db_index=True,
+    )
+
     weight = models.PositiveIntegerField("Вес (г)", null=True, blank=True)
     story = models.TextField("История блюда", blank=True)
-
     is_active = models.BooleanField("Активно", default=True)
 
     class Meta:
         verbose_name = "Блюдо"
         verbose_name_plural = "Блюда"
+        indexes = [
+            # Составной индекс для быстрых запросов видеоленты (активные + готовое видео)
+            models.Index(fields=['is_active', 'video_status']),
+        ]
 
     def __str__(self):
         return self.name

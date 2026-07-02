@@ -3,6 +3,9 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
 
+/// Открыть [BookingScreen] через Navigator.push, не tab.
+const int kNavOpenBooking = -1;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Категории меню / разделы путешествия
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,7 +25,8 @@ class MenuCategory {
   final String subtitle;
   final String totemAsset;
   final Color accentColor;
-  final int navIndex; // куда перейти при нажатии
+  /// Индекс вкладки RootShell или [kNavOpenBooking] для push BookingScreen.
+  final int navIndex;
   final String? badge; // опциональный бейдж (например «NEW»)
 }
 
@@ -49,7 +53,7 @@ const kMenuCategories = [
     subtitle: 'Мероприятия',
     totemAsset: 'assets/images/tree_totem (1).svg',
     accentColor: Color(0xFF9BB898), // приглушённый зелёный (природа, АУА)
-    navIndex: 2,
+    navIndex: 3,
     badge: 'СКОРО',
   ),
   MenuCategory(
@@ -58,7 +62,7 @@ const kMenuCategories = [
     subtitle: 'Стол на вечер',
     totemAsset: 'assets/images/moon_totem (1).svg',
     accentColor: PiligrimColors.water,
-    navIndex: 3,
+    navIndex: kNavOpenBooking,
   ),
 ];
 
