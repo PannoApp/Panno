@@ -3,7 +3,9 @@
     "allow": [
       "Bash(cp .env.prod.example .env.validate)",
       "Bash(docker compose *)",
-      "Bash(rm -f .env.validate)"
+      "Bash(rm -f .env.validate)",
+      "Bash(find android *)",
+      "Bash(ls android/app/src/main/res/xml/)"
     ]
   }
 }
