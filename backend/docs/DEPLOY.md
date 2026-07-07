@@ -58,8 +58,7 @@ ssh root@185.129.51.40
 cat /etc/os-release
 ```
 
-Если увидишь `Ubuntu` или `Debian` — отлично, инструкция ниже для них.
-Если это не Linux (например, Windows) — напиши мне, дам отдельную инструкцию.
+Сервер работает на **AlmaLinux 9** (RHEL-семейство) — команды ниже даны под неё.
 
 ### B3. Поменять пароль root (безопасность)
 
@@ -67,12 +66,22 @@ cat /etc/os-release
 passwd
 ```
 
-Введи новый надёжный пароль дважды.
+Введи новый надёжный пароль дважды. Сервер уже перебирают боты — не откладывай.
 
-### B4. Установить Docker
+### B4. Установить Docker (AlmaLinux 9)
 
 ```bash
-curl -fsSL https://get.docker.com | sh
+# Утилиты и git/nano пригодятся дальше
+dnf -y install dnf-plugins-core git nano
+
+# Официальный репозиторий Docker (репо CentOS совместимо с AlmaLinux)
+dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+# Сам Docker + плагин compose
+dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Запустить и включить автозапуск при перезагрузке сервера
+systemctl enable --now docker
 ```
 
 Проверь, что всё встало:
@@ -175,19 +184,18 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 
 Введи телефон/логин и пароль. Потом сможешь зайти в админку.
 
-### D4. Открыть порты в файрволе
-
-Если на сервере включён `ufw`:
+### D4. Открыть порты в файрволе (AlmaLinux — firewalld)
 
 ```bash
-ufw allow OpenSSH
-ufw allow 8000/tcp
-ufw allow 9000/tcp
-ufw --force enable
-ufw status
+firewall-cmd --permanent --add-port=8000/tcp
+firewall-cmd --permanent --add-port=9000/tcp
+firewall-cmd --reload
+firewall-cmd --list-ports
 ```
 
-> Порт `9001` (веб-консоль MinIO) наружу лучше **не** открывать — оставь закрытым.
+SSH (порт 22) в firewalld разрешён по умолчанию — не трогаем.
+
+> Порт `9001` (веб-консоль MinIO) наружу **не** открываем — оставь закрытым.
 > Также проверь панель управления у хостинга: там может быть свой сетевой файрвол,
 > где тоже нужно разрешить порты 8000 и 9000.
 
