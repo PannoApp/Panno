@@ -60,6 +60,8 @@ lib/firebase_options.dart
 
 # Flutter env files (dart-define)
 .env.*.json
+# Исключение: конфиг деплой-сервера (только публичный адрес, без секретов) — коммитим
+!.env.server.json
 
 # --- Brand / design sources (not for git; keep locally or in Drive) ---
 /brand/*.pdf

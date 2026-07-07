@@ -5,7 +5,8 @@
       "Bash(docker compose *)",
       "Bash(rm -f .env.validate)",
       "Bash(find android *)",
-      "Bash(ls android/app/src/main/res/xml/)"
+      "Bash(ls android/app/src/main/res/xml/)",
+      "Bash(git check-ignore *)"
     ]
   }
 }
