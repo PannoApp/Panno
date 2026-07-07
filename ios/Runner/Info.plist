@@ -2,6 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- ВРЕМЕННО: разрешаем HTTP к тестовому серверу 185.129.51.40 (API :8000 и медиа MinIO :9000).
+	     ATS сопоставляет по хосту, поэтому одно исключение покрывает оба порта.
+	     Убрать, когда появится домен + HTTPS. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>185.129.51.40</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Выберите фото блюда из галереи</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

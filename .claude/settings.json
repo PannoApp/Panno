@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp .env.prod.example .env.validate)",
+      "Bash(docker compose *)",
+      "Bash(rm -f .env.validate)"
+    ]
+  }
+}
