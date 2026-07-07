@@ -194,9 +194,29 @@ services:
           memory: 512m
           cpus: '1.0'
 
-  # ПРИМЕЧАНИЕ: video-worker (FFmpeg-транскодирование видео) убран из этой конфигурации —
-  # он слишком тяжёлый для сервера с 1 ГБ RAM. Загрузка видео блюд обрабатываться не будет.
-  # Когда перейдёшь на сервер побольше (2–4 ГБ) — верни этот сервис из docker-compose.yml.
+  # Celery video worker — FFmpeg-транскодирование видео блюд (очередь video).
+  # ОБЛЕГЧЁННЫЙ вариант для сервера 1 ГБ: одно видео за раз (concurrency=1),
+  # процесс перезапускается каждые 5 задач, чтобы освобождать память.
+  # На 1 ГБ обработка идёт медленно и с активным swap — для demo ок, но при
+  # серьёзной нагрузке апгрейдни сервер до 2–4 ГБ и подними concurrency.
+  video-worker:
+    build: .
+    container_name: celery_video_worker
+    restart: unless-stopped
+    command: celery -A config worker --loglevel=info --queues=video --concurrency=1 --max-tasks-per-child=5 --time-limit=960 --soft-time-limit=900
+    volumes:
+      - ./logs:/app/backend/logs:z
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
   # Celery beat — планировщик периодических задач
   beat:
