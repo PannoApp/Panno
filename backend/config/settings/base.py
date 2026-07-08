@@ -342,6 +342,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.bookings.tasks.send_booking_reminders',
         'schedule': 60 * 15,  # каждые 15 минут
     },
+    'sync-reserve-statuses': {
+        'task': 'apps.bookings.tasks.sync_reserve_statuses',
+        'schedule': 60 * 10,  # каждые 10 минут
+    },
 }
 
 CELERY_TASK_ROUTES = {

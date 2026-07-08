@@ -13,7 +13,12 @@
 Модели/вьюхи/urls намеренно не используются — это просто библиотека клиентов,
 которую импортируют другие приложения (`bookings`, `menu` и т.д.) и Celery-таски.
 
-- `apps/remarked/client.py` — `RemarkedMobileClient` и `RemarkedReservesClient`.
+- `apps/remarked/client.py` — `RemarkedMobileClient` и `RemarkedReservesClient`
+  (низкоуровневый транспорт).
+- `apps/remarked/reserves_client.py` — `ReservesClient`: высокоуровневая
+  обёртка над `RemarkedReservesClient` с кешированием токена и типизированными
+  методами брони — см. раздел «ReservesClient» ниже. Используйте её, а не
+  `RemarkedReservesClient` напрямую, для любой работы с бронями.
 - `apps/remarked/exceptions.py` — `RemarkedAPIError`.
 
 ## REMARKED_API_TOKEN / REMARKED_POINT_ID
@@ -72,30 +77,76 @@ guest = client._call(
    `GetReservesByPhone`, `ChangeReserveStatus`, `GetReserveByID`,
    `IsReserveRead`. Вызываются через `_call(method_name, **payload)`.
 
+   `RemarkedReservesClient` (`apps/remarked/client.py`) — это только транспорт
+   уровня `_call(method_name, **payload)`: собирает тело `{"method": ..., ...}`
+   и шлёт его. Он **не знает про токен** и не подставляет его сам — токен
+   передаётся вызывающим кодом как обычный `token=...` в payload. Не
+   используйте этот класс напрямую для брони — токен здесь не статический
+   `REMARKED_API_TOKEN` (см. предупреждение ниже), а временный, полученный
+   через `GetToken`, и его нужно кешировать и обновлять при 401. Всё это уже
+   сделано в `ReservesClient` — см. следующий раздел.
+
+2. **`POST /api`** (метод `getEventTags`) — уже настоящий JSON-RPC 2.0:
+   `{"jsonrpc": 2, "method": "ReservesWidgetApi.getEventTags", "params": {...}, "id": "..."}`.
+   Вызывается отдельным методом `get_event_tags()` на `RemarkedReservesClient`,
+   а не через `_call()`.
+
    ```python
    from apps.remarked.client import RemarkedReservesClient
 
    client = RemarkedReservesClient()
-   slots = client._call(
-       'GetSlots',
-       token=client.token,
-       reserve_date_period={'from': '2026-07-10', 'to': '2026-07-10'},
-       guests_count=2,
-   )
-   ```
-
-   Токен — статический `REMARKED_API_TOKEN`, передавайте его явно как
-   `token=client.token` в payload методов, которые его требуют (все, кроме
-   `GetToken`). Отдельно вызывать `GetToken` для получения токена **не нужно**
-   при обычной работе — токен уже выдан и не истекает.
-
-2. **`POST /api`** (метод `getEventTags`) — уже настоящий JSON-RPC 2.0:
-   `{"jsonrpc": 2, "method": "ReservesWidgetApi.getEventTags", "params": {...}, "id": "..."}`.
-   Вызывается отдельным методом `get_event_tags()`, а не через `_call()`.
-
-   ```python
    tags = client.get_event_tags()
    ```
+
+> ⚠️ Старая версия этого файла утверждала, что для `GetSlots`/`CreateReserve`/
+> и т.д. можно передавать статический `REMARKED_API_TOKEN` как `token=...`, а
+> `GetToken` вызывать не нужно. Это оказалось неверно — не было проверено
+> живьём на момент написания. Живой тест (см. «Проверено на боевом Remarked»
+> ниже) показал, что для брони нужен именно временный токен из `GetToken`.
+
+## ReservesClient (рекомендуемый способ работы с бронями)
+
+`ReservesClient` (`apps/remarked/reserves_client.py`) — то, что реально нужно
+импортировать для работы с бронями (используется в `apps/bookings/tasks.py`).
+Оборачивает `RemarkedReservesClient`, сам получает и кеширует временный
+токен через `GetToken`, автоматически повторяет вызов один раз с обновлённым
+токеном при 401.
+
+```python
+from apps.remarked.reserves_client import ReservesClient
+
+reserves = ReservesClient()
+
+slots = reserves.get_slots(
+    reserve_date_period={'from': '2026-07-10', 'to': '2026-07-10'},
+    guests_count=2,
+)
+
+result = reserves.create_reserve({
+    'name': 'Алихан', 'phone': '+77001234567',
+    'date': '2026-07-10', 'time': '19:30',
+    'guests_count': 2, 'source': 'mobile_app',
+})
+reserve_id = result['reserve_id']
+
+reserve = reserves.get_reserve_by_id(reserve_id)
+reserves.change_reserve_status(reserve_id, 'canceled', cancel_reason='other')
+```
+
+Доступные методы: `get_token(force_refresh=False)`, `get_slots(...)`,
+`get_days_states(...)`, `create_reserve(reserve, confirm_code=None,
+request_id=None)` (генерирует свой `request_id`-UUID, если не передан —
+это Idempotency-Key на уровне Remarked, не путать с нашим собственным
+заголовком `Idempotency-Key` в `POST /api/v1/bookings/`),
+`get_reserves_by_phone(phone, **kwargs)`, `change_reserve_status(reserve_id,
+status, cancel_reason=None)`, `get_reserve_by_id(reserve_id)`.
+
+Токен кешируется в Redis (`remarked_reserve_token:{point}`, TTL 15 минут —
+в спеке TTL не указан, значение подобрано консервативно). При 401 от любого
+метода токен обновляется принудительно и вызов повторяется один раз; если
+и обновлённый токен получает 401 — ошибка пробрасывается дальше как обычно
+(retry всей задачи — уже на уровне `@shared_task`/`autoretry_for`, как и у
+остальных интеграций).
 
 ## Ошибки
 
@@ -149,6 +200,27 @@ guest = client._call(
 `customer/create` — попытка его записать через API молча не сохранилась
 (осталось `null`). Это, возможно, read-only поле, доступное только из панели
 Remarked — не проверялось глубже, так как для интеграции Panno не требуется.
+
+### `GetToken` (Reserves API v1): `point` — required по спеке, но ломает вызов
+
+Спека `GetToken` (`bookings.json`) помечает `point` как обязательное поле.
+Живой тест показал обратное: `{"method": "GetToken", "point": 303450}`
+(и с верным, и без Authorization-заголовка) отвечает
+`{"status":"error","message":"Unknown error"}`, а `{"method": "GetToken"}`
+без `point` — валидным токеном. Этим токеном успешно проверены `GetSlots`
+(вернул реальные слоты) и `GetReservesByPhone` (вернул реальные брони) — то
+есть скоуп токена и без явного `point` уже соответствует нашей точке.
+`ReservesClient.get_token()` (`apps/remarked/reserves_client.py`) намеренно
+не передаёт `point` в `GetToken` вопреки спеке — см. докстринг класса.
+
+### Полный цикл брони проверен живьём: `CreateReserve` → `GetReserveByID` → `ChangeReserveStatus`
+
+После починки `GetToken` весь цикл проверен реальными запросами (не моками):
+`CreateReserve` создал бронь на тестовый номер (`reserve_id` вернулся сразу),
+`ChangeReserveStatus` сразу же перевёл её в `canceled`, `GetReserveByID`
+подтвердил `inner_status: "canceled"` — то есть маппинг статусов в
+`apps/bookings/tasks.py::sync_reserve_statuses` (`docs/bookings.md`) проверен
+не только моками, но и на реальном ответе Remarked.
 
 ## Таймауты и повторы
 

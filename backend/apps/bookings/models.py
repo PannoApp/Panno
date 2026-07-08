@@ -81,6 +81,15 @@ class TableBooking(models.Model):
         verbose_name="Статус"
     )
 
+    # ID брони в Remarked (CreateReserve.Response.reserve_id) — заполняется
+    # асинхронно таской create_reserve_in_remarked после локального сохранения.
+    remarked_reserve_id = models.IntegerField(
+        "ID брони в Remarked",
+        null=True,
+        blank=True,
+        unique=True,
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата создания"

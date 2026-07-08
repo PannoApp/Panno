@@ -113,7 +113,15 @@ class TableBookingListCreateView(IdempotencyMixin, generics.ListCreateAPIView):
         return TableBooking.objects.filter(user=self.request.user).order_by('-date', '-time')
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        booking = serializer.save(user=self.request.user)
+        from .tasks import create_reserve_in_remarked
+        try:
+            create_reserve_in_remarked.delay(booking.id)
+        except Exception:
+            logger.error(
+                "Celery broker unavailable — create_reserve_in_remarked not queued: booking=%s",
+                booking.id,
+            )
 
 
 def _get_manager_keyboard():

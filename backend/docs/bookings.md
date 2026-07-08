@@ -10,8 +10,14 @@
   status = "pending"  (ожидает подтверждения)
   → push пользователю: "Заявка принята"
   → Telegram: сообщение с кнопками [✅ Подтвердить] [❌ Отменить]
+  → фоново (Celery): бронь пушится в Remarked CRM, remarked_reserve_id сохраняется
         ↓
-  Менеджер нажимает кнопку в Telegram    ←── или меняет статус в Django-админке
+  Менеджер меняет статус ОДНИМ ИЗ ТРЁХ способов:
+    - нажимает кнопку в Telegram-уведомлении;
+    - меняет статус в Django-админке (/admin/bookings/tablebooking/);
+    - меняет статус брони прямо в Remarked CRM (например, у себя на кассе/сайте) —
+      это подхватится в течение ~10 минут периодической синхронизацией, см.
+      «Синхронизация с Remarked» ниже.
         ↓
   status = "confirmed"  →  push: "Ваш столик забронирован"
   status = "canceled"   →  push: "Ваше бронирование было отменено"
@@ -19,7 +25,12 @@
   status = "completed"  →  push: "Спасибо за визит!"
 ```
 
-Менеджер зала меняет статус через **Django-админку** (`/admin/bookings/tablebooking/`) **или прямо из Telegram** — нажатием inline-кнопки в уведомлении.
+Важно: независимо от того, **откуда** пришло изменение статуса (Telegram, админка
+или обратная синхронизация из Remarked), обновление всегда идёт через обычный
+`TableBooking.save()` → срабатывает один и тот же `post_save`-сигнал
+`notify_on_status_change` (`signals.py`) → пользователю уходит один и тот же
+push. Дублирования логики нет — Remarked-синхронизация не отправляет push
+напрямую, она просто меняет `status` локальной записи.
 
 ## Эндпоинты
 
@@ -121,6 +132,7 @@
 | `zone` | string | Предпочтительная зона: `main`, `terrace`, `private` (необязательно) |
 | `comment` | text | Дополнительные пожелания (необязательно) |
 | `status` | string | Статус (см. ниже) |
+| `remarked_reserve_id` | int, null, unique | `reserve_id` этой же брони в Remarked CRM. Заполняется асинхронно после создания (см. «Синхронизация с Remarked»); может быть `null`, пока фоновая задача не отработала или упала после всех ретраев |
 | `created_at` | datetime | Дата создания |
 | `updated_at` | datetime | Дата последнего изменения |
 
@@ -242,6 +254,101 @@ curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 
 Для запуска beat-планировщика в Docker: `docker compose up beat`.
 
+## Синхронизация с Remarked
+
+Каждая бронь Panno дублируется в Remarked CRM — это тот же CRM, которым
+пользуется зал/касса ресторана (см. `backend/docs/remarked.md`). Синхронизация
+двусторонняя и **асинхронная в обе стороны**: ничего из этого не блокирует
+ответ пользователю при создании брони.
+
+### Создание → пуш в Remarked (`create_reserve_in_remarked`)
+
+Файл: `apps/bookings/tasks.py`, вызывается из
+`TableBookingListCreateView.perform_create` сразу после локального сохранения.
+
+1. Локальная запись сохраняется как обычно (её ничего не блокирует, включая
+   `IdempotencyMixin` — этот шаг не менялся).
+2. В фоне (Celery) таска берёт `ReservesClient` (`apps/remarked/reserves_client.py`),
+   получает/берёт из кеша временный токен (`GetToken`), затем вызывает
+   `CreateReserve` с полями брони (`name`, `phone`, `date`, `time`,
+   `guests_count`, `source='mobile_app'`, `comment` если есть).
+3. У `CreateReserve` — свой Idempotency-Key на уровне Remarked (`request_id`,
+   новый UUID на каждый вызов таски). Это отдельный слой от нашего заголовка
+   `Idempotency-Key` из `POST /api/v1/bookings/` — они не связаны и не должны
+   путаться.
+4. Полученный `reserve_id` сохраняется в `remarked_reserve_id`.
+5. Если Remarked недоступен — таска ретраится по стандартному профилю (см.
+   ниже); если и после ретраев не получилось — `remarked_reserve_id` остаётся
+   `null`, локальная бронь при этом уже существует и полностью рабочая
+   (Remarked — не источник истины на этом шаге, а витрина для зала).
+
+**Retry-политика:** `autoretry_for=(Exception,)`, `max_retries=3`,
+`default_retry_delay=30`, `acks_late=True`, `reject_on_worker_lost=True`,
+`time_limit=60`/`soft_time_limit=45`.
+
+### Remarked → обратная синхронизация статуса (`sync_reserve_statuses`)
+
+Файл: `apps/bookings/tasks.py`. Периодическая задача Celery Beat — покрывает
+случай, когда статус брони меняют **в самом Remarked** (а не в нашей
+админке/Telegram), например сотрудник у себя на кассе.
+
+**Расписание:** каждые 10 минут (`CELERY_BEAT_SCHEDULE['sync-reserve-statuses']`
+в `settings/base.py`).
+
+**Логика выборки:** локальные `TableBooking` со статусом `pending` или
+`confirmed` (ещё не в финальном статусе) и заполненным `remarked_reserve_id`.
+Для каждой вызывается `GetReserveByID`, `inner_status` Remarked сравнивается с
+локальным `status` через таблицу маппинга:
+
+| `inner_status` (Remarked) | наш `status` |
+|---|---|
+| `new` | `pending` |
+| `waiting` | `pending` |
+| `confirmed` | `confirmed` |
+| `started` | `confirmed` |
+| `closed` | `completed` |
+| `canceled` | `canceled` |
+
+Это архитектурное решение самого проекта Panno (не согласовывалось отдельно
+с Remarked/заказчиком) — `inner_status` в Remarked гранулярнее (6 значений),
+чем наш `status` (4 значения), поэтому пары значений сознательно сведены к
+одному нашему статусу.
+
+При расхождении — `booking.status = new_status; booking.save()`. Это обычный
+`save()`, поэтому срабатывает уже существующий `post_save`-сигнал
+`notify_on_status_change` и пользователь получает тот же push, что и при
+смене статуса из админки/Telegram — сигнал не менялся и не знает, откуда
+пришло изменение.
+
+Ошибка Remarked по одной брони (например, временный 5xx) не прерывает
+обработку остальных броней в этом же прогоне — просто логируется и
+пропускается; следующий прогон через 10 минут попробует снова.
+
+**Retry-политика (для сбоя всей задачи, не отдельной брони):**
+`autoretry_for=(Exception,)`, `max_retries=3`, `default_retry_delay=60`,
+`acks_late=True`, `reject_on_worker_lost=True`,
+`time_limit=120`/`soft_time_limit=90`.
+
+### Токен Reserves API
+
+`ReservesClient` (`apps/remarked/reserves_client.py`) кеширует временный
+токен `GetToken` в Redis (`remarked_reserve_token:{point}`, TTL 15 минут) и
+делает один retry с принудительным обновлением токена при 401 от любого
+метода. Подробности и живой баг спеки (`point` ломает `GetToken`) — см.
+`backend/docs/remarked.md`.
+
+### Известное ограничение: свободный ввод даты/времени (без проверки занятости)
+
+`BookingScreen` во Flutter пока даёт **свободный** выбор даты/времени —
+занятость слотов не проверяется ни на бэкенде, ни в приложении. Remarked
+предоставляет для этого методы `GetSlots`/`GetDaysStates` (уже есть в
+`ReservesClient`), но подключение эндпоинта
+`GET /api/v1/bookings/availability/` и слот-пикера в Flutter — это отдельная,
+заметная по объёму UI-задача, сознательно вынесенная в отдельный этап
+(«Фаза 2»), а не мелкое доделывание текущего. Бронь и без слот-пикера падает
+в ту же систему, что и с сайта ресторана — блокером для «единой брони» это
+не является.
+
 ## Django-админка (управление бронированиями)
 
 Управление бронированиями полностью осуществляется через `/admin/bookings/tablebooking/`.
@@ -265,15 +372,21 @@ curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 
 ```
 apps/bookings/
-├── models.py       # TableBooking
+├── models.py       # TableBooking (включая remarked_reserve_id)
 ├── serializers.py  # TableBookingSerializer
-├── views.py        # TableBookingListCreateView, TelegramWebhookView
+├── views.py        # TableBookingListCreateView (дёргает create_reserve_in_remarked), TelegramWebhookView
 ├── admin.py        # TableBookingAdmin (управление бронями персоналом)
-├── signals.py      # push + Telegram при создании брони и смене статуса
-├── tasks.py        # send_booking_reminders (Beat, 15 мин) + send_telegram_notification + хелперы _build_booking_html, _tg_post
+├── signals.py      # push + Telegram при создании брони и смене статуса (не знает про Remarked)
+├── tasks.py        # send_booking_reminders (Beat, 15 мин), send_telegram_notification,
+│                   # create_reserve_in_remarked (пуш брони в Remarked после создания),
+│                   # sync_reserve_statuses (Beat, 10 мин — обратная синхронизация статуса),
+│                   # хелперы _build_booking_html, _tg_post
 ├── apps.py         # создание группы «Менеджер зала» + подключение signals
 └── urls.py         # Маршруты /api/v1/bookings/ и /api/v1/bookings/telegram-webhook/
 ```
+
+Зависит от `apps/remarked/` (`ReservesClient`) для обеих задач синхронизации
+с Remarked — см. `backend/docs/remarked.md`.
 
 ## Сериализаторы
 
@@ -297,6 +410,12 @@ apps/bookings/
 - `_original_status` сохраняется в `__init__` модели — это нужно сигналу, чтобы понять, изменился ли статус.
 - Нет ограничения на бронирование в прошлом — валидацию дат при необходимости нужно добавить в сериализатор.
 - Менеджер зала не может изменить поле `user` у брони — оно read-only в `TableBookingStaffSerializer`.
+- `remarked_reserve_id` — eventual consistency, не транзакция: локальная бронь
+  создаётся синхронно и сразу видна пользователю, а появление в Remarked может
+  занять секунды (обычный путь) или не произойти вовсе при недоступном
+  Remarked после исчерпания ретраев. Не полагайтесь на `remarked_reserve_id`
+  сразу после `POST /api/v1/bookings/` — проверяйте его в `GET`, если это
+  важно для сценария.
 
 ## Flutter-интеграция
 

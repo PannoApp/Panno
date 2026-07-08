@@ -49,7 +49,8 @@
       "Bash(curl -s -X PATCH http://localhost:8000/api/v1/users/profile/ -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Content-Type: application/json' -d '{\"first_name\":\"КуратТест\",\"gender\":\"male\",\"email\":\"qatest@example.com\"}')",
       "Bash(curl -s -X PATCH http://localhost:8000/api/v1/users/profile/ -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Content-Type: application/json' -d '{\"first_name\":\"QaTest\",\"gender\":\"male\",\"email\":\"qatest@example.com\"}')",
       "Bash(grep -iB2 -A8 \"push_guest_to_remarked\")",
-      "Bash(curl -s -X POST http://localhost:8000/api/v1/users/auth/verify-sms/ -H 'Content-Type: application/json' -d '{\"phone\":\"+77001112233\",\"otp\":\"5543\"}')"
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/users/auth/verify-sms/ -H 'Content-Type: application/json' -d '{\"phone\":\"+77001112233\",\"otp\":\"5543\"}')",
+      "Bash(docker-compose exec *)"
     ],
     "additionalDirectories": [
       "\\tmp"

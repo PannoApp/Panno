@@ -123,7 +123,8 @@ class TableBookingListCreateViewTest(APITestCase):
         response = self.client.get('/api/v1/bookings/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_create_booking_success(self):
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_create_booking_success(self, mock_reserve_task):
         self._auth()
         payload = {
             'guest_name': 'Алихан',
@@ -139,7 +140,8 @@ class TableBookingListCreateViewTest(APITestCase):
         self.assertEqual(response.data['guest_name'], 'Алихан')
         self.assertEqual(response.data['status'], 'pending')
 
-    def test_create_booking_sets_user(self):
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_create_booking_sets_user(self, mock_reserve_task):
         self._auth()
         payload = {
             'guest_name': 'Данияр',
@@ -483,7 +485,8 @@ class TableBookingPhoneAPITest(APITestCase):
         refresh = RefreshToken.for_user(user or self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
 
-    def test_create_booking_with_phone(self):
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_create_booking_with_phone(self, mock_reserve_task):
         self._auth()
         payload = {
             'guest_name': 'Данияр',
@@ -554,7 +557,8 @@ class TableBookingZoneAPITest(APITestCase):
         refresh = RefreshToken.for_user(self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
 
-    def test_create_booking_with_zone_returns_zone_in_response(self):
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_create_booking_with_zone_returns_zone_in_response(self, mock_reserve_task):
         payload = {
             'guest_name': 'Зонный тест',
             'phone': '+77001234567',
@@ -620,13 +624,15 @@ class BookingIdempotencyTest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_first_request_creates_booking(self):
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_first_request_creates_booking(self, mock_reserve_task):
         key = str(uuid.uuid4())
         response = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(TableBooking.objects.filter(user=self.user).count(), 1)
 
-    def test_duplicate_key_does_not_create_second_booking(self):
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_duplicate_key_does_not_create_second_booking(self, mock_reserve_task):
         key = str(uuid.uuid4())
         r1 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
         r2 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
@@ -635,7 +641,8 @@ class BookingIdempotencyTest(APITestCase):
         self.assertEqual(r1.data['id'], r2.data['id'])
         self.assertEqual(TableBooking.objects.filter(user=self.user).count(), 1)
 
-    def test_different_keys_create_two_bookings(self):
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_different_keys_create_two_bookings(self, mock_reserve_task):
         r1 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
         r2 = self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
         self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
@@ -643,7 +650,8 @@ class BookingIdempotencyTest(APITestCase):
         self.assertNotEqual(r1.data['id'], r2.data['id'])
         self.assertEqual(TableBooking.objects.filter(user=self.user).count(), 2)
 
-    def test_same_key_different_user_creates_new_booking(self):
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_same_key_different_user_creates_new_booking(self, mock_reserve_task):
         key = str(uuid.uuid4())
         self.client.post(self.URL, self.payload, HTTP_IDEMPOTENCY_KEY=key)
 
@@ -2118,5 +2126,394 @@ class TelegramWebhookFSMTest(TestCase):
         from apps.events.models import Event
         self.assertFalse(Event.objects.filter(title='Failed Download Event').exists())
         self.assertIsNone(cache.get('tg_fsm:111222'))
+
+
+# ---------------------------------------------------------------------------
+# Celery task: create_reserve_in_remarked
+# ---------------------------------------------------------------------------
+
+class CreateReserveInRemarkedTaskTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77007000001')
+
+    def _call(self, booking_id):
+        from apps.bookings.tasks import create_reserve_in_remarked
+        create_reserve_in_remarked(booking_id)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_saves_reserve_id_on_success(self, mock_create):
+        mock_create.return_value = {'status': 'success', 'reserve_id': 555}
+        booking = make_booking(user=self.user, phone='+77001234567')
+        self._call(booking.pk)
+        booking.refresh_from_db()
+        self.assertEqual(booking.remarked_reserve_id, 555)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_sends_expected_reserve_fields(self, mock_create):
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(
+            user=self.user, phone='+77001234567', date='2026-06-15',
+            time='19:30:00', guests_count=4, comment='У окна',
+        )
+        self._call(booking.pk)
+        reserve = mock_create.call_args[0][0]
+        self.assertEqual(reserve['name'], booking.guest_name)
+        self.assertEqual(reserve['phone'], '+77001234567')
+        self.assertEqual(reserve['date'], '2026-06-15')
+        self.assertEqual(reserve['time'], '19:30')
+        self.assertEqual(reserve['guests_count'], 4)
+        self.assertEqual(reserve['source'], 'mobile_app')
+        self.assertEqual(reserve['comment'], 'У окна')
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_omits_comment_when_blank(self, mock_create):
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(user=self.user, phone='+77001234567')
+        self._call(booking.pk)
+        reserve = mock_create.call_args[0][0]
+        self.assertNotIn('comment', reserve)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_falls_back_to_user_phone_when_booking_phone_empty(self, mock_create):
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(user=self.user, phone='')
+        self._call(booking.pk)
+        reserve = mock_create.call_args[0][0]
+        self.assertEqual(reserve['phone'], self.user.phone)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_generates_unique_request_id(self, mock_create):
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(user=self.user, phone='+77001234567')
+        self._call(booking.pk)
+        request_id = mock_create.call_args[1]['request_id']
+        uuid.UUID(request_id)  # не бросает — валидный UUID
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_does_not_raise_on_missing_booking(self, mock_create):
+        self._call(999999)
+        mock_create.assert_not_called()
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_no_reserve_id_in_response_does_not_crash(self, mock_create):
+        mock_create.return_value = {'status': 'success'}
+        booking = make_booking(user=self.user, phone='+77001234567')
+        self._call(booking.pk)
+        booking.refresh_from_db()
+        self.assertIsNone(booking.remarked_reserve_id)
+
+    def test_retry_config(self):
+        from apps.bookings.tasks import create_reserve_in_remarked
+        self.assertEqual(create_reserve_in_remarked.max_retries, 3)
+        self.assertEqual(create_reserve_in_remarked.default_retry_delay, 30)
+        self.assertTrue(create_reserve_in_remarked.acks_late)
+        self.assertTrue(create_reserve_in_remarked.reject_on_worker_lost)
+        self.assertIn(Exception, create_reserve_in_remarked.autoretry_for)
+
+
+# ---------------------------------------------------------------------------
+# View: диспетчеризация create_reserve_in_remarked при создании брони
+# ---------------------------------------------------------------------------
+
+class CreateReserveDispatchTest(APITestCase):
+    def setUp(self):
+        self.user = make_user('+77007100001')
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_task_queued_on_create(self, mock_task):
+        payload = {
+            'guest_name': 'Диспетч', 'phone': '+77001234567',
+            'date': '2026-06-20', 'time': '19:00:00', 'guests_count': 2,
+        }
+        response = self.client.post(
+            '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        booking = TableBooking.objects.get(guest_name='Диспетч')
+        mock_task.delay.assert_called_once_with(booking.pk)
+
+    @patch('apps.bookings.tasks.create_reserve_in_remarked')
+    def test_booking_created_even_if_broker_unavailable(self, mock_task):
+        mock_task.delay.side_effect = Exception('Broker down')
+        payload = {
+            'guest_name': 'Без брокера', 'phone': '+77001234567',
+            'date': '2026-06-20', 'time': '19:00:00', 'guests_count': 2,
+        }
+        response = self.client.post(
+            '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(TableBooking.objects.filter(guest_name='Без брокера').exists())
+
+
+# ---------------------------------------------------------------------------
+# Celery task: sync_reserve_statuses
+# ---------------------------------------------------------------------------
+
+class SyncReserveStatusesTaskTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77007200001')
+
+    def _reserve(self, inner_status):
+        return {'reserve': {'inner_status': inner_status}}
+
+    def _call(self):
+        from apps.bookings.tasks import sync_reserve_statuses
+        return sync_reserve_statuses()
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_ignores_bookings_without_remarked_reserve_id(self, mock_get):
+        make_booking(user=self.user, status='pending')
+        result = self._call()
+        mock_get.assert_not_called()
+        self.assertEqual(result, 0)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_ignores_already_final_local_statuses(self, mock_get):
+        make_booking(user=self.user, status='canceled', remarked_reserve_id=1001)
+        make_booking(user=self.user, status='completed', remarked_reserve_id=1002)
+        result = self._call()
+        mock_get.assert_not_called()
+        self.assertEqual(result, 0)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_new_maps_to_pending_no_update_if_already_pending(self, mock_get):
+        mock_get.return_value = self._reserve('new')
+        booking = make_booking(user=self.user, status='pending', remarked_reserve_id=2001)
+        result = self._call()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'pending')
+        self.assertEqual(result, 0)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_waiting_maps_to_pending(self, mock_get):
+        mock_get.return_value = self._reserve('waiting')
+        booking = make_booking(user=self.user, status='pending', remarked_reserve_id=2002)
+        self._call()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'pending')
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_confirmed_maps_to_confirmed(self, mock_get):
+        mock_get.return_value = self._reserve('confirmed')
+        booking = make_booking(user=self.user, status='pending', remarked_reserve_id=2003)
+        result = self._call()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'confirmed')
+        self.assertEqual(result, 1)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_started_maps_to_confirmed(self, mock_get):
+        mock_get.return_value = self._reserve('started')
+        booking = make_booking(user=self.user, status='pending', remarked_reserve_id=2004)
+        self._call()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'confirmed')
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_closed_maps_to_completed(self, mock_get):
+        mock_get.return_value = self._reserve('closed')
+        booking = make_booking(user=self.user, status='confirmed', remarked_reserve_id=2005)
+        self._call()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'completed')
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_canceled_maps_to_canceled(self, mock_get):
+        mock_get.return_value = self._reserve('canceled')
+        booking = make_booking(user=self.user, status='confirmed', remarked_reserve_id=2006)
+        self._call()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'canceled')
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_unknown_inner_status_does_not_update(self, mock_get):
+        mock_get.return_value = self._reserve('some_new_status')
+        booking = make_booking(user=self.user, status='pending', remarked_reserve_id=2007)
+        result = self._call()
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'pending')
+        self.assertEqual(result, 0)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_one_remarked_failure_does_not_block_other_bookings(self, mock_get):
+        from apps.remarked.exceptions import RemarkedAPIError
+        b1 = make_booking(user=self.user, status='pending', remarked_reserve_id=3001)
+        b2 = make_booking(user=self.user, status='pending', remarked_reserve_id=3002)
+
+        def side_effect(reserve_id):
+            if reserve_id == 3001:
+                raise RemarkedAPIError(code=500, message='Server error', status_code=500)
+            return self._reserve('confirmed')
+
+        mock_get.side_effect = side_effect
+        result = self._call()
+
+        b1.refresh_from_db()
+        b2.refresh_from_db()
+        self.assertEqual(b1.status, 'pending')  # не обновлён из-за ошибки
+        self.assertEqual(b2.status, 'confirmed')
+        self.assertEqual(result, 1)
+
+    @patch('apps.notifications.tasks.send_push_notification')
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_status_change_triggers_existing_push_signal(self, mock_get, mock_push):
+        mock_get.return_value = self._reserve('closed')
+        booking = make_booking(user=self.user, status='confirmed', remarked_reserve_id=4001)
+        mock_push.delay.reset_mock()
+        self._call()
+        mock_push.delay.assert_called_once()
+        _, kwargs = mock_push.delay.call_args
+        self.assertEqual(kwargs['user_id'], self.user.pk)
+        self.assertEqual(kwargs['data']['status'], 'completed')
+
+    @patch('apps.notifications.tasks.send_push_notification')
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_no_status_change_does_not_trigger_push(self, mock_get, mock_push):
+        mock_get.return_value = self._reserve('new')
+        make_booking(user=self.user, status='pending', remarked_reserve_id=4002)
+        mock_push.delay.reset_mock()
+        self._call()
+        mock_push.delay.assert_not_called()
+
+    def test_retry_config(self):
+        from apps.bookings.tasks import sync_reserve_statuses
+        self.assertEqual(sync_reserve_statuses.max_retries, 3)
+        self.assertEqual(sync_reserve_statuses.default_retry_delay, 60)
+        self.assertTrue(sync_reserve_statuses.acks_late)
+        self.assertTrue(sync_reserve_statuses.reject_on_worker_lost)
+        self.assertIn(Exception, sync_reserve_statuses.autoretry_for)
+
+
+# ---------------------------------------------------------------------------
+# CELERY_BEAT_SCHEDULE — sync-reserve-statuses зарегистрирована
+# ---------------------------------------------------------------------------
+
+class SyncReserveStatusesBeatScheduleTest(TestCase):
+    def test_registered_in_beat_schedule(self):
+        from django.conf import settings
+        entry = settings.CELERY_BEAT_SCHEDULE.get('sync-reserve-statuses')
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry['task'], 'apps.bookings.tasks.sync_reserve_statuses')
+
+
+# ---------------------------------------------------------------------------
+# Полная цепочка вызовов (мок на уровне RemarkedReservesClient, а не
+# ReservesClient) — в отличие от CreateReserveInRemarkedTaskTest/
+# SyncReserveStatusesTaskTest выше (мокают высокоуровневый ReservesClient),
+# здесь мокается только HTTP-транспорт, поэтому реально прогоняется логика
+# кеширования токена и retry-once на 401 из apps/remarked/reserves_client.py.
+# ---------------------------------------------------------------------------
+
+class CreateReserveInRemarkedFullStackTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77007300001')
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    @patch('apps.remarked.client.RemarkedReservesClient._call')
+    def test_full_chain_get_token_then_create_reserve(self, mock_call):
+        def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                return {'token': 'tok-e2e'}
+            if method_name == 'CreateReserve':
+                self.assertEqual(payload.get('token'), 'tok-e2e')
+                return {'status': 'success', 'reserve_id': 777}
+            raise AssertionError(f'unexpected method {method_name}')
+
+        mock_call.side_effect = side_effect
+        booking = make_booking(user=self.user, phone='+77001234567')
+
+        from apps.bookings.tasks import create_reserve_in_remarked
+        create_reserve_in_remarked(booking.pk)
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.remarked_reserve_id, 777)
+
+    @patch('apps.remarked.client.RemarkedReservesClient._call')
+    def test_token_reused_from_cache_across_two_bookings(self, mock_call):
+        reserve_ids = iter([1, 2])
+
+        def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                return {'token': 'tok-shared'}
+            return {'status': 'success', 'reserve_id': next(reserve_ids)}
+
+        mock_call.side_effect = side_effect
+        b1 = make_booking(user=self.user, phone='+77001234567')
+        b2 = make_booking(user=self.user, phone='+77001234567')
+
+        from apps.bookings.tasks import create_reserve_in_remarked
+        create_reserve_in_remarked(b1.pk)
+        create_reserve_in_remarked(b2.pk)
+
+        get_token_calls = [c for c in mock_call.call_args_list if c.args[0] == 'GetToken']
+        self.assertEqual(len(get_token_calls), 1)  # второй раз токен взят из Redis-кеша
+
+
+class SyncReserveStatusesFullStackTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77007300002')
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    @patch('apps.remarked.client.RemarkedReservesClient._call')
+    def test_full_chain_updates_status_and_triggers_push(self, mock_call):
+        def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                return {'token': 'tok-e2e'}
+            if method_name == 'GetReserveByID':
+                self.assertEqual(payload.get('token'), 'tok-e2e')
+                self.assertEqual(payload.get('reserve_id'), 5001)
+                return {'reserve': {'inner_status': 'closed'}}
+            raise AssertionError(f'unexpected method {method_name}')
+
+        mock_call.side_effect = side_effect
+        booking = make_booking(user=self.user, status='confirmed', remarked_reserve_id=5001)
+
+        with patch('apps.notifications.tasks.send_push_notification') as mock_push:
+            from apps.bookings.tasks import sync_reserve_statuses
+            result = sync_reserve_statuses()
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'completed')
+        self.assertEqual(result, 1)
+        mock_push.delay.assert_called_once()
+        _, kwargs = mock_push.delay.call_args
+        self.assertEqual(kwargs['data']['status'], 'completed')
+
+    @patch('apps.remarked.client.RemarkedReservesClient._call')
+    def test_401_during_sync_triggers_token_refresh_and_retry(self, mock_call):
+        from apps.remarked.exceptions import RemarkedAPIError
+        calls = {'GetToken': 0, 'GetReserveByID': 0}
+
+        def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                calls['GetToken'] += 1
+                return {'token': f'tok-{calls["GetToken"]}'}
+            if method_name == 'GetReserveByID':
+                calls['GetReserveByID'] += 1
+                if calls['GetReserveByID'] == 1:
+                    raise RemarkedAPIError(code=401, message='Empty Bearer Token', status_code=401)
+                return {'reserve': {'inner_status': 'canceled'}}
+            raise AssertionError(f'unexpected method {method_name}')
+
+        mock_call.side_effect = side_effect
+        booking = make_booking(user=self.user, status='pending', remarked_reserve_id=6001)
+
+        with patch('apps.notifications.tasks.send_push_notification'):
+            from apps.bookings.tasks import sync_reserve_statuses
+            sync_reserve_statuses()
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'canceled')
+        self.assertEqual(calls['GetToken'], 2)  # первый токен + обновление после 401
+        self.assertEqual(calls['GetReserveByID'], 2)  # неудачная попытка + retry
 
 
