@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/dio_errors.dart';
 import '../data/models/api_booking.dart';
+import '../data/models/availability_slot.dart';
 import '../data/models/booking_request.dart';
 import '../data/repositories/booking_repository.dart';
 
@@ -31,6 +32,11 @@ class BookingProvider extends ChangeNotifier {
   bool isLoadingHistory = false;
   String? historyError;
 
+  // Проверка доступности слотов на выбранную дату/кол-во гостей
+  List<AvailabilitySlot> availabilitySlots = const [];
+  bool isLoadingAvailability = false;
+  String? availabilityError;
+
   void setZone(String? zone) {
     selectedZone = zone;
     notifyListeners();
@@ -50,6 +56,31 @@ class BookingProvider extends ChangeNotifier {
     visitTime = time;
     notifyListeners();
   }
+
+  Future<void> loadAvailability() async {
+    final date = visitDate;
+    if (date == null || isLoadingAvailability) return;
+
+    isLoadingAvailability = true;
+    availabilityError = null;
+    notifyListeners();
+
+    try {
+      availabilitySlots = await _repository.fetchAvailability(
+        date: _formatDateForApi(date),
+        guests: guests,
+      );
+    } catch (e) {
+      availabilityError = dioErrorMessage(e);
+      availabilitySlots = const [];
+    } finally {
+      isLoadingAvailability = false;
+      notifyListeners();
+    }
+  }
+
+  String _formatDateForApi(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> submitBooking(BookingRequest req) async {
     if (isSubmitting) return;
@@ -107,5 +138,7 @@ class BookingProvider extends ChangeNotifier {
     visitDate = null;
     visitTime = null;
     _idempotencyKey = null;
+    availabilitySlots = const [];
+    availabilityError = null;
   }
 }

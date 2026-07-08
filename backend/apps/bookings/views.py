@@ -11,13 +11,22 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
+from utils.cache import safe_cache_get, safe_cache_set
 from utils.idempotency import IdempotencyMixin
 from utils.pagination import StandardPagination
+from apps.remarked.exceptions import RemarkedAPIError
 from .models import TableBooking
-from .serializers import TableBookingSerializer
+from .serializers import (
+    AvailabilityQuerySerializer,
+    AvailabilityResponseSerializer,
+    TableBookingSerializer,
+)
+from .services import check_availability
 from .tasks import _build_booking_html, _tg_post
 
 logger = logging.getLogger(__name__)
@@ -122,6 +131,75 @@ class TableBookingListCreateView(IdempotencyMixin, generics.ListCreateAPIView):
                 "Celery broker unavailable — create_reserve_in_remarked not queued: booking=%s",
                 booking.id,
             )
+
+
+_error_503 = OpenApiResponse(
+    description='Проверка занятости временно недоступна (Remarked не отвечает)',
+    examples=[OpenApiExample('Remarked недоступен', value={'detail': 'Проверка занятости временно недоступна'})],
+)
+
+_availability_cache_key_fmt = 'reserve_availability:{date}:{guests}'
+
+
+@extend_schema(tags=['Bookings'])
+class BookingAvailabilityView(APIView):
+    """
+    Публичная проверка занятости на дату (весь ресторан, без фильтра по
+    залу — см. docs/bookings.md, «Задел на будущее»). Ничего не создаёт и не
+    меняет — обычный просмотр, как /api/v1/menu/ или /api/v1/core/info/.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Проверить доступность на дату',
+        description=(
+            'Возвращает список получасовых слотов на указанную дату с флагом занятости '
+            'для всего ресторана (без разбивки по залам).\n\n'
+            'Результат кешируется на 60 секунд. Недоступность Remarked не блокирует '
+            'создание брони — эндпоинт лишь подсказка для UI, при 503 клиент может '
+            'продолжить бронирование без проверки.'
+        ),
+        parameters=[
+            OpenApiParameter(name='date', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True, description='Дата визита, YYYY-MM-DD'),
+            OpenApiParameter(name='guests', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=True, description='Количество гостей (1–50)'),
+        ],
+        responses={
+            200: AvailabilityResponseSerializer,
+            400: OpenApiResponse(description='Ошибка валидации параметров'),
+            503: _error_503,
+        },
+        examples=[
+            OpenApiExample(
+                'Пример ответа',
+                value={
+                    'date': '2026-07-15',
+                    'guests_count': 2,
+                    'slots': [
+                        {'time': '12:00:00', 'is_free': False, 'tables_count': 0},
+                        {'time': '14:00:00', 'is_free': True, 'tables_count': 13},
+                    ],
+                },
+                response_only=True,
+            ),
+        ],
+    )
+    def get(self, request, *args, **kwargs):
+        query = AvailabilityQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        date = query.validated_data['date']
+        guests = query.validated_data['guests']
+
+        cache_key = _availability_cache_key_fmt.format(date=date.isoformat(), guests=guests)
+        slots = safe_cache_get(cache_key)
+        if slots is None:
+            try:
+                slots = check_availability(date.isoformat(), guests)
+            except RemarkedAPIError:
+                logger.warning("Availability check failed: date=%s guests=%s", date, guests, exc_info=True)
+                return Response({'detail': 'Проверка занятости временно недоступна'}, status=503)
+            safe_cache_set(cache_key, slots, timeout=60)
+
+        return Response({'date': date, 'guests_count': guests, 'slots': slots})
 
 
 def _get_manager_keyboard():

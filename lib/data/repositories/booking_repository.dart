@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import '../models/api_booking.dart';
+import '../models/availability_slot.dart';
 import '../models/booking_request.dart';
+import '../models/json_utils.dart';
 import '../paginated_response.dart';
 import '../services/api_client.dart';
 
@@ -32,5 +34,18 @@ class BookingRepository {
       response.data ?? {},
       ApiBooking.fromJson,
     ).results;
+  }
+
+  Future<List<AvailabilitySlot>> fetchAvailability({
+    required String date,
+    required int guests,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/bookings/availability/',
+      queryParameters: {'date': date, 'guests': guests},
+    );
+    return asJsonMapList(response.data?['slots'])
+        .map(AvailabilitySlot.fromJson)
+        .toList();
   }
 }

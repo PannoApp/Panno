@@ -50,7 +50,18 @@
       "Bash(curl -s -X PATCH http://localhost:8000/api/v1/users/profile/ -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Content-Type: application/json' -d '{\"first_name\":\"QaTest\",\"gender\":\"male\",\"email\":\"qatest@example.com\"}')",
       "Bash(grep -iB2 -A8 \"push_guest_to_remarked\")",
       "Bash(curl -s -X POST http://localhost:8000/api/v1/users/auth/verify-sms/ -H 'Content-Type: application/json' -d '{\"phone\":\"+77001112233\",\"otp\":\"5543\"}')",
-      "Bash(docker-compose exec *)"
+      "Bash(docker-compose exec *)",
+      "Bash(curl -s -w \"\\\\nHTTP_STATUS:%{time_total}s\\\\n\" \"http://localhost:8000/api/v1/bookings/availability/?date=2026-07-20&guests=2\")",
+      "Bash(curl -s -o /dev/null -w \"cached call: %{time_total}s\\\\n\" \"http://localhost:8000/api/v1/bookings/availability/?date=2026-07-20&guests=2\")",
+      "Bash(curl -s -w \"\\\\nSTATUS:%{http_code}\\\\n\" \"http://localhost:8000/api/v1/bookings/availability/?date=bad-date&guests=999\")",
+      "Bash(tee /c/Users/amanz/AppData/Local/Temp/claude/c--Users-amanz-OneDrive-Desktop-Panno/ea5e84ca-ec6e-4f29-a0b3-90cf14c5f53b/scratchpad/full_test_run.log)",
+      "Bash(./.venv/Scripts/python.exe manage.py test apps.core.tests.RestaurantInfoIsOpenNowTest apps.bookings.tests.TableBookingSerializerTest)",
+      "Bash(curl -s -o /dev/null -w \"STATUS:%{http_code}\\\\n\" http://localhost:9000/minio/health/live)",
+      "Bash(curl -s -o /dev/null -w \"STATUS:%{http_code}\\\\n\" http://localhost:9001/)",
+      "Bash(docker-compose exec -T backend python manage.py shell -c ' *)",
+      "Bash(curl -s -o /dev/null -w \"STATUS:%{http_code}\\\\n\" \"http://10.120.113.95:9000/panno-media/media/interior/53b40e78f2384aa1b0287e6f3f2f1932.png\" --max-time 5)",
+      "Bash(ipconfig)",
+      "Bash(curl -s -o /dev/null -w \"SIZE:%{size_download} bytes, TIME:%{time_total}s, SPEED:%{speed_download} bytes/s\\\\n\" \"http://10.120.112.53:9000/panno-media/media/dishes/videos/6101241cf5a547fcac1351212e5c1356.mp4\")"
     ],
     "additionalDirectories": [
       "\\tmp"

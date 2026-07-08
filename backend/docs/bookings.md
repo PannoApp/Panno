@@ -337,17 +337,85 @@ curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 метода. Подробности и живой баг спеки (`point` ломает `GetToken`) — см.
 `backend/docs/remarked.md`.
 
-### Известное ограничение: свободный ввод даты/времени (без проверки занятости)
+### Проверка доступности: `GET /api/v1/bookings/availability/`
 
-`BookingScreen` во Flutter пока даёт **свободный** выбор даты/времени —
-занятость слотов не проверяется ни на бэкенде, ни в приложении. Remarked
-предоставляет для этого методы `GetSlots`/`GetDaysStates` (уже есть в
-`ReservesClient`), но подключение эндпоинта
-`GET /api/v1/bookings/availability/` и слот-пикера в Flutter — это отдельная,
-заметная по объёму UI-задача, сознательно вынесенная в отдельный этап
-(«Фаза 2»), а не мелкое доделывание текущего. Бронь и без слот-пикера падает
-в ту же систему, что и с сайта ресторана — блокером для «единой брони» это
-не является.
+Публичный (без авторизации, `AllowAny` — как `/api/v1/menu/`,
+`/api/v1/core/info/`) эндпоинт-подсказка для формы бронирования. Ничего не
+создаёт и не меняет — только читает у Remarked свободные слоты на дату.
+
+**Query-параметры:** `date` (обязательный, `YYYY-MM-DD`), `guests`
+(обязательный, `1`–`50`, те же границы, что и `guests_count` у самой брони).
+
+**Ответ 200:**
+```json
+{
+  "date": "2026-07-15",
+  "guests_count": 2,
+  "slots": [
+    {"time": "12:00:00", "is_free": false, "tables_count": 0},
+    {"time": "14:00:00", "is_free": true,  "tables_count": 13}
+  ]
+}
+```
+
+**Ответ 400** — невалидные/отсутствующие `date`/`guests` (стандартный формат
+ошибок DRF-сериализатора, поле → список ошибок).
+
+**Ответ 503** — Remarked недоступен/таймаут (`{"detail": "Проверка занятости
+временно недоступна"}`). **Это не блокер для брони** — фронтенд обязан дать
+пользователю продолжить оформление вручную при 503, ровно как и при пустом
+списке слотов; Remarked здесь — подсказка, а не источник истины (та же
+философия, что и у `remarked_reserve_id` выше).
+
+**Важно — без привязки к залу.** Слот считается свободным (`is_free`),
+если в ресторане свободен **хотя бы один стол в любом зале** — этот
+эндпоинт **не** фильтрует по `zone` (main/terrace/private). Причина —
+техническое ограничение API Remarked, см. подраздел «Задел на будущее» ниже.
+
+**Реализация:**
+- `apps/bookings/services.py::check_availability(date, guests_count)` —
+  вызывает `ReservesClient.get_slots(..., with_rooms=True)` с укороченным
+  таймаутом (`REMARKED_AVAILABILITY_TIMEOUT = 5` — это синхронный вызов
+  прямо в теле HTTP-запроса, гость ждёт ответа, поэтому таймаут короче
+  дефолтных 10 с) и парсит `start_datetime` в `time` (`HH:MM:SS`).
+- `apps/bookings/views.py::BookingAvailabilityView` — кеширует результат в
+  Redis на 60 секунд (`reserve_availability:{date}:{guests}`,
+  `utils/cache.py::safe_cache_get/safe_cache_set`), чтобы не долбить
+  Remarked при повторных проверках одной и той же даты. Пустой список
+  слотов — тоже валидный кешируемый результат (не путать с «нет в кеше»).
+
+#### Задел на будущее: бронирование по залу/столу
+
+Remarked технически поддерживает бронирование конкретных столов
+(`CreateReserve.reserve.table_ids: [...]`), и `GetSlots(with_rooms=True)`
+уже возвращает `tables_count`/`tables_ids` по каждому слоту — оба этих факта
+использованы в реализации уже сейчас, хотя зальная фильтрация не включена:
+
+- Контракт ответа уже содержит `tables_count` — добавление, например,
+  «Свободно 13 столов» в будущем не потребует менять форму ответа.
+- `with_rooms=True` уже передаётся в `get_slots()` — при появлении карты
+  «зал → ID столов» фильтрация добавляется только внутри
+  `check_availability()`, без изменений в самом вызове к Remarked.
+- **Чего не хватает:** отдельного метода вида «дай список залов и столов
+  ресторана» в API Remarked нет. Карта `table_id → (room_name, table_number)`
+  видна только внутри уже существующей брони (`GetReserveByID` →
+  `reserve.tables`, см. `backend/docs/remarked.md`). Чтобы получить полную
+  карту, нужно либо запросить её у ресторана/Remarked вручную и завести как
+  конфиг, либо один раз прогнать оффлайн-скрипт (создать тестовую бронь на
+  каждый стол по очереди и считать структуру через `GetReserveByID`).
+- Когда карта появится — `create_reserve_in_remarked` (см. выше) достаточно
+  дополнить передачей `table_ids` в `reserve`, доработка API Remarked не
+  потребуется.
+
+#### Известное ограничение Flutter: слот-пикера пока нет
+
+Бэкенд-эндпоинт готов и покрыт тестами, но `BookingScreen` во Flutter пока
+не подключён к нему — форма всё ещё даёт свободный ввод времени
+(`showTimePicker`). Подключение слот-пикера в интерфейс — отдельный,
+заметный по объёму UI-шаг (загрузка/пустой список/ошибка как отдельные
+состояния экрана, ручная визуальная проверка), сознательно вынесено в
+отдельный заход. Бронь и без слот-пикера полностью рабочая и падает в ту же
+систему, что и бронь с сайта ресторана — блокером не является.
 
 ## Django-админка (управление бронированиями)
 
@@ -373,8 +441,10 @@ curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 ```
 apps/bookings/
 ├── models.py       # TableBooking (включая remarked_reserve_id)
-├── serializers.py  # TableBookingSerializer
-├── views.py        # TableBookingListCreateView (дёргает create_reserve_in_remarked), TelegramWebhookView
+├── serializers.py  # TableBookingSerializer, Availability*Serializer
+├── services.py     # check_availability (GET .../availability/, синхронный вызов Remarked)
+├── views.py        # TableBookingListCreateView (дёргает create_reserve_in_remarked),
+│                   # BookingAvailabilityView, TelegramWebhookView
 ├── admin.py        # TableBookingAdmin (управление бронями персоналом)
 ├── signals.py      # push + Telegram при создании брони и смене статуса (не знает про Remarked)
 ├── tasks.py        # send_booking_reminders (Beat, 15 мин), send_telegram_notification,
@@ -382,11 +452,12 @@ apps/bookings/
 │                   # sync_reserve_statuses (Beat, 10 мин — обратная синхронизация статуса),
 │                   # хелперы _build_booking_html, _tg_post
 ├── apps.py         # создание группы «Менеджер зала» + подключение signals
-└── urls.py         # Маршруты /api/v1/bookings/ и /api/v1/bookings/telegram-webhook/
+└── urls.py         # /api/v1/bookings/, /api/v1/bookings/availability/, /api/v1/bookings/telegram-webhook/
 ```
 
-Зависит от `apps/remarked/` (`ReservesClient`) для обеих задач синхронизации
-с Remarked — см. `backend/docs/remarked.md`.
+Зависит от `apps/remarked/` (`ReservesClient`) для всех трёх точек
+интеграции с Remarked (пуш брони, обратная синхронизация статуса, проверка
+доступности) — см. `backend/docs/remarked.md`.
 
 ## Сериализаторы
 

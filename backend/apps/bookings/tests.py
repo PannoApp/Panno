@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.core.models import RestaurantInfo
 from .models import TableBooking
 from .serializers import TableBookingSerializer
 
@@ -94,6 +95,69 @@ class TableBookingSerializerTest(TestCase):
 
     def test_comment_is_optional(self):
         s = TableBookingSerializer(data=self._data())
+        self.assertTrue(s.is_valid(), s.errors)
+
+
+# ---------------------------------------------------------------------------
+# TableBookingSerializer.validate() — проверка рабочих часов ресторана
+# (RestaurantInfo.is_open_at, apps/core/models.py)
+# ---------------------------------------------------------------------------
+
+class TableBookingSerializerWorkingHoursTest(TestCase):
+    def _data(self, **overrides):
+        # 2026-06-15 — понедельник
+        data = {
+            'guest_name': 'Алихан',
+            'phone': '+77001234567',
+            'date': '2026-06-15',
+            'time': '19:30:00',
+            'guests_count': 4,
+        }
+        data.update(overrides)
+        return data
+
+    def _set_working_hours(self, working_hours):
+        info = RestaurantInfo.load()
+        info.working_hours = working_hours
+        info.save()
+
+    def test_valid_when_working_hours_not_configured(self):
+        # По умолчанию RestaurantInfo.working_hours пуст — проверка не блокирует
+        s = TableBookingSerializer(data=self._data())
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_valid_when_working_hours_unparseable(self):
+        self._set_working_hours('всегда открыто')
+        s = TableBookingSerializer(data=self._data())
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_valid_when_time_inside_working_hours(self):
+        self._set_working_hours('Пн–Вс: 12:00–22:00')
+        s = TableBookingSerializer(data=self._data(time='19:30:00'))
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_invalid_when_time_outside_working_hours(self):
+        self._set_working_hours('Пн–Вс: 12:00–22:00')
+        s = TableBookingSerializer(data=self._data(time='23:00:00'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('time', s.errors)
+
+    def test_invalid_when_time_before_opening(self):
+        self._set_working_hours('Пн–Вс: 12:00–22:00')
+        s = TableBookingSerializer(data=self._data(time='08:00:00'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('time', s.errors)
+
+    def test_invalid_on_closed_weekday(self):
+        # Ресторан работает только Вт-Вс — понедельник закрыт целиком
+        self._set_working_hours('Вт–Вс: 12:00–22:00')
+        s = TableBookingSerializer(data=self._data(date='2026-06-15', time='19:30:00'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('time', s.errors)
+
+    def test_valid_midnight_crossing_hours(self):
+        self._set_working_hours('Пн–Вс: 20:00–02:00')
+        s = TableBookingSerializer(data=self._data(time='01:00:00'))
         self.assertTrue(s.is_valid(), s.errors)
 
 
@@ -2515,5 +2579,186 @@ class SyncReserveStatusesFullStackTest(TestCase):
         self.assertEqual(booking.status, 'canceled')
         self.assertEqual(calls['GetToken'], 2)  # первый токен + обновление после 401
         self.assertEqual(calls['GetReserveByID'], 2)  # неудачная попытка + retry
+
+
+# ---------------------------------------------------------------------------
+# apps.bookings.services.check_availability
+# ---------------------------------------------------------------------------
+
+class CheckAvailabilityServiceTest(TestCase):
+    @patch('apps.bookings.services.ReservesClient')
+    def test_parses_slots_correctly(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = {
+            'status': 'success',
+            'slots': [
+                {'start_datetime': '2026-07-20 12:30:00', 'is_free': True, 'tables_count': 5},
+                {'start_datetime': '2026-07-20 13:00:00', 'is_free': False, 'tables_count': 0},
+            ],
+        }
+        from apps.bookings.services import check_availability
+        result = check_availability('2026-07-20', 2)
+        self.assertEqual(result, [
+            {'time': '12:30:00', 'is_free': True, 'tables_count': 5},
+            {'time': '13:00:00', 'is_free': False, 'tables_count': 0},
+        ])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_empty_slots_returns_empty_list(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = {'status': 'success', 'slots': []}
+        from apps.bookings.services import check_availability
+        self.assertEqual(check_availability('2026-07-20', 2), [])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_propagates_remarked_error(self, mock_client_cls):
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.side_effect = RemarkedAPIError(code=500, message='boom', status_code=500)
+        from apps.bookings.services import check_availability
+        with self.assertRaises(RemarkedAPIError):
+            check_availability('2026-07-20', 2)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_calls_get_slots_with_rooms_and_date_range(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = {'status': 'success', 'slots': []}
+        from apps.bookings.services import check_availability
+        check_availability('2026-07-20', 4)
+        _, kwargs = mock_instance.get_slots.call_args
+        self.assertEqual(kwargs['reserve_date_period'], {'from': '2026-07-20', 'to': '2026-07-20'})
+        self.assertEqual(kwargs['guests_count'], 4)
+        self.assertTrue(kwargs['with_rooms'])
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/bookings/availability/
+# ---------------------------------------------------------------------------
+
+class BookingAvailabilityViewTest(APITestCase):
+    URL = '/api/v1/bookings/availability/'
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_returns_slots_anonymous(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = {
+            'status': 'success',
+            'slots': [
+                {'start_datetime': '2026-07-15 12:00:00', 'is_free': False, 'tables_count': 0},
+                {'start_datetime': '2026-07-15 14:00:00', 'is_free': True, 'tables_count': 13},
+            ],
+        }
+        response = self.client.get(self.URL, {'date': '2026-07-15', 'guests': 2})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['date'], dt_date(2026, 7, 15))
+        self.assertEqual(response.data['guests_count'], 2)
+        self.assertEqual(len(response.data['slots']), 2)
+        self.assertEqual(response.data['slots'][1]['time'], '14:00:00')
+        self.assertTrue(response.data['slots'][1]['is_free'])
+        self.assertEqual(response.data['slots'][1]['tables_count'], 13)
+
+    def test_missing_date_returns_400(self):
+        response = self.client.get(self.URL, {'guests': 2})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('date', response.data)
+
+    def test_missing_guests_returns_400(self):
+        response = self.client.get(self.URL, {'date': '2026-07-15'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('guests', response.data)
+
+    def test_invalid_date_format_returns_400(self):
+        response = self.client.get(self.URL, {'date': '15-07-2026', 'guests': 2})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('date', response.data)
+
+    def test_guests_zero_returns_400(self):
+        response = self.client.get(self.URL, {'date': '2026-07-15', 'guests': 0})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('guests', response.data)
+
+    def test_guests_51_returns_400(self):
+        response = self.client.get(self.URL, {'date': '2026-07-15', 'guests': 51})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('guests', response.data)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_remarked_error_returns_503(self, mock_client_cls):
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.side_effect = RemarkedAPIError(code=500, message='boom', status_code=500)
+        response = self.client.get(self.URL, {'date': '2026-07-16', 'guests': 2})
+        self.assertEqual(response.status_code, 503)
+        self.assertIn('detail', response.data)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_second_request_within_ttl_uses_cache(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = {'status': 'success', 'slots': []}
+        self.client.get(self.URL, {'date': '2026-07-17', 'guests': 2})
+        self.client.get(self.URL, {'date': '2026-07-17', 'guests': 2})
+        self.assertEqual(mock_instance.get_slots.call_count, 1)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_different_guests_count_not_cached_together(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = {'status': 'success', 'slots': []}
+        self.client.get(self.URL, {'date': '2026-07-18', 'guests': 2})
+        self.client.get(self.URL, {'date': '2026-07-18', 'guests': 4})
+        self.assertEqual(mock_instance.get_slots.call_count, 2)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_empty_result_is_cached_too(self, mock_client_cls):
+        """Пустой список слотов — валидный кешируемый результат, а не 'нет в кеше'."""
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = {'status': 'success', 'slots': []}
+        r1 = self.client.get(self.URL, {'date': '2026-07-22', 'guests': 2})
+        r2 = self.client.get(self.URL, {'date': '2026-07-22', 'guests': 2})
+        self.assertEqual(r1.data['slots'], [])
+        self.assertEqual(r2.data['slots'], [])
+        self.assertEqual(mock_instance.get_slots.call_count, 1)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/bookings/availability/ — полная цепочка (мок RemarkedReservesClient)
+# ---------------------------------------------------------------------------
+
+class BookingAvailabilityFullStackTest(APITestCase):
+    URL = '/api/v1/bookings/availability/'
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    @patch('apps.remarked.client.RemarkedReservesClient._call')
+    def test_full_chain_get_token_then_get_slots(self, mock_call):
+        def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                return {'token': 'tok-avail'}
+            if method_name == 'GetSlots':
+                self.assertEqual(payload.get('token'), 'tok-avail')
+                self.assertTrue(payload.get('with_rooms'))
+                self.assertEqual(payload.get('reserve_date_period'), {'from': '2026-07-21', 'to': '2026-07-21'})
+                return {
+                    'status': 'success',
+                    'slots': [
+                        {'start_datetime': '2026-07-21 19:00:00', 'is_free': True, 'tables_count': 3},
+                    ],
+                }
+            raise AssertionError(f'unexpected method {method_name}')
+
+        mock_call.side_effect = side_effect
+        response = self.client.get(self.URL, {'date': '2026-07-21', 'guests': 3})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['slots'][0]['time'], '19:00:00')
+        self.assertTrue(response.data['slots'][0]['is_free'])
 
 

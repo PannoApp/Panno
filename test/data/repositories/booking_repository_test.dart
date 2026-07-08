@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:piligrim/data/models/api_booking.dart';
+import 'package:piligrim/data/models/availability_slot.dart';
 import 'package:piligrim/data/models/booking_request.dart';
 import 'package:piligrim/data/repositories/booking_repository.dart';
 
@@ -78,6 +79,43 @@ void main() {
       expect(result.first.id, 1);
       expect(result.last.id, 2);
       expect(result.first.status, 'pending');
+    });
+
+    test('fetchAvailability() отправляет GET с query-параметрами date и guests', () async {
+      adapter.enqueue(200, {
+        'date': '2026-07-15',
+        'guests_count': 2,
+        'slots': [
+          {'time': '12:00:00', 'is_free': false, 'tables_count': 0},
+          {'time': '14:00:00', 'is_free': true, 'tables_count': 13},
+        ],
+      });
+
+      final result = await repository.fetchAvailability(date: '2026-07-15', guests: 2);
+
+      expect(adapter.captured, hasLength(1));
+      final req = adapter.captured.single;
+      expect(req.method, 'GET');
+      expect(req.path, contains('/bookings/availability/'));
+      expect(req.queryParameters['date'], '2026-07-15');
+      expect(req.queryParameters['guests'], 2);
+
+      expect(result, hasLength(2));
+      expect(result.first, isA<AvailabilitySlot>());
+      expect(result.first.time, '12:00:00');
+      expect(result.first.isFree, false);
+      expect(result.first.tablesCount, 0);
+      expect(result.last.time, '14:00:00');
+      expect(result.last.isFree, true);
+      expect(result.last.tablesCount, 13);
+    });
+
+    test('fetchAvailability() бросает исключение при 503 (Remarked недоступен)', () async {
+      adapter.enqueue(503, {'detail': 'Проверка занятости временно недоступна'});
+      expect(
+        repository.fetchAvailability(date: '2026-07-15', guests: 2),
+        throwsA(isA<DioException>()),
+      );
     });
   });
 }

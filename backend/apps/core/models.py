@@ -61,12 +61,15 @@ class RestaurantInfo(models.Model):
     privacy_policy = models.TextField("Политика обработки ПД", blank=True)
     terms_of_service = models.TextField("Пользовательское соглашение", blank=True)
 
-    @property
-    def is_open_now(self) -> bool:
+    def is_open_at(self, weekday: int, at_time) -> bool | None:
         """
         Парсит working_hours вида "Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00" и возвращает True,
-        если текущее локальное время входит в указанный диапазон.
-        Возвращает None при невозможности разобрать строку.
+        если указанные (weekday, at_time) попадают в рабочие часы.
+        weekday — 0=Пн..6=Вс (как у datetime.weekday()).
+        Возвращает None при невозможности разобрать строку (не блокирует — см. вызывающий код).
+
+        Используется и для `is_open_now` (текущий момент), и для валидации брони на
+        произвольные дату/время в apps/bookings/serializers.py.
         """
         if not self.working_hours:
             return None
@@ -74,54 +77,38 @@ class RestaurantInfo(models.Model):
         # Нормализуем строку: приводим к нижнему регистру, заменяем длинные тире на дефисы
         normalized = self.working_hours.lower()
         normalized = normalized.replace('–', '-').replace('—', '-')
-        
+
         # Разделяем на сегменты по запятым, точкам с запятой или переносам строк
         segments = re.split(r'[,;\n]', normalized)
-        
+
         from datetime import time
-        
-        # Получаем текущее локальное время и день недели
-        now_dt = timezone.localtime(timezone.now())
-        
-        # Поддержка мокнутого времени в тестах
-        if hasattr(now_dt, 'time') and callable(now_dt.time):
-            current_time = now_dt.time()
-        else:
-            current_time = now_dt
-            
-        if hasattr(now_dt, 'weekday') and callable(now_dt.weekday):
-            current_weekday = now_dt.weekday()
-        else:
-            current_weekday = getattr(now_dt, 'weekday', 0)
-            if not isinstance(current_weekday, int):
-                current_weekday = 0
-        
+
         WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
-        
+
         parsed_any = False
         is_open = False
-        
+
         for segment in segments:
             segment = segment.strip()
             if not segment:
                 continue
-                
+
             # Ищем диапазон времени HH:MM-HH:MM
             time_match = re.search(r'(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})', segment)
             if not time_match:
                 continue
-                
+
             parsed_any = True
-            
+
             open_h, open_m, close_h, close_m = (int(x) for x in time_match.groups())
             open_t = time(open_h, open_m)
             close_t = time(close_h, close_m)
-            
+
             # Извлекаем часть с днями недели, убрав время и двоеточия
             days_part = segment.replace(time_match.group(0), "").strip().strip(":")
-            
+
             days = set()
-            
+
             # Ищем диапазоны дней недели (например, пн-пт)
             day_ranges = re.findall(r'(пн|вт|ср|чт|пт|сб|вс)\s*-\s*(пн|вт|ср|чт|пт|сб|вс)', days_part)
             for start_day, end_day in day_ranges:
@@ -134,36 +121,42 @@ class RestaurantInfo(models.Model):
                     days.update(range(0, end_idx + 1))
                 # Удаляем распознанный диапазон
                 days_part = days_part.replace(f"{start_day}-{end_day}", "")
-                
+
             # Ищем отдельные дни
             individual_days = re.findall(r'(пн|вт|ср|чт|пт|сб|вс)', days_part)
             for d in individual_days:
                 days.add(WEEKDAYS.index(d))
-                
+
             # Если нет упоминаний никаких дней недели вообще в исходном сегменте,
             # считаем, что этот интервал применяется ко всем дням недели
             has_any_weekday_word = any(w in segment for w in WEEKDAYS)
             if not has_any_weekday_word:
                 days = set(range(7))
-                
-            # Проверяем, попадает ли текущее время в интервал работы
+
+            # Проверяем, попадает ли указанное время в интервал работы
             if close_t <= open_t:
                 # Пересечение полуночи
                 in_segment = (
-                    (current_weekday in days and current_time >= open_t) or
-                    ((current_weekday - 1) % 7 in days and current_time < close_t)
+                    (weekday in days and at_time >= open_t) or
+                    ((weekday - 1) % 7 in days and at_time < close_t)
                 )
             else:
                 # В пределах одного дня
-                in_segment = (current_weekday in days and open_t <= current_time < close_t)
-                
+                in_segment = (weekday in days and open_t <= at_time < close_t)
+
             if in_segment:
                 is_open = True
-                
+
         if not parsed_any:
             return None
-            
+
         return is_open
+
+    @property
+    def is_open_now(self) -> bool:
+        """Как is_open_at, но для текущего локального момента времени."""
+        now_dt = timezone.localtime(timezone.now())
+        return self.is_open_at(now_dt.weekday(), now_dt.time())
 
     class Meta:
         verbose_name = "Информация о ресторане"

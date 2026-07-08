@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:piligrim/data/models/availability_slot.dart';
 import 'package:piligrim/data/models/booking_request.dart';
 import 'package:piligrim/data/repositories/booking_repository.dart';
 import 'package:piligrim/providers/booking_provider.dart';
@@ -93,6 +94,75 @@ void main() {
       
       // Ключ должен быть новым
       expect(thirdKey, isNot(equals(firstKey)));
+    });
+  });
+
+  group('BookingProvider.loadAvailability', () {
+    late _MockBookingRepository repository;
+    late BookingProvider provider;
+
+    setUp(() {
+      repository = _MockBookingRepository();
+      provider = BookingProvider(repository: repository);
+    });
+
+    test('без выбранной даты — no-op, запрос не выполняется', () async {
+      await provider.loadAvailability();
+
+      verifyNever(() => repository.fetchAvailability(
+          date: any(named: 'date'), guests: any(named: 'guests')));
+    });
+
+    test('успех → слоты записаны, isLoadingAvailability сброшен, форма не блокируется', () async {
+      provider.visitDate = DateTime(2026, 7, 15);
+      when(() => repository.fetchAvailability(date: any(named: 'date'), guests: any(named: 'guests')))
+          .thenAnswer((_) async => const [
+                AvailabilitySlot(time: '12:00:00', isFree: false, tablesCount: 0),
+                AvailabilitySlot(time: '14:00:00', isFree: true, tablesCount: 13),
+              ]);
+
+      await provider.loadAvailability();
+
+      expect(provider.isLoadingAvailability, isFalse);
+      expect(provider.availabilitySlots, hasLength(2));
+      expect(provider.availabilityError, isNull);
+      expect(provider.isSubmitting, isFalse);
+
+      final captured = verify(() => repository.fetchAvailability(
+              date: captureAny(named: 'date'), guests: captureAny(named: 'guests')))
+          .captured;
+      expect(captured[0], '2026-07-15');
+      expect(captured[1], 2);
+    });
+
+    test('ошибка → availabilityError заполнен, слоты пустые, форма не блокируется', () async {
+      provider.visitDate = DateTime(2026, 7, 15);
+      when(() => repository.fetchAvailability(date: any(named: 'date'), guests: any(named: 'guests')))
+          .thenThrow(Exception('Remarked недоступен'));
+
+      await provider.loadAvailability();
+
+      expect(provider.availabilityError, isNotNull);
+      expect(provider.availabilitySlots, isEmpty);
+      expect(provider.isLoadingAvailability, isFalse);
+      expect(provider.isSubmitting, isFalse);
+    });
+
+    test('повторный вызов во время загрузки — no-op', () async {
+      provider.visitDate = DateTime(2026, 7, 15);
+      final completer = Completer<List<AvailabilitySlot>>();
+      when(() => repository.fetchAvailability(date: any(named: 'date'), guests: any(named: 'guests')))
+          .thenAnswer((_) => completer.future);
+
+      final first = provider.loadAvailability();
+      final second = provider.loadAvailability();
+
+      completer.complete(const []);
+      await first;
+      await second;
+
+      verify(() => repository.fetchAvailability(
+          date: any(named: 'date'), guests: any(named: 'guests'))).called(1);
     });
   });
 }

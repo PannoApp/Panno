@@ -14,15 +14,42 @@ info:
   contact:
     name: Panno Dev Team
 paths:
-  /api/users/auth/request-sms/:
+  /api/v1/users/auth/token/refresh/:
     post:
-      operationId: users_auth_request_sms_create
+      operationId: v1_users_auth_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/v1/users/auth/request-sms/:
+    post:
+      operationId: v1_users_auth_request_sms_create
       description: |-
         Отправляет на указанный номер телефона 4-значный OTP-код через SMS.
 
         Код действителен **3 минуты** и хранится в Redis.
 
-        **Лимит:** 3 запроса в минуту с одного IP-адреса.
+        **Лимит:** 3 запроса в минуту с одного IP-адреса и 5 запросов за 10 минут на один номер телефона.
       summary: Запрос SMS с кодом подтверждения
       tags:
       - Auth
@@ -51,12 +78,12 @@ paths:
         '400':
           description: Ошибка валидации — неверный формат номера телефона
         '429':
-          description: Превышен лимит запросов (3/мин с одного IP)
+          description: Превышен лимит запросов (3/мин с одного IP или 5/10мин на номер)
         '500':
           description: Ошибка сервера при отправке SMS
-  /api/users/auth/verify-sms/:
+  /api/v1/users/auth/verify-sms/:
     post:
-      operationId: users_auth_verify_sms_create
+      operationId: v1_users_auth_verify_sms_create
       description: |-
         Проверяет OTP-код из SMS. При успехе возвращает пару JWT-токенов.
 
@@ -95,11 +122,48 @@ paths:
           description: Неверный или просроченный код, либо ошибка валидации
         '429':
           description: Превышен лимит попыток (5/мин с одного IP)
-  /api/users/profile/:
+  /api/v1/users/auth/logout/:
+    post:
+      operationId: v1_users_auth_logout_create
+      description: |-
+        Добавляет refresh-токен в blacklist, делая его недействительным.
+
+        После logout клиент должен удалить оба токена (`access` и `refresh`) из локального хранилища и перенаправить пользователя на экран входа.
+
+        **Важно:** access-токен продолжает работать до истечения своего TTL (30 мин в проде). Blacklist инвалидирует только возможность получить новый access через refresh.
+      summary: Выход из системы (отзыв refresh-токена)
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+            examples:
+              Запрос:
+                value:
+                  refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: Успешный logout, тело пустое
+        '400':
+          description: Токен невалиден или уже отозван
+        '401':
+          description: Токен не передан или недействителен
+  /api/v1/users/profile/:
     get:
-      operationId: users_profile_retrieve
+      operationId: v1_users_profile_retrieve
       description: 'Возвращает данные авторизованного пользователя: id, номер телефона,
-        имя и фамилию.'
+        имя, фамилию, пол, email и дату рождения.'
       summary: Получить профиль текущего пользователя
       tags:
       - Auth
@@ -115,7 +179,7 @@ paths:
         '401':
           description: Токен не передан или недействителен
     patch:
-      operationId: users_profile_partial_update
+      operationId: v1_users_profile_partial_update
       description: |-
         Частичное обновление профиля (PATCH). Можно передавать только изменяемые поля.
 
@@ -153,9 +217,30 @@ paths:
           description: Ошибка валидации
         '401':
           description: Токен не передан или недействителен
-  /api/menu/categories/:
+  /api/v1/users/account/:
+    delete:
+      operationId: v1_users_account_destroy
+      description: |-
+        Безвозвратно удаляет учётную запись и связанные персональные данные.
+
+        После успешного ответа клиент должен очистить локальные JWT-токены и показать экран неавторизованного пользователя.
+
+        Учётные записи персонала (`is_staff`) через приложение удалить нельзя.
+      summary: Удалить аккаунт текущего пользователя
+      tags:
+      - Auth
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: Аккаунт удалён, тело пустое
+        '401':
+          description: Токен не передан или недействителен
+        '403':
+          description: Удаление запрещено (например, staff-аккаунт)
+  /api/v1/menu/categories/:
     get:
-      operationId: menu_categories_list
+      operationId: v1_menu_categories_list
       description: Возвращает все категории блюд, отсортированные по полю `order`.
       summary: Список категорий меню
       tags:
@@ -172,9 +257,47 @@ paths:
                 items:
                   $ref: '#/components/schemas/Category'
           description: ''
-  /api/menu/dishes/:
+  /api/v1/menu/tags/:
     get:
-      operationId: menu_dishes_list
+      operationId: v1_menu_tags_list
+      description: Возвращает все теги блюд, отсортированные по имени.
+      summary: Список тегов меню
+      tags:
+      - Menu
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+          description: ''
+  /api/v1/menu/allergens/:
+    get:
+      operationId: v1_menu_allergens_list
+      description: Возвращает все аллергены, отсортированные по имени.
+      summary: Список аллергенов
+      tags:
+      - Menu
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Allergen'
+          description: ''
+  /api/v1/menu/dishes/:
+    get:
+      operationId: v1_menu_dishes_list
       description: |-
         Возвращает активные блюда меню с вложенными данными категории, тегов и аллергенов.
 
@@ -199,10 +322,15 @@ paths:
           type: integer
         description: Количество блюд на странице (по умолчанию 5, максимум 20)
       - in: query
-        name: tag_id
+        name: search
         schema:
-          type: integer
-        description: Фильтр по ID тега
+          type: string
+        description: Поиск по названию и описанию блюда (регистронезависимый)
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: 'Фильтр по нескольким тегам (ID через запятую). Пример: ?tag_ids=1,2,3'
       tags:
       - Menu
       security:
@@ -215,9 +343,183 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedDishList'
           description: ''
-  /api/events/upcoming/:
+  /api/v1/menu/feed/:
     get:
-      operationId: events_upcoming_list
+      operationId: v1_menu_feed_list
+      description: |-
+        Возвращает только активные блюда с готовым видео (`video_status=ready`).
+
+        Использует курсорную пагинацию — передайте параметр `cursor` из поля `next` предыдущего ответа для получения следующей порции.
+      summary: Видеолента блюд
+      parameters:
+      - name: cursor
+        required: false
+        in: query
+        description: The pagination cursor value.
+        schema:
+          type: string
+      tags:
+      - Menu
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDishList'
+          description: ''
+  /api/v1/menu/staff/dishes/:
+    get:
+      operationId: v1_menu_staff_dishes_list
+      description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
+      tags:
+      - 'Staff: Menu'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffDish'
+          description: ''
+    post:
+      operationId: v1_menu_staff_dishes_create
+      description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
+      tags:
+      - 'Staff: Menu'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffDishRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffDishRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffDishRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffDish'
+          description: ''
+  /api/v1/menu/staff/dishes/{id}/:
+    patch:
+      operationId: v1_menu_staff_dishes_partial_update
+      description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Блюдо.
+        required: true
+      tags:
+      - 'Staff: Menu'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffDishRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffDishRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffDishRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffDish'
+          description: ''
+    get:
+      operationId: v1_menu_staff_dishes_retrieve
+      description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Блюдо.
+        required: true
+      tags:
+      - 'Staff: Menu'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffDish'
+          description: ''
+    put:
+      operationId: v1_menu_staff_dishes_update
+      description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Блюдо.
+        required: true
+      tags:
+      - 'Staff: Menu'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffDishRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffDishRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffDishRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffDish'
+          description: ''
+    delete:
+      operationId: v1_menu_staff_dishes_destroy
+      description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Блюдо.
+        required: true
+      tags:
+      - 'Staff: Menu'
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/events/upcoming/:
+    get:
+      operationId: v1_events_upcoming_list
       description: Возвращает активные мероприятия с датой проведения **в будущем**,
         отсортированные по ближайшей дате.
       summary: Список предстоящих мероприятий
@@ -244,9 +546,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedEventList'
           description: ''
-  /api/events/archived/:
+  /api/v1/events/archived/:
     get:
-      operationId: events_archived_list
+      operationId: v1_events_archived_list
       description: Возвращает активные мероприятия с датой проведения **в прошлом**,
         отсортированные от самого свежего к старому.
       summary: Архив прошедших мероприятий
@@ -273,9 +575,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedEventList'
           description: ''
-  /api/events/news/:
+  /api/v1/events/news/:
     get:
-      operationId: events_news_list
+      operationId: v1_events_news_list
       description: Возвращает новости ресторана, отсортированные от самой свежей к
         старой.
       summary: Список новостей
@@ -302,9 +604,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedNewsList'
           description: ''
-  /api/events/reservations/create/:
+  /api/v1/events/reservations/create/:
     post:
-      operationId: events_reservations_create_create
+      operationId: v1_events_reservations_create_create
       description: |-
         Создаёт запись текущего авторизованного пользователя на выбранное мероприятие.
 
@@ -343,9 +645,9 @@ paths:
           description: Ошибка валидации или повторная запись на то же мероприятие
         '401':
           description: Токен не передан или недействителен
-  /api/events/reservations/my/:
+  /api/v1/events/reservations/my/:
     get:
-      operationId: events_reservations_my_list
+      operationId: v1_events_reservations_my_list
       description: Возвращает все записи на мероприятия текущего авторизованного пользователя
         с вложенными деталями каждого мероприятия (`event_details`).
       summary: Мои записи на мероприятия
@@ -373,9 +675,373 @@ paths:
           description: ''
         '401':
           description: Токен не передан или недействителен
-  /api/bookings/:
+  /api/v1/events/{event_id}/photo-report/:
     get:
-      operationId: bookings_list
+      operationId: v1_events_photo_report_list
+      description: Возвращает список фотографий фотоотчёта для указанного мероприятия.
+        Доступно только для прошедших событий (date_time в прошлом). Если мероприятие
+        ещё не прошло или фотоотчёт не загружен — возвращается пустой список.
+      summary: Фотоотчёт прошедшего мероприятия
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        description: ID мероприятия
+        required: true
+      tags:
+      - Events
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventPhotoReport'
+          description: ''
+  /api/v1/events/admin/events/:
+    get:
+      operationId: v1_events_admin_events_list
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffEvent'
+          description: ''
+    post:
+      operationId: v1_events_admin_events_create
+      tags:
+      - 'Staff: Events'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffEventRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffEventRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffEventRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffEvent'
+          description: ''
+  /api/v1/events/admin/events/{id}/:
+    patch:
+      operationId: v1_events_admin_events_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Мероприятие.
+        required: true
+      tags:
+      - 'Staff: Events'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffEventRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffEventRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffEventRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffEvent'
+          description: ''
+    get:
+      operationId: v1_events_admin_events_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Мероприятие.
+        required: true
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffEvent'
+          description: ''
+    put:
+      operationId: v1_events_admin_events_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Мероприятие.
+        required: true
+      tags:
+      - 'Staff: Events'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffEventRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffEventRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffEventRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffEvent'
+          description: ''
+    delete:
+      operationId: v1_events_admin_events_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Мероприятие.
+        required: true
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/events/admin/events/{id}/photos/:
+    post:
+      operationId: v1_events_admin_events_photos_create
+      description: Загружает фото в фотоотчёт прошедшего мероприятия.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Мероприятие.
+        required: true
+      tags:
+      - 'Staff: Events'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffEventRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffEventRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffEvent'
+          description: ''
+  /api/v1/events/admin/events/{id}/photos/{photo_pk}/:
+    delete:
+      operationId: v1_events_admin_events_photos_destroy
+      description: Удаляет фото из фотоотчёта мероприятия.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Мероприятие.
+        required: true
+      - in: path
+        name: photo_pk
+        schema:
+          type: string
+        required: true
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/events/admin/news/:
+    get:
+      operationId: v1_events_admin_news_list
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffNews'
+          description: ''
+    post:
+      operationId: v1_events_admin_news_create
+      tags:
+      - 'Staff: Events'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffNewsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffNewsRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffNewsRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffNews'
+          description: ''
+  /api/v1/events/admin/news/{id}/:
+    patch:
+      operationId: v1_events_admin_news_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Новость.
+        required: true
+      tags:
+      - 'Staff: Events'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffNewsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffNewsRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffNewsRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffNews'
+          description: ''
+    get:
+      operationId: v1_events_admin_news_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Новость.
+        required: true
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffNews'
+          description: ''
+    put:
+      operationId: v1_events_admin_news_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Новость.
+        required: true
+      tags:
+      - 'Staff: Events'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffNewsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffNewsRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffNewsRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffNews'
+          description: ''
+    delete:
+      operationId: v1_events_admin_news_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Новость.
+        required: true
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/bookings/:
+    get:
+      operationId: v1_bookings_list
       description: Возвращает все бронирования текущего авторизованного пользователя,
         отсортированные по дате и времени визита (ближайшие первыми).
       summary: Список моих бронирований столов
@@ -404,7 +1070,7 @@ paths:
         '401':
           description: Токен не передан или недействителен
     post:
-      operationId: bookings_create
+      operationId: v1_bookings_create
       description: |-
         Создаёт новое бронирование стола для текущего авторизованного пользователя.
 
@@ -448,9 +1114,60 @@ paths:
           description: Ошибка валидации входных данных
         '401':
           description: Токен не передан или недействителен
-  /api/core/info/:
+  /api/v1/bookings/availability/:
     get:
-      operationId: core_info_retrieve
+      operationId: v1_bookings_availability_retrieve
+      description: |-
+        Возвращает список получасовых слотов на указанную дату с флагом занятости для всего ресторана (без разбивки по залам).
+
+        Результат кешируется на 60 секунд. Недоступность Remarked не блокирует создание брони — эндпоинт лишь подсказка для UI, при 503 клиент может продолжить бронирование без проверки.
+      summary: Проверить доступность на дату
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+        description: Дата визита, YYYY-MM-DD
+        required: true
+      - in: query
+        name: guests
+        schema:
+          type: integer
+        description: Количество гостей (1–50)
+        required: true
+      tags:
+      - Bookings
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+              examples:
+                ПримерОтвета:
+                  value:
+                    date: '2026-07-15'
+                    guests_count: 2
+                    slots:
+                    - time: '12:00:00'
+                      is_free: false
+                      tables_count: 0
+                    - time: '14:00:00'
+                      is_free: true
+                      tables_count: 13
+                  summary: Пример ответа
+          description: ''
+        '400':
+          description: Ошибка валидации параметров
+        '503':
+          description: Проверка занятости временно недоступна (Remarked не отвечает)
+  /api/v1/core/info/:
+    get:
+      operationId: v1_core_info_retrieve
       description: |-
         Возвращает статическую публичную информацию о ресторане: адрес, часы работы и ссылки на 3D-тур и карту 2GIS.
 
@@ -475,9 +1192,65 @@ paths:
                     tour_link: https://tour.example.com/panno
                     twogis_link: https://2gis.kz/almaty/firm/123456789
           description: Информация о ресторане
-  /api/notifications/device/register/:
+  /api/v1/core/app-version/:
+    get:
+      operationId: v1_core_app_version_retrieve
+      description: |-
+        GET /api/v1/core/app-version/?platform=ios|android
+
+        Возвращает минимальную и последнюю версию приложения для заданной платформы.
+        Доступен без авторизации.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppVersion'
+          description: ''
+  /api/v1/core/interior/:
+    get:
+      operationId: v1_core_interior_list
+      description: |-
+        Возвращает фотографии интерьера ресторана, сгруппированные по зонам.
+
+        Доступен без авторизации.
+
+        **Зоны:** `main_hall` — Главный зал, `bar` — Бар, `private` — Приватная комната, `terrace` — Терраса, `other` — Другое.
+      summary: Галерея фотографий интерьера
+      tags:
+      - Core
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InteriorPhoto'
+          description: ''
+  /api/v1/core/health/:
+    get:
+      operationId: v1_core_health_retrieve
+      description: Возвращает статус DB и Redis. Не требует авторизации.
+      tags:
+      - v1
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/notifications/device/register/:
     post:
-      operationId: notifications_device_register_create
+      operationId: v1_notifications_device_register_create
       description: |-
         Регистрирует FCM-токен мобильного устройства для отправки push-уведомлений.
 
@@ -515,6 +1288,71 @@ paths:
           description: Ошибка валидации — токен не передан или пустой
         '401':
           description: Токен не передан или недействителен
+  /api/v1/notifications/bulk-push/:
+    post:
+      operationId: v1_notifications_bulk_push_create
+      description: |-
+        Отправляет push выбранному сегменту пользователей. Доступен только персоналу (`is_staff=True`).
+
+        **Сегменты:**
+        - `all` — все пользователи с FCM-устройствами
+        - `last_visit_days` — посещали ресторан в последние N дней (по бронированиям со статусом `completed`)
+        - `participated_in_event` — участники конкретного мероприятия
+        - `registered_after` — зарегистрированные после указанной даты
+      summary: Массовая рассылка push-уведомлений
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkPushRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BulkPushRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BulkPushRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '202':
+          description: Рассылка поставлена в очередь
+        '400':
+          description: Ошибка валидации
+        '403':
+          description: Нет прав (требуется is_staff)
+  /api/v1/notifications/send-push-via-bot/:
+    post:
+      operationId: v1_notifications_send_push_via_bot_create
+      description: Принимает запрос от Telegram-бота для массовой рассылки push-уведомлений
+        всем зарегистрированным устройствам.
+      summary: Рассылка push-уведомления через Telegram-бот
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendPushViaBotRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SendPushViaBotRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SendPushViaBotRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '202':
+          description: Рассылка успешно поставлена в очередь
+        '400':
+          description: Ошибка валидации данных
+        '403':
+          description: Доступ запрещен (неверный токен вебхука или менеджер не найден/не
+            имеет прав)
 components:
   schemas:
     Allergen:
@@ -530,6 +1368,107 @@ components:
       required:
       - id
       - name
+    AppVersion:
+      type: object
+      properties:
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          title: Платформа
+        min_version:
+          type: string
+          title: Минимальная версия (force update)
+          maxLength: 20
+        latest_version:
+          type: string
+          title: Последняя версия (optional update)
+          maxLength: 20
+        store_url:
+          type: string
+          format: uri
+          title: Ссылка на магазин
+          maxLength: 200
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - latest_version
+      - min_version
+      - platform
+      - updated_at
+    AvailabilityResponse:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        guests_count:
+          type: integer
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/AvailabilitySlot'
+      required:
+      - date
+      - guests_count
+      - slots
+    AvailabilitySlot:
+      type: object
+      description: Только для схемы ответа (drf-spectacular) — сам ответ отдаётся
+        как plain dict.
+      properties:
+        time:
+          type: string
+        is_free:
+          type: boolean
+        tables_count:
+          type: integer
+      required:
+      - is_free
+      - tables_count
+      - time
+    BlankEnum:
+      enum:
+      - ''
+    BulkPushRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        body:
+          type: string
+          minLength: 1
+        data:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+        category:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CategoryEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        segment:
+          allOf:
+          - $ref: '#/components/schemas/SegmentEnum'
+          default: all
+        last_visit_days:
+          type: integer
+          minimum: 1
+          description: Только пользователи, чьи брони были в последние N дней
+        event_id:
+          type: integer
+          description: Только участники указанного мероприятия
+        registered_after:
+          type: string
+          format: date
+          description: Только пользователи, зарегистрированные после даты (YYYY-MM-DD)
+      required:
+      - body
+      - title
     Category:
       type: object
       properties:
@@ -548,6 +1487,12 @@ components:
       required:
       - id
       - name
+    CategoryEnum:
+      enum:
+      - events
+      - promotions
+      - closed_events
+      type: string
     Dish:
       type: object
       properties:
@@ -582,13 +1527,21 @@ components:
           readOnly: true
         image:
           type: string
-          format: uri
-          title: Фото
-        video:
+          readOnly: true
+        video_url:
           type: string
-          format: uri
+          readOnly: true
+        video_status:
+          $ref: '#/components/schemas/VideoStatusEnum'
+        weight:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
           nullable: true
-          title: Видео (для ленты)
+          title: Вес (г)
+        story:
+          type: string
+          title: История блюда
         is_active:
           type: boolean
           title: Активно
@@ -600,6 +1553,7 @@ components:
       - name
       - price
       - tags
+      - video_url
     Event:
       type: object
       description: Сериализатор для модели мероприятий.
@@ -620,8 +1574,17 @@ components:
           title: Дата и время проведения
         image:
           type: string
-          format: uri
-          title: Обложка
+          readOnly: true
+        format:
+          allOf:
+          - $ref: '#/components/schemas/FormatEnum'
+          title: Формат
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Цена входа
         is_active:
           type: boolean
           title: Активно
@@ -630,13 +1593,44 @@ components:
           format: date-time
           readOnly: true
           title: Дата создания
+        has_photo_report:
+          type: string
+          readOnly: true
+        max_places:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Количество разрешенных мест
+          description: 0 означает отсутствие ограничений на количество мест
+        occupied_places:
+          type: string
+          readOnly: true
       required:
       - created_at
       - date_time
       - description
+      - has_photo_report
       - id
       - image
+      - occupied_places
       - title
+    EventPhotoReport:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        image:
+          type: string
+          readOnly: true
+        order:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          title: Порядок отображения
+      required:
+      - id
+      - image
     EventRequest:
       type: object
       description: Сериализатор для модели мероприятий.
@@ -654,17 +1648,28 @@ components:
           type: string
           format: date-time
           title: Дата и время проведения
-        image:
+        format:
+          allOf:
+          - $ref: '#/components/schemas/FormatEnum'
+          title: Формат
+        price:
           type: string
-          format: binary
-          title: Обложка
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          title: Цена входа
         is_active:
           type: boolean
           title: Активно
+        max_places:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Количество разрешенных мест
+          description: 0 означает отсутствие ограничений на количество мест
       required:
       - date_time
       - description
-      - image
       - title
     EventReservation:
       type: object
@@ -709,6 +1714,80 @@ components:
           title: Количество гостей (включая себя)
       required:
       - event
+    FormatEnum:
+      enum:
+      - open
+      - closed
+      type: string
+    GenderEnum:
+      enum:
+      - male
+      - female
+      - not_specified
+      type: string
+    HeroSlide:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        image:
+          type: string
+          readOnly: true
+        order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Порядок
+      required:
+      - id
+      - image
+    InteriorPhoto:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        zone:
+          allOf:
+          - $ref: '#/components/schemas/InteriorPhotoZoneEnum'
+          title: Зона
+        zone_display:
+          type: string
+          readOnly: true
+        image:
+          type: string
+          readOnly: true
+        caption:
+          type: string
+          title: Подпись (необязательно)
+          maxLength: 255
+        order:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Порядок
+      required:
+      - id
+      - image
+      - zone_display
+    InteriorPhotoZoneEnum:
+      enum:
+      - main_hall
+      - bar
+      - private
+      - terrace
+      - other
+      type: string
+    LogoutRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          description: Refresh-токен, который нужно отозвать
+      required:
+      - refresh
     News:
       type: object
       description: Сериализатор для модели новостей.
@@ -725,9 +1804,7 @@ components:
           title: Текст новости
         image:
           type: string
-          format: uri
-          nullable: true
-          title: Изображение
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -737,7 +1814,11 @@ components:
       - content
       - created_at
       - id
+      - image
       - title
+    NullEnum:
+      enum:
+      - null
     PaginatedDishList:
       type: object
       required:
@@ -853,6 +1934,101 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TableBooking'
+    PatchedStaffDishRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          title: Название блюда
+          maxLength: 200
+        description:
+          type: string
+          title: Описание
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Цена
+        category:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: integer
+        allergens:
+          type: array
+          items:
+            type: integer
+        image:
+          type: string
+          format: binary
+        video:
+          type: string
+          format: binary
+          nullable: true
+        weight:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Вес (г)
+        story:
+          type: string
+          title: История блюда
+        is_active:
+          type: boolean
+          title: Активно
+    PatchedStaffEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          title: Заголовок мероприятия
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+          title: Описание
+        date_time:
+          type: string
+          format: date-time
+          title: Дата и время проведения
+        image:
+          type: string
+          format: binary
+        format:
+          type: string
+          minLength: 1
+          default: open
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+        max_places:
+          type: integer
+          default: 0
+    PatchedStaffNewsRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          title: Заголовок новости
+          maxLength: 255
+        content:
+          type: string
+          minLength: 1
+          title: Текст новости
+        image:
+          type: string
+          format: binary
+          nullable: true
     PatchedUserProfileRequest:
       type: object
       properties:
@@ -864,6 +2040,35 @@ components:
           type: string
           title: Фамилия
           maxLength: 50
+        gender:
+          allOf:
+          - $ref: '#/components/schemas/GenderEnum'
+          title: Пол
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        birthday:
+          type: string
+          format: date
+          nullable: true
+          title: Дата рождения
+        notifications_enabled:
+          type: boolean
+        notify_events:
+          type: boolean
+          title: 'Уведомления: мероприятия'
+        notify_promotions:
+          type: boolean
+          title: 'Уведомления: акции'
+        notify_closed_events:
+          type: boolean
+          title: 'Уведомления: закрытые события'
+    PlatformEnum:
+      enum:
+      - ios
+      - android
+      type: string
     RequestSMSRequest:
       type: object
       properties:
@@ -877,7 +2082,6 @@ components:
       - phone
     RestaurantInfo:
       type: object
-      description: Сериализатор для выдачи статической информации о ресторане.
       properties:
         address:
           type: string
@@ -886,7 +2090,17 @@ components:
         working_hours:
           type: string
           title: Часы работы
-          maxLength: 255
+          description: 'Напр.: «Пн–Пт: 12:00–23:00, Сб–Вс: 12:00–00:00»'
+          maxLength: 500
+        working_hours_note:
+          type: string
+          title: Временное изменение режима
+          description: 'Разовое уведомление, которое Flutter покажет гостям (напр.:
+            «Закрыто 1 января»).'
+          maxLength: 500
+        is_open_now:
+          type: boolean
+          readOnly: true
         tour_link:
           type: string
           format: uri
@@ -899,9 +2113,355 @@ components:
           nullable: true
           title: Ссылка на 2GIS
           maxLength: 200
+        google_maps_link:
+          type: string
+          format: uri
+          nullable: true
+          title: Ссылка на Google Maps
+          maxLength: 200
+        yandex_maps_link:
+          type: string
+          format: uri
+          nullable: true
+          title: Ссылка на Яндекс.Карты
+          maxLength: 200
+        phone:
+          type: string
+          title: Телефон
+          maxLength: 20
+        whatsapp:
+          type: string
+          maxLength: 100
+        telegram:
+          type: string
+          maxLength: 100
+        instagram:
+          type: string
+          maxLength: 100
+        concept_description:
+          type: string
+          title: Описание концепции
+        hero_slides:
+          type: array
+          items:
+            $ref: '#/components/schemas/HeroSlide'
+          readOnly: true
+        visit_rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitRule'
+          readOnly: true
+        privacy_policy:
+          type: string
+          title: Политика обработки ПД
+        terms_of_service:
+          type: string
+          title: Пользовательское соглашение
+        feedback_url:
+          type: string
+          format: uri
+          nullable: true
+          title: Обратная связь (URL)
+          maxLength: 200
+        booking_deposit_required:
+          type: boolean
+          title: Требуется депозит при бронировании
+        booking_deposit_note:
+          type: string
+          title: Текст предупреждения о депозите
+          description: 'Напр.: «При бронировании приват-зала необходим депозит. Позвоните
+            менеджеру.»'
+          maxLength: 500
       required:
       - address
+      - hero_slides
+      - is_open_now
+      - visit_rules
       - working_hours
+    SegmentEnum:
+      enum:
+      - all
+      - last_visit_days
+      - participated_in_event
+      - registered_after
+      type: string
+    SendPushViaBotRequest:
+      type: object
+      properties:
+        manager_telegram_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        body:
+          type: string
+          minLength: 1
+        category:
+          default: ''
+          oneOf:
+          - $ref: '#/components/schemas/CategoryEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+      required:
+      - body
+      - manager_telegram_id
+      - title
+    StaffDish:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Название блюда
+          maxLength: 200
+        description:
+          type: string
+          title: Описание
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Цена
+        category:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: integer
+        allergens:
+          type: array
+          items:
+            type: integer
+        image:
+          type: string
+          format: uri
+        image_url:
+          type: string
+          readOnly: true
+        video:
+          type: string
+          format: uri
+          nullable: true
+        video_url:
+          type: string
+          readOnly: true
+        video_status:
+          type: string
+          readOnly: true
+        weight:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Вес (г)
+        story:
+          type: string
+          title: История блюда
+        is_active:
+          type: boolean
+          title: Активно
+      required:
+      - category
+      - id
+      - image_url
+      - name
+      - price
+      - video_status
+      - video_url
+    StaffDishRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          title: Название блюда
+          maxLength: 200
+        description:
+          type: string
+          title: Описание
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Цена
+        category:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: integer
+        allergens:
+          type: array
+          items:
+            type: integer
+        image:
+          type: string
+          format: binary
+        video:
+          type: string
+          format: binary
+          nullable: true
+        weight:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: Вес (г)
+        story:
+          type: string
+          title: История блюда
+        is_active:
+          type: boolean
+          title: Активно
+      required:
+      - category
+      - name
+      - price
+    StaffEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          title: Заголовок мероприятия
+          maxLength: 255
+        description:
+          type: string
+          title: Описание
+        date_time:
+          type: string
+          format: date-time
+          title: Дата и время проведения
+        image:
+          type: string
+          format: uri
+        image_url:
+          type: string
+          readOnly: true
+        format:
+          type: string
+          default: open
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+        max_places:
+          type: integer
+          default: 0
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата создания
+        occupied_places:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - date_time
+      - description
+      - id
+      - image_url
+      - occupied_places
+      - title
+    StaffEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          title: Заголовок мероприятия
+          maxLength: 255
+        description:
+          type: string
+          minLength: 1
+          title: Описание
+        date_time:
+          type: string
+          format: date-time
+          title: Дата и время проведения
+        image:
+          type: string
+          format: binary
+        format:
+          type: string
+          minLength: 1
+          default: open
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+        max_places:
+          type: integer
+          default: 0
+      required:
+      - date_time
+      - description
+      - title
+    StaffNews:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          title: Заголовок новости
+          maxLength: 255
+        content:
+          type: string
+          title: Текст новости
+        image:
+          type: string
+          format: uri
+          nullable: true
+        image_url:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Дата публикации
+      required:
+      - content
+      - created_at
+      - id
+      - image_url
+      - title
+    StaffNewsRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          title: Заголовок новости
+          maxLength: 255
+        content:
+          type: string
+          minLength: 1
+          title: Текст новости
+        image:
+          type: string
+          format: binary
+          nullable: true
+      required:
+      - content
+      - title
     StatusEnum:
       enum:
       - pending
@@ -919,6 +2479,9 @@ components:
           type: string
           title: Имя гостя
           maxLength: 255
+        phone:
+          type: string
+          maxLength: 20
         date:
           type: string
           format: date
@@ -931,6 +2494,13 @@ components:
           type: integer
           minimum: 1
           maximum: 50
+        zone:
+          nullable: true
+          title: Зона/зал
+          oneOf:
+          - $ref: '#/components/schemas/TableBookingZoneEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
         comment:
           type: string
           nullable: true
@@ -951,6 +2521,7 @@ components:
       - guest_name
       - guests_count
       - id
+      - phone
       - status
       - time
     TableBookingRequest:
@@ -961,6 +2532,10 @@ components:
           minLength: 1
           title: Имя гостя
           maxLength: 255
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
         date:
           type: string
           format: date
@@ -973,6 +2548,13 @@ components:
           type: integer
           minimum: 1
           maximum: 50
+        zone:
+          nullable: true
+          title: Зона/зал
+          oneOf:
+          - $ref: '#/components/schemas/TableBookingZoneEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
         comment:
           type: string
           nullable: true
@@ -981,7 +2563,14 @@ components:
       - date
       - guest_name
       - guests_count
+      - phone
       - time
+    TableBookingZoneEnum:
+      enum:
+      - main
+      - terrace
+      - private
+      type: string
     Tag:
       type: object
       properties:
@@ -995,6 +2584,25 @@ components:
       required:
       - id
       - name
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
     UserDeviceRequest:
       type: object
       properties:
@@ -1023,9 +2631,42 @@ components:
           type: string
           title: Фамилия
           maxLength: 50
+        gender:
+          allOf:
+          - $ref: '#/components/schemas/GenderEnum'
+          title: Пол
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        birthday:
+          type: string
+          format: date
+          nullable: true
+          title: Дата рождения
+        notifications_enabled:
+          type: boolean
+        notify_events:
+          type: boolean
+          title: 'Уведомления: мероприятия'
+        notify_promotions:
+          type: boolean
+          title: 'Уведомления: акции'
+        notify_closed_events:
+          type: boolean
+          title: 'Уведомления: закрытые события'
+        is_staff:
+          type: boolean
+          readOnly: true
+        role:
+          type: string
+          readOnly: true
+          default: ''
       required:
       - id
+      - is_staff
       - phone
+      - role
     VerifySMSRequest:
       type: object
       properties:
@@ -1043,6 +2684,26 @@ components:
       required:
       - otp
       - phone
+    VideoStatusEnum:
+      enum:
+      - pending
+      - processing
+      - ready
+      - failed
+      type: string
+    VisitRule:
+      type: object
+      properties:
+        title:
+          type: string
+          title: Название
+          maxLength: 100
+        body:
+          type: string
+          title: Текст
+      required:
+      - body
+      - title
   securitySchemes:
     jwtAuth:
       type: http

@@ -1,5 +1,7 @@
 // Бронирование зала — «Путь Героя к столу»
 // Выбор зоны, даты, кол-ва героев, подтверждение. Согласно ТЗ раздел 4.4
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -41,6 +43,7 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime _visitDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _visitTime = const TimeOfDay(hour: 19, minute: 30);
   String? _selectedZone = 'Главный зал';
+  Timer? _guestsDebounce;
 
   static const _zones = ['Главный зал', 'Терраса', 'Приват'];
   static const _zoneApiMap = {
@@ -55,15 +58,23 @@ class _BookingScreenState extends State<BookingScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final auth = context.read<AuthProvider>();
-      if (!auth.isLoggedIn) return;
-      _nameCtrl.text = auth.user.name;
-      final phone = auth.user.phone.replaceAll(RegExp(r'[^\d+]'), '');
-      if (phone.isNotEmpty) _phoneCtrl.text = phone;
+      if (auth.isLoggedIn) {
+        _nameCtrl.text = auth.user.name;
+        final phone = auth.user.phone.replaceAll(RegExp(r'[^\d+]'), '');
+        if (phone.isNotEmpty) _phoneCtrl.text = phone;
+      }
+
+      // Синхронизируем черновик формы с провайдером и запускаем первую
+      // проверку доступности слотов на дефолтную дату/кол-во гостей.
+      final booking = context.read<BookingProvider>();
+      booking.setVisitDate(_visitDate);
+      booking.loadAvailability();
     });
   }
 
   @override
   void dispose() {
+    _guestsDebounce?.cancel();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _commentCtrl.dispose();
@@ -90,7 +101,24 @@ class _BookingScreenState extends State<BookingScreen> {
         child: child ?? const SizedBox.shrink(),
       ),
     );
-    if (picked != null) setState(() => _visitDate = picked);
+    if (picked != null && mounted) {
+      setState(() => _visitDate = picked);
+      final booking = context.read<BookingProvider>();
+      booking.setVisitDate(picked);
+      await booking.loadAvailability();
+    }
+  }
+
+  void _onGuestsChanged(String value) {
+    final count = int.tryParse(value);
+    if (count == null || count <= 0) return;
+    context.read<BookingProvider>().setGuests(count);
+
+    _guestsDebounce?.cancel();
+    _guestsDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      context.read<BookingProvider>().loadAvailability();
+    });
   }
 
   Future<void> _pickTime() async {
@@ -117,6 +145,19 @@ class _BookingScreenState extends State<BookingScreen> {
   String get _dateForApi {
     final d = _visitDate;
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  // Remarked-подсказка: если для выбранных даты/времени/кол-ва гостей найден
+  // точный слот и он занят — предупреждаем, но не блокируем отправку заявки.
+  bool _isSelectedTimeUnavailable(BookingProvider booking) {
+    if (booking.isLoadingAvailability || booking.availabilityError != null) {
+      return false;
+    }
+    final slot = booking.availabilitySlots
+        .where((s) => s.time == _timeForApi)
+        .toList();
+    if (slot.isEmpty) return false;
+    return !slot.first.isFree;
   }
 
   Future<void> _submit() async {
@@ -414,12 +455,22 @@ class _BookingScreenState extends State<BookingScreen> {
                                 ),
                               ],
                             ),
+                            if (_isSelectedTimeUnavailable(booking)) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                'К сожалению, на эту дату и время все забронировано.',
+                                style: PiligrimTextStyles.caption.copyWith(
+                                  color: PiligrimColors.fruit.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 18),
                             const _FieldLabel('Количество героев'),
                             _PiligrimInput(
                               controller: _guestsCtrl,
                               hint: '2',
                               keyboardType: TextInputType.number,
+                              onChanged: _onGuestsChanged,
                               validator: (value) {
                                 final count = int.tryParse(value ?? '');
                                 if (count == null || count <= 0) {
@@ -564,6 +615,7 @@ class _PiligrimInput extends StatelessWidget {
     this.keyboardType,
     this.maxLines = 1,
     this.validator,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -571,6 +623,7 @@ class _PiligrimInput extends StatelessWidget {
   final TextInputType? keyboardType;
   final int maxLines;
   final String? Function(String?)? validator;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -579,6 +632,7 @@ class _PiligrimInput extends StatelessWidget {
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
+      onChanged: onChanged,
       style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
       decoration: InputDecoration(
         hintText: hint,
@@ -709,4 +763,5 @@ class _ZoneButton extends StatelessWidget {
     );
   }
 }
+
 
