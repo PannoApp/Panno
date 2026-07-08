@@ -31,10 +31,31 @@ class UserManager(BaseUserManager):
         return self.create_user(phone, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
+    GENDER_MALE = 'male'
+    GENDER_FEMALE = 'female'
+    GENDER_NOT_SPECIFIED = 'not_specified'
+    GENDER_CHOICES = [
+        (GENDER_MALE, 'Мужской'),
+        (GENDER_FEMALE, 'Женский'),
+        (GENDER_NOT_SPECIFIED, 'Не указан'),
+    ]
+
     phone = models.CharField(max_length=15, unique=True, verbose_name="Номер телефона")
     first_name = models.CharField(max_length=150, blank=True, verbose_name="Имя")
     last_name = models.CharField(max_length=50, blank=True, verbose_name="Фамилия")
-    
+    gender = models.CharField(
+        "Пол", max_length=20, choices=GENDER_CHOICES, default=GENDER_NOT_SPECIFIED
+    )
+    email = models.EmailField("Email", blank=True)
+    birthday = models.DateField("Дата рождения", null=True, blank=True)
+    remarked_guest_id = models.CharField(
+        "Remarked Guest ID",
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text="ID гостя (gid) в CRM Remarked. Пусто — гость ещё не синхронизирован.",
+    )
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)

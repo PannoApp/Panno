@@ -109,6 +109,9 @@
   "phone": "+77001234567",
   "first_name": "Алихан",
   "last_name": "Сейткали",
+  "gender": "male",
+  "email": "alikhan@example.com",
+  "birthday": "1995-05-20",
   "notifications_enabled": true,
   "notify_events": true,
   "notify_promotions": true,
@@ -129,12 +132,18 @@
 {
   "first_name": "Алихан",
   "last_name": "Сейткали",
+  "gender": "male",
+  "email": "alikhan@example.com",
+  "birthday": "1995-05-20",
   "notify_events": false,
   "notify_promotions": true
 }
 ```
 
 **Ответ 200:** обновлённый профиль (та же схема, что у GET).
+
+После успешного PATCH профиль ставится в очередь на отправку в Remarked
+(`push_guest_to_remarked`, см. раздел [Remarked — источник истины](#remarked--источник-истины-о-госте) ниже) — синхронно на ответ это не влияет.
 
 ## Модель User
 
@@ -144,6 +153,10 @@
 | `phone` | string | Номер телефона, уникальный — является логином |
 | `first_name` | string | Имя (необязательное) |
 | `last_name` | string | Фамилия (необязательное) |
+| `gender` | string | Пол: `male`, `female`, `not_specified` (default) |
+| `email` | string | Email (необязательный, `blank=True`) |
+| `birthday` | date | Дата рождения (необязательная, `null=True`) |
+| `remarked_guest_id` | string | `gid` гостя в CRM Remarked; пусто — гость ещё не синхронизирован. Не отдаётся в `UserProfileSerializer`, виден только в Django Admin |
 | `is_active` | bool | Активен ли пользователь |
 | `is_staff` | bool | Доступ в Django-админку (**не задавать вручную** — синхронизируется с `role`) |
 | `role` | string | Роль: `admin`, `hall_manager`, `content_manager` или пусто |
@@ -154,6 +167,78 @@
 | `date_joined` | datetime | Дата регистрации |
 
 > Сервисные уведомления (подтверждение/изменение брони, напоминание о визите) не управляются флагами — они всегда доставляются.
+
+## Remarked — источник истины о госте
+
+Модуль `apps/remarked/` (см. `backend/docs/remarked.md`) — тонкие HTTP-клиенты к
+CRM Remarked. Профиль пользователя синхронизируется с гостевой карточкой в
+Remarked в обе стороны:
+
+```
+Логин (VerifySMSView)                    Профиль (PATCH /users/profile/,
+    │                                     RegisterDeviceView)
+    ├─ get_or_create(phone)                   │
+    │                                         ├─ serializer.save()
+    ├─ RemarkedGuestService.sync_on_login()   │
+    │   ├─ синхронный pull, timeout=3с        ├─ maybe_push_guest_to_remarked()
+    │   ├─ найден → перезаписать              │   ├─ remarked_guest_id есть → upsert
+    │   │   first_name/last_name/email/       │   │   (customer/create с текущим
+    │   │   birthday/gender, сохранить        │   │   состоянием User)
+    │   │   remarked_guest_id                 │   ├─ гостя ещё нет, но name+gender
+    │   ├─ не найден → ничего не менять       │   │   уже заполнены → создать
+    │   └─ сбой Remarked → не роняем логин,   │   │   (первый customer/create,
+    │       fallback: sync_guest_from_remarked│   │   сохранить gid в
+    │       (та же логика, в Celery)          │   │   remarked_guest_id)
+    │                                         │   └─ иначе (профиль неполный
+    └─ выдать JWT, ответ клиенту              │       и гостя ещё нет) — не звать
+                                               │
+                                               └─ push_guest_to_remarked (Celery)
+```
+
+### Правило конфликтов: Remarked побеждает
+
+При `sync_on_login`/`sync_guest_from_remarked`, если поле в ответе Remarked
+непустое — оно **перезаписывает** локальное значение `first_name`,
+`last_name`, `email`, `birthday`, `gender`. Это осознанное решение: Remarked
+считается основной CRM, местные правки в самом Remarked (менеджером ресторана)
+должны долетать до приложения.
+
+Пустые/отсутствующие в ответе Remarked поля локальные данные **не затирают** —
+иначе первый же логин гостя с неполной карточкой в CRM обнулил бы то, что
+человек уже успел ввести в приложении. Логика — `apply_guest_data_to_user()`
+в `apps/users/services.py`.
+
+### Синхронный pull при логине vs. фоновый push
+
+- **Логин → Remarked (pull, синхронно):** `RemarkedGuestService.sync_on_login()`
+  вызывается прямо в `VerifySMSView.post()` с коротким таймаутом (3 с) —
+  пользователь должен увидеть подтянутые данные сразу на экране после входа,
+  а не через несколько секунд после фонового таска. Сбой (таймаут/сеть/CRM
+  недоступна) не роняет логин — вместо этого синхронизация ставится в очередь
+  как `sync_guest_from_remarked` (Celery, тот же паттерн, что и
+  `SMSService.send_sms` при недоступном Redis/брокере).
+- **Профиль → Remarked (push, всегда асинхронно через Celery):**
+  `push_guest_to_remarked` вызывается из `UserProfileView.perform_update()`
+  после каждого успешного PATCH и из `RegisterDeviceView` в `apps/notifications`
+  после регистрации FCM-токена (заодно передаёт его в Remarked как
+  `firebase_token`). Условие вызова — в `maybe_push_guest_to_remarked()`.
+
+### `POST /store/customer/create` — подтверждён partial update
+
+Remarked требует непустые `name`/`gender` в каждом вызове `customer/create`.
+Проверено живым экспериментом на боевом Remarked (2026-07-08, см.
+`backend/docs/remarked.md#проверено-на-боевом-remarked-2026-07-08`):
+эндпоинт **не** затирает поля, которых нет в запросе — обновляет только то,
+что реально передано. Поэтому `RemarkedMobileClient.create_or_update()`
+может спокойно слать только известные приложению поля (как сейчас) — поля,
+заполненные вручную в CRM (`comment`, `tags`) или считаемые самим Remarked
+(`bonuses`, `amount_spent`), обновлением профиля из приложения не задеваются.
+
+### Административная синхронизация
+
+В Django Admin (`UserAdmin`) есть массовое действие «Синхронизировать с
+Remarked» — ставит `sync_guest_from_remarked` в очередь для выбранных
+пользователей.
 
 ### Синхронизация `role` ↔ `is_staff`
 
@@ -234,8 +319,8 @@ apps/users/
 ├── models.py       # Кастомная модель User (AbstractBaseUser)
 ├── serializers.py  # RequestSMSSerializer, VerifySMSSerializer, LogoutSerializer, UserProfileSerializer
 ├── views.py        # RequestSMSView, VerifySMSView, LogoutView, UserProfileView
-├── services.py     # SMSService: генерация OTP, сохранение в Redis, верификация
-├── tasks.py        # send_sms_task — Celery-таска для HTTP-запроса к SMS-провайдеру
+├── services.py     # SMSService, RemarkedGuestService, apply_guest_data_to_user, maybe_push_guest_to_remarked
+├── tasks.py        # send_sms_task, sync_guest_from_remarked, push_guest_to_remarked
 ├── throttles.py    # PhoneSMSThrottle — троттлинг по номеру телефона (5 запросов / 10 мин)
 └── urls.py         # Маршруты /api/v1/users/...
 ```

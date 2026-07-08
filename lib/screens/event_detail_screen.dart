@@ -15,7 +15,7 @@ import '../widgets/piligrim_background.dart';
 import '../widgets/path_cta.dart';
 import '../widgets/piligrim_toast.dart';
 import '../core/auth_guard.dart';
-import '../widgets/piligrim_tap.dart';
+import '../widgets/piligrim_back_button.dart';
 
 class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({
@@ -75,35 +75,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 expandedHeight: 220,
                 pinned: true,
                 backgroundColor: PiligrimColors.earthDeep,
-                leadingWidth: 80,
-                leading: Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: PiligrimTap(
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            size: 12,
-                            color: PiligrimColors.sky.withValues(alpha: 0.45),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            'Назад',
-                            style: PiligrimTextStyles.caption.copyWith(
-                              color: PiligrimColors.sky.withValues(alpha: 0.45),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                leadingWidth: PiligrimBackButton.kWidth,
+                leading: const PiligrimBackButton(),
                 flexibleSpace: FlexibleSpaceBar(
                   background: Stack(
                     fit: StackFit.expand,

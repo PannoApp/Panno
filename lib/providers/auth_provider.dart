@@ -184,12 +184,23 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Обновляет имя и/или фамилию одним PATCH-запросом.
-  Future<void> updateDisplayProfile({String? firstName, String? lastName}) async {
+  /// Обновляет анкетные данные (имя, фамилия, пол, email, дата рождения)
+  /// одним PATCH-запросом. Каждое поле необязательно — передавай только то,
+  /// что реально изменилось.
+  Future<void> updateDisplayProfile({
+    String? firstName,
+    String? lastName,
+    UserGender? gender,
+    String? email,
+    DateTime? birthday,
+  }) async {
     if (currentUser == null) return;
     final body = <String, dynamic>{};
     if (firstName != null && firstName.isNotEmpty) body['first_name'] = firstName;
     if (lastName != null && lastName.isNotEmpty) body['last_name'] = lastName;
+    if (gender != null) body['gender'] = gender.toJsonValue();
+    if (email != null && email.isNotEmpty) body['email'] = email;
+    if (birthday != null) body['birthday'] = formatDateOnly(birthday);
     if (body.isEmpty) return;
     isLoading = true;
     error = null;

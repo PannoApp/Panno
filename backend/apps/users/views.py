@@ -10,7 +10,7 @@ from django.contrib.auth.models import update_last_login
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 
 from .serializers import RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer, LogoutSerializer
-from .services import SMSService
+from .services import SMSService, RemarkedGuestService, maybe_push_guest_to_remarked
 
 User = get_user_model()
 
@@ -157,6 +157,13 @@ class VerifySMSView(APIView):
                 {'error': 'Ваш аккаунт заблокирован.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        # Синхронный pull из Remarked с коротким таймаутом: пользователь должен
+        # увидеть подтянутые данные сразу на этом ответе, а не через несколько
+        # секунд после фонового Celery-таска. Сбой Remarked не должен ронять логин —
+        # см. RemarkedGuestService.sync_on_login (там же fallback в Celery).
+        RemarkedGuestService.sync_on_login(user)
+
         update_last_login(None, user)
         refresh = RefreshToken.for_user(user)
 
@@ -231,7 +238,10 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
     @extend_schema(
         summary='Получить профиль текущего пользователя',
-        description='Возвращает данные авторизованного пользователя: id, номер телефона, имя и фамилию.',
+        description=(
+            'Возвращает данные авторизованного пользователя: id, номер телефона, '
+            'имя, фамилию, пол, email и дату рождения.'
+        ),
         responses={
             200: UserProfileSerializer,
             401: _error_401,
@@ -265,6 +275,13 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        # Пушим текущее состояние в Remarked, если у гостя уже есть remarked_guest_id
+        # (upsert), либо анкета только что дала достаточно данных для первого
+        # создания (см. maybe_push_guest_to_remarked).
+        maybe_push_guest_to_remarked(serializer.instance)
 
 
 @extend_schema(tags=['Auth'])

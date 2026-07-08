@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'apps.events.apps.EventsConfig',
     'apps.core.apps.CoreConfig',
     'apps.notifications.apps.NotificationsConfig',
+    'apps.remarked.apps.RemarkedConfig',
 
     # Автоудаление файлов при замене/удалении объектов (последним — требование пакета)
     'django_cleanup.apps.CleanupConfig',
@@ -219,6 +220,14 @@ TELEGRAM_BOT_TOKEN = env('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_CHAT_ID = env('TELEGRAM_CHAT_ID', default='')
 # Секрет для верификации входящих webhook-запросов от Telegram (X-Telegram-Bot-Api-Secret-Token)
 TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='')
+
+# ==========================================
+# Remarked CRM (бронирования, меню, стоп-лист)
+# ==========================================
+# Статический токен точки и ID заведения из личного кабинета Remarked.
+# См. backend/docs/remarked.md.
+REMARKED_API_TOKEN = env('REMARKED_API_TOKEN')
+REMARKED_POINT_ID = env.int('REMARKED_POINT_ID')
 
 
 # Настройки Django REST Framework

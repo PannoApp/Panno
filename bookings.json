@@ -1,0 +1,1392 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "RESERVES API V1",
+    "version": "1.0.1",
+    "description": "Здесь собраны и описаны все методы для работы с бронированием в ReMarked. Используемый стандарт - JSON RPC.",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://app.remarked.ru/api/v1"
+    }
+  ],
+  "paths": {
+    "/ApiReservesWidget": {
+      "post": {
+        "tags": [
+          "Бронирование"
+        ],
+        "summary": "Общий метод",
+        "description": "",
+        "operationId": "Reserves",
+        "requestBody": {
+          "description": "",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "method"
+                ],
+                "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/GetToken"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GetDaysStates"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GetSlots"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GetSMSCode"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CreateReserve"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GetReservesByPhone"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ChangeReserveStatus"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GetReserveByID"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IsReserveRead"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/GetToken.Response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GetDaysStates.Response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GetSlots.Response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GetSMSCode.Response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CreateReserve.Response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GetReservesByPhone.Response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ChangeReserveStatus.Response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GetReserveByID.Response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IsReserveRead.Response"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api": {
+      "post": {
+        "tags": [
+          "Бронирование"
+        ],
+        "summary": "Получение тегов",
+        "description": "",
+        "operationId": "Reserves-event-tags",
+        "requestBody": {
+          "description": "",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "method"
+                ],
+                "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/getEventTags"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/getEventTags.Response"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GetToken": {
+        "type": "object",
+        "required": [
+          "method",
+          "point"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "GetToken",
+            "description": "Название метода",
+            "example": "GetToken"
+          },
+          "point": {
+            "type": "integer",
+            "description": "ID заведения",
+            "format": "int64",
+            "example": 7999999
+          },
+          "additional_info": {
+            "type": "boolean",
+            "description": "В данный момент является флагом для отображения capacity в ответе",
+            "default": false,
+            "example": true
+          },
+          "request_id": {
+            "type": "string",
+            "description": "IDEMPOTENCY KEY",
+            "format": "uuid"
+          }
+        }
+      },
+      "GetToken.Response": {
+        "title": "GetToken",
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "capacity": {
+            "type": "object",
+            "required": [
+              "min",
+              "max"
+            ],
+            "properties": {
+              "min": {
+                "type": "integer",
+                "format": "int64",
+                "example": 1
+              },
+              "max": {
+                "type": "integer",
+                "format": "int64",
+                "example": 10
+              }
+            }
+          }
+        }
+      },
+      "GetDaysStates": {
+        "type": "object",
+        "required": [
+          "method",
+          "token",
+          "reserve_date_period",
+          "guests_count"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "GetDaysStates",
+            "description": "Название метода",
+            "example": "GetDaysStates"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "reserve_date_period": {
+            "required": [
+              "from",
+              "to"
+            ],
+            "type": "object",
+            "description": "Период создания резервов",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "guests_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "GetDaysStates.Response": {
+        "title": "GetDaysStates",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "slots": {
+            "example": {
+              "2024-06-25": {
+                "date": "2024-06-25",
+                "is_free": false
+              }
+            },
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date",
+                "example": "2024-06-25"
+              },
+              "is_free": {
+                "type": "boolean",
+                "example": false
+              }
+            }
+          }
+        }
+      },
+      "GetSlots": {
+        "type": "object",
+        "required": [
+          "method",
+          "token",
+          "reserve_date_period",
+          "guests_count"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "GetSlots",
+            "description": "Название метода",
+            "example": "GetSlots"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "reserve_date_period": {
+            "required": [
+              "from",
+              "to"
+            ],
+            "type": "object",
+            "description": "Период создания резервов",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "format": "date"
+              }
+            }
+          },
+          "guests_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "with_rooms": {
+            "type": "boolean",
+            "description": "При `true` возвращает в дополнение к слотам залы и столы"
+          },
+          "slot_duration": {
+            "type": "integer",
+            "minimum": 300,
+            "maximum": 86400,
+            "description": "длительность слота в сек"
+          }
+        }
+      },
+      "GetSlots.Response": {
+        "title": "GetSlots",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "properties": {
+                "start_stamp": {
+                  "type": "integer",
+                  "format": "timeStamp"
+                },
+                "end_stamp": {
+                  "type": "integer",
+                  "format": "timeStamp"
+                },
+                "duration": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "start_datetime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2024-06-25 14:00:00"
+                },
+                "end_datetime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2024-06-25 15:00:00"
+                },
+                "is_free": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "tables_count": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "tables_ids": {
+                  "type": "array"
+                },
+                "table_bundles": {
+                  "type": "array"
+                }
+              }
+            }
+          }
+        }
+      },
+      "GetSMSCode": {
+        "type": "object",
+        "required": [
+          "method",
+          "token",
+          "phone"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "GetSMSCode",
+            "description": "Название метода",
+            "example": "GetSMSCode"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+79189999999"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "IDEMPOTENCY KEY",
+            "format": "uuid"
+          }
+        }
+      },
+      "GetSMSCode.Response": {
+        "title": "GetSMSCode",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          }
+        }
+      },
+      "CreateReserve": {
+        "type": "object",
+        "required": [
+          "token",
+          "reserve",
+          "method"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "CreateReserve",
+            "description": "Название метода",
+            "example": "CreateReserve"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "reserve": {
+            "required": [
+              "name",
+              "phone",
+              "date",
+              "time",
+              "guests_count"
+            ],
+            "type": "object",
+            "description": "Период создания резервов",
+            "properties": {
+              "name": {
+                "type": "string",
+                "example": "TestClient"
+              },
+              "phone": {
+                "type": "string",
+                "example": "+79999999999"
+              },
+              "email": {
+                "type": "string",
+                "example": "test@mail.ru"
+              },
+              "telegram_username": {
+                "description": "Логин телеграм",
+                "type": "string",
+                "example": "telegram_username"
+              },
+              "date": {
+                "type": "string",
+                "format": "date",
+                "example": "2021-10-25"
+              },
+              "time": {
+                "type": "string",
+                "format": "time",
+                "example": "11:30"
+              },
+              "guests_count": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "utm": {
+                "type": "string",
+                "example": "utm_source=google"
+              },
+              "deposit_sum": {
+                "type": "number",
+                "format": "float"
+              },
+              "deposit_status": {
+                "type": "string",
+                "default": "no_deposit",
+                "enum": [
+                  "no_deposit",
+                  "not_paid",
+                  "paid"
+                ],
+                "example": "no_deposit"
+              },
+              "comment": {
+                "type": "string",
+                "example": "test"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "booking",
+                  "banquet"
+                ],
+                "example": "booking"
+              },
+              "source": {
+                "description": "Источник брони",
+                "type": "string",
+                "default": "",
+                "enum": [
+                  "site",
+                  "mobile_app"
+                ],
+                "example": "site"
+              },
+              "duration": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Длительность",
+                "example": "120"
+              },
+              "table_ids": {
+                "type": "array",
+                "example": [
+                  11220,
+                  12910
+                ]
+              },
+              "eventTags": {
+                "type": "array",
+                "example": [
+                  14432,
+                  14854
+                ]
+              },
+              "is_subscription": {
+                "type": "boolean",
+                "description": "Подписан на рассылку",
+                "example": true
+              }
+            }
+          },
+          "confirm_code": {
+            "type": "integer",
+            "format": "int64",
+            "description": "используется только в том случае, если ранее была запрошена и настроена отправка смс."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "IDEMPOTENCY KEY",
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateReserve.Response": {
+        "title": "CreateReserve",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "reserve_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "form_url": {
+            "type": "string",
+            "description": "При наличии онлайн-оплаты резерва"
+          }
+        }
+      },
+      "GetReservesByPhone": {
+        "type": "object",
+        "required": [
+          "token",
+          "phone",
+          "guests_count",
+          "method"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "GetReservesByPhone",
+            "description": "Название метода",
+            "example": "GetReservesByPhone"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+79999999999"
+          },
+          "limit": {
+            "type": "string",
+            "description": "лимит",
+            "default": "100",
+            "maximum": 1000
+          },
+          "offset": {
+            "type": "string",
+            "description": "отступ",
+            "default": "0"
+          },
+          "sort_by": {
+            "type": "string",
+            "format": "enum",
+            "enum": [
+              "id",
+              "estimated_time"
+            ],
+            "description": "ключ сортировки",
+            "default": "id"
+          },
+          "sort_direction": {
+            "type": "string",
+            "format": "enum",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "направление сортировки",
+            "default": "ASC"
+          },
+          "from": {
+            "type": "string",
+            "format": "date",
+            "description": "отступминимальное время начала брони"
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "description": "максимальное время начала брони"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "IDEMPOTENCY KEY",
+            "format": "uuid"
+          }
+        }
+      },
+      "GetReservesByPhone.Response": {
+        "title": "GetReservesByPhone",
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "резервов всего в базе по этому номеру за период"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "резервов возвращено в ответе"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64",
+            "description": "отступ"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "лимит"
+          },
+          "reserves": {
+            "type": "array",
+            "items": {
+              "required": [
+                "id",
+                "surname",
+                "name",
+                "phone",
+                "email",
+                "estimated_time",
+                "duration",
+                "guests_count",
+                "inner_status",
+                "tables",
+                "comment",
+                "manager",
+                "source",
+                "orders",
+                "cancel_reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "ID резерва"
+                },
+                "surname": {
+                  "type": "string",
+                  "description": "фамилия гостя"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "имя гостя"
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "телефон гостя"
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email гостя"
+                },
+                "estimated_time": {
+                  "type": "string",
+                  "description": "время начала брони"
+                },
+                "duration": {
+                  "type": "string",
+                  "description": "длительность (мин)"
+                },
+                "guests_count": {
+                  "type": "string",
+                  "description": "кол-во гостей"
+                },
+                "inner_status": {
+                  "$ref": "#/components/schemas/InnerStatusStructure"
+                },
+                "tables": {
+                  "$ref": "#/components/schemas/TablesStructure"
+                },
+                "comment": {
+                  "type": "string",
+                  "description": "комментарий"
+                },
+                "manager": {
+                  "type": "string",
+                  "description": "ответственный"
+                },
+                "source": {
+                  "type": "string",
+                  "description": "источник"
+                },
+                "orders": {
+                  "type": "string",
+                  "description": "заказы, связанные с бронью"
+                },
+                "cancel_reason": {
+                  "type": "string",
+                  "description": "причина отмены"
+                },
+                "point": {
+                  "type": "integer",
+                  "description": "id заведения\r\n> Вернется в случае, если был передан родительский id заведения"
+                },
+                "restaurant": {
+                  "type": "string",
+                  "description": "название заведения\r\n> Вернется в случае, если был передан родительский id заведения"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ChangeReserveStatus": {
+        "type": "object",
+        "required": [
+          "token",
+          "reserve_id",
+          "status",
+          "method"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "ChangeReserveStatus",
+            "description": "Название метода",
+            "example": "ChangeReserveStatus"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "reserve_id": {
+            "type": "integer",
+            "description": "Id резерва/брони",
+            "example": 1234567890
+          },
+          "status": {
+            "type": "string",
+            "format": "enum",
+            "enum": [
+              "new,",
+              "waiting,",
+              "confirmed,",
+              "canceled,",
+              "started,",
+              "closed,",
+              "error,"
+            ],
+            "description": "Статус брони",
+            "default": "ASC"
+          },
+          "cancel_reason": {
+            "type": "string",
+            "format": "enum",
+            "enum": [
+              "guest_didnt_connect",
+              "rescheduled_by_guest",
+              "didnt_make_deposit",
+              "canceled_by_guest",
+              "guest_confirmed_but_didnt_come",
+              "canceled_by_appwteguide",
+              "other"
+            ],
+            "default": null,
+            "description": "Причина отмены. \r\n>Учитывается только при передаче статуса `canceled` <br />`guest_didnt_connect - Не вышел на связь` <br />`rescheduled_by_guest - Перенес резерв` <br />`didnt_make_deposit - Не внесли депозит` <br />`canceled_by_guest - Сам отменил резерв` <br />`guest_confirmed_but_didnt_come - Подтвердил, но не пришел` <br />`canceled_by_appwteguide - Отмена гостем в приложении WTEGuide` <br />`other - Другое`"
+          }
+        }
+      },
+      "ChangeReserveStatus.Response": {
+        "title": "ChangeReserveStatus",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success",
+            "description": "Статус операции"
+          },
+          "reserve_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Id резерва/брони"
+          }
+        }
+      },
+      "GetCancelReasons": {
+        "type": "object",
+        "required": [
+          "token",
+          "method"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "GetCancelReasons",
+            "description": "Название метода",
+            "example": "GetCancelReasons"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          }
+        }
+      },
+      "GetCancelReasons.Response": {
+        "title": "ChangeReserveStatus",
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "резервов всего в базе по этому номеру за период"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "резервов возвращено в ответе"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64",
+            "description": "отступ"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "лимит"
+          },
+          "reserves": {
+            "type": "array",
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "ID резерва"
+                },
+                "surname": {
+                  "type": "string",
+                  "description": "фамилия"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "имя"
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "телефон"
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email"
+                },
+                "estimated_time": {
+                  "type": "string",
+                  "description": "время начала брони"
+                },
+                "duration": {
+                  "type": "string",
+                  "description": "длительность (мин)"
+                },
+                "inner_status": {
+                  "type": "string",
+                  "description": "статус"
+                },
+                "tables": {
+                  "$ref": "#/components/schemas/TablesStructure"
+                },
+                "comment": {
+                  "type": "string",
+                  "description": "комментарий"
+                },
+                "manager": {
+                  "type": "string",
+                  "description": "ответственный"
+                },
+                "source": {
+                  "type": "string",
+                  "description": "источник"
+                }
+              }
+            }
+          }
+        }
+      },
+      "getEventTags": {
+        "type": "object",
+        "required": [
+          "method",
+          "jsonrpc",
+          "params"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "ReservesWidgetApi.getEventTags",
+            "description": "Название метода",
+            "example": "ReservesWidgetApi.getEventTags"
+          },
+          "jsonrpc": {
+            "type": "string",
+            "description": "Версия jsonrpc",
+            "example": 2,
+            "default": 2
+          },
+          "params": {
+            "type": "object",
+            "description": "параметры запроса",
+            "required": [
+              "token"
+            ],
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "Токен, полученный методом `GetToken`",
+                "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+              }
+            }
+          },
+          "id": {
+            "type": "string",
+            "description": "IDEMPOTENCY KEY",
+            "format": "uuid"
+          }
+        }
+      },
+      "getEventTags.Response": {
+        "title": "getEventTags",
+        "type": "object",
+        "required": [
+          "jsonrpc",
+          "result"
+        ],
+        "properties": {
+          "jsonrpc": {
+            "type": "string",
+            "example": 2
+          },
+          "result": {
+            "type": "object",
+            "required": [
+              "status",
+              "eventTags"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "example": "success"
+              },
+              "eventTags": {
+                "type": "array",
+                "description": "теги",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Id тега"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "наименование тега"
+                    },
+                    "color": {
+                      "type": "string",
+                      "example": "#ff0000",
+                      "description": "цвет тега в формате hex"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "GetReserveByID": {
+        "type": "object",
+        "required": [
+          "method",
+          "token",
+          "reserve_id"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "GetReserveByID",
+            "description": "Получение инофрмации о резерве",
+            "example": "GetReserveByID"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "reserve_id": {
+            "type": "integer",
+            "description": "ID резерва",
+            "format": "int64",
+            "example": 3214
+          },
+          "request_id": {
+            "type": "string",
+            "description": "IDEMPOTENCY KEY",
+            "format": "uuid"
+          }
+        }
+      },
+      "GetReserveByID.Response": {
+        "title": "GetReserveByID",
+        "type": "object",
+        "required": [
+          "reserve"
+        ],
+        "properties": {
+          "reserve": {
+            "type": "object",
+            "properties": {
+              "surname": {
+                "type": "string",
+                "example": "Иванов",
+                "description": "Фамилия на кого был сделан резерв"
+              },
+              "name": {
+                "type": "string",
+                "example": "Иван",
+                "description": "Имя на кого был сделан резерв"
+              },
+              "phone": {
+                "type": "string",
+                "example": 79939999999,
+                "description": "Телефон на кого был сделан резерв"
+              },
+              "email": {
+                "type": "string",
+                "example": "Email",
+                "description": "Email на кого был сделан резерв"
+              },
+              "estimated_time": {
+                "type": "string",
+                "example": "2025-01-01 12:00:00",
+                "description": "Время начала брони"
+              },
+              "duration": {
+                "type": "integer",
+                "example": 120,
+                "description": "Длительность резерва в минутах"
+              },
+              "inner_status": {
+                "$ref": "#/components/schemas/InnerStatusStructure"
+              },
+              "tables": {
+                "$ref": "#/components/schemas/TablesStructure"
+              },
+              "comment": {
+                "type": "string",
+                "example": "Комментарий",
+                "description": "Комментарий к брони"
+              },
+              "manager": {
+                "type": "string",
+                "example": "Хостес",
+                "description": "Ответственный брони"
+              },
+              "source": {
+                "type": "string",
+                "example": "offline",
+                "description": "Источник брони"
+              },
+              "cancel_reason": {
+                "type": "string",
+                "example": "other",
+                "description": "Причина отмены брони"
+              }
+            }
+          }
+        }
+      },
+      "IsReserveRead": {
+        "type": "object",
+        "required": [
+          "method",
+          "token",
+          "reserve_id"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "default": "IsReserveRead",
+            "description": "Проверка прочитан ли резерв",
+            "example": "IsReserveRead"
+          },
+          "token": {
+            "type": "string",
+            "description": "Токен, полученный методом `GetToken`",
+            "example": "b9e3bd1f4e3e70f3ff406a31352bf2fc"
+          },
+          "reserve_id": {
+            "type": "integer",
+            "description": "ID резерва",
+            "format": "int64",
+            "example": 3214
+          },
+          "request_id": {
+            "type": "string",
+            "description": "IDEMPOTENCY KEY",
+            "format": "uuid"
+          }
+        }
+      },
+      "IsReserveRead.Response": {
+        "title": "IsReserveRead",
+        "type": "object",
+        "required": [
+          "status",
+          "is_read"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "is_read": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "Error400": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Статус",
+            "example": "error"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Дата и время на сервере",
+            "example": "2024-01-01 09:23:00"
+          },
+          "code": {
+            "type": "string",
+            "description": "Код ошибки",
+            "example": 400
+          },
+          "message": {
+            "type": "string",
+            "description": "Сообщение об ошибке",
+            "example": "Bad Request"
+          }
+        }
+      },
+      "Error401": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Статус",
+            "example": "error"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Дата и время на сервере",
+            "example": "2024-01-01 09:23:00"
+          },
+          "code": {
+            "type": "string",
+            "description": "Код ошибки",
+            "example": 401
+          },
+          "message": {
+            "type": "string",
+            "description": "Сообщение об ошибке",
+            "example": "Empty Bearer Token"
+          }
+        }
+      },
+      "Error403": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Статус",
+            "example": "error"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Дата и время на сервере",
+            "example": "2024-01-01 09:23:00"
+          },
+          "code": {
+            "type": "string",
+            "description": "Код ошибки",
+            "example": 403
+          },
+          "message": {
+            "type": "string",
+            "description": "Сообщение об ошибке",
+            "example": "Access Denied"
+          }
+        }
+      },
+      "Error404": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Статус ответа",
+            "example": "error"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Дата отправки запроса",
+            "example": "2024-06-02 20:06:44"
+          },
+          "code": {
+            "type": "string",
+            "description": "Код ошибки",
+            "example": 404
+          },
+          "message": {
+            "type": "string",
+            "description": "Сообщение об ошибке",
+            "example": "Not Found"
+          }
+        }
+      },
+      "Error520": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Код внутренней ошибки",
+            "example": {
+              "status": "error",
+              "date": "2024-06-02 16:49:09",
+              "code": 520,
+              "message": "Unknown Error"
+            }
+          },
+          "message": {
+            "type": "string",
+            "description": "Сообщение об ошибке",
+            "example": "Данный элемент не найден"
+          }
+        }
+      },
+      "InnerStatusStructure": {
+        "type": "string",
+        "example": "waiting",
+        "description": "Статус брони\n- `new` - бронь в статусе \"Новая\"\n- `waiting` - бронь в статусе \"Ожидание\"\n- `confirmed` - бронь в статусе \"Подтверждена\"\n- `started` - бронь в статусе \"Гость пришел\"\n- `closed` - бронь в статусе \"Закрыта\"\n- `canceled` - бронь в статусе \"Отменена\"\n",
+        "enum": [
+          "new",
+          "waiting",
+          "confirmed",
+          "started",
+          "closed",
+          "canceled"
+        ]
+      },
+      "TablesStructure": {
+        "type": "object",
+        "description": "Структура забронированных столов, сгруппированных по ID зала.",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/RoomWithTables"
+        },
+        "example": {
+          "19": {
+            "room_name": "Веранда",
+            "tables": {
+              "330": "1",
+              "331": "2",
+              "332": "3",
+              "333": "4",
+              "334": "5",
+              "335": "6",
+              "336": "7",
+              "337": "8"
+            }
+          }
+        }
+      },
+      "RoomWithTables": {
+        "type": "object",
+        "properties": {
+          "room_name": {
+            "type": "string",
+            "description": "Название зала.",
+            "example": "Веранда"
+          },
+          "tables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Номер стола."
+            },
+            "example": {
+              "330": "1",
+              "331": "2"
+            }
+          }
+        }
+      }
+    }
+  }
+}

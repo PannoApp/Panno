@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
+import '../data/models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/path_cta.dart';
@@ -23,7 +24,11 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   bool _loading = false;
+  UserGender? _gender;
+  DateTime? _birthday;
+  bool _showGenderError = false;
 
   @override
   void initState() {
@@ -32,6 +37,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (user != null) {
       _firstNameCtrl.text = user.firstName;
       _lastNameCtrl.text = user.lastName;
+      _emailCtrl.text = user.email;
+      if (user.gender != UserGender.notSpecified) _gender = user.gender;
+      _birthday = user.birthday;
     }
   }
 
@@ -39,24 +47,69 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void dispose() {
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
+    _emailCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthday ?? DateTime(now.year - 25, now.month, now.day),
+      firstDate: DateTime(now.year - 100),
+      lastDate: now,
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.dark(
+            surface: PiligrimColors.earthDeep,
+            primary: PiligrimColors.water,
+            onPrimary: PiligrimColors.sky,
+            onSurface: PiligrimColors.sky,
+          ),
+        ),
+        child: child ?? const SizedBox.shrink(),
+      ),
+    );
+    if (picked != null) setState(() => _birthday = picked);
+  }
+
+  void _selectGender(UserGender gender) {
+    setState(() {
+      _gender = gender;
+      _showGenderError = false;
+    });
+  }
+
+  /// Основной путь: требует явно выбранного пола. Сохраняет всю анкету.
   Future<void> _onStart() async {
+    final gender = _gender;
+    if (gender == null) {
+      setState(() => _showGenderError = true);
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       final firstName = _firstNameCtrl.text.trim();
       final lastName = _lastNameCtrl.text.trim();
-      if (firstName.isNotEmpty || lastName.isNotEmpty) {
-        await context.read<AuthProvider>().updateDisplayProfile(
-              firstName: firstName.isNotEmpty ? firstName : null,
-              lastName: lastName.isNotEmpty ? lastName : null,
-            );
-      }
+      final email = _emailCtrl.text.trim();
+      await context.read<AuthProvider>().updateDisplayProfile(
+            firstName: firstName.isNotEmpty ? firstName : null,
+            lastName: lastName.isNotEmpty ? lastName : null,
+            gender: gender,
+            email: email.isNotEmpty ? email : null,
+            birthday: _birthday,
+          );
     } catch (_) {
-      // поля необязательны — не блокируем продолжение
+      // сеть могла подвести — не блокируем выход с экрана
     }
     if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  /// «Пропустить» — ничего не сохраняет, пол остаётся `not_specified`.
+  void _onSkip() {
+    if (_loading) return;
     Navigator.of(context).pop();
   }
 
@@ -148,7 +201,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 10),
 
                 Text(
-                  'Начало пути — расскажите о себе.\nПоля необязательны.',
+                  'Начало пути — расскажите о себе.\nПол обязателен, остальное — по желанию.',
                   style: PiligrimTextStyles.body.copyWith(
                     color: PiligrimColors.sky.withValues(alpha: 0.48),
                     fontSize: 14,
@@ -176,6 +229,58 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   phone: context.read<AuthProvider>().currentUser?.phone ?? '',
                   delay: 530.ms,
                 ),
+                const SizedBox(height: 14),
+                _BrandField(
+                  controller: _emailCtrl,
+                  hint: 'Email (необязательно)',
+                  delay: 570.ms,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 14),
+                _DateField(
+                  value: _birthday,
+                  onTap: _pickBirthday,
+                  delay: 600.ms,
+                ),
+                const SizedBox(height: 24),
+
+                // ── Пол (обязательный выбор) ─────────────────────────────────
+                Text(
+                  'Пол',
+                  style: PiligrimTextStyles.caption.copyWith(
+                    color: PiligrimColors.sky.withValues(alpha: 0.40),
+                    fontSize: 12,
+                    letterSpacing: 0.3,
+                  ),
+                ).animate().fadeIn(delay: 630.ms, duration: 500.ms),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _GenderOption(
+                      label: UserGender.male.label,
+                      selected: _gender == UserGender.male,
+                      onTap: () => _selectGender(UserGender.male),
+                      delay: 660.ms,
+                    ),
+                    const SizedBox(width: 12),
+                    _GenderOption(
+                      label: UserGender.female.label,
+                      selected: _gender == UserGender.female,
+                      onTap: () => _selectGender(UserGender.female),
+                      delay: 690.ms,
+                    ),
+                  ],
+                ),
+                if (_showGenderError) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Выберите пол, чтобы продолжить, либо нажмите «Пропустить»',
+                    style: PiligrimTextStyles.caption.copyWith(
+                      color: PiligrimColors.fruit,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 48),
 
                 // ── CTA — «Начать путь» ──────────────────────────────────────
@@ -192,7 +297,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // ── Подсказка «пропустить» ───────────────────────────────────
                 Center(
                   child: PiligrimTap(
-                    onTap: _loading ? null : _onStart,
+                    onTap: _loading ? null : _onSkip,
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -313,16 +418,19 @@ class _BrandField extends StatelessWidget {
     required this.controller,
     required this.hint,
     required this.delay,
+    this.keyboardType = TextInputType.text,
   });
 
   final TextEditingController controller;
   final String hint;
   final Duration delay;
+  final TextInputType keyboardType;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      keyboardType: keyboardType,
       style: PiligrimTextStyles.body.copyWith(
         color: PiligrimColors.sky,
         fontSize: 16,
@@ -364,6 +472,132 @@ class _BrandField extends StatelessWidget {
           duration: 500.ms,
           curve: Curves.easeOutCubic,
         );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Поле «Дата рождения» — открывает showDatePicker, необязательное
+// ─────────────────────────────────────────────────────────────────────────────
+class _DateField extends StatelessWidget {
+  const _DateField({
+    required this.value,
+    required this.onTap,
+    required this.delay,
+  });
+
+  final DateTime? value;
+  final VoidCallback onTap;
+  final Duration delay;
+
+  String get _label {
+    final d = value;
+    if (d == null) return 'Дата рождения (необязательно)';
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    return '$dd.$mm.${d.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: PiligrimColors.earthDeep.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: PiligrimColors.sky.withValues(alpha: 0.10),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _label,
+                style: PiligrimTextStyles.body.copyWith(
+                  color: value == null
+                      ? PiligrimColors.sky.withValues(alpha: 0.22)
+                      : PiligrimColors.sky,
+                  fontSize: value == null ? 15 : 16,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 15,
+              color: PiligrimColors.sky.withValues(alpha: 0.30),
+            ),
+          ],
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(delay: delay, duration: 500.ms)
+        .slideY(
+          begin: 0.04,
+          end: 0,
+          delay: delay,
+          duration: 500.ms,
+          curve: Curves.easeOutCubic,
+        );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Чип выбора пола — обязательный выбор для «Начать путь»
+// ─────────────────────────────────────────────────────────────────────────────
+class _GenderOption extends StatelessWidget {
+  const _GenderOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.delay,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Duration delay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: PiligrimTap(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected
+                ? PiligrimColors.water.withValues(alpha: 0.16)
+                : PiligrimColors.earthDeep.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected
+                  ? PiligrimColors.water
+                  : PiligrimColors.sky.withValues(alpha: 0.10),
+              width: selected ? 1.4 : 1,
+            ),
+          ),
+          child: Text(
+            label,
+            style: PiligrimTextStyles.body.copyWith(
+              color: selected
+                  ? PiligrimColors.sky
+                  : PiligrimColors.sky.withValues(alpha: 0.55),
+              fontSize: 15,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(delay: delay, duration: 500.ms);
   }
 }
 
