@@ -29,27 +29,11 @@ class RestaurantInfo(models.Model):
     )
     tour_link = models.URLField(blank=True, null=True, verbose_name="Ссылка на 3D-тур")
 
-    # Ссылки для кнопки «Построить маршрут» — приложение показывает те, что заполнены
-    twogis_link       = models.URLField(blank=True, null=True, verbose_name="Ссылка на 2GIS")
-    google_maps_link  = models.URLField(blank=True, null=True, verbose_name="Ссылка на Google Maps")
-    yandex_maps_link  = models.URLField(blank=True, null=True, verbose_name="Ссылка на Яндекс.Карты")
+    # Ссылка для кнопки «Построить маршрут» (2ГИС — основной картографический сервис для аудитории РК)
+    twogis_link = models.URLField(blank=True, null=True, verbose_name="Ссылка на 2GIS")
 
     # URL для обратной связи (форма, email-ссылка mailto:, WhatsApp и т.п.)
     feedback_url = models.URLField("Обратная связь (URL)", blank=True, null=True)
-
-    # Если ресторан требует депозит при бронировании — Flutter показывает предупреждение
-    # и предлагает гостю позвонить менеджеру. Оплата через приложение не принимается.
-    booking_deposit_required = models.BooleanField(
-        "Требуется депозит при бронировании",
-        default=False,
-    )
-    booking_deposit_note = models.CharField(
-        "Текст предупреждения о депозите",
-        max_length=500,
-        blank=True,
-        default='',
-        help_text="Напр.: «При бронировании приват-зала необходим депозит. Позвоните менеджеру.»",
-    )
 
     phone = models.CharField("Телефон", max_length=20, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=100, blank=True)
@@ -58,8 +42,8 @@ class RestaurantInfo(models.Model):
 
     concept_description = models.TextField("Описание концепции", blank=True, default='')
 
-    privacy_policy = models.TextField("Политика обработки ПД", blank=True)
-    terms_of_service = models.TextField("Пользовательское соглашение", blank=True)
+    privacy_policy = models.URLField("Политика обработки ПД", blank=True)
+    terms_of_service = models.URLField("Пользовательское соглашение", blank=True)
 
     def is_open_at(self, weekday: int, at_time) -> bool | None:
         """

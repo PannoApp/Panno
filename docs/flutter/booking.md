@@ -250,7 +250,6 @@ BookingSuccessScreen({
   required String time,         // «ЧЧ:ММ» — форматированное время
   required int heroesCount,     // количество гостей
   String? zone,                 // читаемое название зала («Главный зал» / «Терраса» / «Приват»)
-  required bool depositRequired,// признак из CoreInfo.bookingDepositRequired
 })
 ```
 
@@ -262,7 +261,7 @@ BookingSuccessScreen({
 | Заголовок «ПУТЬ ЗАБРОНИРОВАН» | fadeIn + slideY, задержка 200 мс |
 | Подзаголовок | «Ваша заявка успешно отправлена проводникам», задержка 300 мс |
 | Карточка деталей | Дата/время, кол-во героев (склонение), зона (если выбрана) |
-| Список «Сценарий после отправки» | 3 шага (+ 4-й при `depositRequired == true`) |
+| Список «Сценарий после отправки» | 3 шага |
 | Кнопки навигации | «МОИ БРОНИРОВАНИЯ» и «НА ГЛАВНУЮ» |
 
 ### Склонение heroes count
@@ -279,34 +278,4 @@ BookingSuccessScreen({
 | «МОИ БРОНИРОВАНИЯ» | `Navigator.pushReplacement` → `BookingHistoryScreen` (форма убирается из стека) |
 | «НА ГЛАВНУЮ» | `Navigator.popUntil((r) => r.isFirst)` → корневой маршрут (`RootShell`) |
 
-### Условный шаг при депозите
-
-Когда `depositRequired == true`, в список «Сценарий после отправки» добавляется 4-й пункт:
-> «Для выбранного стола нужен депозит — менеджер направит вас на звонок.»
-
----
-
-## Баннер депозита и звонок менеджеру
-
-Файл: [lib/screens/booking_screen.dart](../../lib/screens/booking_screen.dart), строки 401–468.
-
-### Условие показа
-
-Баннер рендерится **внутри формы** бронирования, между полем «Комментарий» и кнопкой отправки:
-
-```dart
-if (depositRequired) ...[
-  // блок баннера
-]
-```
-
-Значение `depositRequired` берётся из `context.watch<CoreInfoProvider>().coreInfo?.bookingDepositRequired ?? false`.
-
-### Содержимое баннера
-
-1. **Иконка** `Icons.info_outline_rounded` + **текст** из `CoreInfoProvider.coreInfo?.bookingDepositNote` (фолбэк: `'Для выбранного стола может потребоваться депозит. Уточните у менеджера.'`).
-2. **Кнопка «ПОЗВОНИТЬ МЕНЕДЖЕРУ»** — вызывает `launchUrl(Uri.parse('tel:$phone'))`, где `phone = context.read<CoreInfoProvider>().coreInfo?.phone ?? ''`. Кнопка не показывается если `phone` пустой (вызов `launchUrl` не выполняется).
-
-### Источник данных на бекенде
-
-Поля `booking_deposit_required` и `booking_deposit_note` хранятся в модели `RestaurantInfo` (`backend/apps/core/models.py`) и возвращаются через `GET /api/v1/core/info/`. Оплата депозита через приложение не предусмотрена — только переадресация на звонок.
+В форме бронирования всегда виден дисклеймер: «Важно: в приложении нет онлайн-оплаты и списания депозита» (`lib/screens/booking_screen.dart`). Поле «Требуется депозит при бронировании» было удалено из админки и API как избыточное — оплата через приложение не принимается в принципе.

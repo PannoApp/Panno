@@ -75,7 +75,7 @@ const kHeroPhrases = [
   'Кухня свободы\nи традиций.',
 ];
 
-// ── ТЗ: краткое представление концепции Modern Nomad (1–2 фразы; brandbook)
+// Фолбэк, если поле "Описание концепции" в админке (RestaurantInfo.concept_description) пустое.
 const kModernNomadConcept =
     'Modern Nomad — герой между традицией и сегодняшним днём: аутентичный вкус '
     'и настроение Центральной Азии в тёплой, современной подаче PILIGRIM.';

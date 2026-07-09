@@ -414,6 +414,27 @@ paths:
                 $ref: '#/components/schemas/StaffDish'
           description: ''
   /api/v1/menu/staff/dishes/{id}/:
+    get:
+      operationId: v1_menu_staff_dishes_retrieve
+      description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Блюдо.
+        required: true
+      tags:
+      - 'Staff: Menu'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffDish'
+          description: ''
     patch:
       operationId: v1_menu_staff_dishes_partial_update
       description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
@@ -437,27 +458,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedStaffDishRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StaffDish'
-          description: ''
-    get:
-      operationId: v1_menu_staff_dishes_retrieve
-      description: CRUD блюд для staff/admin. Видит все блюда включая неактивные.
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Блюдо.
-        required: true
-      tags:
-      - 'Staff: Menu'
       security:
       - jwtAuth: []
       responses:
@@ -745,6 +745,26 @@ paths:
                 $ref: '#/components/schemas/StaffEvent'
           description: ''
   /api/v1/events/admin/events/{id}/:
+    get:
+      operationId: v1_events_admin_events_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Мероприятие.
+        required: true
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffEvent'
+          description: ''
     patch:
       operationId: v1_events_admin_events_partial_update
       parameters:
@@ -767,26 +787,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedStaffEventRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StaffEvent'
-          description: ''
-    get:
-      operationId: v1_events_admin_events_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Мероприятие.
-        required: true
-      tags:
-      - 'Staff: Events'
       security:
       - jwtAuth: []
       responses:
@@ -940,6 +940,26 @@ paths:
                 $ref: '#/components/schemas/StaffNews'
           description: ''
   /api/v1/events/admin/news/{id}/:
+    get:
+      operationId: v1_events_admin_news_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Новость.
+        required: true
+      tags:
+      - 'Staff: Events'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffNews'
+          description: ''
     patch:
       operationId: v1_events_admin_news_partial_update
       parameters:
@@ -962,26 +982,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedStaffNewsRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StaffNews'
-          description: ''
-    get:
-      operationId: v1_events_admin_news_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this Новость.
-        required: true
-      tags:
-      - 'Staff: Events'
       security:
       - jwtAuth: []
       responses:
@@ -2113,18 +2113,6 @@ components:
           nullable: true
           title: Ссылка на 2GIS
           maxLength: 200
-        google_maps_link:
-          type: string
-          format: uri
-          nullable: true
-          title: Ссылка на Google Maps
-          maxLength: 200
-        yandex_maps_link:
-          type: string
-          format: uri
-          nullable: true
-          title: Ссылка на Яндекс.Карты
-          maxLength: 200
         phone:
           type: string
           title: Телефон
@@ -2153,25 +2141,20 @@ components:
           readOnly: true
         privacy_policy:
           type: string
+          format: uri
           title: Политика обработки ПД
+          maxLength: 200
         terms_of_service:
           type: string
+          format: uri
           title: Пользовательское соглашение
+          maxLength: 200
         feedback_url:
           type: string
           format: uri
           nullable: true
           title: Обратная связь (URL)
           maxLength: 200
-        booking_deposit_required:
-          type: boolean
-          title: Требуется депозит при бронировании
-        booking_deposit_note:
-          type: string
-          title: Текст предупреждения о депозите
-          description: 'Напр.: «При бронировании приват-зала необходим депозит. Позвоните
-            менеджеру.»'
-          maxLength: 500
       required:
       - address
       - hero_slides

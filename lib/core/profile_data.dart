@@ -75,19 +75,19 @@ const kMessengers = [
     label: 'WhatsApp',
     url: 'https://wa.me/77000000000',
     color: PiligrimColors.steppe,
-    iconAsset: 'assets/images/whatsappsvg.svg',
+    iconAsset: 'assets/images/whatsapp_generic.svg',
   ),
   Messenger(
     label: 'Telegram',
     url: 'https://t.me/piligrim_astana',
     color: PiligrimColors.steppe,
-    iconAsset: 'assets/images/telegramsvg.svg',
+    iconAsset: 'assets/images/telegram_generic.svg',
   ),
   Messenger(
     label: 'Instagram',
     url: 'https://instagram.com/piligrim.astana',
     color: PiligrimColors.steppe,
-    iconAsset: 'assets/images/instagramsvg.svg',
+    iconAsset: 'assets/images/instagram_generic.svg',
   ),
 ];
 

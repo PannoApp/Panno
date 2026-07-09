@@ -314,70 +314,26 @@ class RestaurantInfoMapLinksTest(APITestCase):
     def setUp(self):
         self.info = RestaurantInfo.load()
 
-    def test_response_contains_all_map_links(self):
-        """Все три ссылки на карты должны быть в ответе (могут быть null)."""
+    def test_response_contains_twogis_link(self):
         response = self.client.get('/api/v1/core/info/')
         self.assertIn('twogis_link', response.data)
-        self.assertIn('google_maps_link', response.data)
-        self.assertIn('yandex_maps_link', response.data)
 
     def test_response_contains_feedback_url(self):
         """Ссылка на обратную связь должна быть в ответе."""
         response = self.client.get('/api/v1/core/info/')
         self.assertIn('feedback_url', response.data)
 
-    def test_map_links_reflect_saved_values(self):
-        """Сохранённые ссылки на карты возвращаются корректно."""
-        self.info.google_maps_link = 'https://maps.google.com/?q=panno'
-        self.info.yandex_maps_link = 'https://yandex.kz/maps/?text=panno'
+    def test_twogis_link_reflects_saved_value(self):
+        self.info.twogis_link = 'https://2gis.kz/almaty/firm/panno'
         self.info.save()
         response = self.client.get('/api/v1/core/info/')
-        self.assertEqual(response.data['google_maps_link'], 'https://maps.google.com/?q=panno')
-        self.assertEqual(response.data['yandex_maps_link'], 'https://yandex.kz/maps/?text=panno')
+        self.assertEqual(response.data['twogis_link'], 'https://2gis.kz/almaty/firm/panno')
 
     def test_map_links_nullable(self):
         """Незаполненные ссылки возвращаются как null."""
         response = self.client.get('/api/v1/core/info/')
-        self.assertIsNone(response.data['google_maps_link'])
-        self.assertIsNone(response.data['yandex_maps_link'])
+        self.assertIsNone(response.data['twogis_link'])
         self.assertIsNone(response.data['feedback_url'])
-
-
-# ---------------------------------------------------------------------------
-# GET /api/v1/core/info/ — Поля депозита при бронировании (ТЗ 5)
-# ---------------------------------------------------------------------------
-
-class RestaurantInfoDepositTest(APITestCase):
-    def setUp(self):
-        self.info = RestaurantInfo.load()
-
-    def test_response_contains_deposit_fields(self):
-        """Поля депозита должны присутствовать в ответе."""
-        response = self.client.get('/api/v1/core/info/')
-        self.assertIn('booking_deposit_required', response.data)
-        self.assertIn('booking_deposit_note', response.data)
-
-    def test_deposit_required_defaults_to_false(self):
-        """По умолчанию депозит не требуется."""
-        response = self.client.get('/api/v1/core/info/')
-        self.assertFalse(response.data['booking_deposit_required'])
-
-    def test_deposit_note_defaults_to_empty(self):
-        """По умолчанию текст предупреждения пустой."""
-        response = self.client.get('/api/v1/core/info/')
-        self.assertEqual(response.data['booking_deposit_note'], '')
-
-    def test_deposit_fields_reflect_saved_values(self):
-        """Сохранённые значения полей депозита корректно возвращаются."""
-        self.info.booking_deposit_required = True
-        self.info.booking_deposit_note = 'Позвоните менеджеру для уточнения условий.'
-        self.info.save()
-        response = self.client.get('/api/v1/core/info/')
-        self.assertTrue(response.data['booking_deposit_required'])
-        self.assertEqual(
-            response.data['booking_deposit_note'],
-            'Позвоните менеджеру для уточнения условий.',
-        )
 
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ import '../core/theme.dart';
 import '../data/repositories/core_repository.dart';
 import '../main.dart';
 import '../providers/auth_provider.dart';
+import '../providers/core_info_provider.dart';
 import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -416,12 +417,14 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _buildConcept() {
+    final concept = context.watch<CoreInfoProvider>().coreInfo?.conceptDescription
+        ?? kModernNomadConcept;
     return FadeTransition(
       opacity: _conceptOpacity,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 52),
         child: Text(
-          kModernNomadConcept,
+          concept,
           textAlign: TextAlign.center,
           maxLines: 4,
           overflow: TextOverflow.ellipsis,

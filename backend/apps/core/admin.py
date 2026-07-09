@@ -59,17 +59,15 @@ class RestaurantInfoAdmin(ModelAdmin):
             ),
         }),
         ('Маршруты', {
-            'fields': ('twogis_link', 'google_maps_link', 'yandex_maps_link', 'tour_link'),
+            'fields': ('twogis_link', 'tour_link'),
         }),
         ('Контент главной', {
             'fields': ('concept_description',),
         }),
-        ('Бронирование', {
-            'fields': ('booking_deposit_required', 'booking_deposit_note'),
-        }),
         ('Юридические тексты', {
             'fields': ('privacy_policy', 'terms_of_service'),
             'classes': ('collapse',),
+            'description': 'Укажите ссылку (URL) на документ — не вставляйте текст политики целиком.',
         }),
     )
 

@@ -699,9 +699,9 @@ class _NotifRow extends StatelessWidget {
 /// Маппинг названия мессенджера → SVG-ассет (для социальных ссылок с бэкенда)
 String _resolveMessengerIcon(String label) {
   final l = label.toLowerCase();
-  if (l.contains('whatsapp')) return 'assets/images/whatsappsvg.svg';
-  if (l.contains('telegram')) return 'assets/images/telegramsvg.svg';
-  if (l.contains('instagram')) return 'assets/images/instagramsvg.svg';
+  if (l.contains('whatsapp')) return 'assets/images/whatsapp_generic.svg';
+  if (l.contains('telegram')) return 'assets/images/telegram_generic.svg';
+  if (l.contains('instagram')) return 'assets/images/instagram_generic.svg';
   return 'assets/images/shaman.svg'; // fallback
 }
 
@@ -775,15 +775,12 @@ class _ContactsCard extends StatelessWidget {
     final phone = coreInfo?.phone.isNotEmpty == true
         ? coreInfo!.phone
         : kRestaurantPhone;
-    // Список карт — только те, у которых есть ссылка из CoreInfo
+    // Карта — только 2ГИС (основной картографический сервис для аудитории РК)
     final mapLinks = [
       if (coreInfo?.twogisLink != null)
-        (label: '2ГИС', icon: 'assets/images/2gis.svg', url: coreInfo!.twogisLink!),
-      if (coreInfo?.googleMapsLink != null)
-        (label: 'Google', icon: 'assets/images/googlemapssvg.svg', url: coreInfo!.googleMapsLink!),
-      if (coreInfo?.yandexMapsLink != null)
-        (label: 'Яндекс', icon: 'assets/images/yandexsvg.svg', url: coreInfo!.yandexMapsLink!),
+        (label: '2ГИС', icon: 'assets/images/map_pin_generic.svg', url: coreInfo!.twogisLink!),
     ];
+    final address = coreInfo?.address ?? '';
 
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
         ? coreInfo!.socialLinks
@@ -794,63 +791,6 @@ class _ContactsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Кнопки карт — скрываем если все ссылки null
-          if (mapLinks.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-              child: Row(
-                children: mapLinks.map((t) {
-                  return Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        right: t == mapLinks.last ? 0 : 8,
-                      ),
-                      child: PiligrimTap(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => onLaunch(t.url),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: PiligrimColors.steppe.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: PiligrimColors.steppe.withValues(alpha: 0.16),
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SvgPicture.asset(
-                                t.icon,
-                                width: 20,
-                                height: 20,
-                                colorFilter: ColorFilter.mode(
-                                  PiligrimColors.steppe.withValues(alpha: 0.85),
-                                  BlendMode.srcIn,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                t.label,
-                                style: PiligrimTextStyles.caption.copyWith(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: PiligrimColors.steppe.withValues(alpha: 0.75),
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-          const _ProfileHairlineDivider(inset: 18),
-
           // Телефон
           PiligrimTap(
             onTap: () => onLaunch('tel:$phone'),
@@ -918,6 +858,79 @@ class _ContactsCard extends StatelessWidget {
             }
             return rows;
           }(),
+
+          // Адрес + карта — в самом низу карточки
+          if (address.isNotEmpty || mapLinks.isNotEmpty) ...[
+            const _ProfileHairlineDivider(inset: 18),
+
+            // Адрес — показываем только если пришёл непустым с бэкенда
+            if (address.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(18, 18, 18, mapLinks.isNotEmpty ? 10 : 18),
+                child: Text(
+                  'Наш адрес: $address',
+                  style: PiligrimTextStyles.body.copyWith(
+                    fontSize: 13,
+                    color: PiligrimColors.steppe.withValues(alpha: 0.82),
+                  ),
+                ),
+              ),
+
+            // Кнопка 2ГИС — скрываем если ссылка null
+            if (mapLinks.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(18, address.isNotEmpty ? 0 : 18, 18, 18),
+                child: Row(
+                  children: mapLinks.map((t) {
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: t == mapLinks.last ? 0 : 8,
+                        ),
+                        child: PiligrimTap(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => onLaunch(t.url),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: PiligrimColors.steppe.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: PiligrimColors.steppe.withValues(alpha: 0.16),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SvgPicture.asset(
+                                  t.icon,
+                                  width: 20,
+                                  height: 20,
+                                  colorFilter: ColorFilter.mode(
+                                    PiligrimColors.steppe.withValues(alpha: 0.85),
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  t.label,
+                                  style: PiligrimTextStyles.caption.copyWith(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: PiligrimColors.steppe.withValues(alpha: 0.75),
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
         ],
       ),
     )

@@ -35,7 +35,6 @@ CoreInfo _coreInfo({String privacyPolicy = 'https://api.piligrim.kz/privacy'}) =
       phone: '+77001234567',
       socialLinks: const [],
       heroSlides: const [],
-      bookingDepositRequired: false,
       visitRules: const [],
       privacyPolicy: privacyPolicy,
     );

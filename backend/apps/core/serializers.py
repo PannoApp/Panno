@@ -36,10 +36,7 @@ class RestaurantInfoSerializer(serializers.ModelSerializer):
             'working_hours_note',
             'is_open_now',
             'tour_link',
-            # Ссылки для кнопки «Построить маршрут» — передавай все, клиент покажет доступные
             'twogis_link',
-            'google_maps_link',
-            'yandex_maps_link',
             'phone',
             'whatsapp',
             'telegram',
@@ -50,9 +47,6 @@ class RestaurantInfoSerializer(serializers.ModelSerializer):
             'privacy_policy',
             'terms_of_service',
             'feedback_url',
-            # Флаг депозита: если True — Flutter показывает предупреждение в форме бронирования
-            'booking_deposit_required',
-            'booking_deposit_note',
         )
 
     def get_is_open_now(self, obj) -> bool:

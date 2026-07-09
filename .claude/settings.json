@@ -61,7 +61,8 @@
       "Bash(docker-compose exec -T backend python manage.py shell -c ' *)",
       "Bash(curl -s -o /dev/null -w \"STATUS:%{http_code}\\\\n\" \"http://10.120.113.95:9000/panno-media/media/interior/53b40e78f2384aa1b0287e6f3f2f1932.png\" --max-time 5)",
       "Bash(ipconfig)",
-      "Bash(curl -s -o /dev/null -w \"SIZE:%{size_download} bytes, TIME:%{time_total}s, SPEED:%{speed_download} bytes/s\\\\n\" \"http://10.120.112.53:9000/panno-media/media/dishes/videos/6101241cf5a547fcac1351212e5c1356.mp4\")"
+      "Bash(curl -s -o /dev/null -w \"SIZE:%{size_download} bytes, TIME:%{time_total}s, SPEED:%{speed_download} bytes/s\\\\n\" \"http://10.120.112.53:9000/panno-media/media/dishes/videos/6101241cf5a547fcac1351212e5c1356.mp4\")",
+      "Bash(python manage.py makemigrations core)"
     ],
     "additionalDirectories": [
       "\\tmp"

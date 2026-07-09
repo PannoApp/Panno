@@ -87,7 +87,7 @@ HTTP-слой: [DioClient](api_client.md) (`lib/data/services/api_client.dart`),
 > `gender`/`email`/`birthday` в конструкторе, `fromJson`, `toJson`, `copyWith`.
 
 ### CoreInfo
-`address`, `workingHours`, `isOpenNow`, `phone`, `socialLinks`, `heroSlides`, `heroVideoUrl?`, `bookingDepositRequired`, `visitRules`, `privacyPolicy`
+`address`, `workingHours`, `isOpenNow`, `phone`, `socialLinks`, `heroSlides`, `heroVideoUrl?`, `visitRules`, `privacyPolicy`
 
 ### InteriorSlide
 `id`, `zone`, `zoneDisplay`, `imageUrl`, `caption?`, `order`

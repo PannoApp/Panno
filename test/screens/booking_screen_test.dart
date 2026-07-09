@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 
 import 'package:piligrim/data/models/availability_slot.dart';
 import 'package:piligrim/data/models/booking_request.dart';
-import 'package:piligrim/data/models/core_info.dart';
 import 'package:piligrim/data/models/user_profile.dart';
 import 'package:piligrim/data/repositories/booking_repository.dart';
 import 'package:piligrim/data/repositories/core_repository.dart';
@@ -43,19 +42,6 @@ UserProfile _sampleProfile() => const UserProfile(
       notifyPromotions: false,
       notifyClosedEvents: false,
       notificationsEnabled: true,
-    );
-
-CoreInfo _coreInfo({bool depositRequired = false, String? bookingDepositNote}) => CoreInfo(
-      address: 'Астана',
-      workingHours: '10:00–22:00',
-      isOpenNow: true,
-      phone: '+77001234567',
-      socialLinks: const [],
-      heroSlides: const [],
-      bookingDepositRequired: depositRequired,
-      bookingDepositNote: bookingDepositNote,
-      visitRules: const [],
-      privacyPolicy: 'Политика',
     );
 
 void main() {
@@ -142,21 +128,6 @@ void main() {
       await settle(tester); // pump обрабатывает addPostFrameCallback → заполняет поля
 
       expect(find.widgetWithText(TextFormField, '+77001234567'), findsOneWidget);
-    });
-
-    testWidgets('Если depositRequired=true → предупреждение видно', (tester) async {
-      core.coreInfo = _coreInfo(
-        depositRequired: true,
-        bookingDepositNote: 'Для выбранного стола может потребоваться депозит. Менеджер направит вас на звонок.',
-      );
-
-      await tester.pumpWidget(buildApp());
-      await settle(tester);
-
-      expect(
-        find.textContaining('Менеджер направит вас на звонок'),
-        findsOneWidget,
-      );
     });
 
     testWidgets('При успешном submitBooking() → success state отображается',

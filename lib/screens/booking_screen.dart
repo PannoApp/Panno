@@ -4,18 +4,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../core/auth_guard.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
 import '../data/models/booking_request.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
-import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/path_cta.dart';
 import '../widgets/piligrim_toast.dart';
-import '../widgets/piligrim_cta.dart';
 import '../widgets/piligrim_tap.dart';
 import '../core/piligrim_route.dart';
 import 'booking_success_screen.dart';
@@ -227,8 +224,6 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     final booking = context.watch<BookingProvider>();
-    final depositRequired =
-        context.watch<CoreInfoProvider>().coreInfo?.bookingDepositRequired ?? false;
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
@@ -504,58 +499,6 @@ class _BookingScreenState extends State<BookingScreen> {
                               hint: 'Повод визита, пожелания, аллергии',
                               maxLines: 4,
                             ),
-                            if (depositRequired) ...[
-                              const SizedBox(height: 18),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  color: PiligrimColors.earth.withValues(alpha: 0.4),
-                                  border: Border.all(
-                                    color: PiligrimColors.steppe.withValues(alpha: 0.45),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.info_outline_rounded,
-                                          color: PiligrimColors.steppe,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            context.watch<CoreInfoProvider>().coreInfo?.bookingDepositNote
-                                                ?? 'Для выбранного стола может потребоваться депозит. Уточните у менеджера.',
-                                            style: PiligrimTextStyles.caption.copyWith(
-                                              color: PiligrimColors.sky.withValues(alpha: 0.85),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    SecondaryCtaButton(
-                                      label: 'ПОЗВОНИТЬ МЕНЕДЖЕРУ',
-                                      height: 40,
-                                      onTap: () async {
-                                        final phone = context.read<CoreInfoProvider>().coreInfo?.phone ?? '';
-                                        if (phone.isNotEmpty) {
-                                          final uri = Uri.parse('tel:$phone');
-                                          if (await canLaunchUrl(uri)) {
-                                            await launchUrl(uri);
-                                          }
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 32),
                             PathCta(
                               label: booking.isSubmitting ? 'ОТПРАВЛЯЕМ...' : 'ОТПРАВИТЬ ЗАЯВКУ',
