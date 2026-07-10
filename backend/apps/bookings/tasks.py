@@ -246,6 +246,8 @@ def create_reserve_in_remarked(booking_id):
     в Remarked упадёт после исчерпания ретраев (см. TableBookingListCreateView).
     """
     from .models import TableBooking
+    from .services import pick_table_for_room
+    from apps.remarked.exceptions import RemarkedAPIError
     from apps.remarked.reserves_client import ReservesClient
 
     try:
@@ -263,6 +265,28 @@ def create_reserve_in_remarked(booking_id):
     }
     if booking.comment:
         reserve['comment'] = booking.comment
+
+    if booking.remarked_room_id:
+        # Гость выбрал конкретный зал — пытаемся честно забронировать стол
+        # именно в нём, а не полагаться на автоподбор Remarked по всему
+        # ресторану. Если между проверкой доступности и созданием брони зал
+        # разобрали (или Remarked недоступен для этого доп. запроса) — просто
+        # не передаём table_ids, бронь всё равно создастся без привязки к залу.
+        try:
+            table_id = pick_table_for_room(
+                booking.date.isoformat(),
+                booking.time.strftime('%H:%M:%S'),
+                booking.guests_count,
+                booking.remarked_room_id,
+            )
+        except RemarkedAPIError:
+            logger.warning(
+                "pick_table_for_room failed, creating reserve without table_ids: booking=%s room=%s",
+                booking_id, booking.remarked_room_id, exc_info=True,
+            )
+            table_id = None
+        if table_id:
+            reserve['table_ids'] = [table_id]
 
     client = ReservesClient()
     # Отдельный слой идемпотентности от нашего собственного Idempotency-Key

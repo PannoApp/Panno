@@ -16,6 +16,7 @@ import 'package:piligrim/providers/auth_provider.dart';
 import 'package:piligrim/providers/booking_provider.dart';
 import 'package:piligrim/providers/core_info_provider.dart';
 import 'package:piligrim/screens/booking_screen.dart' show BookingScreen, bookingTimeForApi;
+import 'package:piligrim/screens/booking_success_screen.dart';
 import 'package:piligrim/screens/phone_entry_screen.dart';
 
 import '../support/fake_token_storage.dart';
@@ -75,10 +76,15 @@ void main() {
 
     setUp(() {
       mockRepo = _MockBookingRepository();
-      // BookingScreen дёргает loadAvailability() при монтировании (initState) —
-      // дефолтный стаб нужен всем тестам, даже тем, что не проверяют слот-пикер.
-      when(() => mockRepo.fetchAvailability(date: any(named: 'date'), guests: any(named: 'guests')))
-          .thenAnswer((_) async => const []);
+      // BookingScreen дёргает loadAvailability() и loadZones() при монтировании
+      // (initState) — дефолтные стабы нужны всем тестам, даже тем, что не
+      // проверяют слот-пикер/выбор зала.
+      when(() => mockRepo.fetchAvailability(
+            date: any(named: 'date'),
+            guests: any(named: 'guests'),
+            zoneId: any(named: 'zoneId'),
+          )).thenAnswer((_) async => const []);
+      when(() => mockRepo.fetchZones()).thenAnswer((_) async => const []);
       final adapter = MockDioAdapter();
       final dio = createMockDio(adapter);
       auth = AuthProvider(
@@ -143,7 +149,12 @@ void main() {
       await tester.tap(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
       await settle(tester); // guardAuth + submitBooking завершаются
 
-      expect(find.text('Сценарий после отправки'), findsOneWidget);
+      // Предыдущая проверка искала текст 'Сценарий после отправки', которого
+      // нет нигде в BookingSuccessScreen (см. lib/screens/booking_success_screen.dart) —
+      // похоже на не обновлённый плейсхолдер из ранней версии теста. Проверяем
+      // реальный заголовок экрана успеха.
+      expect(find.byType(BookingSuccessScreen), findsOneWidget);
+      expect(find.textContaining('ЗАБРОНИРОВАН'), findsOneWidget);
     });
 
     group('предупреждение о занятости (Remarked)', () {
@@ -152,7 +163,11 @@ void main() {
       testWidgets('выбранное время занято (is_free=false) → показывает предупреждение',
           (tester) async {
         // Дефолтное время формы — 19:30
-        when(() => mockRepo.fetchAvailability(date: any(named: 'date'), guests: any(named: 'guests')))
+        when(() => mockRepo.fetchAvailability(
+              date: any(named: 'date'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            ))
             .thenAnswer((_) async => const [
                   AvailabilitySlot(time: '19:30:00', isFree: false, tablesCount: 0),
                 ]);
@@ -169,7 +184,11 @@ void main() {
 
       testWidgets('выбранное время свободно (is_free=true) → предупреждения нет',
           (tester) async {
-        when(() => mockRepo.fetchAvailability(date: any(named: 'date'), guests: any(named: 'guests')))
+        when(() => mockRepo.fetchAvailability(
+              date: any(named: 'date'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            ))
             .thenAnswer((_) async => const [
                   AvailabilitySlot(time: '19:30:00', isFree: true, tablesCount: 5),
                 ]);
@@ -182,7 +201,11 @@ void main() {
 
       testWidgets('нет точного совпадения слота с выбранным временем → предупреждения нет',
           (tester) async {
-        when(() => mockRepo.fetchAvailability(date: any(named: 'date'), guests: any(named: 'guests')))
+        when(() => mockRepo.fetchAvailability(
+              date: any(named: 'date'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            ))
             .thenAnswer((_) async => const [
                   AvailabilitySlot(time: '20:00:00', isFree: false, tablesCount: 0),
                 ]);
@@ -195,7 +218,11 @@ void main() {
 
       testWidgets('ошибка проверки доступности → предупреждения нет, форма не блокируется',
           (tester) async {
-        when(() => mockRepo.fetchAvailability(date: any(named: 'date'), guests: any(named: 'guests')))
+        when(() => mockRepo.fetchAvailability(
+              date: any(named: 'date'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            ))
             .thenThrow(Exception('Проверка занятости временно недоступна'));
 
         await tester.pumpWidget(buildApp());

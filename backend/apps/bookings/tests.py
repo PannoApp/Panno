@@ -572,7 +572,12 @@ class TableBookingPhoneAPITest(APITestCase):
 # ---------------------------------------------------------------------------
 
 class TableBookingZoneTest(TestCase):
-    """Проверяет, что сериализатор принимает допустимые зоны и отклоняет недопустимые."""
+    """
+    zone — свободный текст (реальные названия залов из Remarked, см.
+    apps/bookings/services.py::list_zones), больше не ограничен фиксированным
+    списком choices — раньше тут были придуманные main/terrace/private,
+    не совпадавшие с реальными залами ресторана («Зал 1», «Зал 2»).
+    """
 
     def _data(self, **overrides):
         data = {
@@ -585,36 +590,40 @@ class TableBookingZoneTest(TestCase):
         data.update(overrides)
         return data
 
-    def test_zone_main_is_valid(self):
-        s = TableBookingSerializer(data=self._data(zone='main'))
+    def test_zone_real_room_name_is_valid(self):
+        s = TableBookingSerializer(data=self._data(zone='Зал 1'))
         self.assertTrue(s.is_valid(), s.errors)
 
-    def test_zone_terrace_is_valid(self):
-        s = TableBookingSerializer(data=self._data(zone='terrace'))
-        self.assertTrue(s.is_valid(), s.errors)
-
-    def test_zone_private_is_valid(self):
-        s = TableBookingSerializer(data=self._data(zone='private'))
-        self.assertTrue(s.is_valid(), s.errors)
-
-    def test_zone_invalid_value_rejected(self):
-        # 'rooftop' не входит в choices — сериализатор должен вернуть ошибку
+    def test_zone_arbitrary_text_is_valid(self):
+        # zone больше не ограничен choices — любой текст проходит валидацию.
         s = TableBookingSerializer(data=self._data(zone='rooftop'))
-        self.assertFalse(s.is_valid())
-        self.assertIn('zone', s.errors)
+        self.assertTrue(s.is_valid(), s.errors)
 
     def test_zone_omitted_is_valid(self):
-        # zone — необязательное поле
         s = TableBookingSerializer(data=self._data())
         self.assertTrue(s.is_valid(), s.errors)
 
+    def test_remarked_room_id_is_valid(self):
+        s = TableBookingSerializer(data=self._data(zone='Зал 1', remarked_room_id=304))
+        self.assertTrue(s.is_valid(), s.errors)
+        self.assertEqual(s.validated_data['remarked_room_id'], 304)
+
+    def test_remarked_room_id_omitted_is_valid(self):
+        s = TableBookingSerializer(data=self._data())
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_remarked_room_id_non_integer_rejected(self):
+        s = TableBookingSerializer(data=self._data(remarked_room_id='not-a-number'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('remarked_room_id', s.errors)
+
 
 # ---------------------------------------------------------------------------
-# Поле zone — API
+# Поле zone / remarked_room_id — API
 # ---------------------------------------------------------------------------
 
 class TableBookingZoneAPITest(APITestCase):
-    """Проверяет поле zone через API: возврат в ответе и валидация значения."""
+    """Проверяет поля zone и remarked_room_id через API: возврат в ответе, валидация типа."""
 
     def setUp(self):
         self.user = make_user('+77015000001')
@@ -629,29 +638,30 @@ class TableBookingZoneAPITest(APITestCase):
             'date': '2026-07-01',
             'time': '19:00:00',
             'guests_count': 2,
-            'zone': 'terrace',
+            'zone': 'Зал 2',
+            'remarked_room_id': 305,
         }
         resp = self.client.post(
             '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(resp.data['zone'], 'terrace')
+        self.assertEqual(resp.data['zone'], 'Зал 2')
+        self.assertEqual(resp.data['remarked_room_id'], 305)
 
-    def test_create_booking_invalid_zone_returns_400(self):
-        # Недопустимое значение зоны должно возвращать 400
+    def test_create_booking_non_integer_remarked_room_id_returns_400(self):
         payload = {
             'guest_name': 'Зонный тест',
             'phone': '+77001234567',
             'date': '2026-07-01',
             'time': '19:00:00',
             'guests_count': 2,
-            'zone': 'rooftop',
+            'remarked_room_id': 'not-a-number',
         }
         resp = self.client.post(
             '/api/v1/bookings/', payload, HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('zone', resp.data)
+        self.assertIn('remarked_room_id', resp.data)
 
 
 # ---------------------------------------------------------------------------
@@ -2273,6 +2283,207 @@ class CreateReserveInRemarkedTaskTest(TestCase):
         self.assertTrue(create_reserve_in_remarked.acks_late)
         self.assertTrue(create_reserve_in_remarked.reject_on_worker_lost)
         self.assertIn(Exception, create_reserve_in_remarked.autoretry_for)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    @patch('apps.bookings.services.pick_table_for_room')
+    def test_passes_table_ids_when_room_selected_and_table_found(self, mock_pick, mock_create):
+        mock_pick.return_value = 4384
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(
+            user=self.user, phone='+77001234567', date='2026-06-15',
+            time='19:30:00', guests_count=2, remarked_room_id=305,
+        )
+        self._call(booking.pk)
+        mock_pick.assert_called_once_with('2026-06-15', '19:30:00', 2, 305)
+        reserve = mock_create.call_args[0][0]
+        self.assertEqual(reserve['table_ids'], [4384])
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    @patch('apps.bookings.services.pick_table_for_room')
+    def test_no_table_ids_when_room_selected_but_nothing_free(self, mock_pick, mock_create):
+        mock_pick.return_value = None
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(user=self.user, phone='+77001234567', remarked_room_id=305)
+        self._call(booking.pk)
+        reserve = mock_create.call_args[0][0]
+        self.assertNotIn('table_ids', reserve)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    @patch('apps.bookings.services.pick_table_for_room')
+    def test_room_lookup_error_does_not_block_reserve_creation(self, mock_pick, mock_create):
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_pick.side_effect = RemarkedAPIError(code=500, message='boom', status_code=500)
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(user=self.user, phone='+77001234567', remarked_room_id=305)
+        self._call(booking.pk)
+        booking.refresh_from_db()
+        self.assertEqual(booking.remarked_reserve_id, 1)
+        reserve = mock_create.call_args[0][0]
+        self.assertNotIn('table_ids', reserve)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    @patch('apps.bookings.services.pick_table_for_room')
+    def test_no_room_selected_skips_table_lookup(self, mock_pick, mock_create):
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(user=self.user, phone='+77001234567')
+        self._call(booking.pk)
+        mock_pick.assert_not_called()
+        reserve = mock_create.call_args[0][0]
+        self.assertNotIn('table_ids', reserve)
+
+
+# ---------------------------------------------------------------------------
+# apps.bookings.services — залы (get_rooms/list_zones/pick_table_for_room)
+# ---------------------------------------------------------------------------
+
+_SLOTS_WITH_ROOMS_RESPONSE = {
+    'status': 'success',
+    'slots': [
+        {
+            'start_datetime': '2026-07-20 19:00:00', 'is_free': True,
+            'tables_count': 2, 'tables_ids': [4384, 4391],
+        },
+        {
+            'start_datetime': '2026-07-20 19:30:00', 'is_free': True,
+            'tables_count': 1, 'tables_ids': [4391],
+        },
+    ],
+    'rooms': {
+        '304': {'id': 304, 'name': 'Зал 1', 'tables': {'4361': {'id': 4361, 'name': '4', 'capacity': 2}}},
+        '305': {
+            'id': 305, 'name': 'Зал 2',
+            'tables': {
+                '4384': {'id': 4384, 'name': '202', 'capacity': 2},
+                '4391': {'id': 4391, 'name': '210', 'capacity': 2},
+            },
+        },
+    },
+}
+
+
+class RemarkedRoomsServiceTest(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_get_rooms_parses_rooms_and_tables(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import get_rooms
+        rooms = get_rooms()
+        self.assertEqual(set(rooms.keys()), {304, 305})
+        self.assertEqual(rooms[305]['name'], 'Зал 2')
+        self.assertEqual(set(rooms[305]['tables'].keys()), {4384, 4391})
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_get_rooms_cached_on_second_call(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import get_rooms
+        get_rooms()
+        get_rooms()
+        self.assertEqual(mock_instance.get_slots.call_count, 1)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_list_zones_returns_id_and_name_only(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import list_zones
+        zones = list_zones()
+        self.assertCountEqual(zones, [{'id': 304, 'name': 'Зал 1'}, {'id': 305, 'name': 'Зал 2'}])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_check_availability_filters_by_zone(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import check_availability
+        # Без zone_id — считаем по всему ресторану (tables_count как в ответе).
+        result_all = check_availability('2026-07-20', 2)
+        self.assertEqual(result_all[0]['tables_count'], 2)
+        self.assertEqual(result_all[1]['tables_count'], 1)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_check_availability_zone_id_narrows_tables_count(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import check_availability
+        # Зал 304 содержит только стол 4361, которого нет ни в одном слоте выше.
+        result = check_availability('2026-07-20', 2, zone_id=304)
+        self.assertEqual(result[0]['tables_count'], 0)
+        self.assertFalse(result[0]['is_free'])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_check_availability_zone_id_matching_room(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import check_availability
+        result = check_availability('2026-07-20', 2, zone_id=305)
+        self.assertEqual(result[0]['tables_count'], 2)
+        self.assertTrue(result[0]['is_free'])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_pick_table_for_room_returns_free_table_at_exact_time(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import pick_table_for_room
+        table_id = pick_table_for_room('2026-07-20', '19:30:00', 2, 305)
+        self.assertEqual(table_id, 4391)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_pick_table_for_room_returns_none_for_unknown_room(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import pick_table_for_room
+        self.assertIsNone(pick_table_for_room('2026-07-20', '19:30:00', 2, 999))
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_pick_table_for_room_returns_none_when_time_not_free(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import pick_table_for_room
+        self.assertIsNone(pick_table_for_room('2026-07-20', '20:00:00', 2, 305))
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/bookings/zones/
+# ---------------------------------------------------------------------------
+
+class BookingZonesViewTest(APITestCase):
+    URL = '/api/v1/bookings/zones/'
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_returns_zones_anonymous(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertCountEqual(response.data, [{'id': 304, 'name': 'Зал 1'}, {'id': 305, 'name': 'Зал 2'}])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_second_request_uses_cache(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        self.client.get(self.URL)
+        self.client.get(self.URL)
+        self.assertEqual(mock_instance.get_slots.call_count, 1)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_remarked_error_returns_empty_list_not_500(self, mock_client_cls):
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.side_effect = RemarkedAPIError(code=500, message='boom', status_code=500)
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
 
 
 # ---------------------------------------------------------------------------

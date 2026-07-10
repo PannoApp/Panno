@@ -8,6 +8,7 @@ import '../core/auth_guard.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
 import '../data/models/booking_request.dart';
+import '../data/models/booking_zone.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../widgets/piligrim_background.dart';
@@ -39,15 +40,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   DateTime _visitDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _visitTime = const TimeOfDay(hour: 19, minute: 30);
-  String? _selectedZone = 'Главный зал';
   Timer? _guestsDebounce;
-
-  static const _zones = ['Главный зал', 'Терраса', 'Приват'];
-  static const _zoneApiMap = {
-    'Главный зал': 'main',
-    'Терраса': 'terrace',
-    'Приват': 'private',
-  };
 
   @override
   void initState() {
@@ -61,10 +54,12 @@ class _BookingScreenState extends State<BookingScreen> {
         if (phone.isNotEmpty) _phoneCtrl.text = phone;
       }
 
-      // Синхронизируем черновик формы с провайдером и запускаем первую
-      // проверку доступности слотов на дефолтную дату/кол-во гостей.
+      // Синхронизируем черновик формы с провайдером, грузим реальные залы
+      // ресторана и запускаем первую проверку доступности слотов на
+      // дефолтную дату/кол-во гостей.
       final booking = context.read<BookingProvider>();
       booking.setVisitDate(_visitDate);
+      booking.loadZones();
       booking.loadAvailability();
     });
   }
@@ -164,13 +159,15 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final booking = context.read<BookingProvider>();
+    final selectedZone = booking.selectedZone;
     final req = BookingRequest(
       guestName: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       date: _dateForApi,
       time: _timeForApi,
       guestsCount: int.parse(_guestsCtrl.text),
-      zone: _selectedZone != null ? _zoneApiMap[_selectedZone] : null,
+      zone: selectedZone?.name,
+      remarkedRoomId: selectedZone?.id,
       comment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
     );
 
@@ -181,12 +178,14 @@ class _BookingScreenState extends State<BookingScreen> {
       final dateText = _dateLabel;
       final timeText = _timeLabel;
       final count = int.parse(_guestsCtrl.text);
-      final zoneText = _selectedZone;
+      // booking.selectedZone к этому моменту уже сброшен провайдером
+      // (submitBooking → _resetForm), поэтому берём имя из значения,
+      // захваченного до отправки.
+      final zoneText = selectedZone?.name;
 
       _nameCtrl.clear();
       _commentCtrl.clear();
       setState(() {
-        _selectedZone = null;
         _visitDate = DateTime.now().add(const Duration(days: 1));
         _visitTime = const TimeOfDay(hour: 19, minute: 0);
       });
@@ -474,24 +473,28 @@ class _BookingScreenState extends State<BookingScreen> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 18),
-                            const _FieldLabel('Зона / зал (опционально)'),
-                            Row(
-                              children: _zones.asMap().entries.map((e) {
-                                final zone = e.value;
-                                final isLast = e.key == _zones.length - 1;
-                                return Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(right: isLast ? 0 : 8),
-                                    child: _ZoneButton(
-                                      label: zone,
-                                      isSelected: _selectedZone == zone,
-                                      onTap: () => setState(() => _selectedZone = zone),
+                            if (booking.zones.isNotEmpty) ...[
+                              const SizedBox(height: 18),
+                              const _FieldLabel('Зона / зал (опционально)'),
+                              Row(
+                                children: booking.zones.asMap().entries.map((e) {
+                                  final BookingZone zone = e.value;
+                                  final isLast = e.key == booking.zones.length - 1;
+                                  return Expanded(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(right: isLast ? 0 : 8),
+                                      child: _ZoneButton(
+                                        label: zone.name,
+                                        isSelected: booking.selectedZone?.id == zone.id,
+                                        onTap: () => booking.setZone(
+                                          booking.selectedZone?.id == zone.id ? null : zone,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
                             const SizedBox(height: 18),
                             const _FieldLabel('Комментарий'),
                             _PiligrimInput(

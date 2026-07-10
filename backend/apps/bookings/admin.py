@@ -65,6 +65,6 @@ class TableBookingAdmin(ModelAdmin):
             'fields': ('date', 'time', 'zone', 'status')
         }),
         ('Системные данные', {
-            'fields': ('remarked_reserve_id', 'created_at'),
+            'fields': ('remarked_reserve_id', 'remarked_room_id', 'created_at'),
         }),
     )

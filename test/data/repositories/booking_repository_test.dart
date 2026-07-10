@@ -117,5 +117,37 @@ void main() {
         throwsA(isA<DioException>()),
       );
     });
+
+    test('fetchAvailability() передаёт zone_id, если указан', () async {
+      adapter.enqueue(200, {'date': '2026-07-15', 'guests_count': 2, 'slots': []});
+      await repository.fetchAvailability(date: '2026-07-15', guests: 2, zoneId: 305);
+
+      final req = adapter.captured.single;
+      expect(req.queryParameters['zone_id'], 305);
+    });
+
+    test('fetchAvailability() без zoneId не отправляет zone_id', () async {
+      adapter.enqueue(200, {'date': '2026-07-15', 'guests_count': 2, 'slots': []});
+      await repository.fetchAvailability(date: '2026-07-15', guests: 2);
+
+      final req = adapter.captured.single;
+      expect(req.queryParameters.containsKey('zone_id'), isFalse);
+    });
+
+    test('fetchZones() возвращает список BookingZone', () async {
+      adapter.enqueue(200, [
+        {'id': 304, 'name': 'Зал 1'},
+        {'id': 305, 'name': 'Зал 2'},
+      ]);
+
+      final result = await repository.fetchZones();
+
+      expect(adapter.captured.single.path, contains('/bookings/zones/'));
+      expect(result, hasLength(2));
+      expect(result.first.id, 304);
+      expect(result.first.name, 'Зал 1');
+      expect(result.last.id, 305);
+      expect(result.last.name, 'Зал 2');
+    });
   });
 }

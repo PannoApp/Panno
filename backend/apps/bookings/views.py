@@ -24,9 +24,10 @@ from .models import TableBooking
 from .serializers import (
     AvailabilityQuerySerializer,
     AvailabilityResponseSerializer,
+    BookingZoneSerializer,
     TableBookingSerializer,
 )
-from .services import check_availability
+from .services import check_availability, list_zones
 from .tasks import _build_booking_html, _tg_post
 
 logger = logging.getLogger(__name__)
@@ -138,23 +139,26 @@ _error_503 = OpenApiResponse(
     examples=[OpenApiExample('Remarked недоступен', value={'detail': 'Проверка занятости временно недоступна'})],
 )
 
-_availability_cache_key_fmt = 'reserve_availability:{date}:{guests}'
+_availability_cache_key_fmt = 'reserve_availability:{date}:{guests}:{zone}'
+_zones_cache_key = 'reserve_zones'
 
 
 @extend_schema(tags=['Bookings'])
 class BookingAvailabilityView(APIView):
     """
-    Публичная проверка занятости на дату (весь ресторан, без фильтра по
-    залу — см. docs/bookings.md, «Задел на будущее»). Ничего не создаёт и не
-    меняет — обычный просмотр, как /api/v1/menu/ или /api/v1/core/info/.
+    Публичная проверка занятости на дату, опционально — по конкретному залу
+    (см. BookingZonesView и apps/bookings/services.py::get_rooms). Ничего не
+    создаёт и не меняет — обычный просмотр, как /api/v1/menu/ или
+    /api/v1/core/info/.
     """
     permission_classes = [AllowAny]
 
     @extend_schema(
         summary='Проверить доступность на дату',
         description=(
-            'Возвращает список получасовых слотов на указанную дату с флагом занятости '
-            'для всего ресторана (без разбивки по залам).\n\n'
+            'Возвращает список получасовых слотов на указанную дату с флагом занятости.\n\n'
+            'Если передан `zone_id` (см. `/bookings/zones/`) — занятость считается только '
+            'по столам этого зала, иначе — по всему ресторану.\n\n'
             'Результат кешируется на 60 секунд. Недоступность Remarked не блокирует '
             'создание брони — эндпоинт лишь подсказка для UI, при 503 клиент может '
             'продолжить бронирование без проверки.'
@@ -162,6 +166,7 @@ class BookingAvailabilityView(APIView):
         parameters=[
             OpenApiParameter(name='date', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True, description='Дата визита, YYYY-MM-DD'),
             OpenApiParameter(name='guests', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=True, description='Количество гостей (1–50)'),
+            OpenApiParameter(name='zone_id', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=False, description='ID зала из /bookings/zones/ (опционально)'),
         ],
         responses={
             200: AvailabilityResponseSerializer,
@@ -188,18 +193,57 @@ class BookingAvailabilityView(APIView):
         query.is_valid(raise_exception=True)
         date = query.validated_data['date']
         guests = query.validated_data['guests']
+        zone_id = query.validated_data.get('zone_id')
 
-        cache_key = _availability_cache_key_fmt.format(date=date.isoformat(), guests=guests)
+        cache_key = _availability_cache_key_fmt.format(date=date.isoformat(), guests=guests, zone=zone_id or '')
         slots = safe_cache_get(cache_key)
         if slots is None:
             try:
-                slots = check_availability(date.isoformat(), guests)
+                slots = check_availability(date.isoformat(), guests, zone_id=zone_id)
             except RemarkedAPIError:
-                logger.warning("Availability check failed: date=%s guests=%s", date, guests, exc_info=True)
+                logger.warning("Availability check failed: date=%s guests=%s zone_id=%s", date, guests, zone_id, exc_info=True)
                 return Response({'detail': 'Проверка занятости временно недоступна'}, status=503)
             safe_cache_set(cache_key, slots, timeout=60)
 
         return Response({'date': date, 'guests_count': guests, 'slots': slots})
+
+
+@extend_schema(tags=['Bookings'])
+class BookingZonesView(APIView):
+    """
+    Список реальных залов ресторана из Remarked (id + название), для пикера
+    зала в форме бронирования — см. apps/bookings/services.py::list_zones.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Список залов ресторана',
+        description=(
+            'Возвращает реальные залы ресторана (id и название) из Remarked. '
+            'Результат кешируется на час. При недоступности Remarked возвращает '
+            'пустой список — клиент должен считать выбор зала необязательным.'
+        ),
+        responses={
+            200: BookingZoneSerializer(many=True),
+        },
+        examples=[
+            OpenApiExample(
+                'Пример ответа',
+                value=[{'id': 304, 'name': 'Зал 1'}, {'id': 305, 'name': 'Зал 2'}],
+                response_only=True,
+            ),
+        ],
+    )
+    def get(self, request, *args, **kwargs):
+        zones = safe_cache_get(_zones_cache_key)
+        if zones is None:
+            try:
+                zones = list_zones()
+            except RemarkedAPIError:
+                logger.warning("Zones fetch failed", exc_info=True)
+                return Response([])
+            safe_cache_set(_zones_cache_key, zones, timeout=60 * 60)
+        return Response(zones)
 
 
 def _get_manager_keyboard():

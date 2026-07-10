@@ -5,6 +5,7 @@ import '../core/dio_errors.dart';
 import '../data/models/api_booking.dart';
 import '../data/models/availability_slot.dart';
 import '../data/models/booking_request.dart';
+import '../data/models/booking_zone.dart';
 import '../data/repositories/booking_repository.dart';
 
 class BookingProvider extends ChangeNotifier {
@@ -15,12 +16,17 @@ class BookingProvider extends ChangeNotifier {
   String? _idempotencyKey;
 
   // Черновик формы (выбранные пользователем значения до отправки)
-  String? selectedZone = 'Главный зал';
+  BookingZone? selectedZone;
   int guests = 2;
   DateTime? visitDate;
   DateTime? visitTime;
 
-  static const zones = ['Главный зал', 'Терраса', 'Приват'];
+  // Реальные залы ресторана из Remarked (см. GET /bookings/zones/) —
+  // раньше тут был захардкоженный список main/terrace/private, не
+  // совпадавший с реальными залами.
+  List<BookingZone> zones = const [];
+  bool isLoadingZones = false;
+  String? zonesError;
 
   // Состояние отправки заявки
   bool isSubmitting = false;
@@ -32,14 +38,15 @@ class BookingProvider extends ChangeNotifier {
   bool isLoadingHistory = false;
   String? historyError;
 
-  // Проверка доступности слотов на выбранную дату/кол-во гостей
+  // Проверка доступности слотов на выбранную дату/кол-во гостей/зал
   List<AvailabilitySlot> availabilitySlots = const [];
   bool isLoadingAvailability = false;
   String? availabilityError;
 
-  void setZone(String? zone) {
+  void setZone(BookingZone? zone) {
     selectedZone = zone;
     notifyListeners();
+    loadAvailability();
   }
 
   void setGuests(int count) {
@@ -57,6 +64,26 @@ class BookingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Список залов не зависит от даты/гостей и меняется редко — грузим один
+  // раз (экран вызывает это в initState). Недоступность Remarked не должна
+  // ломать форму брони — просто выбор зала останется пустым (необязательное поле).
+  Future<void> loadZones() async {
+    if (isLoadingZones || zones.isNotEmpty) return;
+    isLoadingZones = true;
+    zonesError = null;
+    notifyListeners();
+
+    try {
+      zones = await _repository.fetchZones();
+    } catch (e) {
+      zonesError = dioErrorMessage(e);
+      zones = const [];
+    } finally {
+      isLoadingZones = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> loadAvailability() async {
     final date = visitDate;
     if (date == null || isLoadingAvailability) return;
@@ -69,6 +96,7 @@ class BookingProvider extends ChangeNotifier {
       availabilitySlots = await _repository.fetchAvailability(
         date: _formatDateForApi(date),
         guests: guests,
+        zoneId: selectedZone?.id,
       );
     } catch (e) {
       availabilityError = dioErrorMessage(e);
@@ -133,7 +161,7 @@ class BookingProvider extends ChangeNotifier {
   Future<void> retryHistory() => loadHistory();
 
   void _resetForm() {
-    selectedZone = 'Главный зал';
+    selectedZone = null;
     guests = 2;
     visitDate = null;
     visitTime = null;
