@@ -39,7 +39,8 @@ class TableBookingSerializer(serializers.ModelSerializer):
         model = TableBooking
         fields = (
             'id', 'guest_name', 'phone', 'date', 'time', 'guests_count',
-            'zone', 'remarked_room_id', 'comment', 'status', 'created_at',
+            'zone', 'remarked_room_id', 'remarked_table_id', 'comment',
+            'status', 'created_at',
         )
         read_only_fields = ('id', 'status', 'created_at')
 
@@ -50,10 +51,24 @@ class BookingZoneSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
+class BookingTableSerializer(serializers.Serializer):
+    """Только для схемы ответа (drf-spectacular) — сам ответ отдаётся как plain dict."""
+    id = serializers.IntegerField()
+    name = serializers.CharField(allow_null=True)
+    capacity = serializers.IntegerField(allow_null=True)
+
+
 class AvailabilityQuerySerializer(serializers.Serializer):
     date = serializers.DateField()
     guests = serializers.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(50)])
     zone_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+
+
+class AvailableTablesQuerySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    time = serializers.TimeField()
+    guests = serializers.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(50)])
+    zone_id = serializers.IntegerField()
 
 
 class AvailabilitySlotSerializer(serializers.Serializer):

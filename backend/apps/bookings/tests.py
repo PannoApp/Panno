@@ -617,6 +617,20 @@ class TableBookingZoneTest(TestCase):
         self.assertFalse(s.is_valid())
         self.assertIn('remarked_room_id', s.errors)
 
+    def test_remarked_table_id_is_valid(self):
+        s = TableBookingSerializer(data=self._data(zone='Зал 2', remarked_room_id=305, remarked_table_id=4391))
+        self.assertTrue(s.is_valid(), s.errors)
+        self.assertEqual(s.validated_data['remarked_table_id'], 4391)
+
+    def test_remarked_table_id_omitted_is_valid(self):
+        s = TableBookingSerializer(data=self._data())
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_remarked_table_id_non_integer_rejected(self):
+        s = TableBookingSerializer(data=self._data(remarked_table_id='not-a-number'))
+        self.assertFalse(s.is_valid())
+        self.assertIn('remarked_table_id', s.errors)
+
 
 # ---------------------------------------------------------------------------
 # Поле zone / remarked_room_id — API
@@ -2256,6 +2270,42 @@ class CreateReserveInRemarkedTaskTest(TestCase):
         self.assertEqual(reserve['phone'], self.user.phone)
 
     @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_business_rejection_from_remarked_does_not_raise_or_retry(self, mock_create):
+        # HTTP 200, но тело — business-level отказ Remarked (например, "Time
+        # is restricted to reservation"): повтор с теми же параметрами
+        # провалится так же, поэтому задача не должна пробрасывать исключение
+        # (иначе autoretry_for бесполезно потратит 3 попытки).
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_create.side_effect = RemarkedAPIError(
+            code=200, message='Time is restricted to reservation', status_code=200,
+        )
+        booking = make_booking(user=self.user, phone='+77001234567')
+        self._call(booking.pk)  # не должно бросить исключение
+        booking.refresh_from_db()
+        self.assertIsNone(booking.remarked_reserve_id)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_server_error_from_remarked_still_propagates_for_retry(self, mock_create):
+        # Настоящая транспортная/серверная ошибка (5xx) — потенциально
+        # временная, поэтому исключение должно пробрасываться дальше, чтобы
+        # autoretry_for=(Exception,) перезапустил задачу как раньше.
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_create.side_effect = RemarkedAPIError(code=500, message='boom', status_code=500)
+        booking = make_booking(user=self.user, phone='+77001234567')
+        with self.assertRaises(RemarkedAPIError):
+            self._call(booking.pk)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    def test_network_error_from_remarked_still_propagates_for_retry(self, mock_create):
+        # status_code=None (сетевой сбой, см. client.py::_post) — тоже
+        # потенциально временная проблема, должна ретраиться как раньше.
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_create.side_effect = RemarkedAPIError(message='Connection reset')
+        booking = make_booking(user=self.user, phone='+77001234567')
+        with self.assertRaises(RemarkedAPIError):
+            self._call(booking.pk)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
     def test_generates_unique_request_id(self, mock_create):
         mock_create.return_value = {'status': 'success', 'reserve_id': 1}
         booking = make_booking(user=self.user, phone='+77001234567')
@@ -2326,6 +2376,73 @@ class CreateReserveInRemarkedTaskTest(TestCase):
     def test_no_room_selected_skips_table_lookup(self, mock_pick, mock_create):
         mock_create.return_value = {'status': 'success', 'reserve_id': 1}
         booking = make_booking(user=self.user, phone='+77001234567')
+        self._call(booking.pk)
+        mock_pick.assert_not_called()
+        reserve = mock_create.call_args[0][0]
+        self.assertNotIn('table_ids', reserve)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    @patch('apps.bookings.services.pick_table_for_room')
+    @patch('apps.bookings.services._free_table_ids_at_slot')
+    def test_explicit_table_selected_used_directly_no_pick(self, mock_free_ids, mock_pick, mock_create):
+        # Гость выбрал конкретный стол — перепроверяем, что он всё ещё
+        # свободен (см. _free_table_ids_at_slot), и передаём его напрямую;
+        # pick_table_for_room вообще не вызывается (стол уже выбран, не «Любой»).
+        mock_free_ids.return_value = [4391]
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(
+            user=self.user, phone='+77001234567',
+            remarked_room_id=305, remarked_table_id=4391,
+        )
+        self._call(booking.pk)
+        mock_pick.assert_not_called()
+        mock_free_ids.assert_called_once_with('2026-06-15', '19:00:00', 2, 305)
+        reserve = mock_create.call_args[0][0]
+        self.assertEqual(reserve['table_ids'], [4391])
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    @patch('apps.bookings.services.pick_table_for_room')
+    @patch('apps.bookings.services._free_table_ids_at_slot')
+    def test_explicit_table_no_longer_free_falls_back_without_table_ids(self, mock_free_ids, mock_pick, mock_create):
+        # За время между показом пикера и выполнением этой (асинхронной)
+        # задачи стол успели занять — не передаём table_ids вовсе, бронь
+        # создаётся без привязки к конкретному столу, а не конфликтует в Remarked.
+        mock_free_ids.return_value = [4384]  # 4391 больше не свободен
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(
+            user=self.user, phone='+77001234567',
+            remarked_room_id=305, remarked_table_id=4391,
+        )
+        self._call(booking.pk)
+        mock_pick.assert_not_called()
+        reserve = mock_create.call_args[0][0]
+        self.assertNotIn('table_ids', reserve)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    @patch('apps.bookings.services.pick_table_for_room')
+    @patch('apps.bookings.services._free_table_ids_at_slot')
+    def test_explicit_table_recheck_error_falls_back_without_table_ids(self, mock_free_ids, mock_pick, mock_create):
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_free_ids.side_effect = RemarkedAPIError(code=500, message='boom', status_code=500)
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(
+            user=self.user, phone='+77001234567',
+            remarked_room_id=305, remarked_table_id=4391,
+        )
+        self._call(booking.pk)
+        booking.refresh_from_db()
+        self.assertEqual(booking.remarked_reserve_id, 1)
+        reserve = mock_create.call_args[0][0]
+        self.assertNotIn('table_ids', reserve)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.create_reserve')
+    @patch('apps.bookings.services.pick_table_for_room')
+    def test_explicit_table_without_room_skips_recheck_and_table_ids(self, mock_pick, mock_create):
+        # Без remarked_room_id перепроверить стол нечем (нет контекста зала) —
+        # в этом случае консервативно не передаём table_ids вовсе, а не
+        # доверяем потенциально устаревшему выбору без проверки.
+        mock_create.return_value = {'status': 'success', 'reserve_id': 1}
+        booking = make_booking(user=self.user, phone='+77001234567', remarked_table_id=4391)
         self._call(booking.pk)
         mock_pick.assert_not_called()
         reserve = mock_create.call_args[0][0]
@@ -2446,6 +2563,49 @@ class RemarkedRoomsServiceTest(TestCase):
         from apps.bookings.services import pick_table_for_room
         self.assertIsNone(pick_table_for_room('2026-07-20', '20:00:00', 2, 305))
 
+    @patch('apps.bookings.services.ReservesClient')
+    def test_list_available_tables_returns_name_and_capacity(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import list_available_tables
+        tables = list_available_tables('2026-07-20', '19:00:00', 2, 305)
+        self.assertEqual(tables, [
+            {'id': 4384, 'name': '202', 'capacity': 2},
+            {'id': 4391, 'name': '210', 'capacity': 2},
+        ])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_list_available_tables_sorted_by_numeric_name(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        response = {
+            'status': 'success',
+            'slots': [{'start_datetime': '2026-07-20 19:00:00', 'is_free': True, 'tables_count': 3, 'tables_ids': [1, 2, 3]}],
+            'rooms': {'305': {'id': 305, 'name': 'Зал 2', 'tables': {
+                '1': {'id': 1, 'name': '10', 'capacity': 2},
+                '2': {'id': 2, 'name': '2', 'capacity': 2},
+                '3': {'id': 3, 'name': '1', 'capacity': 2},
+            }}},
+        }
+        mock_instance.get_slots.return_value = response
+        from apps.bookings.services import list_available_tables
+        tables = list_available_tables('2026-07-20', '19:00:00', 2, 305)
+        # Числовая сортировка: '1', '2', '10' — а не лексикографическая ('1', '10', '2')
+        self.assertEqual([t['name'] for t in tables], ['1', '2', '10'])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_list_available_tables_unknown_room_returns_empty(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import list_available_tables
+        self.assertEqual(list_available_tables('2026-07-20', '19:00:00', 2, 999), [])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_list_available_tables_time_not_free_returns_empty(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        from apps.bookings.services import list_available_tables
+        self.assertEqual(list_available_tables('2026-07-20', '20:00:00', 2, 305), [])
+
 
 # ---------------------------------------------------------------------------
 # GET /api/v1/bookings/zones/
@@ -2484,6 +2644,100 @@ class BookingZonesViewTest(APITestCase):
         response = self.client.get(self.URL)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/bookings/tables/
+# ---------------------------------------------------------------------------
+
+class BookingTablesViewTest(APITestCase):
+    URL = '/api/v1/bookings/tables/'
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def _params(self, **overrides):
+        params = {'date': '2026-07-20', 'time': '19:00:00', 'guests': 2, 'zone_id': 305}
+        params.update(overrides)
+        return params
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_returns_tables_anonymous(self, mock_client_cls):
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        response = self.client.get(self.URL, self._params())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [
+            {'id': 4384, 'name': '202', 'capacity': 2},
+            {'id': 4391, 'name': '210', 'capacity': 2},
+        ])
+
+    def test_missing_zone_id_returns_400(self):
+        params = self._params()
+        del params['zone_id']
+        response = self.client.get(self.URL, params)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('zone_id', response.data)
+
+    def test_missing_time_returns_400(self):
+        params = self._params()
+        del params['time']
+        response = self.client.get(self.URL, params)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('time', response.data)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_confirmed_zero_free_tables_returns_200_empty_list(self, mock_client_cls):
+        # Remarked ответил успешно, но у зала 304 (Зал 1, стол 4361) в этот
+        # слот нет ни одного своего свободного стола (tables_ids слота —
+        # только 4384/4391, оба из Зала 2) — это подтверждённый факт, не
+        # ошибка, поэтому 200 с пустым списком, а не 503.
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        response = self.client.get(self.URL, self._params(zone_id=304))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_remarked_error_returns_503_not_empty_list(self, mock_client_cls):
+        # В отличие от /bookings/zones/, пустой список тут — подтверждённый
+        # факт «в зале нет свободных столов» (клиент должен на это опираться,
+        # чтобы не дать забронировать зал без мест). Поэтому при реальной
+        # ошибке Remarked (не «зон свободных нет», а «неизвестно») отдаём 503,
+        # как и /bookings/availability/, а не 200 с тем же пустым списком.
+        from apps.remarked.exceptions import RemarkedAPIError
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.side_effect = RemarkedAPIError(code=500, message='boom', status_code=500)
+        response = self.client.get(self.URL, self._params())
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_second_request_uses_cache(self, mock_client_cls):
+        # Первый запрос делает 2 вызова get_slots: один — get_rooms() (и
+        # кеширует залы отдельно на час), другой — сам подбор свободных
+        # столов на точное время (не кешируется на этом уровне). Второй
+        # запрос с теми же параметрами полностью берётся из view-кеша
+        # (`_tables_cache_key_fmt`) — новых вызовов get_slots быть не должно.
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        self.client.get(self.URL, self._params())
+        self.assertEqual(mock_instance.get_slots.call_count, 2)
+        self.client.get(self.URL, self._params())
+        self.assertEqual(mock_instance.get_slots.call_count, 2)
+
+    @patch('apps.bookings.services.ReservesClient')
+    def test_different_zone_not_cached_together(self, mock_client_cls):
+        # Второй запрос (другой zone_id) — промах view-кеша, но get_rooms()
+        # уже закеширован после первого запроса, поэтому добавляется только
+        # один новый вызов get_slots (подбор столов), а не два.
+        mock_instance = mock_client_cls.return_value
+        mock_instance.get_slots.return_value = _SLOTS_WITH_ROOMS_RESPONSE
+        self.client.get(self.URL, self._params(zone_id=305))
+        self.client.get(self.URL, self._params(zone_id=304))
+        self.assertEqual(mock_instance.get_slots.call_count, 3)
 
 
 # ---------------------------------------------------------------------------

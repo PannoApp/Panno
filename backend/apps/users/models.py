@@ -55,6 +55,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         null=True,
         help_text="ID гостя (gid) в CRM Remarked. Пусто — гость ещё не синхронизирован.",
     )
+    cashback = models.DecimalField(
+        "Кэшбек",
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Баланс бонусов гостя из CRM Remarked (поле `bonuses`). Обновляется при синхронизации.",
+    )
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

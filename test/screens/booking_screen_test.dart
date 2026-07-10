@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 
 import 'package:piligrim/data/models/availability_slot.dart';
 import 'package:piligrim/data/models/booking_request.dart';
+import 'package:piligrim/data/models/booking_table.dart';
+import 'package:piligrim/data/models/booking_zone.dart';
 import 'package:piligrim/data/models/user_profile.dart';
 import 'package:piligrim/data/repositories/booking_repository.dart';
 import 'package:piligrim/data/repositories/core_repository.dart';
@@ -232,6 +234,188 @@ void main() {
 
         await tester.ensureVisible(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
         expect(find.text('ОТПРАВИТЬ ЗАЯВКУ'), findsOneWidget);
+      });
+    });
+
+    group('выбор конкретного стола', () {
+      const zoneA = BookingZone(id: 304, name: 'Зал 1');
+
+      testWidgets('пикер стола скрыт, пока зал не выбран', (tester) async {
+        when(() => mockRepo.fetchZones()).thenAnswer((_) async => const [zoneA]);
+
+        await tester.pumpWidget(buildApp());
+        await settle(tester);
+
+        expect(find.text('Любой стол'), findsNothing);
+      });
+
+      testWidgets('после выбора зала показывается «Любой стол», тап открывает список свободных столов',
+          (tester) async {
+        when(() => mockRepo.fetchZones()).thenAnswer((_) async => const [zoneA]);
+        when(() => mockRepo.fetchTables(
+              date: any(named: 'date'),
+              time: any(named: 'time'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            )).thenAnswer((_) async => const [
+              BookingTable(id: 4384, name: '202', capacity: 2),
+              BookingTable(id: 4391, name: '210', capacity: 2),
+            ]);
+
+        await tester.pumpWidget(buildApp());
+        await settle(tester);
+
+        await tester.ensureVisible(find.text('Зал 1'));
+        await tester.tap(find.text('Зал 1'));
+        await settle(tester);
+
+        expect(find.text('Любой стол'), findsOneWidget);
+
+        await tester.tap(find.text('Любой стол'));
+        await settle(tester);
+
+        expect(find.text('Стол 202'), findsOneWidget);
+        expect(find.text('Стол 210'), findsOneWidget);
+      });
+
+      testWidgets('нет свободных столов → «Любой стол» скрыт, показано предупреждение, отправка заблокирована',
+          (tester) async {
+        auth.currentUser = _sampleProfile();
+        when(() => mockRepo.fetchZones()).thenAnswer((_) async => const [zoneA]);
+        when(() => mockRepo.fetchTables(
+              date: any(named: 'date'),
+              time: any(named: 'time'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            )).thenAnswer((_) async => const []);
+
+        await tester.pumpWidget(buildApp());
+        await settle(tester);
+
+        await tester.ensureVisible(find.text('Зал 1'));
+        await tester.tap(find.text('Зал 1'));
+        await settle(tester);
+
+        expect(find.text('Любой стол'), findsNothing);
+        expect(
+          find.textContaining('нет свободных столов на выбранные дату и время'),
+          findsOneWidget,
+        );
+
+        await tester.ensureVisible(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
+        await tester.tap(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
+        await settle(tester);
+
+        verifyNever(() => mockRepo.createBooking(any(), idempotencyKey: any(named: 'idempotencyKey')));
+      });
+
+      testWidgets('ошибка загрузки столов (Remarked недоступен) не блокирует отправку',
+          (tester) async {
+        auth.currentUser = _sampleProfile();
+        when(() => mockRepo.fetchZones()).thenAnswer((_) async => const [zoneA]);
+        when(() => mockRepo.fetchTables(
+              date: any(named: 'date'),
+              time: any(named: 'time'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            )).thenThrow(Exception('Проверка занятости временно недоступна'));
+        when(() => mockRepo.createBooking(any(), idempotencyKey: any(named: 'idempotencyKey')))
+            .thenAnswer((_) async {});
+
+        await tester.pumpWidget(buildApp());
+        await settle(tester);
+
+        await tester.ensureVisible(find.text('Зал 1'));
+        await tester.tap(find.text('Зал 1'));
+        await settle(tester);
+
+        expect(find.text('Любой стол'), findsNothing);
+        expect(
+          find.textContaining('нет свободных столов на выбранные дату и время'),
+          findsNothing,
+        );
+
+        await tester.ensureVisible(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
+        await tester.tap(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
+        await settle(tester);
+
+        verify(() => mockRepo.createBooking(any(), idempotencyKey: any(named: 'idempotencyKey'))).called(1);
+      });
+
+      testWidgets('выбор конкретного стола отправляется как remarked_table_id',
+          (tester) async {
+        auth.currentUser = _sampleProfile();
+        when(() => mockRepo.fetchZones()).thenAnswer((_) async => const [zoneA]);
+        when(() => mockRepo.fetchTables(
+              date: any(named: 'date'),
+              time: any(named: 'time'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            )).thenAnswer((_) async => const [
+              BookingTable(id: 4384, name: '202', capacity: 2),
+            ]);
+        when(() => mockRepo.createBooking(any(), idempotencyKey: any(named: 'idempotencyKey')))
+            .thenAnswer((_) async {});
+
+        await tester.pumpWidget(buildApp());
+        await settle(tester);
+
+        await tester.ensureVisible(find.text('Зал 1'));
+        await tester.tap(find.text('Зал 1'));
+        await settle(tester);
+
+        await tester.tap(find.text('Любой стол'));
+        await settle(tester);
+
+        await tester.tap(find.text('Стол 202'));
+        await settle(tester);
+
+        await tester.ensureVisible(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
+        await tester.tap(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
+        await settle(tester);
+
+        final captured = verify(() => mockRepo.createBooking(
+              captureAny(),
+              idempotencyKey: any(named: 'idempotencyKey'),
+            )).captured;
+        final req = captured.single as BookingRequest;
+        expect(req.remarkedRoomId, 304);
+        expect(req.remarkedTableId, 4384);
+      });
+
+      testWidgets('без выбора стола (только зал) remarked_table_id не отправляется',
+          (tester) async {
+        auth.currentUser = _sampleProfile();
+        when(() => mockRepo.fetchZones()).thenAnswer((_) async => const [zoneA]);
+        when(() => mockRepo.fetchTables(
+              date: any(named: 'date'),
+              time: any(named: 'time'),
+              guests: any(named: 'guests'),
+              zoneId: any(named: 'zoneId'),
+            )).thenAnswer((_) async => const [
+              BookingTable(id: 4384, name: '202', capacity: 2),
+            ]);
+        when(() => mockRepo.createBooking(any(), idempotencyKey: any(named: 'idempotencyKey')))
+            .thenAnswer((_) async {});
+
+        await tester.pumpWidget(buildApp());
+        await settle(tester);
+
+        await tester.ensureVisible(find.text('Зал 1'));
+        await tester.tap(find.text('Зал 1'));
+        await settle(tester);
+
+        await tester.ensureVisible(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
+        await tester.tap(find.text('ОТПРАВИТЬ ЗАЯВКУ'));
+        await settle(tester);
+
+        final captured = verify(() => mockRepo.createBooking(
+              captureAny(),
+              idempotencyKey: any(named: 'idempotencyKey'),
+            )).captured;
+        final req = captured.single as BookingRequest;
+        expect(req.remarkedRoomId, 304);
+        expect(req.remarkedTableId, isNull);
       });
     });
   });

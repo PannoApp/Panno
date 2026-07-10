@@ -37,12 +37,20 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // AuthProvider.init() (main.dart) восстанавливает сессию асинхронно и
+  // может завершиться позже первого кадра — если на момент этой проверки
+  // isLoggedIn ещё false, полагаемся на повторную проверку в build()
+  // (см. Consumer<AuthProvider> ниже), чтобы история всё равно подгрузилась,
+  // когда авторизация восстановится.
+  bool _historyRequested = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (context.read<AuthProvider>().isLoggedIn) {
+        _historyRequested = true;
         context.read<BookingProvider>().loadHistory();
       }
     });
@@ -137,9 +145,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   PiligrimPageRoute(builder: (_) => const OnboardingScreen()),
                 );
               }
+              _historyRequested = true;
               context.read<BookingProvider>().loadHistory();
             },
           );
+        }
+        if (!_historyRequested) {
+          // Сюда попадаем, когда AuthProvider.init() восстановил сессию уже
+          // после первого кадра (см. комментарий у _historyRequested) —
+          // initState это пропустил, догоняем здесь.
+          _historyRequested = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) context.read<BookingProvider>().loadHistory();
+          });
         }
         final user = auth.user;
         final bottomPad = MediaQuery.paddingOf(context).bottom + 32;
@@ -177,6 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             user: user,
                             onNavigate: widget.onNavigate,
                           ),
+                          const SizedBox(height: 12),
+                          _CashbackCard(cashback: user.cashback),
                           const SizedBox(height: 28),
                         ],
 
@@ -522,6 +542,49 @@ class _StatCard extends StatelessWidget {
         .animate(delay: delay)
         .fadeIn(duration: 500.ms)
         .slideY(begin: 0.06, end: 0, duration: 500.ms);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CASHBACK CARD — баланс бонусов гостя, синхронизированный из Remarked CRM
+// ─────────────────────────────────────────────────────────────────────────────
+String _formatCashback(double value) => value.round().toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]} ',
+    );
+
+class _CashbackCard extends StatelessWidget {
+  const _CashbackCard({required this.cashback});
+  final double cashback;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileGlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Кэшбек',
+                  style: PiligrimTextStyles.caption.copyWith(fontSize: 11),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_formatCashback(cashback)} ₸',
+                  style: PiligrimTextStyles.heading.copyWith(
+                    fontSize: 20,
+                    color: PiligrimColors.steppe,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.06, end: 0, duration: 500.ms);
   }
 }
 

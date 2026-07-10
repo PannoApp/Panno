@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import '../models/api_booking.dart';
 import '../models/availability_slot.dart';
 import '../models/booking_request.dart';
+import '../models/booking_table.dart';
 import '../models/booking_zone.dart';
 import '../models/json_utils.dart';
 import '../paginated_response.dart';
@@ -59,6 +60,26 @@ class BookingRepository {
     final response = await _dio.get<List<dynamic>>('/bookings/zones/');
     return (response.data ?? const [])
         .map((e) => BookingZone.fromJson(asJsonMap(e)))
+        .toList();
+  }
+
+  Future<List<BookingTable>> fetchTables({
+    required String date,
+    required String time,
+    required int guests,
+    required int zoneId,
+  }) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/bookings/tables/',
+      queryParameters: {
+        'date': date,
+        'time': time,
+        'guests': guests,
+        'zone_id': zoneId,
+      },
+    );
+    return (response.data ?? const [])
+        .map((e) => BookingTable.fromJson(asJsonMap(e)))
         .toList();
   }
 }

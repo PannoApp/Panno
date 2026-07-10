@@ -246,7 +246,7 @@ def create_reserve_in_remarked(booking_id):
     в Remarked упадёт после исчерпания ретраев (см. TableBookingListCreateView).
     """
     from .models import TableBooking
-    from .services import pick_table_for_room
+    from .services import _free_table_ids_at_slot, pick_table_for_room
     from apps.remarked.exceptions import RemarkedAPIError
     from apps.remarked.reserves_client import ReservesClient
 
@@ -266,12 +266,38 @@ def create_reserve_in_remarked(booking_id):
     if booking.comment:
         reserve['comment'] = booking.comment
 
-    if booking.remarked_room_id:
-        # Гость выбрал конкретный зал — пытаемся честно забронировать стол
-        # именно в нём, а не полагаться на автоподбор Remarked по всему
-        # ресторану. Если между проверкой доступности и созданием брони зал
-        # разобрали (или Remarked недоступен для этого доп. запроса) — просто
-        # не передаём table_ids, бронь всё равно создастся без привязки к залу.
+    if booking.remarked_table_id:
+        # Гость явно выбрал конкретный стол в UI (не «Любой стол»), но между
+        # показом пикера и выполнением этой (асинхронной) задачи стол мог
+        # успеть занять кто-то другой (звонок в ресторан, ручная посадка
+        # менеджером в Remarked) — перепроверяем прямо перед CreateReserve.
+        # Если стол уже недоступен, просто не передаём table_ids: бронь всё
+        # равно создастся, но без привязки к конкретному столу (как «Любой
+        # стол» в этом зале), а не тихо конфликтует в Remarked.
+        still_free = False
+        if booking.remarked_room_id:
+            try:
+                free_table_ids = _free_table_ids_at_slot(
+                    booking.date.isoformat(),
+                    booking.time.strftime('%H:%M:%S'),
+                    booking.guests_count,
+                    booking.remarked_room_id,
+                )
+                still_free = booking.remarked_table_id in free_table_ids
+            except RemarkedAPIError:
+                logger.warning(
+                    "Table re-check failed, creating reserve without table_ids: booking=%s table=%s",
+                    booking_id, booking.remarked_table_id, exc_info=True,
+                )
+        if still_free:
+            reserve['table_ids'] = [booking.remarked_table_id]
+    elif booking.remarked_room_id:
+        # Гость выбрал зал, но не конкретный стол («Любой стол») — пытаемся
+        # честно забронировать стол именно в этом зале, а не полагаться на
+        # автоподбор Remarked по всему ресторану. Если между проверкой
+        # доступности и созданием брони зал разобрали (или Remarked недоступен
+        # для этого доп. запроса) — просто не передаём table_ids, бронь всё
+        # равно создастся без привязки к залу.
         try:
             table_id = pick_table_for_room(
                 booking.date.isoformat(),
@@ -292,7 +318,22 @@ def create_reserve_in_remarked(booking_id):
     # Отдельный слой идемпотентности от нашего собственного Idempotency-Key
     # (IdempotencyMixin в views.py) — это ключ, который понимает сам Remarked
     # на уровне метода CreateReserve.
-    response = client.create_reserve(reserve, request_id=str(uuid.uuid4()))
+    try:
+        response = client.create_reserve(reserve, request_id=str(uuid.uuid4()))
+    except RemarkedAPIError as exc:
+        if exc.status_code is not None and 200 <= exc.status_code < 300:
+            # HTTP 200, но тело — business-level отказ Remarked (например,
+            # "Time is restricted to reservation": время визита нарушает
+            # правило, настроенное в самом Remarked и не проверяемое через
+            # GetSlots). Повтор с теми же датой/временем/гостями провалится
+            # так же — ретраить нет смысла, только тратим 3 попытки впустую.
+            # Бронь остаётся локально как pending без remarked_reserve_id.
+            logger.error(
+                "Remarked rejected reserve (non-retryable business rule): booking=%s error=%s",
+                booking_id, exc,
+            )
+            return
+        raise
 
     reserve_id = response.get('reserve_id')
     if reserve_id and booking.remarked_reserve_id != reserve_id:

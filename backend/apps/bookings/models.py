@@ -74,6 +74,17 @@ class TableBooking(models.Model):
         blank=True,
     )
 
+    # ID конкретного стола в Remarked (GetSlots.rooms[].tables[].id) — гость
+    # явно выбрал стол в UI (не «Любой стол»). Если заполнено — используется
+    # в create_reserve_in_remarked напрямую, без автоподбора через
+    # pick_table_for_room. Пусто — гость выбрал «Любой стол» (или зал вообще
+    # не выбирал) — прежнее поведение автоподбора не меняется.
+    remarked_table_id = models.IntegerField(
+        "ID стола в Remarked",
+        null=True,
+        blank=True,
+    )
+
     # Поле для дополнительных пожеланий клиента
     comment = models.TextField(
         verbose_name="Комментарий",

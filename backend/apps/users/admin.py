@@ -50,7 +50,7 @@ class UserAdmin(AdminOnlyMixin, BaseUserAdmin):
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
 
-    list_display    = ('phone', 'first_name', 'last_name', 'role', 'telegram_id', 'remarked_guest_id', 'is_staff', 'is_active', 'date_joined')
+    list_display    = ('phone', 'first_name', 'last_name', 'role', 'telegram_id', 'remarked_guest_id', 'cashback', 'is_staff', 'is_active', 'date_joined')
     list_filter     = ('role', 'is_staff', 'is_active', 'gender')
     search_fields   = ('phone', 'first_name', 'last_name', 'telegram_id', 'email', 'remarked_guest_id')
     ordering        = ('phone',)
@@ -59,7 +59,7 @@ class UserAdmin(AdminOnlyMixin, BaseUserAdmin):
     fieldsets = (
         (None, {'fields': ('phone', 'password')}),
         ('Персональная информация', {'fields': ('first_name', 'last_name', 'gender', 'email', 'birthday', 'role', 'telegram_id')}),
-        ('Remarked CRM', {'fields': ('remarked_guest_id',)}),
+        ('Remarked CRM', {'fields': ('remarked_guest_id', 'cashback')}),
         ('Права доступа', {'fields': ('is_active', 'is_staff', 'is_superuser')}),
         ('Настройки уведомлений', {'fields': ('notifications_enabled', 'notify_events', 'notify_promotions', 'notify_closed_events')}),
         ('Важные даты', {'fields': ('last_login', 'date_joined')}),
@@ -72,5 +72,5 @@ class UserAdmin(AdminOnlyMixin, BaseUserAdmin):
         }),
     )
 
-    readonly_fields = ('date_joined', 'last_login')
+    readonly_fields = ('date_joined', 'last_login', 'cashback')
     filter_horizontal = ()

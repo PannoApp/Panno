@@ -14,6 +14,7 @@ class HeroUser {
     this.journeyStartLabel,
     this.bookingsCount = 0,
     this.eventsCount = 0,
+    this.cashback = 0,
   });
 
   final String name;
@@ -22,6 +23,7 @@ class HeroUser {
   final String? journeyStartLabel;
   final int bookingsCount;
   final int eventsCount;
+  final double cashback;
 
   bool get isAuthorized => name.isNotEmpty;
 }

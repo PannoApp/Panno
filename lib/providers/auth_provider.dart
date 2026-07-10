@@ -56,6 +56,7 @@ class AuthProvider extends ChangeNotifier {
       journeyStartValue: journey.$1,
       journeyStartLabel: journey.$2,
       eventsCount: eventsCount,
+      cashback: profile.cashback,
     );
   }
 

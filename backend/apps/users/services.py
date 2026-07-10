@@ -1,5 +1,6 @@
 import secrets
 import logging
+from decimal import Decimal, InvalidOperation
 from django.core.cache import cache
 from django.conf import settings
 from django.utils.dateparse import parse_date
@@ -76,8 +77,9 @@ REMARKED_LOGIN_SYNC_TIMEOUT = 3
 def apply_guest_data_to_user(user, guest):
     """
     Перезаписывает first_name/last_name/email/birthday/gender данными гостя
-    из Remarked и сохраняет remarked_guest_id. Remarked — источник истины при
-    конфликте: непустое поле в ответе побеждает локальное значение.
+    из Remarked, сохраняет remarked_guest_id и cashback (поле `bonuses`).
+    Remarked — источник истины при конфликте: непустое поле в ответе побеждает
+    локальное значение.
 
     Пустые/отсутствующие в ответе Remarked поля локальные данные НЕ затирают —
     иначе первый же логин гостя с неполной карточкой в CRM обнулил бы то, что
@@ -109,6 +111,12 @@ def apply_guest_data_to_user(user, guest):
     if guest.get('id'):
         user.remarked_guest_id = str(guest['id'])
         changed_fields.append('remarked_guest_id')
+    if guest.get('bonuses') is not None:
+        try:
+            user.cashback = Decimal(str(guest['bonuses']))
+            changed_fields.append('cashback')
+        except InvalidOperation:
+            logger.warning("Remarked bonuses value not a number: %r", guest['bonuses'])
 
     if not changed_fields:
         return False

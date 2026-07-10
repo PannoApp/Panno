@@ -5,6 +5,7 @@ import '../core/dio_errors.dart';
 import '../data/models/api_booking.dart';
 import '../data/models/availability_slot.dart';
 import '../data/models/booking_request.dart';
+import '../data/models/booking_table.dart';
 import '../data/models/booking_zone.dart';
 import '../data/repositories/booking_repository.dart';
 
@@ -28,6 +29,13 @@ class BookingProvider extends ChangeNotifier {
   bool isLoadingZones = false;
   String? zonesError;
 
+  // Конкретный стол внутри выбранного зала (см. GET /bookings/tables/).
+  // Появляется только после выбора зала; null означает «Любой стол».
+  BookingTable? selectedTable;
+  List<BookingTable> tables = const [];
+  bool isLoadingTables = false;
+  String? tablesError;
+
   // Состояние отправки заявки
   bool isSubmitting = false;
   bool isSuccess = false;
@@ -45,8 +53,17 @@ class BookingProvider extends ChangeNotifier {
 
   void setZone(BookingZone? zone) {
     selectedZone = zone;
+    selectedTable = null;
+    tables = const [];
+    tablesError = null;
     notifyListeners();
     loadAvailability();
+    loadTables();
+  }
+
+  void setTable(BookingTable? table) {
+    selectedTable = table;
+    notifyListeners();
   }
 
   void setGuests(int count) {
@@ -107,8 +124,53 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // Список свободных столов конкретного зала на точные дату/время/кол-во
+  // гостей. Появляется только когда выбран зал — без зала «любой стол в
+  // любом зале» подбирается backend'ом автоматически, как и раньше.
+  Future<void> loadTables() async {
+    final zone = selectedZone;
+    final date = visitDate;
+    final time = visitTime;
+    if (zone == null || date == null || time == null) {
+      if (tables.isNotEmpty || selectedTable != null) {
+        tables = const [];
+        selectedTable = null;
+        notifyListeners();
+      }
+      return;
+    }
+    if (isLoadingTables) return;
+
+    isLoadingTables = true;
+    tablesError = null;
+    notifyListeners();
+
+    try {
+      tables = await _repository.fetchTables(
+        date: _formatDateForApi(date),
+        time: _formatTimeForApi(time),
+        guests: guests,
+        zoneId: zone.id,
+      );
+      if (selectedTable != null &&
+          !tables.any((t) => t.id == selectedTable!.id)) {
+        selectedTable = null;
+      }
+    } catch (e) {
+      tablesError = dioErrorMessage(e);
+      tables = const [];
+      selectedTable = null;
+    } finally {
+      isLoadingTables = false;
+      notifyListeners();
+    }
+  }
+
   String _formatDateForApi(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  String _formatTimeForApi(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00';
 
   Future<void> submitBooking(BookingRequest req) async {
     if (isSubmitting) return;
@@ -128,6 +190,10 @@ class BookingProvider extends ChangeNotifier {
       );
       isSuccess = true;
       _resetForm();
+      // Обновляем историю сразу — иначе счётчик «Бронирований» на экране
+      // профиля (берёт данные из history) остаётся старым, пока гость сам
+      // не откроет экран истории брони.
+      loadHistory();
     } catch (e) {
       error = dioErrorMessage(e);
     } finally {
@@ -162,6 +228,9 @@ class BookingProvider extends ChangeNotifier {
 
   void _resetForm() {
     selectedZone = null;
+    selectedTable = null;
+    tables = const [];
+    tablesError = null;
     guests = 2;
     visitDate = null;
     visitTime = null;

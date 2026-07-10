@@ -59,6 +59,7 @@ class _BookingScreenState extends State<BookingScreen> {
       // дефолтную дату/кол-во гостей.
       final booking = context.read<BookingProvider>();
       booking.setVisitDate(_visitDate);
+      booking.setVisitTime(_visitTimeAsDateTime);
       booking.loadZones();
       booking.loadAvailability();
     });
@@ -98,6 +99,7 @@ class _BookingScreenState extends State<BookingScreen> {
       final booking = context.read<BookingProvider>();
       booking.setVisitDate(picked);
       await booking.loadAvailability();
+      await booking.loadTables();
     }
   }
 
@@ -109,7 +111,9 @@ class _BookingScreenState extends State<BookingScreen> {
     _guestsDebounce?.cancel();
     _guestsDebounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
-      context.read<BookingProvider>().loadAvailability();
+      final booking = context.read<BookingProvider>();
+      booking.loadAvailability();
+      booking.loadTables();
     });
   }
 
@@ -129,14 +133,124 @@ class _BookingScreenState extends State<BookingScreen> {
         child: child ?? const SizedBox.shrink(),
       ),
     );
-    if (picked != null) setState(() => _visitTime = picked);
+    if (picked != null && mounted) {
+      setState(() => _visitTime = picked);
+      final booking = context.read<BookingProvider>();
+      booking.setVisitTime(_visitTimeAsDateTime);
+      await booking.loadTables();
+    }
   }
+
+  DateTime get _visitTimeAsDateTime => DateTime(2000, 1, 1, _visitTime.hour, _visitTime.minute);
 
   String get _timeForApi => bookingTimeForApi(_visitTime);
 
   String get _dateForApi {
     final d = _visitDate;
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  // Блок «Стол» показываем при выбранном зале, если только запрос не упал с
+  // ошибкой (Remarked недоступен — тогда, как и с остальными подсказками в
+  // этой форме, просто молча ничего не показываем и не блокируем отправку,
+  // т.к. реальная занятость неизвестна).
+  bool _showTableSection(BookingProvider booking) {
+    return booking.selectedZone != null && booking.tablesError == null;
+  }
+
+  // Подтверждённый Remarked факт (не ошибка, не загрузка) — в выбранном зале
+  // нет ни одного свободного стола на эти дату/время/кол-во гостей. В отличие
+  // от _isSelectedTimeUnavailable (общая подсказка по ресторану, не
+  // блокирует) это должно реально блокировать отправку — иначе бронь всё
+  // равно создастся, просто автоподбором в ДРУГОМ, не выбранном госте зале.
+  bool _isZoneFullyBooked(BookingProvider booking) {
+    return booking.selectedZone != null &&
+        !booking.isLoadingTables &&
+        booking.tablesError == null &&
+        booking.tables.isEmpty;
+  }
+
+  String _selectedTableLabel(BookingProvider booking) {
+    final table = booking.selectedTable;
+    if (table == null) return 'Любой стол';
+    return table.name != null ? 'Стол ${table.name}' : '№${table.id}';
+  }
+
+  Future<void> _pickTable(BookingProvider booking) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: PiligrimColors.earthDeep,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: PiligrimColors.sky.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'ВЫБОР СТОЛА',
+                        style: PiligrimTextStyles.sectionLabel.copyWith(
+                          color: PiligrimColors.sky.withValues(alpha: 0.50),
+                          letterSpacing: 1.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      children: [
+                        _TableOptionTile(
+                          label: 'Любой стол',
+                          subtitle: null,
+                          isSelected: booking.selectedTable == null,
+                          onTap: () {
+                            booking.setTable(null);
+                            Navigator.of(sheetContext).pop();
+                          },
+                        ),
+                        ...booking.tables.map(
+                          (table) => _TableOptionTile(
+                            label: table.name != null ? 'Стол ${table.name}' : '№${table.id}',
+                            subtitle: table.capacity != null ? 'до ${table.capacity} гостей' : null,
+                            isSelected: booking.selectedTable?.id == table.id,
+                            onTap: () {
+                              booking.setTable(table);
+                              Navigator.of(sheetContext).pop();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // Remarked-подсказка: если для выбранных даты/времени/кол-ва гостей найден
@@ -159,7 +273,17 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final booking = context.read<BookingProvider>();
+    if (_isZoneFullyBooked(booking)) {
+      PiligrimToast.show(
+        context,
+        'В зале «${booking.selectedZone?.name}» нет свободных столов на выбранные дату и время.',
+        type: PiligrimToastType.error,
+      );
+      return;
+    }
+
     final selectedZone = booking.selectedZone;
+    final selectedTable = booking.selectedTable;
     final req = BookingRequest(
       guestName: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
@@ -168,6 +292,7 @@ class _BookingScreenState extends State<BookingScreen> {
       guestsCount: int.parse(_guestsCtrl.text),
       zone: selectedZone?.name,
       remarkedRoomId: selectedZone?.id,
+      remarkedTableId: selectedTable?.id,
       comment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
     );
 
@@ -495,6 +620,47 @@ class _BookingScreenState extends State<BookingScreen> {
                                 }).toList(),
                               ),
                             ],
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: !_showTableSection(booking)
+                                  ? const SizedBox(width: double.infinity)
+                                  : Padding(
+                                      padding: const EdgeInsets.only(top: 18),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (booking.isLoadingTables) ...[
+                                            const _FieldLabel('Стол (опционально)'),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 9),
+                                              child: SizedBox(
+                                                height: 16,
+                                                width: 16,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: PiligrimColors.sky.withValues(alpha: 0.4),
+                                                ),
+                                              ),
+                                            ),
+                                          ] else if (booking.tables.isNotEmpty) ...[
+                                            const _FieldLabel('Стол (опционально)'),
+                                            _TableSelector(
+                                              label: _selectedTableLabel(booking),
+                                              onTap: () => _pickTable(booking),
+                                            ),
+                                          ] else
+                                            Text(
+                                              'В зале «${booking.selectedZone?.name}» нет свободных столов на выбранные дату и время. Выберите другой зал, дату или время.',
+                                              style: PiligrimTextStyles.caption.copyWith(
+                                                color: PiligrimColors.fruit.withValues(alpha: 0.85),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                            ),
                             const SizedBox(height: 18),
                             const _FieldLabel('Комментарий'),
                             _PiligrimInput(
@@ -505,7 +671,7 @@ class _BookingScreenState extends State<BookingScreen> {
                             const SizedBox(height: 32),
                             PathCta(
                               label: booking.isSubmitting ? 'ОТПРАВЛЯЕМ...' : 'ОТПРАВИТЬ ЗАЯВКУ',
-                              onTap: booking.isSubmitting ? null : _submit,
+                              onTap: (booking.isSubmitting || _isZoneFullyBooked(booking)) ? null : _submit,
                             ),
                             const SizedBox(height: 20),
                             Text(
@@ -704,6 +870,109 @@ class _ZoneButton extends StatelessWidget {
             ),
             child: Text(label),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Поле выбора стола в стиле _DateTimeChip — тап открывает выпадающий список
+// (модальный bottom sheet), а не разворачивает все варианты сразу: при
+// 15-20 свободных столах это выглядело бы как «простыня» из чипов.
+class _TableSelector extends StatelessWidget {
+  const _TableSelector({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: PiligrimColors.earthWarm.withValues(alpha: 0.95),
+          border: Border.all(color: PiligrimColors.sky.withValues(alpha: 0.11)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: PiligrimTextStyles.body.copyWith(
+                  color: PiligrimColors.sky,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: PiligrimColors.sky.withValues(alpha: 0.45),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Строка внутри выпадающего списка столов (bottom sheet) — подпись с
+// вместимостью и галочкой у текущего выбора.
+class _TableOptionTile extends StatelessWidget {
+  const _TableOptionTile({
+    required this.label,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String? subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: PiligrimTextStyles.body.copyWith(
+                      color: isSelected ? PiligrimColors.water : PiligrimColors.sky,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: PiligrimTextStyles.caption.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_rounded, color: PiligrimColors.water, size: 20),
+          ],
         ),
       ),
     );

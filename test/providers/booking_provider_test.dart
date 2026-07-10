@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:piligrim/data/models/api_booking.dart';
 import 'package:piligrim/data/models/availability_slot.dart';
 import 'package:piligrim/data/models/booking_request.dart';
+import 'package:piligrim/data/models/booking_table.dart';
+import 'package:piligrim/data/models/booking_zone.dart';
 import 'package:piligrim/data/repositories/booking_repository.dart';
 import 'package:piligrim/providers/booking_provider.dart';
 
@@ -53,6 +56,28 @@ void main() {
 
       expect(provider.isSuccess, isTrue);
       expect(provider.error, isNull);
+    });
+
+    test('submitBooking() при успехе → обновляет history (счётчик на профиле не отстаёт)', () async {
+      when(() => repository.createBooking(any(), idempotencyKey: any(named: 'idempotencyKey')))
+          .thenAnswer((_) async {});
+      when(() => repository.fetchHistory(page: any(named: 'page'))).thenAnswer((_) async => const [
+            ApiBooking(
+              id: 1,
+              guestName: 'Айдар',
+              phone: '+77001234567',
+              date: '2026-06-15',
+              time: '19:30',
+              guestsCount: 2,
+              status: 'pending',
+            ),
+          ]);
+
+      await provider.submitBooking(_req);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(provider.history, hasLength(1));
+      verify(() => repository.fetchHistory(page: any(named: 'page'))).called(1);
     });
 
     test('submitBooking() при ошибке → error != null', () async {
@@ -163,6 +188,140 @@ void main() {
 
       verify(() => repository.fetchAvailability(
           date: any(named: 'date'), guests: any(named: 'guests'))).called(1);
+    });
+  });
+
+  group('BookingProvider.loadTables', () {
+    late _MockBookingRepository repository;
+    late BookingProvider provider;
+
+    setUp(() {
+      repository = _MockBookingRepository();
+      provider = BookingProvider(repository: repository);
+      when(() => repository.fetchAvailability(
+            date: any(named: 'date'),
+            guests: any(named: 'guests'),
+            zoneId: any(named: 'zoneId'),
+          )).thenAnswer((_) async => const []);
+    });
+
+    const zone = BookingZone(id: 305, name: 'Зал 2');
+
+    test('без выбранного зала — no-op, запрос не выполняется', () async {
+      provider.visitDate = DateTime(2026, 7, 15);
+      provider.visitTime = DateTime(2000, 1, 1, 19, 30);
+
+      await provider.loadTables();
+
+      verifyNever(() => repository.fetchTables(
+            date: any(named: 'date'),
+            time: any(named: 'time'),
+            guests: any(named: 'guests'),
+            zoneId: any(named: 'zoneId'),
+          ));
+    });
+
+    test('setZone() сбрасывает selectedTable и запускает loadTables()', () async {
+      provider.visitDate = DateTime(2026, 7, 15);
+      provider.visitTime = DateTime(2000, 1, 1, 19, 30);
+      when(() => repository.fetchTables(
+            date: any(named: 'date'),
+            time: any(named: 'time'),
+            guests: any(named: 'guests'),
+            zoneId: any(named: 'zoneId'),
+          )).thenAnswer((_) async => const [
+            BookingTable(id: 4384, name: '202', capacity: 2),
+          ]);
+
+      provider.setTable(const BookingTable(id: 9999, name: 'старый'));
+      provider.setZone(zone);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(provider.selectedZone, zone);
+      expect(provider.selectedTable, isNull);
+      verify(() => repository.fetchTables(
+            date: captureAny(named: 'date'),
+            time: any(named: 'time'),
+            guests: any(named: 'guests'),
+            zoneId: any(named: 'zoneId'),
+          )).called(1);
+    });
+
+    test('успех → tables записаны, isLoadingTables сброшен', () async {
+      provider.visitDate = DateTime(2026, 7, 15);
+      provider.visitTime = DateTime(2000, 1, 1, 19, 30);
+      provider.selectedZone = zone;
+      when(() => repository.fetchTables(
+            date: any(named: 'date'),
+            time: any(named: 'time'),
+            guests: any(named: 'guests'),
+            zoneId: any(named: 'zoneId'),
+          )).thenAnswer((_) async => const [
+            BookingTable(id: 4384, name: '202', capacity: 2),
+            BookingTable(id: 4391, name: '210', capacity: 2),
+          ]);
+
+      await provider.loadTables();
+
+      expect(provider.isLoadingTables, isFalse);
+      expect(provider.tables, hasLength(2));
+      expect(provider.tablesError, isNull);
+
+      final captured = verify(() => repository.fetchTables(
+              date: captureAny(named: 'date'),
+              time: captureAny(named: 'time'),
+              guests: captureAny(named: 'guests'),
+              zoneId: captureAny(named: 'zoneId')))
+          .captured;
+      expect(captured[0], '2026-07-15');
+      expect(captured[1], '19:30:00');
+      expect(captured[2], 2);
+      expect(captured[3], 305);
+    });
+
+    test('ошибка → tablesError заполнен, tables пустые, selectedTable сброшен', () async {
+      provider.visitDate = DateTime(2026, 7, 15);
+      provider.visitTime = DateTime(2000, 1, 1, 19, 30);
+      provider.selectedZone = zone;
+      provider.selectedTable = const BookingTable(id: 4384, name: '202');
+      when(() => repository.fetchTables(
+            date: any(named: 'date'),
+            time: any(named: 'time'),
+            guests: any(named: 'guests'),
+            zoneId: any(named: 'zoneId'),
+          )).thenThrow(Exception('Remarked недоступен'));
+
+      await provider.loadTables();
+
+      expect(provider.tablesError, isNotNull);
+      expect(provider.tables, isEmpty);
+      expect(provider.selectedTable, isNull);
+      expect(provider.isLoadingTables, isFalse);
+    });
+
+    test('selectedTable сбрасывается, если его больше нет в новом списке столов', () async {
+      provider.visitDate = DateTime(2026, 7, 15);
+      provider.visitTime = DateTime(2000, 1, 1, 19, 30);
+      provider.selectedZone = zone;
+      provider.selectedTable = const BookingTable(id: 9999, name: 'ушедший');
+      when(() => repository.fetchTables(
+            date: any(named: 'date'),
+            time: any(named: 'time'),
+            guests: any(named: 'guests'),
+            zoneId: any(named: 'zoneId'),
+          )).thenAnswer((_) async => const [
+            BookingTable(id: 4384, name: '202', capacity: 2),
+          ]);
+
+      await provider.loadTables();
+
+      expect(provider.selectedTable, isNull);
+    });
+
+    test('setTable() устанавливает выбранный стол', () {
+      const table = BookingTable(id: 4384, name: '202', capacity: 2);
+      provider.setTable(table);
+      expect(provider.selectedTable, table);
     });
   });
 }

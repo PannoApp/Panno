@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 from importlib import import_module, reload
 from unittest.mock import patch, MagicMock
 
@@ -438,6 +439,24 @@ class UserProfileSerializerTest(APITestCase):
         self.client.patch(self.PROFILE_URL, {'role': 'admin'})
         regular.refresh_from_db()
         self.assertEqual(regular.role, '')
+
+    def test_profile_response_includes_cashback(self):
+        """Профиль должен отдавать баланс кэшбека, синхронизированный из Remarked."""
+        user = User.objects.create_user(phone='+77009990005')
+        user.cashback = Decimal('750.25')
+        user.save()
+        self._auth(user)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['cashback'], '750.25')
+
+    def test_profile_cashback_readonly(self):
+        """PATCH с cashback игнорируется — значение приходит только из Remarked."""
+        user = User.objects.create_user(phone='+77009990006')
+        self._auth(user)
+        self.client.patch(self.PROFILE_URL, {'cashback': '9999.00'})
+        user.refresh_from_db()
+        self.assertEqual(user.cashback, Decimal('0'))
 
 
 # ---------------------------------------------------------------------------
@@ -998,6 +1017,31 @@ class ApplyGuestDataToUserTest(TestCase):
         apply_guest_data_to_user(self.user, {'gender': 'alien'})
         self.user.refresh_from_db()
         self.assertEqual(self.user.gender, User.GENDER_NOT_SPECIFIED)
+
+    def test_bonuses_saved_as_cashback(self):
+        apply_guest_data_to_user(self.user, {'bonuses': 1250.5})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.cashback, Decimal('1250.50'))
+
+    def test_zero_bonuses_is_not_treated_as_missing(self):
+        """bonuses=0 — валидное значение (баланс сгорел/потрачен), не должно игнорироваться."""
+        self.user.cashback = Decimal('500')
+        self.user.save()
+        apply_guest_data_to_user(self.user, {'bonuses': 0})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.cashback, Decimal('0'))
+
+    def test_missing_bonuses_does_not_change_cashback(self):
+        self.user.cashback = Decimal('300')
+        self.user.save()
+        apply_guest_data_to_user(self.user, {'name': 'Алихан'})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.cashback, Decimal('300'))
+
+    def test_non_numeric_bonuses_ignored(self):
+        self.assertFalse(apply_guest_data_to_user(self.user, {'bonuses': 'not-a-number'}))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.cashback, Decimal('0'))
 
 
 class RemarkedGuestServiceSyncOnLoginTest(TestCase):

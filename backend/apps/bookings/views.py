@@ -24,10 +24,12 @@ from .models import TableBooking
 from .serializers import (
     AvailabilityQuerySerializer,
     AvailabilityResponseSerializer,
+    AvailableTablesQuerySerializer,
+    BookingTableSerializer,
     BookingZoneSerializer,
     TableBookingSerializer,
 )
-from .services import check_availability, list_zones
+from .services import check_availability, list_available_tables, list_zones
 from .tasks import _build_booking_html, _tg_post
 
 logger = logging.getLogger(__name__)
@@ -244,6 +246,79 @@ class BookingZonesView(APIView):
                 return Response([])
             safe_cache_set(_zones_cache_key, zones, timeout=60 * 60)
         return Response(zones)
+
+
+_tables_cache_key_fmt = 'reserve_tables:{date}:{time}:{guests}:{zone}'
+
+
+@extend_schema(tags=['Bookings'])
+class BookingTablesView(APIView):
+    """
+    Список свободных столов конкретного зала на точные дату/время/кол-во
+    гостей — для пикера конкретного стола в форме бронирования (появляется
+    после выбора зала, см. BookingZonesView). Ничего не создаёт и не меняет.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Список свободных столов зала на точное время',
+        description=(
+            'Возвращает свободные столы конкретного зала (`zone_id` из '
+            '`/bookings/zones/`) на точные дату/время/кол-во гостей — с '
+            'человеческим номером стола и вместимостью.\n\n'
+            'Результат кешируется на 60 секунд. Пустой список `200 []` — '
+            'подтверждённый Remarked факт: в зале нет свободных столов на '
+            'эти дату/время/кол-во гостей (клиент должен не позволять '
+            'бронирование в этом зале). При недоступности Remarked — `503`, '
+            'а не пустой список: в этом случае реальная занятость неизвестна, '
+            'и клиент не должен блокировать бронирование по этой причине '
+            '(та же семантика, что у `/bookings/availability/`).'
+        ),
+        parameters=[
+            OpenApiParameter(name='date', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True, description='Дата визита, YYYY-MM-DD'),
+            OpenApiParameter(name='time', type=OpenApiTypes.TIME, location=OpenApiParameter.QUERY, required=True, description='Точное время визита, HH:MM:SS'),
+            OpenApiParameter(name='guests', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=True, description='Количество гостей (1–50)'),
+            OpenApiParameter(name='zone_id', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=True, description='ID зала из /bookings/zones/'),
+        ],
+        responses={
+            200: BookingTableSerializer(many=True),
+            400: OpenApiResponse(description='Ошибка валидации параметров'),
+            503: _error_503,
+        },
+        examples=[
+            OpenApiExample(
+                'Пример ответа',
+                value=[
+                    {'id': 4384, 'name': '202', 'capacity': 2},
+                    {'id': 4391, 'name': '210', 'capacity': 2},
+                ],
+                response_only=True,
+            ),
+        ],
+    )
+    def get(self, request, *args, **kwargs):
+        query = AvailableTablesQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        date = query.validated_data['date']
+        time = query.validated_data['time']
+        guests = query.validated_data['guests']
+        zone_id = query.validated_data['zone_id']
+
+        cache_key = _tables_cache_key_fmt.format(
+            date=date.isoformat(), time=time.isoformat(), guests=guests, zone=zone_id,
+        )
+        tables = safe_cache_get(cache_key)
+        if tables is None:
+            try:
+                tables = list_available_tables(date.isoformat(), time.strftime('%H:%M:%S'), guests, zone_id)
+            except RemarkedAPIError:
+                logger.warning(
+                    "Available tables fetch failed: date=%s time=%s guests=%s zone_id=%s",
+                    date, time, guests, zone_id, exc_info=True,
+                )
+                return Response({'detail': 'Проверка занятости временно недоступна'}, status=503)
+            safe_cache_set(cache_key, tables, timeout=60)
+        return Response(tables)
 
 
 def _get_manager_keyboard():

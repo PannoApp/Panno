@@ -64,7 +64,9 @@
       "Bash(curl -s -o /dev/null -w \"SIZE:%{size_download} bytes, TIME:%{time_total}s, SPEED:%{speed_download} bytes/s\\\\n\" \"http://10.120.112.53:9000/panno-media/media/dishes/videos/6101241cf5a547fcac1351212e5c1356.mp4\")",
       "Bash(python manage.py makemigrations core)",
       "Bash(sed -n '1,200p' apps/users/tasks.py)",
-      "Bash(find apps *)"
+      "Bash(find apps *)",
+      "Bash(grep -A 100 \"Failing tests:\" /tmp_test_output.txt)",
+      "Bash(python -c ' *)"
     ],
     "additionalDirectories": [
       "\\tmp"

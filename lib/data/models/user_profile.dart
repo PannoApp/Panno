@@ -64,6 +64,7 @@ class UserProfile {
     this.gender = UserGender.notSpecified,
     this.email = '',
     this.birthday,
+    this.cashback = 0,
   });
 
   final int id;
@@ -80,6 +81,7 @@ class UserProfile {
   final UserGender gender;
   final String email;
   final DateTime? birthday;
+  final double cashback;
 
   String get displayName => '$firstName $lastName'.trim();
   bool get isAdmin => isStaff;
@@ -110,6 +112,7 @@ class UserProfile {
       gender: _parseGender(json['gender']),
       email: (json['email'] ?? '').toString(),
       birthday: _parseDateJoined(json['birthday']),
+      cashback: json['cashback'] == null ? 0 : parseDouble(json['cashback'], field: 'cashback'),
     );
   }
 
@@ -134,6 +137,7 @@ class UserProfile {
         'gender': gender.toJsonValue(),
         'email': email,
         if (birthday != null) 'birthday': formatDateOnly(birthday!),
+        'cashback': cashback,
       };
 
   UserProfile copyWith({
@@ -165,6 +169,7 @@ class UserProfile {
       gender: gender ?? this.gender,
       email: email ?? this.email,
       birthday: birthday ?? this.birthday,
+      cashback: cashback,
     );
   }
 }

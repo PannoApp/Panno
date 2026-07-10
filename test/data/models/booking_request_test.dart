@@ -25,7 +25,7 @@ void main() {
       });
     });
 
-    test('omits null zone, remarkedRoomId and comment', () {
+    test('omits null zone, remarkedRoomId, remarkedTableId and comment', () {
       final json = const BookingRequest(
         guestName: 'Айдар',
         phone: '+77001234567',
@@ -36,6 +36,7 @@ void main() {
 
       expect(json.containsKey('zone'), isFalse);
       expect(json.containsKey('remarked_room_id'), isFalse);
+      expect(json.containsKey('remarked_table_id'), isFalse);
       expect(json.containsKey('comment'), isFalse);
       expect(json['guests_count'], 2);
     });
@@ -53,6 +54,21 @@ void main() {
 
       expect(json['zone'], 'Зал 1');
       expect(json['remarked_room_id'], 304);
+    });
+
+    test('includes remarked_table_id when a specific table is selected', () {
+      final json = const BookingRequest(
+        guestName: 'Айдар',
+        phone: '+77001234567',
+        date: '2026-05-20',
+        time: '19:30',
+        guestsCount: 4,
+        zone: 'Зал 1',
+        remarkedRoomId: 304,
+        remarkedTableId: 4391,
+      ).toJson();
+
+      expect(json['remarked_table_id'], 4391);
     });
   });
 }

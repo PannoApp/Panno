@@ -206,6 +206,43 @@ void main() {
       expect(profile.toJson().containsKey('birthday'), isFalse);
     });
 
+    test('cashback defaults to 0 when absent', () {
+      final profile = UserProfile.fromJson({
+        'id': 1,
+        'phone': '+77001234567',
+        'first_name': 'A',
+        'last_name': 'B',
+      });
+
+      expect(profile.cashback, 0);
+    });
+
+    test('cashback parses numeric string from Decimal field', () {
+      final profile = UserProfile.fromJson({
+        'id': 1,
+        'phone': '+77001234567',
+        'first_name': 'A',
+        'last_name': 'B',
+        'cashback': '1250.50',
+      });
+
+      expect(profile.cashback, 1250.5);
+    });
+
+    test('copyWith preserves cashback', () {
+      final original = UserProfile.fromJson({
+        'id': 1,
+        'phone': '+77001234567',
+        'first_name': 'A',
+        'last_name': 'B',
+        'cashback': '400',
+      });
+
+      final updated = original.copyWith(notifyEvents: false);
+
+      expect(updated.cashback, 400);
+    });
+
     test('copyWith updates gender/email/birthday independently', () {
       final original = UserProfile.fromJson({
         'id': 1,
