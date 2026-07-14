@@ -68,7 +68,7 @@ class TableBooking(models.Model):
     # зал, используется в create_reserve_in_remarked для подбора свободного
     # стола именно в этом зале. Пусто — гость не указал зал, Remarked сам
     # подбирает стол по всему ресторану.
-    remarked_room_id = models.IntegerField(
+    remarked_room_id = models.BigIntegerField(
         "ID зала в Remarked",
         null=True,
         blank=True,
@@ -79,7 +79,10 @@ class TableBooking(models.Model):
     # в create_reserve_in_remarked напрямую, без автоподбора через
     # pick_table_for_room. Пусто — гость выбрал «Любой стол» (или зал вообще
     # не выбирал) — прежнее поведение автоподбора не меняется.
-    remarked_table_id = models.IntegerField(
+    # BigIntegerField, не IntegerField: реальные ID столов Remarked (в отличие
+    # от легаси/виджетных, см. docs/remarked.md) — 14-значные числа
+    # (например, 29646547874285), не помещаются в 32-битный IntegerField.
+    remarked_table_id = models.BigIntegerField(
         "ID стола в Remarked",
         null=True,
         blank=True,

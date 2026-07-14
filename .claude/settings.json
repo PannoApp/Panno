@@ -66,7 +66,18 @@
       "Bash(sed -n '1,200p' apps/users/tasks.py)",
       "Bash(find apps *)",
       "Bash(grep -A 100 \"Failing tests:\" /tmp_test_output.txt)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "PowerShell(docker compose -f \"C:\\\\Users\\\\amanz\\\\OneDrive\\\\Desktop\\\\Panno\\\\docker-compose.yml\" ps)",
+      "Bash(docker info *)",
+      "Bash(python -c \"import requests; print\\('requests OK', requests.__version__\\)\")",
+      "Bash(python remarked_probe.py)",
+      "Bash(python remarked_probe_bearer.py)",
+      "Bash(python remarked_probe_app3.py)",
+      "Bash(python remarked_probe_point_variants.py)",
+      "Bash(python remarked_probe_deep.py)",
+      "Bash(python -c \"print\\('checking docker or local venv'\\)\")",
+      "Bash(docker run *)",
+      "Bash(ssh -v -o ConnectTimeout=10 root@185.129.51.40 exit)"
     ],
     "additionalDirectories": [
       "\\tmp"

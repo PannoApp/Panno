@@ -229,6 +229,15 @@ TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='')
 REMARKED_API_TOKEN = env('REMARKED_API_TOKEN')
 REMARKED_POINT_ID = env.int('REMARKED_POINT_ID')
 
+# TODO(remarked-point-bug): временный обход. GetToken (Reserves API v1) ломается
+# с "Unknown error" для ЛЮБОГО переданного `point` (проверено на разных значениях,
+# включая пример из их же спеки) — see docs/remarked.md, раздел про GetToken.
+# Пока используем статический токен Reserves API, полученный напрямую от
+# поддержки Remarked (не протухает так же быстро, как токен из GetToken без
+# point, и правильно скоупится на нашу точку — в отличие от него). Вернуть
+# обратно на динамический GetToken, когда Remarked починит обработку `point`.
+REMARKED_RESERVES_STATIC_TOKEN = env('REMARKED_RESERVES_STATIC_TOKEN', default='')
+
 
 # Настройки Django REST Framework
 REST_FRAMEWORK = {

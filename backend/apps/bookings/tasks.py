@@ -240,8 +240,9 @@ def send_event_reservation_telegram_notification(reservation_id):
 )
 def create_reserve_in_remarked(booking_id):
     """
-    Создаёт бронь в Remarked (GetToken → CreateReserve) по уже сохранённой
-    локально TableBooking и сохраняет полученный reserve_id обратно.
+    Создаёт бронь в Remarked (CreateReserve статическим токеном Reserves API,
+    см. apps/remarked/reserves_client.py) по уже сохранённой локально
+    TableBooking и сохраняет полученный reserve_id обратно.
     Локальная запись — источник истины и остаётся без изменений, если вызов
     в Remarked упадёт после исчерпания ретраев (см. TableBookingListCreateView).
     """
