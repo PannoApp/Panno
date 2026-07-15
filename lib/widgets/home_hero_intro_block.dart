@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../core/home_data.dart';
+import '../providers/core_info_provider.dart';
 
 class HomeHeroIntroBlock extends StatefulWidget {
   const HomeHeroIntroBlock({super.key});
@@ -52,6 +54,8 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
 
   @override
   Widget build(BuildContext context) {
+    final concept = context.watch<CoreInfoProvider>().coreInfo?.conceptDescription
+        ?? kModernNomadConcept;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
       child: Column(
@@ -105,7 +109,7 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
           const SizedBox(height: 18),
 
           Text(
-            kModernNomadConcept,
+            concept,
             style: PiligrimTextStyles.body.copyWith(
               fontSize: 13.5,
               height: 1.6,

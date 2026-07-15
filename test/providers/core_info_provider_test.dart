@@ -14,7 +14,6 @@ CoreInfo _sampleCoreInfo() => CoreInfo.fromJson({
       'phone': '+7700',
       'visit_rules': 'rules',
       'privacy_policy': 'policy',
-      'booking_deposit_required': false,
     });
 
 void main() {
@@ -68,7 +67,6 @@ void main() {
           'phone': '+7700',
           'visit_rules': 'rules',
           'privacy_policy': 'policy',
-          'booking_deposit_required': false,
         }),
       );
       when(() => repository.fetchInterior()).thenAnswer((_) async => []);

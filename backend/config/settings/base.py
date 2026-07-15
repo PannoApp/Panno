@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'apps.events.apps.EventsConfig',
     'apps.core.apps.CoreConfig',
     'apps.notifications.apps.NotificationsConfig',
+    'apps.remarked.apps.RemarkedConfig',
 
     # Автоудаление файлов при замене/удалении объектов (последним — требование пакета)
     'django_cleanup.apps.CleanupConfig',
@@ -220,6 +221,23 @@ TELEGRAM_CHAT_ID = env('TELEGRAM_CHAT_ID', default='')
 # Секрет для верификации входящих webhook-запросов от Telegram (X-Telegram-Bot-Api-Secret-Token)
 TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='')
 
+# ==========================================
+# Remarked CRM (бронирования, меню, стоп-лист)
+# ==========================================
+# Статический токен точки и ID заведения из личного кабинета Remarked.
+# См. backend/docs/remarked.md.
+REMARKED_API_TOKEN = env('REMARKED_API_TOKEN')
+REMARKED_POINT_ID = env.int('REMARKED_POINT_ID')
+
+# TODO(remarked-point-bug): временный обход. GetToken (Reserves API v1) ломается
+# с "Unknown error" для ЛЮБОГО переданного `point` (проверено на разных значениях,
+# включая пример из их же спеки) — see docs/remarked.md, раздел про GetToken.
+# Пока используем статический токен Reserves API, полученный напрямую от
+# поддержки Remarked (не протухает так же быстро, как токен из GetToken без
+# point, и правильно скоупится на нашу точку — в отличие от него). Вернуть
+# обратно на динамический GetToken, когда Remarked починит обработку `point`.
+REMARKED_RESERVES_STATIC_TOKEN = env('REMARKED_RESERVES_STATIC_TOKEN', default='')
+
 
 # Настройки Django REST Framework
 REST_FRAMEWORK = {
@@ -332,6 +350,10 @@ CELERY_BEAT_SCHEDULE = {
     'send-booking-reminders': {
         'task': 'apps.bookings.tasks.send_booking_reminders',
         'schedule': 60 * 15,  # каждые 15 минут
+    },
+    'sync-reserve-statuses': {
+        'task': 'apps.bookings.tasks.sync_reserve_statuses',
+        'schedule': 60 * 10,  # каждые 10 минут
     },
 }
 

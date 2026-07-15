@@ -276,25 +276,7 @@ if (nextUrl != null) {
 - **Push при подтверждении:** *«Ваш столик забронирован на ДД.ММ.ГГГГ в ЧЧ:ММ. Ждём вас!»* — дата и время подставляются из брони.
 - **Push-напоминания:** За 1–2 часа до визита пользователь получает push-напоминание о брони (сервисное, отключить нельзя).
 
-### 3.1.1 Логика депозита
-
-`CoreInfo` (загружается при старте через `GET /api/v1/core/info/`) содержит:
-- `bookingDepositRequired` — признак необходимости депозита
-- `bookingDepositNote` — текст для отображения (может быть пустым)
-- `phone` — номер заведения для кнопки звонка
-
-Баннер отображается **внутри формы** бронирования (не как отдельный диалог), между полем «Комментарий» и кнопкой отправки:
-
-```dart
-if (coreInfo.bookingDepositRequired) {
-  // Показать контейнер с текстом coreInfo.bookingDepositNote
-  // и кнопкой «ПОЗВОНИТЬ МЕНЕДЖЕРУ»
-  final uri = Uri.parse('tel:${coreInfo.phone}');
-  if (await canLaunchUrl(uri)) await launchUrl(uri);
-}
-```
-
-Оплата депозита через приложение не принимается — только переадресация на звонок менеджеру.
+Оплата через приложение не принимается ни в каком виде — форма бронирования показывает статичный дисклеймер об этом.
 
 ### 3.1.2 Экран успеха после отправки заявки
 
@@ -308,7 +290,6 @@ Navigator.of(context).push(
       time: timeText,         // «ЧЧ:ММ»
       heroesCount: count,
       zone: zoneText,         // читаемое название или null
-      depositRequired: coreInfo.bookingDepositRequired,
     ),
   ),
 );
@@ -379,8 +360,6 @@ Navigator.of(context).push(
     ],
     "tour_link": "https://...",
     "twogis_link": "https://2gis.kz/...",
-    "google_maps_link": "https://maps.google.com/?q=...",
-    "yandex_maps_link": "https://yandex.kz/maps/?text=...",
     "feedback_url": "https://wa.me/77001234567",
     "visit_rules": [
       {"title": "Дресс-код", "body": "Деловой casual..."},
@@ -403,17 +382,11 @@ Navigator.of(context).push(
 | `telegram` | Telegram (username или ссылка) |
 | `instagram` | Instagram handle |
 | `visit_rules` | Правила посещения — массив объектов `{"title": "...", "body": "..."}`, отсортированных по полю `order`. Пустой список `[]` если не заполнено. |
-| `privacy_policy` | Политика обработки персональных данных (для экрана согласия) |
-| `terms_of_service` | Пользовательское соглашение |
+| `privacy_policy` | URL политики обработки персональных данных (для экрана согласия) |
+| `terms_of_service` | URL пользовательского соглашения |
 | `tour_link` | URL для WebView 3D-тура (`null` если не задано) |
-| `twogis_link` | URL маршрута в 2ГИС (`null` если не задано) |
-| `google_maps_link` | URL маршрута в Google Maps (`null` если не задано) |
-| `yandex_maps_link` | URL маршрута в Яндекс.Картах (`null` если не задано) |
+| `twogis_link` | URL маршрута в 2ГИС (`null` если не задано) — единственный поддерживаемый картографический сервис |
 | `feedback_url` | URL для обратной связи (WhatsApp, форма, mailto: и т.п.). `null` если не задано. |
-| `booking_deposit_required` | `true` — ресторан требует депозит при бронировании. Flutter показывает предупреждение. |
-| `booking_deposit_note` | Текст предупреждения о депозите (пустая строка если не задано). |
-
-**Логика кнопки «Построить маршрут»:** показывай только те карты, для которых поле не `null`. Если заполнены несколько — дай пользователю выбор.
 
 ### 5.1.1 Галерея интерьера (вкладка «3D-тур / Интерьер»)
 `GET /api/v1/core/interior/` (Без авторизации)

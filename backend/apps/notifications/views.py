@@ -72,6 +72,9 @@ class RegisterDeviceView(views.APIView):
                 defaults={'user': request.user}
             )
 
+            from apps.users.services import maybe_push_guest_to_remarked
+            maybe_push_guest_to_remarked(request.user, firebase_token=fcm_token)
+
             if created:
                 return Response(
                     {"message": "Устройство успешно зарегистрировано."},

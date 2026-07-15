@@ -80,14 +80,10 @@ class CoreInfo {
     required this.phone,
     required this.socialLinks,
     required this.heroSlides,
-    required this.bookingDepositRequired,
-    this.bookingDepositNote,
     required this.visitRules,
     required this.privacyPolicy,
     this.conceptDescription,
     this.twogisLink,
-    this.googleMapsLink,
-    this.yandexMapsLink,
     this.feedbackUrl,
     this.termsOfService,
     this.tourLink,
@@ -100,14 +96,10 @@ class CoreInfo {
   final String phone;
   final List<SocialLink> socialLinks;
   final List<InteriorSlide> heroSlides;
-  final bool bookingDepositRequired;
-  final String? bookingDepositNote;
   final List<VisitRuleItem> visitRules;
   final String privacyPolicy;
   final String? conceptDescription;
   final String? twogisLink;
-  final String? googleMapsLink;
-  final String? yandexMapsLink;
   final String? feedbackUrl;
   final String? termsOfService;
   final String? tourLink;
@@ -131,12 +123,6 @@ class CoreInfo {
       phone: parseString(json['phone'], field: 'phone'),
       socialLinks: _parseSocialLinks(json),
       heroSlides: _parseHeroSlides(json['hero_slides'] ?? json['heroSlides']),
-      bookingDepositRequired: parseBool(
-        json['booking_deposit_required'] ?? json['bookingDepositRequired'],
-      ),
-      bookingDepositNote: parseStringOrNull(
-        json['booking_deposit_note'] ?? json['bookingDepositNote'],
-      ),
       visitRules: _parseVisitRules(json['visit_rules'] ?? json['visitRules']),
       privacyPolicy: parseString(
         json['privacy_policy'] ?? json['privacyPolicy'],
@@ -146,12 +132,6 @@ class CoreInfo {
         json['concept_description'] ?? json['conceptDescription'],
       ),
       twogisLink: parseStringOrNull(json['twogis_link'] ?? json['twogisLink']),
-      googleMapsLink: parseStringOrNull(
-        json['google_maps_link'] ?? json['googleMapsLink'],
-      ),
-      yandexMapsLink: parseStringOrNull(
-        json['yandex_maps_link'] ?? json['yandexMapsLink'],
-      ),
       feedbackUrl: parseStringOrNull(json['feedback_url'] ?? json['feedbackUrl']),
       termsOfService: parseStringOrNull(
         json['terms_of_service'] ?? json['termsOfService'],
@@ -168,14 +148,10 @@ class CoreInfo {
         'phone': phone,
         'social_links': socialLinks.map((e) => e.toJson()).toList(),
         'hero_slides': heroSlides.map((e) => e.toJson()).toList(),
-        'booking_deposit_required': bookingDepositRequired,
-        if (bookingDepositNote != null) 'booking_deposit_note': bookingDepositNote,
         'visit_rules': visitRules.map((e) => e.toJson()).toList(),
         'privacy_policy': privacyPolicy,
         if (conceptDescription != null) 'concept_description': conceptDescription,
         if (twogisLink != null) 'twogis_link': twogisLink,
-        if (googleMapsLink != null) 'google_maps_link': googleMapsLink,
-        if (yandexMapsLink != null) 'yandex_maps_link': yandexMapsLink,
         if (feedbackUrl != null) 'feedback_url': feedbackUrl,
         if (termsOfService != null) 'terms_of_service': termsOfService,
         if (tourLink != null) 'tour_link': tourLink,

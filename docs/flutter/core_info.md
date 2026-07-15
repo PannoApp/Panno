@@ -24,9 +24,7 @@
 
 | Поле модели | JSON | Назначение |
 |-------------|------|------------|
-| `twogisLink` | `twogis_link` | Ссылка на 2ГИС |
-| `googleMapsLink` | `google_maps_link` | Google Maps |
-| `yandexMapsLink` | `yandex_maps_link` | Яндекс.Карты |
+| `twogisLink` | `twogis_link` | Ссылка на 2ГИС (единственный картографический сервис — Google Maps/Яндекс.Карты убраны) |
 | `feedbackUrl` | `feedback_url` | Обратная связь (WhatsApp, форма и т.д.) |
 | `termsOfService` | `terms_of_service` | Пользовательское соглашение |
 | `tourLink` | `tour_link` | 3D-тур (пока только в модели, UI — позже) |

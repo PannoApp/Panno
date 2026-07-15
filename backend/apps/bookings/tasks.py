@@ -1,5 +1,6 @@
 import html
 import logging
+import uuid
 import requests
 from celery import shared_task
 from django.conf import settings
@@ -225,4 +226,192 @@ def send_event_reservation_telegram_notification(reservation_id):
         'parse_mode': 'HTML',
     }, token, raise_on_error=True)
     logger.info("Telegram notification sent for event reservation: %s", reservation_id)
+
+
+@shared_task(
+    name='apps.bookings.tasks.create_reserve_in_remarked',
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=30,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    time_limit=60,
+    soft_time_limit=45,
+)
+def create_reserve_in_remarked(booking_id):
+    """
+    Создаёт бронь в Remarked (CreateReserve статическим токеном Reserves API,
+    см. apps/remarked/reserves_client.py) по уже сохранённой локально
+    TableBooking и сохраняет полученный reserve_id обратно.
+    Локальная запись — источник истины и остаётся без изменений, если вызов
+    в Remarked упадёт после исчерпания ретраев (см. TableBookingListCreateView).
+    """
+    from .models import TableBooking
+    from .services import _free_table_ids_at_slot, pick_table_for_room
+    from apps.remarked.exceptions import RemarkedAPIError
+    from apps.remarked.reserves_client import ReservesClient
+
+    try:
+        booking = TableBooking.objects.select_related('user').get(pk=booking_id)
+    except TableBooking.DoesNotExist:
+        return
+
+    reserve = {
+        'name': booking.guest_name,
+        'phone': booking.phone or (booking.user.phone if booking.user_id else ''),
+        'date': booking.date.isoformat(),
+        'time': booking.time.strftime('%H:%M'),
+        'guests_count': booking.guests_count,
+        'source': 'mobile_app',
+    }
+    if booking.comment:
+        reserve['comment'] = booking.comment
+
+    if booking.remarked_table_id:
+        # Гость явно выбрал конкретный стол в UI (не «Любой стол»), но между
+        # показом пикера и выполнением этой (асинхронной) задачи стол мог
+        # успеть занять кто-то другой (звонок в ресторан, ручная посадка
+        # менеджером в Remarked) — перепроверяем прямо перед CreateReserve.
+        # Если стол уже недоступен, просто не передаём table_ids: бронь всё
+        # равно создастся, но без привязки к конкретному столу (как «Любой
+        # стол» в этом зале), а не тихо конфликтует в Remarked.
+        still_free = False
+        if booking.remarked_room_id:
+            try:
+                free_table_ids = _free_table_ids_at_slot(
+                    booking.date.isoformat(),
+                    booking.time.strftime('%H:%M:%S'),
+                    booking.guests_count,
+                    booking.remarked_room_id,
+                )
+                still_free = booking.remarked_table_id in free_table_ids
+            except RemarkedAPIError:
+                logger.warning(
+                    "Table re-check failed, creating reserve without table_ids: booking=%s table=%s",
+                    booking_id, booking.remarked_table_id, exc_info=True,
+                )
+        if still_free:
+            reserve['table_ids'] = [booking.remarked_table_id]
+    elif booking.remarked_room_id:
+        # Гость выбрал зал, но не конкретный стол («Любой стол») — пытаемся
+        # честно забронировать стол именно в этом зале, а не полагаться на
+        # автоподбор Remarked по всему ресторану. Если между проверкой
+        # доступности и созданием брони зал разобрали (или Remarked недоступен
+        # для этого доп. запроса) — просто не передаём table_ids, бронь всё
+        # равно создастся без привязки к залу.
+        try:
+            table_id = pick_table_for_room(
+                booking.date.isoformat(),
+                booking.time.strftime('%H:%M:%S'),
+                booking.guests_count,
+                booking.remarked_room_id,
+            )
+        except RemarkedAPIError:
+            logger.warning(
+                "pick_table_for_room failed, creating reserve without table_ids: booking=%s room=%s",
+                booking_id, booking.remarked_room_id, exc_info=True,
+            )
+            table_id = None
+        if table_id:
+            reserve['table_ids'] = [table_id]
+
+    client = ReservesClient()
+    # Отдельный слой идемпотентности от нашего собственного Idempotency-Key
+    # (IdempotencyMixin в views.py) — это ключ, который понимает сам Remarked
+    # на уровне метода CreateReserve.
+    try:
+        response = client.create_reserve(reserve, request_id=str(uuid.uuid4()))
+    except RemarkedAPIError as exc:
+        if exc.status_code is not None and 200 <= exc.status_code < 300:
+            # HTTP 200, но тело — business-level отказ Remarked (например,
+            # "Time is restricted to reservation": время визита нарушает
+            # правило, настроенное в самом Remarked и не проверяемое через
+            # GetSlots). Повтор с теми же датой/временем/гостями провалится
+            # так же — ретраить нет смысла, только тратим 3 попытки впустую.
+            # Бронь остаётся локально как pending без remarked_reserve_id.
+            logger.error(
+                "Remarked rejected reserve (non-retryable business rule): booking=%s error=%s",
+                booking_id, exc,
+            )
+            return
+        raise
+
+    reserve_id = response.get('reserve_id')
+    if reserve_id and booking.remarked_reserve_id != reserve_id:
+        booking.remarked_reserve_id = reserve_id
+        booking.save(update_fields=['remarked_reserve_id'])
+    logger.info("Remarked reserve created: booking=%s reserve_id=%s", booking_id, reserve_id)
+
+
+# Remarked inner_status (GetReserveByID/GetReservesByPhone) → наш TableBooking.status.
+# Архитектурное решение, не согласованное с заказчиком отдельно (см. тикет):
+# new/waiting — ещё не подтверждено менеджером → pending;
+# confirmed/started — бронь актуальна и гость уже пришёл/подтверждён → confirmed;
+# closed — визит завершён → completed;
+# canceled — отменена (менеджером или гостем) → canceled.
+RESERVE_INNER_STATUS_TO_LOCAL = {
+    'new': 'pending',
+    'waiting': 'pending',
+    'confirmed': 'confirmed',
+    'started': 'confirmed',
+    'closed': 'completed',
+    'canceled': 'canceled',
+}
+
+
+@shared_task(
+    name='apps.bookings.tasks.sync_reserve_statuses',
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=60,
+    acks_late=True,
+    reject_on_worker_lost=True,
+    time_limit=120,
+    soft_time_limit=90,
+)
+def sync_reserve_statuses():
+    """
+    Запускается по расписанию Celery Beat (см. CELERY_BEAT_SCHEDULE) —
+    обратная синхронизация: менеджер меняет статус брони в Remarked, а не
+    в нашем приложении. Для каждой ещё не завершённой локально брони с уже
+    известным remarked_reserve_id дёргает GetReserveByID и при расхождении
+    статуса обновляет локальную запись. save() триггерит существующий
+    post_save-сигнал notify_on_status_change (apps/bookings/signals.py),
+    который сам разошлёт пуш пользователю — сигнал не меняется.
+
+    Ошибка Remarked по одной брони не прерывает синхронизацию остальных —
+    следующий плановый запуск повторит попытку для неё же.
+    """
+    from .models import TableBooking
+    from apps.remarked.reserves_client import ReservesClient
+    from apps.remarked.exceptions import RemarkedAPIError
+
+    bookings = TableBooking.objects.filter(
+        status__in=('pending', 'confirmed'),
+        remarked_reserve_id__isnull=False,
+    )
+
+    client = ReservesClient()
+    updated = 0
+    for booking in bookings:
+        try:
+            response = client.get_reserve_by_id(booking.remarked_reserve_id)
+        except RemarkedAPIError:
+            logger.warning(
+                "sync_reserve_statuses: Remarked lookup failed for booking=%s reserve_id=%s",
+                booking.pk, booking.remarked_reserve_id, exc_info=True,
+            )
+            continue
+
+        inner_status = (response.get('reserve') or {}).get('inner_status')
+        new_status = RESERVE_INNER_STATUS_TO_LOCAL.get(inner_status)
+        if not new_status or new_status == booking.status:
+            continue
+
+        booking.status = new_status
+        booking.save()
+        updated += 1
+
+    logger.info("Reserve statuses synced: %d booking(s) updated", updated)
+    return updated
 

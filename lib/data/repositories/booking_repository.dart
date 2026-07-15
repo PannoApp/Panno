@@ -1,6 +1,10 @@
 import 'package:dio/dio.dart';
 import '../models/api_booking.dart';
+import '../models/availability_slot.dart';
 import '../models/booking_request.dart';
+import '../models/booking_table.dart';
+import '../models/booking_zone.dart';
+import '../models/json_utils.dart';
 import '../paginated_response.dart';
 import '../services/api_client.dart';
 
@@ -32,5 +36,50 @@ class BookingRepository {
       response.data ?? {},
       ApiBooking.fromJson,
     ).results;
+  }
+
+  Future<List<AvailabilitySlot>> fetchAvailability({
+    required String date,
+    required int guests,
+    int? zoneId,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/bookings/availability/',
+      queryParameters: {
+        'date': date,
+        'guests': guests,
+        if (zoneId != null) 'zone_id': zoneId,
+      },
+    );
+    return asJsonMapList(response.data?['slots'])
+        .map(AvailabilitySlot.fromJson)
+        .toList();
+  }
+
+  Future<List<BookingZone>> fetchZones() async {
+    final response = await _dio.get<List<dynamic>>('/bookings/zones/');
+    return (response.data ?? const [])
+        .map((e) => BookingZone.fromJson(asJsonMap(e)))
+        .toList();
+  }
+
+  Future<List<BookingTable>> fetchTables({
+    required String date,
+    required String time,
+    required int guests,
+    required int zoneId,
+  }) async {
+    final response = await _dio.get<List<dynamic>>(
+      '/bookings/tables/',
+      queryParameters: {
+        'date': date,
+        'time': time,
+        'guests': guests,
+        'zone_id': zoneId,
+      },
+    );
+    return (response.data ?? const [])
+        .map((e) => BookingTable.fromJson(asJsonMap(e)))
+        .toList();
   }
 }

@@ -53,17 +53,39 @@ class TableBooking(models.Model):
         verbose_name="Количество гостей"
     )
     
-    ZONE_CHOICES = [
-        ('main', 'Главный зал'),
-        ('terrace', 'Терраса'),
-        ('private', 'Приват'),
-    ]
+    # Название зала — раньше был фиксированный список (main/terrace/private),
+    # придуманный нами и не совпадавший с реальными залами ресторана. Теперь
+    # это свободный текст, синхронизированный с реальными залами из Remarked
+    # (см. remarked_room_id и apps/bookings/services.py::get_rooms).
     zone = models.CharField(
         "Зона/зал",
-        max_length=50,
-        choices=ZONE_CHOICES,
+        max_length=100,
         blank=True,
         null=True,
+    )
+
+    # ID зала в Remarked (GetSlots.rooms[].id) — если гость выбрал конкретный
+    # зал, используется в create_reserve_in_remarked для подбора свободного
+    # стола именно в этом зале. Пусто — гость не указал зал, Remarked сам
+    # подбирает стол по всему ресторану.
+    remarked_room_id = models.BigIntegerField(
+        "ID зала в Remarked",
+        null=True,
+        blank=True,
+    )
+
+    # ID конкретного стола в Remarked (GetSlots.rooms[].tables[].id) — гость
+    # явно выбрал стол в UI (не «Любой стол»). Если заполнено — используется
+    # в create_reserve_in_remarked напрямую, без автоподбора через
+    # pick_table_for_room. Пусто — гость выбрал «Любой стол» (или зал вообще
+    # не выбирал) — прежнее поведение автоподбора не меняется.
+    # BigIntegerField, не IntegerField: реальные ID столов Remarked (в отличие
+    # от легаси/виджетных, см. docs/remarked.md) — 14-значные числа
+    # (например, 29646547874285), не помещаются в 32-битный IntegerField.
+    remarked_table_id = models.BigIntegerField(
+        "ID стола в Remarked",
+        null=True,
+        blank=True,
     )
 
     # Поле для дополнительных пожеланий клиента
@@ -79,6 +101,15 @@ class TableBooking(models.Model):
         choices=STATUS_CHOICES,
         default='pending',
         verbose_name="Статус"
+    )
+
+    # ID брони в Remarked (CreateReserve.Response.reserve_id) — заполняется
+    # асинхронно таской create_reserve_in_remarked после локального сохранения.
+    remarked_reserve_id = models.IntegerField(
+        "ID брони в Remarked",
+        null=True,
+        blank=True,
+        unique=True,
     )
 
     created_at = models.DateTimeField(

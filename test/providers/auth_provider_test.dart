@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:piligrim/data/models/user_profile.dart';
 import 'package:piligrim/data/services/auth_service.dart';
 import 'package:piligrim/providers/auth_provider.dart';
 
@@ -162,6 +163,53 @@ void main() {
           .single;
       expect(patch.data, {'notifications_enabled': false});
       expect(auth.currentUser?.notificationsEnabled, isFalse);
+    });
+
+    test('updateDisplayProfile sends gender/email/birthday in PATCH body', () async {
+      storage.access = 'stored-access';
+      adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
+      adapter.enqueue(200, {
+        ..._sampleProfile(),
+        'gender': 'male',
+        'email': 'a@example.com',
+        'birthday': '1995-05-20',
+      });
+
+      final auth = buildProvider();
+      await auth.init();
+      await auth.updateDisplayProfile(
+        gender: UserGender.male,
+        email: 'a@example.com',
+        birthday: DateTime(1995, 5, 20),
+      );
+
+      final patch = adapter.captured
+          .where((r) => r.method == 'PATCH' && r.path == '/users/profile/')
+          .single;
+      expect(patch.data, {
+        'gender': 'male',
+        'email': 'a@example.com',
+        'birthday': '1995-05-20',
+      });
+      expect(auth.currentUser?.gender, UserGender.male);
+      expect(auth.currentUser?.email, 'a@example.com');
+    });
+
+    test('updateDisplayProfile omits unset optional fields', () async {
+      storage.access = 'stored-access';
+      adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
+      adapter.enqueue(200, {..._sampleProfile(), 'first_name': 'Данияр'});
+
+      final auth = buildProvider();
+      await auth.init();
+      await auth.updateDisplayProfile(firstName: 'Данияр');
+
+      final patch = adapter.captured
+          .where((r) => r.method == 'PATCH' && r.path == '/users/profile/')
+          .single;
+      expect(patch.data, {'first_name': 'Данияр'});
     });
 
     test('init loads eventsCount from reservations API', () async {

@@ -9,6 +9,7 @@ import '../core/theme.dart';
 import '../data/events_news_data.dart';
 import '../data/repositories/events_repository.dart';
 import '../providers/events_provider.dart';
+import '../widgets/piligrim_back_button.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tap.dart';
 import '../widgets/piligrim_toast.dart';
@@ -192,35 +193,8 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leadingWidth: 80,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: PiligrimTap(
-            onTap: () => Navigator.of(context).pop(),
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    size: 12,
-                    color: PiligrimColors.sky.withValues(alpha: 0.45),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    'Назад',
-                    style: PiligrimTextStyles.caption.copyWith(
-                      color: PiligrimColors.sky.withValues(alpha: 0.45),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        leadingWidth: PiligrimBackButton.kWidth,
+        leading: const PiligrimBackButton(),
         title: Text(
           _isCreating ? 'Новая новость' : 'Редактировать новость',
           style: PiligrimTextStyles.heading.copyWith(

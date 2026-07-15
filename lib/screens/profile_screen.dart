@@ -37,12 +37,20 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // AuthProvider.init() (main.dart) восстанавливает сессию асинхронно и
+  // может завершиться позже первого кадра — если на момент этой проверки
+  // isLoggedIn ещё false, полагаемся на повторную проверку в build()
+  // (см. Consumer<AuthProvider> ниже), чтобы история всё равно подгрузилась,
+  // когда авторизация восстановится.
+  bool _historyRequested = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (context.read<AuthProvider>().isLoggedIn) {
+        _historyRequested = true;
         context.read<BookingProvider>().loadHistory();
       }
     });
@@ -137,9 +145,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   PiligrimPageRoute(builder: (_) => const OnboardingScreen()),
                 );
               }
+              _historyRequested = true;
               context.read<BookingProvider>().loadHistory();
             },
           );
+        }
+        if (!_historyRequested) {
+          // Сюда попадаем, когда AuthProvider.init() восстановил сессию уже
+          // после первого кадра (см. комментарий у _historyRequested) —
+          // initState это пропустил, догоняем здесь.
+          _historyRequested = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) context.read<BookingProvider>().loadHistory();
+          });
         }
         final user = auth.user;
         final bottomPad = MediaQuery.paddingOf(context).bottom + 32;
@@ -177,6 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             user: user,
                             onNavigate: widget.onNavigate,
                           ),
+                          const SizedBox(height: 12),
+                          _CashbackCard(cashback: user.cashback),
                           const SizedBox(height: 28),
                         ],
 
@@ -526,6 +546,49 @@ class _StatCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CASHBACK CARD — баланс бонусов гостя, синхронизированный из Remarked CRM
+// ─────────────────────────────────────────────────────────────────────────────
+String _formatCashback(double value) => value.round().toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]} ',
+    );
+
+class _CashbackCard extends StatelessWidget {
+  const _CashbackCard({required this.cashback});
+  final double cashback;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileGlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Кэшбек',
+                  style: PiligrimTextStyles.caption.copyWith(fontSize: 11),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_formatCashback(cashback)} ₸',
+                  style: PiligrimTextStyles.heading.copyWith(
+                    fontSize: 20,
+                    color: PiligrimColors.steppe,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.06, end: 0, duration: 500.ms);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICATIONS CARD
 // ─────────────────────────────────────────────────────────────────────────────
 class _NotificationsCard extends StatelessWidget {
@@ -699,9 +762,9 @@ class _NotifRow extends StatelessWidget {
 /// Маппинг названия мессенджера → SVG-ассет (для социальных ссылок с бэкенда)
 String _resolveMessengerIcon(String label) {
   final l = label.toLowerCase();
-  if (l.contains('whatsapp')) return 'assets/images/whatsappsvg.svg';
-  if (l.contains('telegram')) return 'assets/images/telegramsvg.svg';
-  if (l.contains('instagram')) return 'assets/images/instagramsvg.svg';
+  if (l.contains('whatsapp')) return 'assets/images/whatsapp_generic.svg';
+  if (l.contains('telegram')) return 'assets/images/telegram_generic.svg';
+  if (l.contains('instagram')) return 'assets/images/instagram_generic.svg';
   return 'assets/images/shaman.svg'; // fallback
 }
 
@@ -775,15 +838,12 @@ class _ContactsCard extends StatelessWidget {
     final phone = coreInfo?.phone.isNotEmpty == true
         ? coreInfo!.phone
         : kRestaurantPhone;
-    // Список карт — только те, у которых есть ссылка из CoreInfo
+    // Карта — только 2ГИС (основной картографический сервис для аудитории РК)
     final mapLinks = [
       if (coreInfo?.twogisLink != null)
-        (label: '2ГИС', icon: 'assets/images/2gis.svg', url: coreInfo!.twogisLink!),
-      if (coreInfo?.googleMapsLink != null)
-        (label: 'Google', icon: 'assets/images/googlemapssvg.svg', url: coreInfo!.googleMapsLink!),
-      if (coreInfo?.yandexMapsLink != null)
-        (label: 'Яндекс', icon: 'assets/images/yandexsvg.svg', url: coreInfo!.yandexMapsLink!),
+        (label: '2ГИС', icon: 'assets/images/map_pin_generic.svg', url: coreInfo!.twogisLink!),
     ];
+    final address = coreInfo?.address ?? '';
 
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
         ? coreInfo!.socialLinks
@@ -794,63 +854,6 @@ class _ContactsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Кнопки карт — скрываем если все ссылки null
-          if (mapLinks.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-              child: Row(
-                children: mapLinks.map((t) {
-                  return Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        right: t == mapLinks.last ? 0 : 8,
-                      ),
-                      child: PiligrimTap(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => onLaunch(t.url),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: PiligrimColors.steppe.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: PiligrimColors.steppe.withValues(alpha: 0.16),
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SvgPicture.asset(
-                                t.icon,
-                                width: 20,
-                                height: 20,
-                                colorFilter: ColorFilter.mode(
-                                  PiligrimColors.steppe.withValues(alpha: 0.85),
-                                  BlendMode.srcIn,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                t.label,
-                                style: PiligrimTextStyles.caption.copyWith(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: PiligrimColors.steppe.withValues(alpha: 0.75),
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-          const _ProfileHairlineDivider(inset: 18),
-
           // Телефон
           PiligrimTap(
             onTap: () => onLaunch('tel:$phone'),
@@ -918,6 +921,79 @@ class _ContactsCard extends StatelessWidget {
             }
             return rows;
           }(),
+
+          // Адрес + карта — в самом низу карточки
+          if (address.isNotEmpty || mapLinks.isNotEmpty) ...[
+            const _ProfileHairlineDivider(inset: 18),
+
+            // Адрес — показываем только если пришёл непустым с бэкенда
+            if (address.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(18, 18, 18, mapLinks.isNotEmpty ? 10 : 18),
+                child: Text(
+                  'Наш адрес: $address',
+                  style: PiligrimTextStyles.body.copyWith(
+                    fontSize: 13,
+                    color: PiligrimColors.steppe.withValues(alpha: 0.82),
+                  ),
+                ),
+              ),
+
+            // Кнопка 2ГИС — скрываем если ссылка null
+            if (mapLinks.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(18, address.isNotEmpty ? 0 : 18, 18, 18),
+                child: Row(
+                  children: mapLinks.map((t) {
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: t == mapLinks.last ? 0 : 8,
+                        ),
+                        child: PiligrimTap(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => onLaunch(t.url),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: PiligrimColors.steppe.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: PiligrimColors.steppe.withValues(alpha: 0.16),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SvgPicture.asset(
+                                  t.icon,
+                                  width: 20,
+                                  height: 20,
+                                  colorFilter: ColorFilter.mode(
+                                    PiligrimColors.steppe.withValues(alpha: 0.85),
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  t.label,
+                                  style: PiligrimTextStyles.caption.copyWith(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: PiligrimColors.steppe.withValues(alpha: 0.75),
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
         ],
       ),
     )

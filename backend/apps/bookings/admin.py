@@ -40,6 +40,7 @@ class TableBookingAdmin(ModelAdmin):
         'zone',
         'status',
         'user',
+        'remarked_reserve_id',
         'created_at',
     )
     
@@ -64,6 +65,6 @@ class TableBookingAdmin(ModelAdmin):
             'fields': ('date', 'time', 'zone', 'status')
         }),
         ('Системные данные', {
-            'fields': ('created_at',),
+            'fields': ('remarked_reserve_id', 'remarked_room_id', 'remarked_table_id', 'created_at'),
         }),
     )

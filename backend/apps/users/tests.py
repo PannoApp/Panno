@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 from importlib import import_module, reload
 from unittest.mock import patch, MagicMock
 
@@ -9,8 +10,15 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.remarked.exceptions import RemarkedAPIError
+
 from .serializers import RequestSMSSerializer, VerifySMSSerializer
-from .services import SMSService
+from .services import (
+    SMSService,
+    RemarkedGuestService,
+    apply_guest_data_to_user,
+    maybe_push_guest_to_remarked,
+)
 from .throttles import PhoneSMSThrottle
 
 User = get_user_model()
@@ -256,6 +264,11 @@ class VerifySMSViewTest(APITestCase):
     def setUp(self):
         cache.clear()
         cache.set(f'otp_{self.PHONE}', self.OTP, 180)
+        # Логин больше не должен реально ходить в Remarked — эти тесты не про
+        # синхронизацию гостя. Сама синхронизация покрыта VerifySMSRemarkedSyncTest.
+        patcher = patch('apps.users.views.RemarkedGuestService.sync_on_login')
+        self.mock_remarked_sync = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_valid_otp_returns_jwt_tokens(self):
         response = self.client.post('/api/v1/users/auth/verify-sms/', {
@@ -426,6 +439,24 @@ class UserProfileSerializerTest(APITestCase):
         self.client.patch(self.PROFILE_URL, {'role': 'admin'})
         regular.refresh_from_db()
         self.assertEqual(regular.role, '')
+
+    def test_profile_response_includes_cashback(self):
+        """Профиль должен отдавать баланс кэшбека, синхронизированный из Remarked."""
+        user = User.objects.create_user(phone='+77009990005')
+        user.cashback = Decimal('750.25')
+        user.save()
+        self._auth(user)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['cashback'], '750.25')
+
+    def test_profile_cashback_readonly(self):
+        """PATCH с cashback игнорируется — значение приходит только из Remarked."""
+        user = User.objects.create_user(phone='+77009990006')
+        self._auth(user)
+        self.client.patch(self.PROFILE_URL, {'cashback': '9999.00'})
+        user.refresh_from_db()
+        self.assertEqual(user.cashback, Decimal('0'))
 
 
 # ---------------------------------------------------------------------------
@@ -927,4 +958,285 @@ class CustomAdminLogoutTest(TestCase):
 
         # Проверяем, что пользователь разлогинен
         self.assertNotIn('_auth_user_id', self.client.session)
+
+
+# ---------------------------------------------------------------------------
+# Remarked: интеграция гостя (регистрация ↔ Remarked)
+# ---------------------------------------------------------------------------
+
+class ApplyGuestDataToUserTest(TestCase):
+    """apply_guest_data_to_user — маппинг ответа Remarked на поля User."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77005550001')
+
+    def test_none_guest_does_nothing(self):
+        self.assertFalse(apply_guest_data_to_user(self.user, None))
+
+    def test_empty_dict_does_nothing(self):
+        self.assertFalse(apply_guest_data_to_user(self.user, {}))
+
+    def test_fills_all_fields_from_guest(self):
+        guest = {
+            'id': 'gid-123',
+            'name': 'Алихан',
+            'surname': 'Сейткали',
+            'email': 'a@example.com',
+            'birthday': '1995-05-20',
+            'gender': 'male',
+        }
+        self.assertTrue(apply_guest_data_to_user(self.user, guest))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Алихан')
+        self.assertEqual(self.user.last_name, 'Сейткали')
+        self.assertEqual(self.user.email, 'a@example.com')
+        self.assertEqual(self.user.birthday.isoformat(), '1995-05-20')
+        self.assertEqual(self.user.gender, User.GENDER_MALE)
+        self.assertEqual(self.user.remarked_guest_id, 'gid-123')
+
+    def test_remarked_wins_over_local_value_on_conflict(self):
+        self.user.first_name = 'Local'
+        self.user.save()
+        apply_guest_data_to_user(self.user, {'name': 'FromRemarked'})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'FromRemarked')
+
+    def test_missing_fields_do_not_erase_local_data(self):
+        """Пустые/отсутствующие поля в ответе Remarked не должны затирать то, что уже есть локально."""
+        self.user.first_name = 'Local'
+        self.user.email = 'local@example.com'
+        self.user.save()
+        apply_guest_data_to_user(self.user, {'name': '', 'id': 'gid-999'})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Local')
+        self.assertEqual(self.user.email, 'local@example.com')
+        self.assertEqual(self.user.remarked_guest_id, 'gid-999')
+
+    def test_unknown_gender_value_ignored(self):
+        """Remarked отдаёт только male/female — прочие/пустые значения не должны попасть в поле."""
+        apply_guest_data_to_user(self.user, {'gender': 'alien'})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.gender, User.GENDER_NOT_SPECIFIED)
+
+    def test_bonuses_saved_as_cashback(self):
+        apply_guest_data_to_user(self.user, {'bonuses': 1250.5})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.cashback, Decimal('1250.50'))
+
+    def test_zero_bonuses_is_not_treated_as_missing(self):
+        """bonuses=0 — валидное значение (баланс сгорел/потрачен), не должно игнорироваться."""
+        self.user.cashback = Decimal('500')
+        self.user.save()
+        apply_guest_data_to_user(self.user, {'bonuses': 0})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.cashback, Decimal('0'))
+
+    def test_missing_bonuses_does_not_change_cashback(self):
+        self.user.cashback = Decimal('300')
+        self.user.save()
+        apply_guest_data_to_user(self.user, {'name': 'Алихан'})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.cashback, Decimal('300'))
+
+    def test_non_numeric_bonuses_ignored(self):
+        self.assertFalse(apply_guest_data_to_user(self.user, {'bonuses': 'not-a-number'}))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.cashback, Decimal('0'))
+
+
+class RemarkedGuestServiceSyncOnLoginTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77005550002')
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_guest_found_updates_user(self, mock_get_info):
+        mock_get_info.return_value = {'name': 'Данияр', 'gender': 'male', 'id': 'gid-1'}
+        RemarkedGuestService.sync_on_login(self.user)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Данияр')
+        self.assertEqual(self.user.remarked_guest_id, 'gid-1')
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_guest_not_found_does_not_change_user(self, mock_get_info):
+        mock_get_info.return_value = None
+        original_name = self.user.first_name
+        RemarkedGuestService.sync_on_login(self.user)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, original_name)
+
+    @patch('apps.users.tasks.sync_guest_from_remarked.delay')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_api_error_falls_back_to_celery_task(self, mock_get_info, mock_delay):
+        mock_get_info.side_effect = RemarkedAPIError(code=500, message='boom')
+        RemarkedGuestService.sync_on_login(self.user)
+        mock_delay.assert_called_once_with(self.user.pk)
+
+    @patch('apps.users.tasks.sync_guest_from_remarked.delay')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_unexpected_exception_falls_back_to_celery_task(self, mock_get_info, mock_delay):
+        """Не только RemarkedAPIError — любая неожиданная ошибка тоже не должна ронять логин."""
+        mock_get_info.side_effect = Exception('network is down')
+        RemarkedGuestService.sync_on_login(self.user)
+        mock_delay.assert_called_once_with(self.user.pk)
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_broker_unavailable_does_not_raise(self, mock_get_info):
+        mock_get_info.side_effect = RemarkedAPIError(code=500, message='boom')
+        with patch('apps.users.tasks.sync_guest_from_remarked.delay', side_effect=Exception('broker down')):
+            RemarkedGuestService.sync_on_login(self.user)  # не должно бросать
+
+
+class VerifySMSRemarkedSyncIntegrationTest(APITestCase):
+    """VerifySMSView: синхронный pull из Remarked при логине не должен ронять авторизацию."""
+
+    PHONE = '+77005550003'
+    OTP = '1111'
+
+    def setUp(self):
+        cache.clear()
+        cache.set(f'otp_{self.PHONE}', self.OTP, 180)
+
+    @patch('apps.users.views.RemarkedGuestService.sync_on_login')
+    def test_verify_sms_calls_sync_on_login_with_the_logged_in_user(self, mock_sync):
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
+            'phone': self.PHONE, 'otp': self.OTP,
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_sync.assert_called_once()
+        called_user = mock_sync.call_args[0][0]
+        self.assertEqual(called_user.phone, self.PHONE)
+
+    @patch('apps.users.tasks.sync_guest_from_remarked.delay')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_login_succeeds_even_if_remarked_is_unreachable(self, mock_get_info, mock_task_delay):
+        mock_get_info.side_effect = RemarkedAPIError(message='connection refused')
+        response = self.client.post('/api/v1/users/auth/verify-sms/', {
+            'phone': self.PHONE, 'otp': self.OTP,
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        # Сбой синхронного пути должен уйти в фоновую таску как fallback
+        mock_task_delay.assert_called_once()
+
+
+class MaybePushGuestToRemarkedTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77005550004')
+
+    @patch('apps.users.tasks.push_guest_to_remarked.delay')
+    def test_incomplete_profile_without_guest_id_does_not_queue(self, mock_delay):
+        maybe_push_guest_to_remarked(self.user)
+        mock_delay.assert_not_called()
+
+    @patch('apps.users.tasks.push_guest_to_remarked.delay')
+    def test_name_and_gender_present_queues_task(self, mock_delay):
+        self.user.first_name = 'Алихан'
+        self.user.gender = User.GENDER_MALE
+        self.user.save()
+        maybe_push_guest_to_remarked(self.user)
+        mock_delay.assert_called_once_with(self.user.id, firebase_token=None, device_token=None)
+
+    @patch('apps.users.tasks.push_guest_to_remarked.delay')
+    def test_existing_guest_id_always_queues_even_if_profile_incomplete(self, mock_delay):
+        self.user.remarked_guest_id = 'gid-existing'
+        self.user.save()
+        maybe_push_guest_to_remarked(self.user)
+        mock_delay.assert_called_once()
+
+    @patch('apps.users.tasks.push_guest_to_remarked.delay')
+    def test_firebase_and_device_token_forwarded(self, mock_delay):
+        self.user.remarked_guest_id = 'gid-existing'
+        self.user.save()
+        maybe_push_guest_to_remarked(self.user, firebase_token='fcm-1', device_token='dev-1')
+        mock_delay.assert_called_once_with(self.user.id, firebase_token='fcm-1', device_token='dev-1')
+
+    def test_broker_unavailable_does_not_raise(self):
+        self.user.remarked_guest_id = 'gid-existing'
+        self.user.save()
+        with patch('apps.users.tasks.push_guest_to_remarked.delay', side_effect=Exception('broker down')):
+            maybe_push_guest_to_remarked(self.user)  # не должно бросать
+
+
+class UserProfilePatchTriggersRemarkedPushTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77005550005')
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    @patch('apps.users.views.maybe_push_guest_to_remarked')
+    def test_patch_calls_maybe_push_guest_to_remarked(self, mock_maybe_push):
+        response = self.client.patch('/api/v1/users/profile/', {
+            'first_name': 'Данияр', 'gender': 'male',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_maybe_push.assert_called_once()
+        called_user = mock_maybe_push.call_args[0][0]
+        self.assertEqual(called_user.pk, self.user.pk)
+
+    def test_patch_accepts_gender_email_birthday(self):
+        with patch('apps.users.views.maybe_push_guest_to_remarked'):
+            response = self.client.patch('/api/v1/users/profile/', {
+                'gender': 'female', 'email': 'x@example.com', 'birthday': '1990-01-01',
+            })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.gender, User.GENDER_FEMALE)
+        self.assertEqual(self.user.email, 'x@example.com')
+        self.assertEqual(self.user.birthday.isoformat(), '1990-01-01')
+
+
+class PushGuestToRemarkedTaskTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            phone='+77005550006', first_name='Алихан',
+        )
+        self.user.gender = User.GENDER_MALE
+        self.user.save()
+
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    def test_saves_gid_on_success(self, mock_create):
+        mock_create.return_value = 'gid-777'
+        from .tasks import push_guest_to_remarked
+        push_guest_to_remarked.apply(args=[self.user.id])
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.remarked_guest_id, 'gid-777')
+
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    def test_passes_firebase_token_through(self, mock_create):
+        mock_create.return_value = 'gid-1'
+        from .tasks import push_guest_to_remarked
+        push_guest_to_remarked.apply(args=[self.user.id], kwargs={'firebase_token': 'fcm-abc'})
+        mock_create.assert_called_once()
+        _, kwargs = mock_create.call_args
+        self.assertEqual(kwargs.get('firebase_token'), 'fcm-abc')
+
+    def test_missing_user_does_not_raise(self):
+        from .tasks import push_guest_to_remarked
+        result = push_guest_to_remarked.apply(args=[999999])
+        self.assertFalse(result.failed())
+
+
+class SyncGuestFromRemarkedTaskTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(phone='+77005550007')
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_applies_guest_data(self, mock_get_info):
+        mock_get_info.return_value = {'name': 'Марат', 'id': 'gid-99'}
+        from .tasks import sync_guest_from_remarked
+        sync_guest_from_remarked.apply(args=[self.user.id])
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Марат')
+        self.assertEqual(self.user.remarked_guest_id, 'gid-99')
+
+    def test_missing_user_does_not_raise(self):
+        from .tasks import sync_guest_from_remarked
+        result = sync_guest_from_remarked.apply(args=[999999])
+        self.assertFalse(result.failed())
+
+
+class UserGenderFieldTest(TestCase):
+    def test_default_gender_is_not_specified(self):
+        user = User.objects.create_user(phone='+77005550008')
+        self.assertEqual(user.gender, User.GENDER_NOT_SPECIFIED)
 

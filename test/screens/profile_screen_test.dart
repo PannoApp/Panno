@@ -35,7 +35,6 @@ CoreInfo _coreInfo({String privacyPolicy = 'https://api.piligrim.kz/privacy'}) =
       phone: '+77001234567',
       socialLinks: const [],
       heroSlides: const [],
-      bookingDepositRequired: false,
       visitRules: const [],
       privacyPolicy: privacyPolicy,
     );
@@ -167,6 +166,28 @@ void main() {
           .single;
       expect(patch.data, {'notify_events': false});
       expect(auth.currentUser?.notifyEvents, isFalse);
+    });
+
+    testWidgets('Кэшбек из профиля отображается отформатированной суммой',
+        (tester) async {
+      auth.currentUser = const UserProfile(
+        id: 1,
+        phone: '+77001234567',
+        firstName: 'Айдар',
+        lastName: 'Нурланов',
+        notifyEvents: true,
+        notifyPromotions: false,
+        notifyClosedEvents: false,
+        notificationsEnabled: true,
+        cashback: 12500,
+      );
+      auth.notifyListeners();
+
+      await tester.pumpWidget(buildApp());
+      await settle(tester);
+
+      expect(find.text('Кэшбек'), findsOneWidget);
+      expect(find.text('12 500 ₸'), findsOneWidget);
     });
 
     testWidgets('Тап «Бронирований» → BookingHistoryScreen', (tester) async {

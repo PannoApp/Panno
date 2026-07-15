@@ -7,25 +7,20 @@ Map<String, dynamic> _minimalCoreInfoJson() => {
       'is_open_now': true,
       'phone': '+77001234567',
       'privacy_policy': 'Политика',
-      'booking_deposit_required': false,
     };
 
 void main() {
   group('CoreInfo.fromJson', () {
-    test('parses six new link fields when present', () {
+    test('parses new link fields when present', () {
       final info = CoreInfo.fromJson({
         ..._minimalCoreInfoJson(),
         'twogis_link': 'https://2gis.kz/firm/1',
-        'google_maps_link': 'https://maps.google.com/?q=1',
-        'yandex_maps_link': 'https://yandex.kz/maps/1',
         'feedback_url': 'https://wa.me/77001234567',
         'terms_of_service': 'Текст соглашения',
         'tour_link': 'https://tour.example.com',
       });
 
       expect(info.twogisLink, 'https://2gis.kz/firm/1');
-      expect(info.googleMapsLink, 'https://maps.google.com/?q=1');
-      expect(info.yandexMapsLink, 'https://yandex.kz/maps/1');
       expect(info.feedbackUrl, 'https://wa.me/77001234567');
       expect(info.termsOfService, 'Текст соглашения');
       expect(info.tourLink, 'https://tour.example.com');
@@ -35,8 +30,6 @@ void main() {
       final info = CoreInfo.fromJson(_minimalCoreInfoJson());
 
       expect(info.twogisLink, isNull);
-      expect(info.googleMapsLink, isNull);
-      expect(info.yandexMapsLink, isNull);
       expect(info.feedbackUrl, isNull);
       expect(info.termsOfService, isNull);
       expect(info.tourLink, isNull);

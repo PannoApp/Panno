@@ -1,19 +1,19 @@
 // Бронирование зала — «Путь Героя к столу»
 // Выбор зоны, даты, кол-ва героев, подтверждение. Согласно ТЗ раздел 4.4
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../core/auth_guard.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
 import '../data/models/booking_request.dart';
+import '../data/models/booking_zone.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
-import '../providers/core_info_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/path_cta.dart';
 import '../widgets/piligrim_toast.dart';
-import '../widgets/piligrim_cta.dart';
 import '../widgets/piligrim_tap.dart';
 import '../core/piligrim_route.dart';
 import 'booking_success_screen.dart';
@@ -40,14 +40,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   DateTime _visitDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _visitTime = const TimeOfDay(hour: 19, minute: 30);
-  String? _selectedZone = 'Главный зал';
-
-  static const _zones = ['Главный зал', 'Терраса', 'Приват'];
-  static const _zoneApiMap = {
-    'Главный зал': 'main',
-    'Терраса': 'terrace',
-    'Приват': 'private',
-  };
+  Timer? _guestsDebounce;
 
   @override
   void initState() {
@@ -55,15 +48,26 @@ class _BookingScreenState extends State<BookingScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final auth = context.read<AuthProvider>();
-      if (!auth.isLoggedIn) return;
-      _nameCtrl.text = auth.user.name;
-      final phone = auth.user.phone.replaceAll(RegExp(r'[^\d+]'), '');
-      if (phone.isNotEmpty) _phoneCtrl.text = phone;
+      if (auth.isLoggedIn) {
+        _nameCtrl.text = auth.user.name;
+        final phone = auth.user.phone.replaceAll(RegExp(r'[^\d+]'), '');
+        if (phone.isNotEmpty) _phoneCtrl.text = phone;
+      }
+
+      // Синхронизируем черновик формы с провайдером, грузим реальные залы
+      // ресторана и запускаем первую проверку доступности слотов на
+      // дефолтную дату/кол-во гостей.
+      final booking = context.read<BookingProvider>();
+      booking.setVisitDate(_visitDate);
+      booking.setVisitTime(_visitTimeAsDateTime);
+      booking.loadZones();
+      booking.loadAvailability();
     });
   }
 
   @override
   void dispose() {
+    _guestsDebounce?.cancel();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _commentCtrl.dispose();
@@ -90,7 +94,27 @@ class _BookingScreenState extends State<BookingScreen> {
         child: child ?? const SizedBox.shrink(),
       ),
     );
-    if (picked != null) setState(() => _visitDate = picked);
+    if (picked != null && mounted) {
+      setState(() => _visitDate = picked);
+      final booking = context.read<BookingProvider>();
+      booking.setVisitDate(picked);
+      await booking.loadAvailability();
+      await booking.loadTables();
+    }
+  }
+
+  void _onGuestsChanged(String value) {
+    final count = int.tryParse(value);
+    if (count == null || count <= 0) return;
+    context.read<BookingProvider>().setGuests(count);
+
+    _guestsDebounce?.cancel();
+    _guestsDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final booking = context.read<BookingProvider>();
+      booking.loadAvailability();
+      booking.loadTables();
+    });
   }
 
   Future<void> _pickTime() async {
@@ -109,14 +133,137 @@ class _BookingScreenState extends State<BookingScreen> {
         child: child ?? const SizedBox.shrink(),
       ),
     );
-    if (picked != null) setState(() => _visitTime = picked);
+    if (picked != null && mounted) {
+      setState(() => _visitTime = picked);
+      final booking = context.read<BookingProvider>();
+      booking.setVisitTime(_visitTimeAsDateTime);
+      await booking.loadTables();
+    }
   }
+
+  DateTime get _visitTimeAsDateTime => DateTime(2000, 1, 1, _visitTime.hour, _visitTime.minute);
 
   String get _timeForApi => bookingTimeForApi(_visitTime);
 
   String get _dateForApi {
     final d = _visitDate;
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  // Блок «Стол» показываем при выбранном зале, если только запрос не упал с
+  // ошибкой (Remarked недоступен — тогда, как и с остальными подсказками в
+  // этой форме, просто молча ничего не показываем и не блокируем отправку,
+  // т.к. реальная занятость неизвестна).
+  bool _showTableSection(BookingProvider booking) {
+    return booking.selectedZone != null && booking.tablesError == null;
+  }
+
+  // Подтверждённый Remarked факт (не ошибка, не загрузка) — в выбранном зале
+  // нет ни одного свободного стола на эти дату/время/кол-во гостей. В отличие
+  // от _isSelectedTimeUnavailable (общая подсказка по ресторану, не
+  // блокирует) это должно реально блокировать отправку — иначе бронь всё
+  // равно создастся, просто автоподбором в ДРУГОМ, не выбранном госте зале.
+  bool _isZoneFullyBooked(BookingProvider booking) {
+    return booking.selectedZone != null &&
+        !booking.isLoadingTables &&
+        booking.tablesError == null &&
+        booking.tables.isEmpty;
+  }
+
+  String _selectedTableLabel(BookingProvider booking) {
+    final table = booking.selectedTable;
+    if (table == null) return 'Любой стол';
+    return table.name != null ? 'Стол ${table.name}' : '№${table.id}';
+  }
+
+  Future<void> _pickTable(BookingProvider booking) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: PiligrimColors.earthDeep,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: PiligrimColors.sky.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'ВЫБОР СТОЛА',
+                        style: PiligrimTextStyles.sectionLabel.copyWith(
+                          color: PiligrimColors.sky.withValues(alpha: 0.50),
+                          letterSpacing: 1.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      children: [
+                        _TableOptionTile(
+                          label: 'Любой стол',
+                          subtitle: null,
+                          isSelected: booking.selectedTable == null,
+                          onTap: () {
+                            booking.setTable(null);
+                            Navigator.of(sheetContext).pop();
+                          },
+                        ),
+                        ...booking.tables.map(
+                          (table) => _TableOptionTile(
+                            label: table.name != null ? 'Стол ${table.name}' : '№${table.id}',
+                            subtitle: table.capacity != null ? 'до ${table.capacity} гостей' : null,
+                            isSelected: booking.selectedTable?.id == table.id,
+                            onTap: () {
+                              booking.setTable(table);
+                              Navigator.of(sheetContext).pop();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Remarked-подсказка: если для выбранных даты/времени/кол-ва гостей найден
+  // точный слот и он занят — предупреждаем, но не блокируем отправку заявки.
+  bool _isSelectedTimeUnavailable(BookingProvider booking) {
+    if (booking.isLoadingAvailability || booking.availabilityError != null) {
+      return false;
+    }
+    final slot = booking.availabilitySlots
+        .where((s) => s.time == _timeForApi)
+        .toList();
+    if (slot.isEmpty) return false;
+    return !slot.first.isFree;
   }
 
   Future<void> _submit() async {
@@ -126,13 +273,26 @@ class _BookingScreenState extends State<BookingScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final booking = context.read<BookingProvider>();
+    if (_isZoneFullyBooked(booking)) {
+      PiligrimToast.show(
+        context,
+        'В зале «${booking.selectedZone?.name}» нет свободных столов на выбранные дату и время.',
+        type: PiligrimToastType.error,
+      );
+      return;
+    }
+
+    final selectedZone = booking.selectedZone;
+    final selectedTable = booking.selectedTable;
     final req = BookingRequest(
       guestName: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       date: _dateForApi,
       time: _timeForApi,
       guestsCount: int.parse(_guestsCtrl.text),
-      zone: _selectedZone != null ? _zoneApiMap[_selectedZone] : null,
+      zone: selectedZone?.name,
+      remarkedRoomId: selectedZone?.id,
+      remarkedTableId: selectedTable?.id,
       comment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
     );
 
@@ -143,12 +303,14 @@ class _BookingScreenState extends State<BookingScreen> {
       final dateText = _dateLabel;
       final timeText = _timeLabel;
       final count = int.parse(_guestsCtrl.text);
-      final zoneText = _selectedZone;
+      // booking.selectedZone к этому моменту уже сброшен провайдером
+      // (submitBooking → _resetForm), поэтому берём имя из значения,
+      // захваченного до отправки.
+      final zoneText = selectedZone?.name;
 
       _nameCtrl.clear();
       _commentCtrl.clear();
       setState(() {
-        _selectedZone = null;
         _visitDate = DateTime.now().add(const Duration(days: 1));
         _visitTime = const TimeOfDay(hour: 19, minute: 0);
       });
@@ -186,8 +348,6 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     final booking = context.watch<BookingProvider>();
-    final depositRequired =
-        context.watch<CoreInfoProvider>().coreInfo?.bookingDepositRequired ?? false;
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
@@ -414,12 +574,22 @@ class _BookingScreenState extends State<BookingScreen> {
                                 ),
                               ],
                             ),
+                            if (_isSelectedTimeUnavailable(booking)) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                'К сожалению, на эту дату и время все забронировано.',
+                                style: PiligrimTextStyles.caption.copyWith(
+                                  color: PiligrimColors.fruit.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 18),
                             const _FieldLabel('Количество героев'),
                             _PiligrimInput(
                               controller: _guestsCtrl,
                               hint: '2',
                               keyboardType: TextInputType.number,
+                              onChanged: _onGuestsChanged,
                               validator: (value) {
                                 final count = int.tryParse(value ?? '');
                                 if (count == null || count <= 0) {
@@ -428,23 +598,68 @@ class _BookingScreenState extends State<BookingScreen> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 18),
-                            const _FieldLabel('Зона / зал (опционально)'),
-                            Row(
-                              children: _zones.asMap().entries.map((e) {
-                                final zone = e.value;
-                                final isLast = e.key == _zones.length - 1;
-                                return Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(right: isLast ? 0 : 8),
-                                    child: _ZoneButton(
-                                      label: zone,
-                                      isSelected: _selectedZone == zone,
-                                      onTap: () => setState(() => _selectedZone = zone),
+                            if (booking.zones.isNotEmpty) ...[
+                              const SizedBox(height: 18),
+                              const _FieldLabel('Зона / зал (опционально)'),
+                              Row(
+                                children: booking.zones.asMap().entries.map((e) {
+                                  final BookingZone zone = e.value;
+                                  final isLast = e.key == booking.zones.length - 1;
+                                  return Expanded(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(right: isLast ? 0 : 8),
+                                      child: _ZoneButton(
+                                        label: zone.name,
+                                        isSelected: booking.selectedZone?.id == zone.id,
+                                        onTap: () => booking.setZone(
+                                          booking.selectedZone?.id == zone.id ? null : zone,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              child: !_showTableSection(booking)
+                                  ? const SizedBox(width: double.infinity)
+                                  : Padding(
+                                      padding: const EdgeInsets.only(top: 18),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (booking.isLoadingTables) ...[
+                                            const _FieldLabel('Стол (опционально)'),
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 9),
+                                              child: SizedBox(
+                                                height: 16,
+                                                width: 16,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: PiligrimColors.sky.withValues(alpha: 0.4),
+                                                ),
+                                              ),
+                                            ),
+                                          ] else if (booking.tables.isNotEmpty) ...[
+                                            const _FieldLabel('Стол (опционально)'),
+                                            _TableSelector(
+                                              label: _selectedTableLabel(booking),
+                                              onTap: () => _pickTable(booking),
+                                            ),
+                                          ] else
+                                            Text(
+                                              'В зале «${booking.selectedZone?.name}» нет свободных столов на выбранные дату и время. Выберите другой зал, дату или время.',
+                                              style: PiligrimTextStyles.caption.copyWith(
+                                                color: PiligrimColors.fruit.withValues(alpha: 0.85),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
                             ),
                             const SizedBox(height: 18),
                             const _FieldLabel('Комментарий'),
@@ -453,62 +668,10 @@ class _BookingScreenState extends State<BookingScreen> {
                               hint: 'Повод визита, пожелания, аллергии',
                               maxLines: 4,
                             ),
-                            if (depositRequired) ...[
-                              const SizedBox(height: 18),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  color: PiligrimColors.earth.withValues(alpha: 0.4),
-                                  border: Border.all(
-                                    color: PiligrimColors.steppe.withValues(alpha: 0.45),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.info_outline_rounded,
-                                          color: PiligrimColors.steppe,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            context.watch<CoreInfoProvider>().coreInfo?.bookingDepositNote
-                                                ?? 'Для выбранного стола может потребоваться депозит. Уточните у менеджера.',
-                                            style: PiligrimTextStyles.caption.copyWith(
-                                              color: PiligrimColors.sky.withValues(alpha: 0.85),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    SecondaryCtaButton(
-                                      label: 'ПОЗВОНИТЬ МЕНЕДЖЕРУ',
-                                      height: 40,
-                                      onTap: () async {
-                                        final phone = context.read<CoreInfoProvider>().coreInfo?.phone ?? '';
-                                        if (phone.isNotEmpty) {
-                                          final uri = Uri.parse('tel:$phone');
-                                          if (await canLaunchUrl(uri)) {
-                                            await launchUrl(uri);
-                                          }
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 32),
                             PathCta(
                               label: booking.isSubmitting ? 'ОТПРАВЛЯЕМ...' : 'ОТПРАВИТЬ ЗАЯВКУ',
-                              onTap: booking.isSubmitting ? null : _submit,
+                              onTap: (booking.isSubmitting || _isZoneFullyBooked(booking)) ? null : _submit,
                             ),
                             const SizedBox(height: 20),
                             Text(
@@ -564,6 +727,7 @@ class _PiligrimInput extends StatelessWidget {
     this.keyboardType,
     this.maxLines = 1,
     this.validator,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -571,6 +735,7 @@ class _PiligrimInput extends StatelessWidget {
   final TextInputType? keyboardType;
   final int maxLines;
   final String? Function(String?)? validator;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -579,6 +744,7 @@ class _PiligrimInput extends StatelessWidget {
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
+      onChanged: onChanged,
       style: PiligrimTextStyles.body.copyWith(color: PiligrimColors.sky),
       decoration: InputDecoration(
         hintText: hint,
@@ -709,4 +875,108 @@ class _ZoneButton extends StatelessWidget {
     );
   }
 }
+
+// Поле выбора стола в стиле _DateTimeChip — тап открывает выпадающий список
+// (модальный bottom sheet), а не разворачивает все варианты сразу: при
+// 15-20 свободных столах это выглядело бы как «простыня» из чипов.
+class _TableSelector extends StatelessWidget {
+  const _TableSelector({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: PiligrimColors.earthWarm.withValues(alpha: 0.95),
+          border: Border.all(color: PiligrimColors.sky.withValues(alpha: 0.11)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: PiligrimTextStyles.body.copyWith(
+                  color: PiligrimColors.sky,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: PiligrimColors.sky.withValues(alpha: 0.45),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Строка внутри выпадающего списка столов (bottom sheet) — подпись с
+// вместимостью и галочкой у текущего выбора.
+class _TableOptionTile extends StatelessWidget {
+  const _TableOptionTile({
+    required this.label,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String? subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PiligrimTap(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: PiligrimTextStyles.body.copyWith(
+                      color: isSelected ? PiligrimColors.water : PiligrimColors.sky,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: PiligrimTextStyles.caption.copyWith(
+                        color: PiligrimColors.sky.withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_rounded, color: PiligrimColors.water, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 

@@ -32,6 +32,15 @@
 
 Терминальные статусы (`completed`, `canceled`) — конечные, обратный переход невозможен.
 
+> **С бэкенда (без изменений в контрактах для Flutter):** каждая бронь теперь
+> также дублируется в CRM Remarked, которой пользуется зал ресторана, и раз в
+> 10 минут бэкенд подтягивает оттуда актуальный статус — то есть `confirmed`/
+> `canceled`/`completed` может прийти не только из Django-админки/Telegram, но
+> и из-за того, что сотрудник поменял статус прямо в Remarked. Для Flutter это
+> прозрачно: `status` в ответе `GET /api/v1/bookings/` — как и раньше, просто
+> строка, никаких новых полей и изменений формата не появилось. Подробности —
+> `backend/docs/bookings.md`, раздел «Синхронизация с Remarked».
+
 ---
 
 ## BookingProvider API
@@ -44,10 +53,18 @@
 
 | Поле | Тип | Значение по умолчанию | Описание |
 |---|---|---|---|
-| `selectedZone` | `String?` | `'Главный зал'` | Выбранная зона зала |
+| `selectedZone` | `BookingZone?` | `null` | Выбранный зал (реальный, из Remarked — см. «Залы» ниже) |
 | `guests` | `int` | `2` | Количество гостей (1–50) |
 | `visitDate` | `DateTime?` | `null` | Дата визита |
 | `visitTime` | `DateTime?` | `null` | Время визита |
+
+### Поля залов
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `zones` | `List<BookingZone>` | Реальные залы ресторана, см. `loadZones()` ниже |
+| `isLoadingZones` | `bool` | `true` во время загрузки списка залов |
+| `zonesError` | `String?` | Ошибка загрузки или `null` |
 
 ### Поля состояния отправки
 
@@ -67,8 +84,16 @@
 
 ### Методы
 
-#### `setZone(String? zone)`
-Обновляет выбранную зону зала и вызывает `notifyListeners()`.
+#### `setZone(BookingZone? zone)`
+Обновляет выбранный зал, вызывает `notifyListeners()` и сразу перезапускает
+`loadAvailability()` — занятость должна пересчитаться для нового зала.
+
+#### `Future<void> loadZones()`
+Загружает список реальных залов через `_repository.fetchZones()`. Не
+перезапускает загрузку, если список уже не пуст или загрузка уже идёт
+(`zones.isNotEmpty || isLoadingZones` → no-op). Ошибка не ломает форму —
+`zonesError` заполняется, `zones` остаётся пустым, пикер зала в
+`BookingScreen` просто не отображается (зал — необязательное поле).
 
 #### `setGuests(int count)`
 Устанавливает количество гостей с ограничением `clamp(1, 50)`.
@@ -94,27 +119,36 @@
 
 #### `_resetForm()` (приватный)
 Сбрасывает поля формы к значениям по умолчанию после успешной отправки.
+`zones`/`isLoadingZones`/`zonesError` не сбрасываются — список залов не
+зависит от конкретной заявки, перезагружать его на каждую новую бронь не нужно.
 
 ```
-selectedZone = 'Главный зал'
+selectedZone = null
 guests = 2
 visitDate = null
 visitTime = null
 ```
 
-### Доступные зоны
+### Залы
+
+Раньше здесь был захардкоженный список (`'Главный зал'`/`'Терраса'`/`'Приват'`
+→ `main`/`terrace`/`private`), не совпадавший с реальными залами ресторана.
+Теперь залы — реальные, приходят с бэкенда:
 
 ```dart
-static const zones = ['Главный зал', 'Терраса', 'Приват'];
+class BookingZone {
+  final int id;      // GetSlots.rooms[].id в Remarked
+  final String name; // например, "Зал 1"
+}
 ```
 
-Соответствие API-значениям (маппинг в `BookingScreen`):
-
-| Flutter-название | API-значение (backend enum) |
-|---|---|
-| Главный зал | `main` |
-| Терраса | `terrace` |
-| Приват | `private` |
+Файл: [lib/data/models/booking_zone.dart](../../lib/data/models/booking_zone.dart).
+Загружается через `BookingProvider.loadZones()` (см. выше) →
+`BookingRepository.fetchZones()` → `GET /bookings/zones/`. `BookingScreen`
+вызывает `loadZones()` в `initState` и рендерит кнопки зала только если
+`booking.zones.isNotEmpty` — при недоступности Remarked (пустой список) блок
+выбора зала просто не показывается, форма не блокируется. Повторный тап по
+уже выбранному залу снимает выбор (`selectedZone = null`).
 
 ---
 
@@ -209,7 +243,8 @@ Badge рендерится как контейнер с:
 | `date` | `date` | да | Дата в формате `YYYY-MM-DD` |
 | `time` | `time` | да | Время в формате `HH:mm` |
 | `guestsCount` | `guests_count` | да | Количество гостей |
-| `zone` | `zone` | нет | API-значение зоны (`main`/`terrace`/`private`) |
+| `zone` | `zone` | нет | Название реального зала (`BookingZone.name`, например «Зал 1») — свободный текст, не enum |
+| `remarkedRoomId` | `remarked_room_id` | нет | `BookingZone.id` — нужен бэкенду, чтобы подобрать стол именно в этом зале |
 | `comment` | `comment` | нет | Комментарий гостя |
 
 ### ApiBooking
@@ -240,8 +275,7 @@ BookingSuccessScreen({
   required String date,         // «ДД.ММ.ГГГГ» — форматированная дата
   required String time,         // «ЧЧ:ММ» — форматированное время
   required int heroesCount,     // количество гостей
-  String? zone,                 // читаемое название зала («Главный зал» / «Терраса» / «Приват»)
-  required bool depositRequired,// признак из CoreInfo.bookingDepositRequired
+  String? zone,                 // название реального зала («Зал 1» и т.п.), если гость его выбрал
 })
 ```
 
@@ -253,7 +287,7 @@ BookingSuccessScreen({
 | Заголовок «ПУТЬ ЗАБРОНИРОВАН» | fadeIn + slideY, задержка 200 мс |
 | Подзаголовок | «Ваша заявка успешно отправлена проводникам», задержка 300 мс |
 | Карточка деталей | Дата/время, кол-во героев (склонение), зона (если выбрана) |
-| Список «Сценарий после отправки» | 3 шага (+ 4-й при `depositRequired == true`) |
+| Список «Сценарий после отправки» | 3 шага |
 | Кнопки навигации | «МОИ БРОНИРОВАНИЯ» и «НА ГЛАВНУЮ» |
 
 ### Склонение heroes count
@@ -270,34 +304,4 @@ BookingSuccessScreen({
 | «МОИ БРОНИРОВАНИЯ» | `Navigator.pushReplacement` → `BookingHistoryScreen` (форма убирается из стека) |
 | «НА ГЛАВНУЮ» | `Navigator.popUntil((r) => r.isFirst)` → корневой маршрут (`RootShell`) |
 
-### Условный шаг при депозите
-
-Когда `depositRequired == true`, в список «Сценарий после отправки» добавляется 4-й пункт:
-> «Для выбранного стола нужен депозит — менеджер направит вас на звонок.»
-
----
-
-## Баннер депозита и звонок менеджеру
-
-Файл: [lib/screens/booking_screen.dart](../../lib/screens/booking_screen.dart), строки 401–468.
-
-### Условие показа
-
-Баннер рендерится **внутри формы** бронирования, между полем «Комментарий» и кнопкой отправки:
-
-```dart
-if (depositRequired) ...[
-  // блок баннера
-]
-```
-
-Значение `depositRequired` берётся из `context.watch<CoreInfoProvider>().coreInfo?.bookingDepositRequired ?? false`.
-
-### Содержимое баннера
-
-1. **Иконка** `Icons.info_outline_rounded` + **текст** из `CoreInfoProvider.coreInfo?.bookingDepositNote` (фолбэк: `'Для выбранного стола может потребоваться депозит. Уточните у менеджера.'`).
-2. **Кнопка «ПОЗВОНИТЬ МЕНЕДЖЕРУ»** — вызывает `launchUrl(Uri.parse('tel:$phone'))`, где `phone = context.read<CoreInfoProvider>().coreInfo?.phone ?? ''`. Кнопка не показывается если `phone` пустой (вызов `launchUrl` не выполняется).
-
-### Источник данных на бекенде
-
-Поля `booking_deposit_required` и `booking_deposit_note` хранятся в модели `RestaurantInfo` (`backend/apps/core/models.py`) и возвращаются через `GET /api/v1/core/info/`. Оплата депозита через приложение не предусмотрена — только переадресация на звонок.
+В форме бронирования всегда виден дисклеймер: «Важно: в приложении нет онлайн-оплаты и списания депозита» (`lib/screens/booking_screen.dart`). Поле «Требуется депозит при бронировании» было удалено из админки и API как избыточное — оплата через приложение не принимается в принципе.

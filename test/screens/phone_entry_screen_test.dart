@@ -34,7 +34,14 @@ Widget _wrap(Widget screen, AuthProvider auth) {
 // Ожидание завершения async-операций без pumpAndSettle (обходим бесконечные анимации).
 Future<void> _settle(WidgetTester tester) async {
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 200));
+  await tester.pump(const Duration(seconds: 2));
+  // flutter_animate планирует Future.delayed(Duration.zero, ...) для эффектов
+  // без явного delay (см. TextCtaButton в piligrim_auth_view.dart) — такой
+  // таймер может встать в очередь уже во время текущего pump(), поэтому
+  // добиваем его серией нулевых pump() вместо одного.
+  for (var i = 0; i < 10; i++) {
+    await tester.pump(Duration.zero);
+  }
 }
 
 void main() {
@@ -51,7 +58,7 @@ void main() {
       await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
       await tester.pump();
 
-      await tester.tap(find.text('Получить код'));
+      await tester.tap(find.text('ПОЛУЧИТЬ КОД'));
       await _settle(tester);
 
       // Форма не прошла валидацию — сетевой запрос не отправлен.
@@ -63,13 +70,13 @@ void main() {
       await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
       await tester.pump();
 
-      await tester.enterText(find.byType(TextFormField).first, '79991234');
-      await tester.tap(find.text('Получить код'));
+      await tester.enterText(find.byType(TextField).first, '79991234');
+      await tester.tap(find.text('ПОЛУЧИТЬ КОД'));
       await _settle(tester);
 
       // Форма не прошла → код не запрошен, поле «Код» не появилось.
       expect(adapter.captured, isEmpty);
-      expect(find.text('Подтвердить'), findsNothing);
+      expect(find.text('ПОДТВЕРДИТЬ'), findsNothing);
     });
 
     testWidgets('корректный номер 11 цифр — sendOtp вызван', (tester) async {
@@ -78,8 +85,8 @@ void main() {
       await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
       await tester.pump();
 
-      await tester.enterText(find.byType(TextFormField).first, '+77771234567');
-      await tester.tap(find.text('Получить код'));
+      await tester.enterText(find.byType(TextField).first, '+77771234567');
+      await tester.tap(find.text('ПОЛУЧИТЬ КОД'));
       await _settle(tester);
 
       expect(
@@ -95,12 +102,12 @@ void main() {
       await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
       await tester.pump();
 
-      await tester.enterText(find.byType(TextFormField).first, '+77771234567');
-      await tester.tap(find.text('Получить код'));
+      await tester.enterText(find.byType(TextField).first, '+77771234567');
+      await tester.tap(find.text('ПОЛУЧИТЬ КОД'));
       await _settle(tester);
 
       // После sendOtp кнопка переключается на «Подтвердить» — OTP-этап.
-      expect(find.text('Подтвердить'), findsOneWidget);
+      expect(find.text('ПОДТВЕРДИТЬ'), findsOneWidget);
     });
   });
 
@@ -118,16 +125,16 @@ void main() {
       adapter.enqueue(200, <String, dynamic>{});
       await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
       await tester.pump();
-      await tester.enterText(find.byType(TextFormField).first, '+77771234567');
-      await tester.tap(find.text('Получить код'));
+      await tester.enterText(find.byType(TextField).first, '+77771234567');
+      await tester.tap(find.text('ПОЛУЧИТЬ КОД'));
       await _settle(tester);
     }
 
     testWidgets('код короче 4 символов — confirmOtp не вызван', (tester) async {
       await navigateToOtpStage(tester);
 
-      await tester.enterText(find.byType(TextFormField).first, '123');
-      await tester.tap(find.text('Подтвердить'));
+      await tester.enterText(find.byType(TextField).first, '123');
+      await tester.tap(find.text('ПОДТВЕРДИТЬ'));
       await _settle(tester);
 
       expect(
@@ -157,8 +164,8 @@ void main() {
         'notify_closed_events': false,
       });
 
-      await tester.enterText(find.byType(TextFormField).first, '123456');
-      await tester.tap(find.text('Подтвердить'));
+      await tester.enterText(find.byType(TextField).first, '123456');
+      await tester.tap(find.text('ПОДТВЕРДИТЬ'));
       await _settle(tester);
 
       // Единственный источник истины о входе — AuthProvider.

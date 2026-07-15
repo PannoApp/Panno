@@ -27,7 +27,6 @@ void main() {
         ],
         'visit_rules': 'Правила',
         'privacy_policy': 'Политика',
-        'booking_deposit_required': false,
       });
 
       final info = await repository.fetchCoreInfo();
