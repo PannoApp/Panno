@@ -2,6 +2,7 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 import requests
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 
 from .client import RemarkedMobileClient, RemarkedReservesClient
@@ -137,7 +138,7 @@ class RemarkedMobileClientGuestTest(TestCase):
 # RemarkedReservesClient
 # ---------------------------------------------------------------------------
 
-@override_settings(REMARKED_API_TOKEN='test-token', REMARKED_POINT_ID=12345)
+@override_settings(REMARKED_API_TOKEN='test-token', REMARKED_POINT_ID=12345, REMARKED_RESERVES_REFERER='1.2.3.4')
 class RemarkedReservesClientTest(TestCase):
     def test_call_sends_method_in_body(self):
         client = RemarkedReservesClient()
@@ -149,6 +150,29 @@ class RemarkedReservesClientTest(TestCase):
         self.assertEqual(kwargs['json']['method'], 'GetToken')
         self.assertEqual(kwargs['json']['point'], client.point_id)
         self.assertNotIn('jsonrpc', kwargs['json'])
+
+    def test_call_sends_referer_header(self):
+        """
+        Разгадано 2026-07-14: GetToken с point ломался из-за отсутствия
+        Referer, не из-за самого point — см. docs/remarked.md.
+        """
+        client = RemarkedReservesClient()
+        response = _mock_response(200, {'status': 'success', 'token': 'abc'})
+        with patch.object(client.session, 'post', return_value=response) as mock_post:
+            client._call('GetToken', point=client.point_id)
+
+        _, kwargs = mock_post.call_args
+        self.assertEqual(kwargs['headers']['Referer'], '1.2.3.4')
+
+    @override_settings(REMARKED_RESERVES_REFERER='')
+    def test_no_referer_header_when_not_configured(self):
+        client = RemarkedReservesClient()
+        response = _mock_response(200, {'status': 'success', 'token': 'abc'})
+        with patch.object(client.session, 'post', return_value=response) as mock_post:
+            client._call('GetToken', point=client.point_id)
+
+        _, kwargs = mock_post.call_args
+        self.assertIsNone(kwargs['headers'])
 
     def test_get_event_tags_uses_real_jsonrpc_format(self):
         client = RemarkedReservesClient()
@@ -205,29 +229,102 @@ class RemarkedBaseClientRetryTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# ReservesClient — статический токен (временный обход GetToken, см.
-# reserves_client.py docstring)
+# ReservesClient — кеш токена в Redis
 # ---------------------------------------------------------------------------
 
-@override_settings(REMARKED_RESERVES_STATIC_TOKEN='static-tok')
-class ReservesClientStaticTokenTest(TestCase):
-    def test_get_token_returns_configured_static_token_without_calling_transport(self):
+@override_settings(REMARKED_API_TOKEN='test-token', REMARKED_POINT_ID=12345)
+class ReservesClientTokenCacheTest(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_get_token_calls_get_token_with_point_and_caches_result(self):
         reserves = ReservesClient()
+        with patch.object(reserves.transport, '_call', return_value={'token': 'tok-1'}) as mock_call:
+            token = reserves.get_token()
+
+        self.assertEqual(token, 'tok-1')
+        mock_call.assert_called_once_with('GetToken', point=12345)
+        self.assertEqual(cache.get('remarked_reserve_token:12345'), 'tok-1')
+
+    def test_get_token_uses_cached_value_without_calling_transport(self):
+        reserves = ReservesClient()
+        cache.set('remarked_reserve_token:12345', 'cached-tok', timeout=900)
+
         with patch.object(reserves.transport, '_call') as mock_call:
             token = reserves.get_token()
 
-        self.assertEqual(token, 'static-tok')
+        self.assertEqual(token, 'cached-tok')
         mock_call.assert_not_called()
 
-    def test_force_refresh_still_returns_same_static_token(self):
+    def test_force_refresh_bypasses_cache_and_overwrites_it(self):
         reserves = ReservesClient()
-        with patch.object(reserves.transport, '_call') as mock_call:
+        cache.set('remarked_reserve_token:12345', 'stale-tok', timeout=900)
+
+        with patch.object(reserves.transport, '_call', return_value={'token': 'fresh-tok'}) as mock_call:
             token = reserves.get_token(force_refresh=True)
 
-        self.assertEqual(token, 'static-tok')
-        mock_call.assert_not_called()
+        self.assertEqual(token, 'fresh-tok')
+        mock_call.assert_called_once_with('GetToken', point=12345)
+        self.assertEqual(cache.get('remarked_reserve_token:12345'), 'fresh-tok')
 
-    def test_errors_from_transport_propagate_without_retry(self):
+    def test_different_points_use_different_cache_keys(self):
+        cache.set('remarked_reserve_token:12345', 'tok-for-12345', timeout=900)
+        other = ReservesClient(transport=RemarkedReservesClient(point_id=99999))
+
+        with patch.object(other.transport, '_call', return_value={'token': 'tok-for-99999'}) as mock_call:
+            token = other.get_token()
+
+        self.assertEqual(token, 'tok-for-99999')
+        mock_call.assert_called_once_with('GetToken', point=99999)
+        self.assertEqual(cache.get('remarked_reserve_token:99999'), 'tok-for-99999')
+
+
+# ---------------------------------------------------------------------------
+# ReservesClient — retry-once на 401 с обновлением токена
+# ---------------------------------------------------------------------------
+
+@override_settings(REMARKED_API_TOKEN='test-token', REMARKED_POINT_ID=12345)
+class ReservesClientRetryOn401Test(TestCase):
+    def setUp(self):
+        cache.clear()
+        cache.set('remarked_reserve_token:12345', 'stale-tok', timeout=900)
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_401_triggers_single_retry_with_refreshed_token(self):
+        reserves = ReservesClient()
+        error = RemarkedAPIError(code=401, message='Empty Bearer Token', status_code=401)
+        with patch.object(
+            reserves.transport, '_call',
+            side_effect=[error, {'token': 'fresh-tok'}, {'status': 'success', 'slots': []}],
+        ) as mock_call:
+            result = reserves.get_slots({'from': '2026-07-10', 'to': '2026-07-10'}, guests_count=2)
+
+        self.assertEqual(result['status'], 'success')
+        self.assertEqual(mock_call.call_count, 3)
+        # 1) GetSlots с протухшим токеном (401) → 2) GetToken (обновление) → 3) GetSlots с новым токеном
+        self.assertEqual(mock_call.call_args_list[0].args[0], 'GetSlots')
+        self.assertEqual(mock_call.call_args_list[0].kwargs['token'], 'stale-tok')
+        self.assertEqual(mock_call.call_args_list[1].args[0], 'GetToken')
+        self.assertEqual(mock_call.call_args_list[2].kwargs['token'], 'fresh-tok')
+        self.assertEqual(cache.get('remarked_reserve_token:12345'), 'fresh-tok')
+
+    def test_second_401_after_refresh_is_not_retried_again(self):
+        """Retry-once — если и обновлённый токен получает 401, ошибка пробрасывается."""
+        reserves = ReservesClient()
+        error = RemarkedAPIError(code=401, message='Empty Bearer Token', status_code=401)
+        with patch.object(
+            reserves.transport, '_call',
+            side_effect=[error, {'token': 'fresh-tok'}, error],
+        ):
+            with self.assertRaises(RemarkedAPIError):
+                reserves.get_slots({'from': 'x', 'to': 'y'}, guests_count=2)
+
+    def test_non_401_error_propagates_without_retry(self):
         reserves = ReservesClient()
         error = RemarkedAPIError(code=400, message='Bad Request', status_code=400)
         with patch.object(reserves.transport, '_call', side_effect=error) as mock_call:
@@ -240,8 +337,15 @@ class ReservesClientStaticTokenTest(TestCase):
 # ReservesClient — типизированные методы
 # ---------------------------------------------------------------------------
 
-@override_settings(REMARKED_RESERVES_STATIC_TOKEN='tok-a')
+@override_settings(REMARKED_API_TOKEN='test-token', REMARKED_POINT_ID=12345)
 class ReservesClientTypedMethodsTest(TestCase):
+    def setUp(self):
+        cache.clear()
+        cache.set('remarked_reserve_token:12345', 'tok-a', timeout=900)
+
+    def tearDown(self):
+        cache.clear()
+
     def test_get_slots_sends_expected_payload(self):
         reserves = ReservesClient()
         with patch.object(reserves.transport, '_call', return_value={'status': 'success', 'slots': []}) as mock_call:

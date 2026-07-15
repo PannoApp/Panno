@@ -2932,20 +2932,23 @@ class SyncReserveStatusesBeatScheduleTest(TestCase):
 # Полная цепочка вызовов (мок на уровне RemarkedReservesClient, а не
 # ReservesClient) — в отличие от CreateReserveInRemarkedTaskTest/
 # SyncReserveStatusesTaskTest выше (мокают высокоуровневый ReservesClient),
-# здесь мокается только HTTP-транспорт, поэтому реально прогоняется передача
-# статического токена (REMARKED_RESERVES_STATIC_TOKEN) из
-# apps/remarked/reserves_client.py — GetToken сейчас не используется, см.
-# докстринг ReservesClient.
+# здесь мокается только HTTP-транспорт, поэтому реально прогоняется логика
+# кеширования токена и retry-once на 401 из apps/remarked/reserves_client.py.
 # ---------------------------------------------------------------------------
 
-@override_settings(REMARKED_RESERVES_STATIC_TOKEN='tok-e2e')
 class CreateReserveInRemarkedFullStackTest(TestCase):
     def setUp(self):
         self.user = make_user('+77007300001')
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
 
     @patch('apps.remarked.client.RemarkedReservesClient._call')
-    def test_full_chain_uses_static_token_for_create_reserve(self, mock_call):
+    def test_full_chain_get_token_then_create_reserve(self, mock_call):
         def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                return {'token': 'tok-e2e'}
             if method_name == 'CreateReserve':
                 self.assertEqual(payload.get('token'), 'tok-e2e')
                 return {'status': 'success', 'reserve_id': 777}
@@ -2959,15 +2962,17 @@ class CreateReserveInRemarkedFullStackTest(TestCase):
 
         booking.refresh_from_db()
         self.assertEqual(booking.remarked_reserve_id, 777)
-        mock_call.assert_called_once()  # GetToken больше не вызывается вообще
 
     @patch('apps.remarked.client.RemarkedReservesClient._call')
-    def test_same_static_token_used_across_two_bookings(self, mock_call):
+    def test_token_reused_from_cache_across_two_bookings(self, mock_call):
         reserve_ids = iter([1, 2])
-        mock_call.side_effect = lambda method_name, **payload: {
-            'status': 'success', 'reserve_id': next(reserve_ids),
-        }
 
+        def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                return {'token': 'tok-shared'}
+            return {'status': 'success', 'reserve_id': next(reserve_ids)}
+
+        mock_call.side_effect = side_effect
         b1 = make_booking(user=self.user, phone='+77001234567')
         b2 = make_booking(user=self.user, phone='+77001234567')
 
@@ -2975,19 +2980,23 @@ class CreateReserveInRemarkedFullStackTest(TestCase):
         create_reserve_in_remarked(b1.pk)
         create_reserve_in_remarked(b2.pk)
 
-        self.assertEqual(mock_call.call_count, 2)  # только 2x CreateReserve, ни одного GetToken
-        for call in mock_call.call_args_list:
-            self.assertEqual(call.kwargs['token'], 'tok-e2e')
+        get_token_calls = [c for c in mock_call.call_args_list if c.args[0] == 'GetToken']
+        self.assertEqual(len(get_token_calls), 1)  # второй раз токен взят из Redis-кеша
 
 
-@override_settings(REMARKED_RESERVES_STATIC_TOKEN='tok-e2e')
 class SyncReserveStatusesFullStackTest(TestCase):
     def setUp(self):
         self.user = make_user('+77007300002')
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
 
     @patch('apps.remarked.client.RemarkedReservesClient._call')
     def test_full_chain_updates_status_and_triggers_push(self, mock_call):
         def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                return {'token': 'tok-e2e'}
             if method_name == 'GetReserveByID':
                 self.assertEqual(payload.get('token'), 'tok-e2e')
                 self.assertEqual(payload.get('reserve_id'), 5001)
@@ -3009,33 +3018,32 @@ class SyncReserveStatusesFullStackTest(TestCase):
         self.assertEqual(kwargs['data']['status'], 'completed')
 
     @patch('apps.remarked.client.RemarkedReservesClient._call')
-    def test_error_from_remarked_skips_booking_without_crashing_task(self, mock_call):
-        """
-        Токен статический — нет GetToken/refresh, поэтому ошибка Remarked
-        (в т.ч. 401) на конкретной брони просто пропускает её в этом прогоне
-        (см. docstring sync_reserve_statuses — следующий плановый запуск
-        повторит попытку), а не крашит и не ретраит всю задачу.
-        """
+    def test_401_during_sync_triggers_token_refresh_and_retry(self, mock_call):
         from apps.remarked.exceptions import RemarkedAPIError
+        calls = {'GetToken': 0, 'GetReserveByID': 0}
 
         def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                calls['GetToken'] += 1
+                return {'token': f'tok-{calls["GetToken"]}'}
             if method_name == 'GetReserveByID':
-                self.assertEqual(payload.get('token'), 'tok-e2e')
-                raise RemarkedAPIError(code=401, message='Empty Bearer Token', status_code=401)
+                calls['GetReserveByID'] += 1
+                if calls['GetReserveByID'] == 1:
+                    raise RemarkedAPIError(code=401, message='Empty Bearer Token', status_code=401)
+                return {'reserve': {'inner_status': 'canceled'}}
             raise AssertionError(f'unexpected method {method_name}')
 
         mock_call.side_effect = side_effect
         booking = make_booking(user=self.user, status='pending', remarked_reserve_id=6001)
 
-        with patch('apps.notifications.tasks.send_push_notification') as mock_push:
+        with patch('apps.notifications.tasks.send_push_notification'):
             from apps.bookings.tasks import sync_reserve_statuses
-            result = sync_reserve_statuses()
+            sync_reserve_statuses()
 
         booking.refresh_from_db()
-        self.assertEqual(booking.status, 'pending')  # не обновилась, ошибка просто пропущена
-        self.assertEqual(result, 0)
-        mock_push.delay.assert_not_called()
-        mock_call.assert_called_once()  # без внутреннего retry на статическом токене
+        self.assertEqual(booking.status, 'canceled')
+        self.assertEqual(calls['GetToken'], 2)  # первый токен + обновление после 401
+        self.assertEqual(calls['GetReserveByID'], 2)  # неудачная попытка + retry
 
 
 # ---------------------------------------------------------------------------
@@ -3186,7 +3194,6 @@ class BookingAvailabilityViewTest(APITestCase):
 # GET /api/v1/bookings/availability/ — полная цепочка (мок RemarkedReservesClient)
 # ---------------------------------------------------------------------------
 
-@override_settings(REMARKED_RESERVES_STATIC_TOKEN='tok-avail')
 class BookingAvailabilityFullStackTest(APITestCase):
     URL = '/api/v1/bookings/availability/'
 
@@ -3197,8 +3204,10 @@ class BookingAvailabilityFullStackTest(APITestCase):
         cache.clear()
 
     @patch('apps.remarked.client.RemarkedReservesClient._call')
-    def test_full_chain_uses_static_token_for_get_slots(self, mock_call):
+    def test_full_chain_get_token_then_get_slots(self, mock_call):
         def side_effect(method_name, **payload):
+            if method_name == 'GetToken':
+                return {'token': 'tok-avail'}
             if method_name == 'GetSlots':
                 self.assertEqual(payload.get('token'), 'tok-avail')
                 self.assertTrue(payload.get('with_rooms'))
@@ -3216,6 +3225,5 @@ class BookingAvailabilityFullStackTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['slots'][0]['time'], '19:00:00')
         self.assertTrue(response.data['slots'][0]['is_free'])
-        mock_call.assert_called_once()  # GetToken больше не вызывается вообще
 
 

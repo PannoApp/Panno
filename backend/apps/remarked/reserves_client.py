@@ -1,37 +1,67 @@
+import logging
 import uuid
 
-from django.conf import settings
+from utils.cache import safe_cache_get, safe_cache_set
 
 from .client import RemarkedReservesClient
+from .exceptions import RemarkedAPIError
+
+logger = logging.getLogger(__name__)
+
+# TTL в спеке Reserves API не указан — ставим консервативные 15 минут и
+# подстраховываемся retry-once с принудительным обновлением токена на 401
+# от любого метода (см. _call_with_token), а не только на просрочку TTL.
+TOKEN_CACHE_TTL = 60 * 15
+TOKEN_CACHE_KEY_FMT = 'remarked_reserve_token:{point}'
 
 
 class ReservesClient:
     """
-    Высокоуровневая обёртка над RemarkedReservesClient (api/v1, /ApiReservesWidget) —
-    типизированные методы для брони.
+    Высокоуровневая обёртка над RemarkedReservesClient (api/v1, /ApiReservesWidget):
+    кеширует временный токен, полученный через GetToken, в Redis и добавляет
+    типизированные методы для брони. Токен из GetToken — не то же самое, что
+    статический REMARKED_API_TOKEN (см. apps/remarked/client.py) и передаётся
+    в теле остальных методов (`token=...`).
 
-    TODO(remarked-point-bug): GetToken (динамическое получение токена) сейчас
-    не используется. Эмпирически проверено (2026-07-08 — 2026-07-14): `point`
-    у GetToken отмечен в спеке как required, но при ЛЮБОМ переданном значении
-    (наша точка 303450, пример из их же спеки 7999999, случайное число) метод
-    ломается с `{"status":"error","message":"Unknown error"}`. Без `point`
-    метод не ошибается, но возвращает токен с неверным скоупом — GetSlots этим
-    токеном отдаёт несвязанные с реальной схемой зала данные (см.
-    docs/remarked.md). Пока используем статический токен Reserves API
-    (`REMARKED_RESERVES_STATIC_TOKEN`), полученный напрямую от поддержки
-    Remarked — он корректно скоупится на нашу точку. Вернуть на GetToken,
-    когда Remarked починит обработку `point`.
+    Разгадано 2026-07-14: `GetToken` с `point` ломался (`Unknown error`) не
+    из-за самого `point`, а из-за отсутствия заголовка `Referer` — без него
+    сервер не может сверить точку с разрешённым IP. С `Referer`, выставленным
+    в реальный исходящий IP сервера (`REMARKED_RESERVES_REFERER`, см.
+    `RemarkedReservesClient`), `GetToken` с `point` работает штатно и
+    возвращает токен, корректно заскоупленный на нашу точку — GetSlots/
+    CreateReserve/GetReserveByID этим токеном отдают реальные данные,
+    совпадающие со схемой зала в кабинете Remarked (см. docs/remarked.md).
     """
 
     def __init__(self, transport=None):
         self.transport = transport or RemarkedReservesClient()
 
+    @property
+    def _cache_key(self):
+        return TOKEN_CACHE_KEY_FMT.format(point=self.transport.point_id)
+
     def get_token(self, force_refresh=False):
-        return settings.REMARKED_RESERVES_STATIC_TOKEN
+        if not force_refresh:
+            cached = safe_cache_get(self._cache_key)
+            if cached:
+                return cached
+
+        response = self.transport._call('GetToken', point=self.transport.point_id)
+        token = response.get('token')
+        if token:
+            safe_cache_set(self._cache_key, token, timeout=TOKEN_CACHE_TTL)
+        return token
 
     def _call_with_token(self, method_name, **payload):
         token = self.get_token()
-        return self.transport._call(method_name, token=token, **payload)
+        try:
+            return self.transport._call(method_name, token=token, **payload)
+        except RemarkedAPIError as exc:
+            if exc.status_code == 401:
+                logger.warning('Remarked reserve token rejected (401), refreshing and retrying: %s', method_name)
+                token = self.get_token(force_refresh=True)
+                return self.transport._call(method_name, token=token, **payload)
+            raise
 
     def get_slots(self, reserve_date_period, guests_count, with_rooms=None, slot_duration=None):
         payload = {'reserve_date_period': reserve_date_period, 'guests_count': guests_count}

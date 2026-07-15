@@ -229,14 +229,13 @@ TELEGRAM_WEBHOOK_SECRET = env('TELEGRAM_WEBHOOK_SECRET', default='')
 REMARKED_API_TOKEN = env('REMARKED_API_TOKEN')
 REMARKED_POINT_ID = env.int('REMARKED_POINT_ID')
 
-# TODO(remarked-point-bug): временный обход. GetToken (Reserves API v1) ломается
-# с "Unknown error" для ЛЮБОГО переданного `point` (проверено на разных значениях,
-# включая пример из их же спеки) — see docs/remarked.md, раздел про GetToken.
-# Пока используем статический токен Reserves API, полученный напрямую от
-# поддержки Remarked (не протухает так же быстро, как токен из GetToken без
-# point, и правильно скоупится на нашу точку — в отличие от него). Вернуть
-# обратно на динамический GetToken, когда Remarked починит обработку `point`.
-REMARKED_RESERVES_STATIC_TOKEN = env('REMARKED_RESERVES_STATIC_TOKEN', default='')
+# Разгадано 2026-07-14: GetToken (Reserves API v1) с `point` ломался не из-за
+# самого point, а из-за отсутствия заголовка Referer — без него сервер не мог
+# сверить точку с разрешённым IP. С Referer, выставленным в реальный исходящий
+# IP сервера, GetToken с point работает штатно и возвращает токен, корректно
+# заскоупленный на нашу точку (см. apps/remarked/reserves_client.py,
+# docs/remarked.md). Обновлять при смене сервера/деплоя.
+REMARKED_RESERVES_REFERER = env('REMARKED_RESERVES_REFERER', default='')
 
 
 # Настройки Django REST Framework

@@ -154,13 +154,23 @@ class RemarkedReservesClient(_BaseRemarkedClient):
       (все, кроме GetToken).
     - `/api` (метод getEventTags) — уже настоящий JSON-RPC 2.0, с полями
       jsonrpc/params/id. Вызывается отдельным методом `get_event_tags()`.
+
+    Заголовок `Referer` (REMARKED_RESERVES_REFERER) обязателен для `GetToken`
+    с `point` — без него сервер отвечает `Unknown error` независимо от
+    значения `point` (разгадано 2026-07-14, см. docs/remarked.md). Шлём его
+    на все методы, а не только GetToken — не помешает.
     """
 
     base_url = 'https://app.remarked.ru/api/v1'
 
+    def __init__(self, *args, referer=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.referer = referer if referer is not None else settings.REMARKED_RESERVES_REFERER
+
     def _call(self, method_name, **payload):
         body = {'method': method_name, **payload}
-        return self._post('/ApiReservesWidget', body)
+        headers = {'Referer': self.referer} if self.referer else None
+        return self._post('/ApiReservesWidget', body, headers=headers)
 
     def get_event_tags(self, request_id=None):
         body = {
