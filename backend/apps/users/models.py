@@ -75,14 +75,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField("Роль", max_length=20, choices=ROLE_CHOICES, blank=True)
 
     notifications_enabled = models.BooleanField(default=True)
-    telegram_id = models.CharField(
-        "Telegram ID",
-        max_length=100,
-        blank=True,
-        null=True,
-        unique=True,
-        help_text="ID чата менеджера в Telegram для авторизации в боте."
-    )
 
     # Категорийные настройки уведомлений (сервисные уведомления — бронь — не отключаются)
     notify_events = models.BooleanField("Уведомления: мероприятия", default=True)

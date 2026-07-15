@@ -34,7 +34,3 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [],
     'DEFAULT_THROTTLE_RATES': {},
 }
-
-# Отключаем отправку реальных Telegram уведомлений в тестах
-TELEGRAM_BOT_TOKEN = ''
-TELEGRAM_CHAT_ID = ''

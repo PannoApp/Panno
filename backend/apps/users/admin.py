@@ -50,15 +50,15 @@ class UserAdmin(AdminOnlyMixin, BaseUserAdmin):
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
 
-    list_display    = ('phone', 'first_name', 'last_name', 'role', 'telegram_id', 'remarked_guest_id', 'cashback', 'is_staff', 'is_active', 'date_joined')
+    list_display    = ('phone', 'first_name', 'last_name', 'role', 'remarked_guest_id', 'cashback', 'is_staff', 'is_active', 'date_joined')
     list_filter     = ('role', 'is_staff', 'is_active', 'gender')
-    search_fields   = ('phone', 'first_name', 'last_name', 'telegram_id', 'email', 'remarked_guest_id')
+    search_fields   = ('phone', 'first_name', 'last_name', 'email', 'remarked_guest_id')
     ordering        = ('phone',)
     actions         = (sync_with_remarked,)
 
     fieldsets = (
         (None, {'fields': ('phone', 'password')}),
-        ('Персональная информация', {'fields': ('first_name', 'last_name', 'gender', 'email', 'birthday', 'role', 'telegram_id')}),
+        ('Персональная информация', {'fields': ('first_name', 'last_name', 'gender', 'email', 'birthday', 'role')}),
         ('Remarked CRM', {'fields': ('remarked_guest_id', 'cashback')}),
         ('Права доступа', {'fields': ('is_active', 'is_staff', 'is_superuser')}),
         ('Настройки уведомлений', {'fields': ('notifications_enabled', 'notify_events', 'notify_promotions', 'notify_closed_events')}),

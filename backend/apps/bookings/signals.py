@@ -44,9 +44,7 @@ def notify_on_status_change(sender, instance, created, **kwargs):
                 body="Мы свяжемся с вами в ближайшее время.",
                 data={'booking_id': str(instance.pk), 'status': 'pending'},
             )
-        from apps.bookings.tasks import send_telegram_notification
-        _safe_delay(send_telegram_notification, instance.pk)
-        logger.info("Push+Telegram queued: booking=%s created", instance.pk)
+        logger.info("Push queued: booking=%s created", instance.pk)
         return
 
     if not instance.user_id:

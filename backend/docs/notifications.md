@@ -207,40 +207,6 @@ FIREBASE_CREDENTIALS_PATH=/app/backend/firebase-credentials.json
 > 1. **View** (`BulkPushView`) — при построении выборки сегментов `last_visit_days`, `participated_in_event`, `registered_after`, `by_city` применяется `UserDevice.objects.filter(user_id__in=...)`. Поле `queued` в ответе и `total_users` в `PushCampaign` отражают только реальных получателей.
 > 2. **Task** (`send_bulk_push_notification`) — дополнительная фильтрация перед созданием подзадач как защитный слой (если таска вызвана напрямую, минуя view).
 
-### POST /api/v1/notifications/send-push-via-bot/
-
-Запуск рассылки push-уведомлений всем зарегистрированным устройствам через Telegram-бот.
-
-**Авторизация:** Публичный эндпоинт, защищенный заголовком `X-Telegram-Bot-Api-Secret-Token` и проверкой Telegram ID менеджера.
-
-**Тело запроса:**
-```json
-{
-  "manager_telegram_id": "123456789",
-  "title": "Заголовок рассылки",
-  "body": "Текст сообщения для всех пользователей"
-}
-```
-
-**Заголовки:**
-- `X-Telegram-Bot-Api-Secret-Token`: Секретный токен вебхука (должен совпадать с `TELEGRAM_WEBHOOK_SECRET` в настройках Django).
-
-**Проверки прав менеджера:**
-Пользователь с переданным `telegram_id` должен:
-1. Быть активным (`is_active = True`).
-2. Иметь статус суперпользователя (`is_superuser = True`) или одну из разрешенных менеджерских ролей (`admin`, `content_manager`). Роль `hall_manager` не дает прав на запуск рассылки.
-
-**Ответ 202 (Принято):**
-```json
-{ "queued": 5, "campaign_id": 12 }
-```
-
-**Ответ 403 (Запрещено):**
-При неверном заголовке секретного токена, если менеджер не зарегистрирован в системе или не обладает достаточными правами.
-
-**Ответ 400 (Некорректный запрос):**
-При ошибке валидации переданных данных (отсутствие заголовка или текста сообщения).
-
 ## Статистика кампаний (PushCampaign)
 
 Каждый вызов `POST /api/v1/notifications/bulk-push/` создаёт запись `PushCampaign` в базе данных. Статистика доступна в Django-админке: `Notifications → Push-кампании`.

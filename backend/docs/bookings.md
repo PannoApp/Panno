@@ -9,11 +9,9 @@
         ↓
   status = "pending"  (ожидает подтверждения)
   → push пользователю: "Заявка принята"
-  → Telegram: сообщение с кнопками [✅ Подтвердить] [❌ Отменить]
   → фоново (Celery): бронь пушится в Remarked CRM, remarked_reserve_id сохраняется
         ↓
-  Менеджер меняет статус ОДНИМ ИЗ ТРЁХ способов:
-    - нажимает кнопку в Telegram-уведомлении;
+  Менеджер меняет статус ОДНИМ ИЗ ДВУХ способов:
     - меняет статус в Django-админке (/admin/bookings/tablebooking/);
     - меняет статус брони прямо в Remarked CRM (например, у себя на кассе/сайте) —
       это подхватится в течение ~10 минут периодической синхронизацией, см.
@@ -25,7 +23,7 @@
   status = "completed"  →  push: "Спасибо за визит!"
 ```
 
-Важно: независимо от того, **откуда** пришло изменение статуса (Telegram, админка
+Важно: независимо от того, **откуда** пришло изменение статуса (админка
 или обратная синхронизация из Remarked), обновление всегда идёт через обычный
 `TableBooking.save()` → срабатывает один и тот же `post_save`-сигнал
 `notify_on_status_change` (`signals.py`) → пользователю уходит один и тот же
@@ -160,73 +158,6 @@ push. Дублирования логики нет — Remarked-синхрони
 
 Push уходит только если у пользователя есть зарегистрированное FCM-устройство. Если бронь создана администратором без привязки к аккаунту (`user=None`), push не отправляется.
 
-## Telegram-уведомления для менеджеров
-
-При создании **любой** брони (в том числе без привязанного аккаунта) Celery-задача `send_telegram_notification` отправляет сообщение в Telegram-чат менеджеров с двумя inline-кнопками: **✅ Подтвердить** и **❌ Отменить**.
-
-### Переменные окружения
-
-| Переменная | Описание |
-|---|---|
-| `TELEGRAM_BOT_TOKEN` | Токен бота, полученный у @BotFather |
-| `TELEGRAM_CHAT_ID` | ID чата/группы (отрицательное число для групп, например `-1001234567890`) |
-| `TELEGRAM_WEBHOOK_SECRET` | Произвольная строка для проверки подлинности входящих запросов от Telegram (рекомендуется) |
-
-Если `TELEGRAM_BOT_TOKEN` или `TELEGRAM_CHAT_ID` не задан — задача молча завершается без ошибки. `TELEGRAM_WEBHOOK_SECRET` опционален, но рекомендуется в production.
-
-### Формат сообщения
-
-```
-🍽 Бронирование #42
-
-👤 Иван Иванов
-📞 +77001234567
-📅 15.06.2026 в 19:00
-👥 4 гост.
-🏠 Зал 1
-💬 Аллергия на орехи
-🔗 WhatsApp  ← кликабельная ссылка wa.me/77001234567
-
-[ ✅ Подтвердить ]  [ ❌ Отменить ]
-```
-
-После нажатия кнопки:
-- Спиннер у кнопки исчезает (`answerCallbackQuery`)
-- Сообщение редактируется: кнопки убираются, добавляется итоговый статус (`✅ Подтверждено администратором` / `❌ Отменено администратором`)
-- Если бронь уже в финальном статусе — показывается alert с текущим статусом, сообщение не трогается
-
-Телефон берётся из поля `phone` брони. Если оно пустое и бронь привязана к пользователю — берётся `user.phone` как fallback. Без номера выводится `—`, ссылка на WhatsApp не добавляется.
-
-### Webhook-эндпоинт
-
-`POST /api/v1/bookings/telegram-webhook/`
-
-Принимает `callback_query` (нажатия inline-кнопок) и обычные сообщения `message` (текст, фото) от Telegram. Используется для подтверждения/отмены бронирований менеджером, а также для пошагового интерактивного диалога (FSM) при создании push-рассылок, новостей и мероприятий. CSRF-exempt, защищён заголовком `X-Telegram-Bot-Api-Secret-Token` (если задан `TELEGRAM_WEBHOOK_SECRET`).
-
-**Регистрация webhook (выполняется один раз после деплоя):**
-
-```bash
-curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
-  -d "url=https://your-domain.com/api/v1/bookings/telegram-webhook/" \
-  -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"
-```
-
-**Проверка регистрации:**
-
-```bash
-curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
-```
-
-### Retry-политика задачи `send_telegram_notification`
-
-| Параметр | Значение |
-|---|---|
-| `autoretry_for` | `(Exception,)` |
-| `max_retries` | `3` |
-| `default_retry_delay` | `30 с` |
-| `acks_late` | `True` |
-| `reject_on_worker_lost` | `True` |
-
 ## Напоминания о визите
 
 За 1–2 часа до визита пользователю уходит push-напоминание через Celery Beat.
@@ -292,7 +223,7 @@ curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 
 Файл: `apps/bookings/tasks.py`. Периодическая задача Celery Beat — покрывает
 случай, когда статус брони меняют **в самом Remarked** (а не в нашей
-админке/Telegram), например сотрудник у себя на кассе.
+админке), например сотрудник у себя на кассе.
 
 **Расписание:** каждые 10 минут (`CELERY_BEAT_SCHEDULE['sync-reserve-statuses']`
 в `settings/base.py`).
@@ -319,7 +250,7 @@ curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 При расхождении — `booking.status = new_status; booking.save()`. Это обычный
 `save()`, поэтому срабатывает уже существующий `post_save`-сигнал
 `notify_on_status_change` и пользователь получает тот же push, что и при
-смене статуса из админки/Telegram — сигнал не менялся и не знает, откуда
+смене статуса из админки — сигнал не менялся и не знает, откуда
 пришло изменение.
 
 Ошибка Remarked по одной брони (например, временный 5xx) не прерывает
@@ -551,15 +482,14 @@ apps/bookings/
 ├── services.py     # check_availability (zone_id), get_rooms/list_zones (кеш 1ч),
 │                   # pick_table_for_room (подбор стола в зале для create_reserve_in_remarked)
 ├── views.py        # TableBookingListCreateView (дёргает create_reserve_in_remarked),
-│                   # BookingAvailabilityView, BookingZonesView, TelegramWebhookView
+│                   # BookingAvailabilityView, BookingZonesView, BookingTablesView
 ├── admin.py        # TableBookingAdmin (управление бронями персоналом)
-├── signals.py      # push + Telegram при создании брони и смене статуса (не знает про Remarked)
-├── tasks.py        # send_booking_reminders (Beat, 15 мин), send_telegram_notification,
+├── signals.py      # push при создании брони и смене статуса (не знает про Remarked)
+├── tasks.py        # send_booking_reminders (Beat, 15 мин),
 │                   # create_reserve_in_remarked (пуш брони в Remarked + подбор стола по залу),
-│                   # sync_reserve_statuses (Beat, 10 мин — обратная синхронизация статуса),
-│                   # хелперы _build_booking_html, _tg_post
+│                   # sync_reserve_statuses (Beat, 10 мин — обратная синхронизация статуса)
 ├── apps.py         # создание группы «Менеджер зала» + подключение signals
-└── urls.py         # /api/v1/bookings/, /bookings/availability/, /bookings/zones/, /bookings/telegram-webhook/
+└── urls.py         # /api/v1/bookings/, /bookings/availability/, /bookings/zones/, /bookings/tables/
 ```
 
 Зависит от `apps/remarked/` (`ReservesClient`) для всех трёх точек

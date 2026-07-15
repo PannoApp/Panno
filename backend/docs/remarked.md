@@ -1,8 +1,6 @@
 # Remarked CRM — API-клиенты
 
-> **Зачем:** брони, меню и стоп-лист переезжают в CRM Remarked (см.
-> `backend/docs/telegram_removal.md` — Telegram-уведомления менеджерам и часть
-> логики броней становятся избыточными после этого переезда).
+> **Зачем:** брони, меню и стоп-лист переезжают в CRM Remarked.
 > Этот файл объясняет, что такое `apps/remarked/`, откуда взяты
 > `REMARKED_API_TOKEN`/`REMARKED_POINT_ID` в `.env` и как их поменять,
 > чтобы через полгода никто не гадал.
@@ -298,4 +296,4 @@ capacity, min_capacity, max_capacity, room_id, image_url, description}}}}`:
 - Повторы бизнес-логики (например, весь Celery-таск при 5xx от Remarked)
   клиент не делает — это задача вызывающего кода
   (`autoretry_for`/`max_retries` на уровне `@shared_task`, как это уже сделано
-  в `apps/bookings/tasks.py` для Telegram).
+  в `apps/bookings/tasks.py`).
