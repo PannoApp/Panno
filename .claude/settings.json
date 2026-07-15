@@ -77,10 +77,15 @@
       "Bash(python remarked_probe_deep.py)",
       "Bash(python -c \"print\\('checking docker or local venv'\\)\")",
       "Bash(docker run *)",
-      "Bash(ssh -v -o ConnectTimeout=10 root@185.129.51.40 exit)"
+      "Bash(ssh -v -o ConnectTimeout=10 root@185.129.51.40 exit)",
+      "Bash(echo \"dmesg | tail -20 | grep -i 'killed process\\\\\\\\|out of memory'\")",
+      "Bash(where.exe sshpass *)",
+      "Bash(python -c \"import paramiko\")",
+      "Bash(mkdir -p \"/c/Users/amanz/.claude/projects/c--Users-amanz-OneDrive-Desktop-Panno/memory\")"
     ],
     "additionalDirectories": [
-      "\\tmp"
+      "\\tmp",
+      "C:\\Users\\amanz\\.claude\\projects\\c--Users-amanz-OneDrive-Desktop-Panno\\memory"
     ]
   }
 }
