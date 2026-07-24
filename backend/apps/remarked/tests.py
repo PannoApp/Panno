@@ -124,6 +124,22 @@ class RemarkedMobileClientGuestTest(TestCase):
         self.assertEqual(body['birthday'], '1995-05-20')
         self.assertEqual(body['firebase_token'], 'fcm-1')
         self.assertEqual(body['device_token'], 'dev-1')
+        self.assertEqual(body['subscriptions'], {'type': 'firebase', 'sub_type': 'all'})
+
+    def test_create_or_update_omits_subscriptions_without_firebase_token(self):
+        """
+        Без firebase_token подписывать не на что — Remarked (2026-07-23)
+        подтвердил, что без subscriptions гость не получает их push-рассылки,
+        даже если firebase_token у него уже был передан раньше.
+        """
+        client = RemarkedMobileClient()
+        response = _mock_response(200, {'gid': 'gid-1'})
+        user = MagicMock(phone='+77001234567', first_name='Алихан', last_name='', email='', birthday=None, gender='male')
+        with patch.object(client.session, 'post', return_value=response) as mock_post:
+            client.create_or_update(user, device_token='dev-1')
+
+        _, kwargs = mock_post.call_args
+        self.assertNotIn('subscriptions', kwargs['json'])
 
     def test_timeout_override_used(self):
         client = RemarkedMobileClient(timeout=3)

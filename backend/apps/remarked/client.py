@@ -133,6 +133,13 @@ class RemarkedMobileClient(_BaseRemarkedClient):
             payload['birthday'] = user.birthday.isoformat()
         if firebase_token:
             payload['firebase_token'] = firebase_token
+            # Без этого гость технически имеет firebase_token, но не подписан
+            # на рассылки по каналу FB в самом Remarked — их push-виджет
+            # молча ничего не отправляет такому гостю (разгадано 2026-07-23,
+            # проверено живьём: наш собственный тестовый push через FCM API
+            # с их же ключом доходил, а их рассылка — нет, именно из-за
+            # отсутствия подписки).
+            payload['subscriptions'] = {'type': 'firebase', 'sub_type': 'all'}
         if device_token:
             payload['device_token'] = device_token
 
