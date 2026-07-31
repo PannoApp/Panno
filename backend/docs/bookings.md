@@ -518,18 +518,21 @@ apps/bookings/
 │                   # list_available_tables/_free_table_ids_at_slot (свободные столы зала на слот),
 │                   # pick_table_for_room (подбор стола в зале для create_reserve_in_remarked)
 ├── views.py        # TableBookingListCreateView (дёргает create_reserve_in_remarked),
-│                   # BookingAvailabilityView, BookingZonesView, BookingTablesView, TelegramWebhookView
+│                   # BookingAvailabilityView, BookingZonesView, BookingTablesView
 ├── admin.py        # TableBookingAdmin (has_view/change/add/delete_permission по User.role)
-├── signals.py      # push + Telegram при создании брони и смене статуса (не знает про Remarked)
-├── tasks.py        # send_booking_reminders (Beat, 15 мин), send_telegram_notification,
+├── signals.py      # push при создании брони и смене статуса (не знает про Remarked)
+├── tasks.py        # send_booking_reminders (Beat, 15 мин),
 │                   # create_reserve_in_remarked (пуш брони в Remarked + подбор стола по залу),
-│                   # sync_reserve_statuses (Beat, 10 мин — обратная синхронизация статуса),
-│                   # send_event_reservation_telegram_notification (уведомление о записи на
-│                   # мероприятие — используется apps/events/, но живёт здесь),
-│                   # хелперы _build_booking_html, _tg_post
+│                   # sync_reserve_statuses (Beat, 10 мин — обратная синхронизация статуса)
 ├── apps.py         # подключение signals (ready())
-└── urls.py         # /api/v1/bookings/, /bookings/availability/, /bookings/zones/, /bookings/tables/, /bookings/telegram-webhook/
+└── urls.py         # /api/v1/bookings/, /bookings/availability/, /bookings/zones/, /bookings/tables/
 ```
+
+> Telegram-уведомления менеджерам (вебхук, инлайн-кнопки, `send_telegram_notification`,
+> `send_event_reservation_telegram_notification`) полностью удалены из проекта —
+> брони и рассылки полностью переехали на Remarked CRM и Django Admin, бот стал
+> избыточным. FCM push-инфраструктура (`send_booking_reminders`, сигналы, `UserDevice`)
+> не затронута — Telegram был лишь одним из триггеров пуша, не самим механизмом доставки.
 
 Зависит от `apps/remarked/` (`ReservesClient`) для всех трёх точек
 интеграции с Remarked (пуш брони, обратная синхронизация статуса, проверка

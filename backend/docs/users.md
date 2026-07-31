@@ -175,8 +175,12 @@
 | `notify_events` | bool | Уведомления о мероприятиях (default: true) |
 | `notify_promotions` | bool | Уведомления об акциях (default: true) |
 | `notify_closed_events` | bool | Уведомления о закрытых событиях (default: true) |
-| `telegram_id` | string | Legacy-поле: ID чата менеджера в Telegram для авторизации в боте. По плану [telegram_removal.md](./telegram_removal.md) подлежит удалению вместе со всей Telegram-логикой, но на данный момент ещё присутствует в модели и используется в `apps/users/admin.py` (`list_display`, `search_fields`, `fieldsets`) |
 | `date_joined` | datetime | Дата регистрации |
+
+> Legacy-поле `telegram_id` (ID чата менеджера в Telegram для авторизации в боте)
+> полностью удалено вместе со всей Telegram-логикой — миграция
+> `apps/users/migrations/0011_remove_user_telegram_id.py`, поле убрано из модели
+> и из `apps/users/admin.py` (`list_display`/`search_fields`/`fieldsets`).
 
 > Сервисные уведомления (подтверждение/изменение брони, напоминание о визите) не управляются флагами — они всегда доставляются.
 

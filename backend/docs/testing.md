@@ -2,7 +2,7 @@
 
 ## Обзор
 
-В проекте 696 unit-тестов для всех 6 модулей.
+В проекте 638 unit-тестов для 7 модулей (включая `apps/remarked/` — тонкий HTTP-клиент без моделей/вьюх, но с собственным набором тестов).
 
 Тесты покрывают:
 - Сервисный слой (OTP-логика)
@@ -128,9 +128,9 @@ docker-compose run --rm --no-deps backend \
 | `SyncGuestFromRemarkedTaskTest` | Celery-задача обратной синхронизации из Remarked |
 | `UserGenderFieldTest` | поле `gender` модели `User` |
 
-### bookings — 237 тестов (`apps/bookings/tests.py`)
+### bookings — 149 тестов (`apps/bookings/tests.py`)
 
-Один (большой) файл. Помимо старой брони/сериализаторов/пушей, здесь теперь основная масса тестов — интеграция с Remarked (создание и синхронизация статусов брони) и Telegram-бот (уведомления, инлайн-кнопки, вебхук и его FSM). Классов `TableBookingStaffSerializerTest`, `StaffBookingListViewTest`, `StaffBookingUpdateViewTest` из старой версии документа в коде больше нет — отдельного Staff API для броней не существует, брони администрируются только через Django Admin.
+Один (большой) файл. Помимо брони/сериализаторов/пушей, здесь основная масса тестов — интеграция с Remarked (создание брони, подбор зала/стола, синхронизация статусов). Telegram-уведомления менеджерам и вебхук бота полностью удалены из проекта (см. историю `telegram_removal.md` — сам файл-план удалён после выполнения) вместе со всеми тестами на них (`TelegramNotificationTaskTest`, `TelegramWebhookFSMTest` и другими). Классов `TableBookingStaffSerializerTest`, `StaffBookingListViewTest`, `StaffBookingUpdateViewTest` из старой версии документа в коде тоже больше нет — отдельного Staff API для броней не существует, брони администрируются только через Django Admin.
 
 | Класс | Что проверяет |
 |---|---|
@@ -143,10 +143,6 @@ docker-compose run --rm --no-deps backend \
 | `TableBookingZoneTest`, `TableBookingZoneAPITest` | `zone` — свободный текст (реальные названия залов из Remarked) |
 | `BookingIdempotencyTest` | повторная отправка запроса на создание брони не плодит дубликаты |
 | `BookingReminderRetryConfigTest`, `BookingReminderDeduplicationTest` | ретраи и дедупликация задачи напоминаний |
-| `TelegramNotificationTaskTest`, `BookingSignalTelegramTest` | Celery-задача и сигнал отправки уведомления о брони в Telegram |
-| `BuildBookingHtmlHelperTest`, `TgPostHelperTest` | хелперы формирования HTML-сообщения и запроса к Telegram Bot API |
-| `TelegramNotificationInlineKeyboardTest` | инлайн-кнопки подтверждения/отмены под сообщением в Telegram |
-| `TelegramWebhookSecretTest`, `TelegramWebhookBasicTest`, `TelegramWebhookConfirmTest`, `TelegramWebhookCancelTest`, `TelegramWebhookAlreadyProcessedTest`, `TelegramWebhookFSMTest` | вебхук Telegram-бота: проверка секрета, базовые сценарии, подтверждение/отмена брони, повторная обработка, переходы состояний FSM |
 | `CreateReserveInRemarkedTaskTest`, `CreateReserveDispatchTest`, `CreateReserveInRemarkedFullStackTest` | создание брони в Remarked (Celery-задача, диспетчеризация, сквозной сценарий) |
 | `SyncReserveStatusesTaskTest`, `SyncReserveStatusesBeatScheduleTest`, `SyncReserveStatusesFullStackTest` | периодическая синхронизация статусов брони из Remarked |
 | `RemarkedRoomsServiceTest` | получение списка залов/столов из Remarked |
@@ -197,7 +193,7 @@ docker-compose run --rm --no-deps backend \
 | `JsonFormatterTests`, `RequestLoggingMiddlewareTests` (`test_logging_middleware.py`) | форматирование логов в JSON, middleware логирования запросов |
 | `CustomExceptionHandlerTest` (`test_exception_handler.py`) | кастомный DRF exception handler |
 
-### notifications — 60 тестов (`apps/notifications/tests.py`)
+### notifications — 54 теста (`apps/notifications/tests.py`)
 
 | Класс | Что проверяет |
 |---|---|
@@ -213,7 +209,19 @@ docker-compose run --rm --no-deps backend \
 | `NotificationsEnabledFlagTest` | общий флаг включения уведомлений у пользователя |
 | `CeleryRetryConfigTest` | конфигурация ретраев push-задач |
 | `FirebaseStartupValidationTest` | проверка инициализации Firebase при старте |
-| `SendPushViaBotViewTest` | отправка сервисного пуша через Telegram-бота |
+
+### remarked — 36 тестов (`apps/remarked/tests.py`)
+
+Не входит в перечисленные выше "6 модулей" в исходном смысле документа (нет моделей/вьюх/urls — только HTTP-клиенты, см. `remarked.md`), но покрыт собственными unit-тестами:
+
+| Класс | Что проверяет |
+|---|---|
+| `RemarkedMobileClientGuestTest` | `RemarkedMobileClient` — get-info/customer-create, обработка 400 как «гость не найден» |
+| `RemarkedReservesClientTest` | низкоуровневый транспорт `RemarkedReservesClient._call()` |
+| `RemarkedBaseClientRetryTest` | единичный ретрай при сетевой ошибке |
+| `ReservesClientTokenCacheTest` | кеширование токена `GetToken` в Redis, `Referer`/`point` |
+| `ReservesClientRetryOn401Test` | принудительное обновление токена и повтор запроса при 401 |
+| `ReservesClientTypedMethodsTest` | типизированные методы `ReservesClient` (`create_reserve`, `get_slots` и т.д.) |
 
 ---
 

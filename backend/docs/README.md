@@ -41,7 +41,6 @@ backend/
 - [notifications.md](notifications.md) — Push-уведомления (FCM)
 - [remarked.md](remarked.md) — Клиенты к CRM Remarked (`apps/remarked/`), брони/меню/стоп-лист
 - [remarked-push-integration.md](remarked-push-integration.md) — Формат push-уведомлений для прямой отправки через Remarked/FCM
-- [telegram_removal.md](telegram_removal.md) — Чек-лист удаления Telegram-логики после переезда на Remarked
 - [logging.md](logging.md) — Логирование HTTP-запросов и обработка исключений DRF
 - [admin.md](admin.md) — Роли пользователей и матрица разрешений в Django Admin
 - [for_admins.md](for_admins.md) — Руководство для администратора контента (`/admin/`)

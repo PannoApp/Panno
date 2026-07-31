@@ -253,7 +253,7 @@ News (Новость) — независимая сущность
 - **Тело:** "Jazz Night — 20.06.2026 20:00"
 - **data:** `{ "event_id": "3", "reservation_id": "15" }`
 
-Помимо пуша гостю, `apps/events/signals.py` также ставит в очередь `send_event_reservation_telegram_notification` (`apps/bookings/tasks.py`) — уведомление менеджеру в Telegram о новой записи на мероприятие. Эта функциональность в процессе планового удаления (см. `backend/docs/telegram_removal.md`), поэтому не считайте её частью долгосрочного API.
+Уведомление менеджеру в Telegram о новой записи на мероприятие (ранее отправлялось через `send_event_reservation_telegram_notification`) удалено вместе со всей Telegram-логикой проекта — `apps/events/signals.py` теперь ставит в очередь только пуш гостю.
 
 ---
 
@@ -437,7 +437,7 @@ apps/events/
 │                   # EventReservationCreateView, UserEventReservationsListView,
 │                   # EventPhotoReportListView,
 │                   # StaffEventViewSet, StaffNewsViewSet
-├── signals.py      # push + telegram-уведомление менеджеру при создании EventReservation; инвалидация кэша
+├── signals.py      # push гостю при создании EventReservation; инвалидация кэша
 ├── admin.py        # EventAdmin, NewsAdmin, EventReservationAdmin (+ EventPhotoReportInline)
 ├── apps.py         # подключение signals в ready()
 └── urls.py         # Маршруты /api/v1/events/... + router для admin/events, admin/news
