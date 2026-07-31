@@ -2785,8 +2785,13 @@ class SyncReserveStatusesTaskTest(TestCase):
     def setUp(self):
         self.user = make_user('+77007200001')
 
-    def _reserve(self, inner_status):
-        return {'reserve': {'inner_status': inner_status}}
+    def _reserve(self, inner_status, estimated_time=None, guests_count=None):
+        reserve = {'inner_status': inner_status}
+        if estimated_time is not None:
+            reserve['estimated_time'] = estimated_time
+        if guests_count is not None:
+            reserve['guests_count'] = guests_count
+        return {'reserve': reserve}
 
     def _call(self):
         from apps.bookings.tasks import sync_reserve_statuses
@@ -2906,6 +2911,89 @@ class SyncReserveStatusesTaskTest(TestCase):
         mock_push.delay.reset_mock()
         self._call()
         mock_push.delay.assert_not_called()
+
+    # ── estimated_time / guests_count (менеджер поменял в Remarked напрямую) ──
+
+    @patch('apps.notifications.tasks.send_push_notification')
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_estimated_time_change_updates_date_and_time_without_status_change(
+        self, mock_get, mock_push,
+    ):
+        # Менеджер перенёс бронь на другое время в Remarked, статус не менял.
+        mock_get.return_value = self._reserve('new', estimated_time='2026-06-16 20:30:00')
+        booking = make_booking(
+            user=self.user, status='pending', remarked_reserve_id=5001,
+            date='2026-06-15', time='19:00:00',
+        )
+        mock_push.delay.reset_mock()
+        result = self._call()
+
+        booking.refresh_from_db()
+        self.assertEqual(str(booking.date), '2026-06-16')
+        self.assertEqual(str(booking.time), '20:30:00')
+        self.assertEqual(booking.status, 'pending')  # статус не тронут
+        self.assertEqual(result, 1)
+        # Статус не менялся — сигнал не должен слать пуш.
+        mock_push.delay.assert_not_called()
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_guests_count_change_updates_local_value(self, mock_get):
+        mock_get.return_value = self._reserve('new', guests_count=5)
+        booking = make_booking(
+            user=self.user, status='pending', remarked_reserve_id=5002, guests_count=2,
+        )
+        result = self._call()
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.guests_count, 5)
+        self.assertEqual(result, 1)
+
+    @patch('apps.notifications.tasks.send_push_notification')
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_status_and_time_change_together_pushes_with_new_time(
+        self, mock_get, mock_push,
+    ):
+        # Менеджер одновременно подтвердил бронь и перенёс время — пуш должен
+        # уйти с уже актуальным (новым) временем, а не с исходным.
+        mock_get.return_value = self._reserve('confirmed', estimated_time='2026-06-16 20:30:00')
+        booking = make_booking(
+            user=self.user, status='pending', remarked_reserve_id=5003,
+            date='2026-06-15', time='19:00:00',
+        )
+        mock_push.delay.reset_mock()
+        self._call()
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'confirmed')
+        self.assertEqual(str(booking.date), '2026-06-16')
+        self.assertEqual(str(booking.time), '20:30:00')
+        mock_push.delay.assert_called_once()
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_unparsable_estimated_time_is_skipped_without_crashing(self, mock_get):
+        mock_get.return_value = self._reserve('new', estimated_time='not-a-date')
+        booking = make_booking(
+            user=self.user, status='pending', remarked_reserve_id=5004,
+            date='2026-06-15', time='19:00:00',
+        )
+        result = self._call()
+
+        booking.refresh_from_db()
+        self.assertEqual(str(booking.date), '2026-06-15')  # не тронуто
+        self.assertEqual(str(booking.time), '19:00:00')     # не тронуто
+        self.assertEqual(result, 0)
+
+    @patch('apps.remarked.reserves_client.ReservesClient.get_reserve_by_id')
+    def test_same_date_time_guests_no_update(self, mock_get):
+        mock_get.return_value = self._reserve(
+            'new', estimated_time='2026-06-15 19:00:00', guests_count=2,
+        )
+        make_booking(
+            user=self.user, status='pending', remarked_reserve_id=5005,
+            date='2026-06-15', time='19:00:00', guests_count=2,
+        )
+        result = self._call()
+        self.assertEqual(result, 0)
 
     def test_retry_config(self):
         from apps.bookings.tasks import sync_reserve_statuses
