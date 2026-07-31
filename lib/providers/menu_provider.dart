@@ -1,11 +1,14 @@
 // MenuProvider — состояние меню: категории, блюда, пагинация, поиск, режим отображения.
 // Подключён к MenuRepository; мок-данные не используются.
 import 'dart:async';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/dio_errors.dart';
+import '../data/models/api_allergen.dart';
 import '../data/models/api_category.dart';
 import '../data/models/api_dish.dart';
 import '../data/models/api_tag.dart';
@@ -334,6 +337,114 @@ class MenuProvider extends ChangeNotifier {
   void clearFeedStartIndex() {
     if (feedStartIndex == null) return;
     feedStartIndex = null;
+  }
+
+  // ── Admin: форма блюда (DishEditScreen) ─────────────────────────────────────
+
+  // Аллергены для чекбоксов формы блюда (теги переиспользуют [allTags]).
+  List<ApiAllergen> allergens = const [];
+  bool isLoadingDishMetadata = false;
+
+  /// Загружает теги и аллергены для формы редактирования блюда.
+  /// Ошибка не блокирует форму — просто списки чипов останутся пустыми.
+  Future<void> loadDishMetadata() async {
+    isLoadingDishMetadata = true;
+    notifyListeners();
+    try {
+      final results = await Future.wait([
+        _repository.fetchTags(),
+        _repository.fetchAllergens(),
+      ]);
+      allTags = results[0] as List<ApiTag>;
+      allergens = results[1] as List<ApiAllergen>;
+    } catch (_) {
+      // форма остаётся доступной без тегов/аллергенов
+    } finally {
+      isLoadingDishMetadata = false;
+      notifyListeners();
+    }
+  }
+
+  bool isSavingDish = false;
+  String? saveDishError;
+
+  Future<bool> createDish(
+    Map<String, dynamic> fields, {
+    File? image,
+    File? video,
+  }) async {
+    isSavingDish = true;
+    saveDishError = null;
+    notifyListeners();
+    try {
+      await _repository.createDish(fields, image: image, video: video);
+      load();
+      return true;
+    } on DioException catch (e) {
+      saveDishError = adminSaveErrorMessage(e);
+      return false;
+    } catch (e) {
+      saveDishError = 'Не удалось сохранить блюдо: $e';
+      return false;
+    } finally {
+      isSavingDish = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateDish(
+    int id,
+    Map<String, dynamic> fields, {
+    File? image,
+    File? video,
+  }) async {
+    isSavingDish = true;
+    saveDishError = null;
+    notifyListeners();
+    try {
+      await _repository.updateDish(id, fields, image: image, video: video);
+      load();
+      return true;
+    } on DioException catch (e) {
+      saveDishError = adminSaveErrorMessage(e);
+      return false;
+    } catch (e) {
+      saveDishError = 'Не удалось сохранить блюдо: $e';
+      return false;
+    } finally {
+      isSavingDish = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteDish(int id) async {
+    isSavingDish = true;
+    saveDishError = null;
+    notifyListeners();
+    try {
+      await _repository.deleteDish(id);
+      load();
+      return true;
+    } on DioException catch (e) {
+      saveDishError = adminDeleteErrorMessage(e, fallback: 'Не удалось удалить блюдо');
+      return false;
+    } catch (e) {
+      saveDishError = 'Ошибка при удалении: $e';
+      return false;
+    } finally {
+      isSavingDish = false;
+      notifyListeners();
+    }
+  }
+
+  /// Полные данные блюда (теги, аллергены), например для [DishDetailSheet].
+  /// Возвращает null при ошибке — вызывающий код остаётся с частичными данными.
+  Future<ApiDish?> fetchDishDetail(int id) async {
+    try {
+      return await _repository.fetchDish(id);
+    } catch (_) {
+      return null;
+    }
   }
 
   @override

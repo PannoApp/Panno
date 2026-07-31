@@ -9,7 +9,7 @@ HTTP-слой: [DioClient](api_client.md) (`lib/data/services/api_client.dart`),
 3. **save tokens** — `TokenStorage.saveTokens(access, refresh)`.
 4. **load profile** — `GET /users/profile/` → `UserProfile` в `AuthProvider.currentUser`.
 
-Выход: `POST /auth/logout/` с `refresh`, затем очистка `TokenStorage` и `currentUser`.
+Выход: `POST /users/auth/logout/` с `refresh`, затем очистка `TokenStorage` и `currentUser`.
 
 ## AuthProvider
 
@@ -35,6 +35,9 @@ HTTP-слой: [DioClient](api_client.md) (`lib/data/services/api_client.dart`),
 |------|------|----------|
 | `notificationsEnabled` | `notifications_enabled` | Мастер-переключатель push (по умолчанию `true`) |
 | `dateJoined` | `date_joined` | Дата регистрации → «С нами: Март 2024» |
+| `isStaff` | `is_staff` | Флаг доступа к admin-функциям (`isAdmin` — алиас) |
+| `role` | `role` | Роль пользователя (строка, по умолчанию `''`) |
+| `cashback` | `cashback` | Баланс кэшбэка (`double`, по умолчанию `0`) |
 
 `EventReservationRepository.fetchMyReservationsCount()` — длина `results` из `/events/reservations/my/`.
 
@@ -70,7 +73,7 @@ HTTP-слой: [DioClient](api_client.md) (`lib/data/services/api_client.dart`),
 `id`, `guestName`, `phone`, `date`, `time`, `guestsCount`, `zone?`, `comment?`, `status`
 
 ### BookingRequest
-`guestName`, `phone`, `date`, `time`, `guestsCount`, `zone?`, `comment?` — только `toJson()`.
+`guestName`, `phone`, `date`, `time`, `guestsCount`, `zone?`, `remarkedRoomId?`, `remarkedTableId?`, `comment?` — только `toJson()`. Полное описание полей (в т.ч. `remarked_room_id`/`remarked_table_id`) — в `booking.md`.
 
 ### UserProfile
 `id`, `phone`, `firstName`, `lastName`, `gender`, `email`, `birthday`, `notifyEvents`, `notifyPromotions`, `notifyClosedEvents`
@@ -135,9 +138,9 @@ email:, birthday:)` (→ `PATCH /users/profile/`, откуда бэкенд ас
 Remarked, пока пол не будет выбран через этот экран повторно (доступен снова
 из профиля) или другой PATCH с явным полом.
 
-## TODO
+## FCM
 
-- Регистрация FCM-токена после появления `FcmService` (см. комментарий в `AuthProvider.confirmOtp`).
+`FcmService` уже реализован (`lib/data/services/fcm_service.dart`) и подключён в `AuthProvider` через приватный хелпер `_registerFcmIfPossible()`, который вызывает `FcmService.instance.registerTokenWithServer(_dio)`. Вызывается из `init()` (если уже залогинен) и из `confirmOtp()` (после успешного verify-sms) — так что регистрация токена происходит автоматически при каждом входе, отдельного TODO здесь больше нет.
 
 ---
 
@@ -159,10 +162,14 @@ Remarked, пока пол не будет выбран через этот эк�
 
 **Файл:** `lib/screens/phone_entry_screen.dart`
 
-Один экран с двумя состояниями, управляемыми флагом `_awaitingCode`:
+Тонкая обёртка-`Scaffold` (AppBar + back-кнопка) вокруг общего виджета `PiligrimAuthView` (`lib/widgets/piligrim_auth_view.dart`), в котором и живёт вся логика двух состояний, управляемых флагом `_awaitingCode`:
 
 1. **Ввод телефона** — поле `+7 7XX XXX XX XX`, валидация: strip non-digits → нужно ≥ 11 цифр. Кнопка «Получить код» → `AuthProvider.sendOtp(phone)`.
-2. **Ввод кода** — числовое поле `maxLength: 6`. Кнопка «Подтвердить» → `AuthProvider.confirmOtp(phone, code)` → `Navigator.pop()` при успехе.
+2. **Ввод кода** — числовое поле `maxLength: 4` (4-значный OTP). Кнопка «Подтвердить» → `AuthProvider.confirmOtp(phone, code)`.
+
+`PiligrimAuthView` принимает колбэк `onSuccess(isNewUser)`, который `PhoneEntryScreen` использует так:
+- **Новый пользователь** (`isNewUser == true`) — `AuthProvider.clearNewUserFlag()`, затем `Navigator.pushReplacement` на `OnboardingScreen`.
+- **Существующий пользователь** — просто `Navigator.of(context).pop()`.
 
 Параметров нет. Всегда открывается через `Navigator.push` (не роут в `IndexedStack`).
 

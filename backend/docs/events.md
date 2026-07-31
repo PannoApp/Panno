@@ -177,7 +177,7 @@ News (Новость) — независимая сущность
 
 Ответ — плоский массив (не пагинированный), результаты отсортированы по полю `order`, затем по дате загрузки.
 
-Фотографии загружаются через Django-админку: страница мероприятия → inline-секция «Фотоотчёт».
+Фотографии можно загружать как через Django-админку (страница мероприятия → inline-секция «Фотоотчёт»), так и через staff-эндпоинты `StaffEventViewSet` — см. раздел «Управление фотоотчётом (Staff Only)» ниже.
 
 **Интеграция с EventSerializer:** поле `has_photo_report` в ответах `/upcoming/` и `/archived/` возвращает `true`, если для мероприятия уже есть хотя бы одно фото. Flutter-клиент использует это поле чтобы решить, отображать ли секцию фотоотчёта без лишнего запроса.
 
@@ -210,7 +210,7 @@ News (Новость) — независимая сущность
 | `order` | int | Порядок отображения в галерее (по умолчанию 0) |
 | `uploaded_at` | datetime | Дата загрузки (auto) |
 
-Результаты сортируются по `order ASC`, затем `uploaded_at ASC`. Управление исключительно через Django-админку (inline в `EventAdmin`).
+Результаты сортируются по `order ASC`, затем `uploaded_at ASC`. Управление доступно через Django-админку (inline в `EventAdmin`) и через staff-эндпоинты `StaffEventViewSet` (см. «Управление фотоотчётом (Staff Only)» ниже).
 
 ### News
 
@@ -236,14 +236,14 @@ News (Новость) — независимая сущность
 
 ### Поля только для персонала (EventReservationStaffSerializer)
 
-Для менеджера зала доступен `EventReservationStaffSerializer`, который добавляет:
+`EventReservationStaffSerializer` расширяет `EventReservationSerializer` полями:
 
 | Поле | Тип | Описание |
 |---|---|---|
 | `guest_name` | string | Имя гостя (first_name + last_name из профиля; или телефон если имя не заполнено) |
 | `guest_phone` | string | Телефон гостя из профиля (`user.phone`) |
 
-Эти поля также отображаются в Django-админке (`EventReservation → list_display`).
+На данный момент этот сериализатор не подключён ни к одному REST-эндпоинту — ни один `view` в `apps/events/views.py` его не использует. Реально те же данные (`guest_name`/`guest_phone`) доступны менеджеру зала только через Django-админку (`EventReservationAdmin → list_display`, вычисляется отдельными методами в `admin.py`, не через этот сериализатор). Сериализатор используется только в тестах.
 
 ## Push-уведомления
 
@@ -253,13 +253,15 @@ News (Новость) — независимая сущность
 - **Тело:** "Jazz Night — 20.06.2026 20:00"
 - **data:** `{ "event_id": "3", "reservation_id": "15" }`
 
+Помимо пуша гостю, `apps/events/signals.py` также ставит в очередь `send_event_reservation_telegram_notification` (`apps/bookings/tasks.py`) — уведомление менеджеру в Telegram о новой записи на мероприятие. Эта функциональность в процессе планового удаления (см. `backend/docs/telegram_removal.md`), поэтому не считайте её частью долгосрочного API.
+
 ---
 
 ## Admin Events CRUD (Staff Only)
 
 Полный CRUD мероприятий для сотрудников. Видит **все** мероприятия, включая неактивные (`is_active=False`).
 
-**Авторизация:** `Bearer <access_token>`, пользователь должен иметь роль `content_manager`, `manager`, или `admin` (`is_staff=True`).
+**Авторизация:** `Bearer <access_token>`, пользователь должен быть staff (`IsStaffOrAdmin` — проверяется только `is_staff=True`, без проверки конкретной роли).
 
 | Метод | URL | Описание |
 |---|---|---|
@@ -327,6 +329,55 @@ curl -X PATCH https://piligrim.kz/api/v1/events/admin/events/3/ \
 
 ---
 
+## Управление фотоотчётом (Staff Only)
+
+Действия `StaffEventViewSet`, позволяющие сотрудникам добавлять и удалять фотографии фотоотчёта без Django-админки.
+
+**Авторизация:** `Bearer <access_token>`, `IsStaffOrAdmin` (`is_staff=True`).
+
+| Метод | URL | Описание |
+|---|---|---|
+| `POST` | `/api/v1/events/admin/events/{id}/photos/` | Добавить фото в фотоотчёт мероприятия |
+| `DELETE` | `/api/v1/events/admin/events/{id}/photos/{photo_id}/` | Удалить фото из фотоотчёта |
+
+### POST .../photos/
+
+**Content-Type:** `multipart/form-data`
+
+**Тело запроса:**
+```
+image: <файл>
+order: 0        # необязательное, по умолчанию 0
+```
+
+Использует `StaffPhotoReportCreateSerializer` (принимает `image`, `order`), но отдаёт ответ в формате `EventPhotoReportSerializer`.
+
+**Ответ 201:**
+```json
+{
+  "id": 3,
+  "image": "https://cdn.example.com/media/events/reports/f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6.jpg",
+  "order": 0
+}
+```
+
+### DELETE .../photos/{photo_id}/
+
+Удаляет фото фотоотчёта (`photo_id` должен принадлежать указанному мероприятию, иначе `404`).
+
+**Ответ:** `204 No Content`
+
+### Ошибки
+
+| Код | Причина |
+|---|---|
+| `400` | Нет `image` в запросе на добавление |
+| `401` | Токен не передан или истёк |
+| `403` | Пользователь не является staff |
+| `404` | Мероприятие или фото не найдено |
+
+---
+
 ## Admin News CRUD (Staff Only)
 
 Полный CRUD новостей для сотрудников.
@@ -386,7 +437,8 @@ apps/events/
 │                   # EventReservationCreateView, UserEventReservationsListView,
 │                   # EventPhotoReportListView,
 │                   # StaffEventViewSet, StaffNewsViewSet
-├── signals.py      # push при создании EventReservation; инвалидация кэша
+├── signals.py      # push + telegram-уведомление менеджеру при создании EventReservation; инвалидация кэша
+├── admin.py        # EventAdmin, NewsAdmin, EventReservationAdmin (+ EventPhotoReportInline)
 ├── apps.py         # подключение signals в ready()
 └── urls.py         # Маршруты /api/v1/events/... + router для admin/events, admin/news
 ```
@@ -400,7 +452,7 @@ apps/events/
 
 ## Идемпотентность
 
-`POST /api/v1/events/reservations/create/` требует заголовок `Idempotency-Key` со значением UUID v4. Мобильный клиент генерирует UUID v4 один раз при начале заполнения формы / попытке отправки и переиспользует тот же UUID при всех сетевых retry-ях для этой формы.
+`POST /api/v1/events/reservations/create/` требует заголовок `Idempotency-Key` со значением UUID. Сервер (`utils/idempotency.py`) валидирует его простым `uuid.UUID(raw_key)` — принимается UUID **любой версии** (v1/v3/v4/v5), строгой проверки версии нет. Мобильный клиент по конвенции генерирует именно UUID v4 один раз при начале заполнения формы / попытке отправки и переиспользует тот же UUID при всех сетевых retry-ях для этой формы.
 
 **Поведение:**
 - Первый запрос с ключом — создание записи, ответ кешируется в Redis на 24 часа.

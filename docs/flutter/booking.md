@@ -66,6 +66,23 @@
 | `isLoadingZones` | `bool` | `true` во время загрузки списка залов |
 | `zonesError` | `String?` | Ошибка загрузки или `null` |
 
+### Поля столов
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `selectedTable` | `BookingTable?` | Выбранный стол внутри выбранного зала, `null` = «Любой стол» |
+| `tables` | `List<BookingTable>` | Свободные столы зала на точные дату/время/кол-во гостей, см. `loadTables()` ниже |
+| `isLoadingTables` | `bool` | `true` во время загрузки списка столов |
+| `tablesError` | `String?` | Ошибка загрузки или `null` |
+
+### Поля доступности
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `availabilitySlots` | `List<AvailabilitySlot>` | Свободные слоты на выбранную дату/кол-во гостей/зал, см. `loadAvailability()` ниже |
+| `isLoadingAvailability` | `bool` | `true` во время проверки доступности |
+| `availabilityError` | `String?` | Ошибка проверки доступности или `null` |
+
 ### Поля состояния отправки
 
 | Поле | Тип | Описание |
@@ -85,8 +102,11 @@
 ### Методы
 
 #### `setZone(BookingZone? zone)`
-Обновляет выбранный зал, вызывает `notifyListeners()` и сразу перезапускает
-`loadAvailability()` — занятость должна пересчитаться для нового зала.
+Обновляет выбранный зал и сбрасывает всё, что зависело от предыдущего зала:
+`selectedTable = null`, `tables = []`, `tablesError = null`. После
+`notifyListeners()` перезапускает и `loadAvailability()` (занятость должна
+пересчитаться для нового зала), и `loadTables()` (список столов грузится
+заново для нового зала — см. «Столы» ниже).
 
 #### `Future<void> loadZones()`
 Загружает список реальных залов через `_repository.fetchZones()`. Не
@@ -95,17 +115,41 @@
 `zonesError` заполняется, `zones` остаётся пустым, пикер зала в
 `BookingScreen` просто не отображается (зал — необязательное поле).
 
+#### `setTable(BookingTable? table)`
+Обновляет выбранный стол и вызывает `notifyListeners()`. Никаких побочных
+эффектов (в отличие от `setZone`) — выбор стола не влияет ни на список
+залов, ни на доступность слотов.
+
 #### `setGuests(int count)`
 Устанавливает количество гостей с ограничением `clamp(1, 50)`.
 
 #### `setVisitDate(DateTime date)` / `setVisitTime(DateTime time)`
 Обновляют дату и время визита соответственно.
 
+#### `Future<void> loadTables()`
+Загружает свободные столы конкретного зала через
+`_repository.fetchTables()` по точным дате/времени/кол-ву гостей и
+`zoneId`. No-op (с очисткой `tables`/`selectedTable`, если они не пусты),
+если `selectedZone == null`, `visitDate == null` или `visitTime == null` —
+без зала «любой стол в любом зале» подбирается бэкендом автоматически, как
+и раньше. Также no-op, если загрузка уже идёт (`isLoadingTables`). После
+успешной загрузки, если ранее выбранного стола больше нет в списке
+свежих `tables` (например, его уже забронировали), `selectedTable`
+сбрасывается в `null`. При ошибке — `tablesError` заполняется, `tables` и
+`selectedTable` сбрасываются.
+
+#### `Future<void> loadAvailability()`
+Проверяет доступность слотов через `_repository.fetchAvailability()` по
+дате, кол-ву гостей и (опционально) `selectedZone?.id`. No-op, если
+`visitDate == null` или загрузка уже идёт. Результат — в
+`availabilitySlots`; при ошибке — в `availabilityError`, `availabilitySlots`
+сбрасывается в `[]`.
+
 #### `Future<void> submitBooking(BookingRequest req)`
 Отправляет заявку на бронирование.
 
 - Защита от двойной отправки: при `isSubmitting == true` возвращает сразу.
-- Последовательность: устанавливает `isSubmitting = true` → вызывает `_repository.createBooking(req)` → при успехе устанавливает `isSuccess = true` и сбрасывает форму через `_resetForm()` → при ошибке записывает в `error`.
+- Последовательность: устанавливает `isSubmitting = true` → вызывает `_repository.createBooking(req)` → при успехе устанавливает `isSuccess = true`, сбрасывает форму через `_resetForm()` и вызывает `loadHistory()` (счётчик «Бронирований» на экране профиля берёт данные из `history`, иначе он остался бы устаревшим до тех пор, пока гость сам не откроет экран истории) → при ошибке записывает в `error`.
 - После завершения `isSubmitting` всегда сбрасывается в `false` (блок `finally`).
 
 #### `Future<void> loadHistory({int page = 1})`
@@ -117,16 +161,26 @@
 #### `resetSubmitState()`
 Сбрасывает `isSuccess` и `error` в исходное состояние. Вызывается при повторном открытии экрана бронирования, чтобы не показывать устаревший результат.
 
+#### `Future<void> retryHistory()`
+Тонкая обёртка над `loadHistory()` — семантический алиас для повторной
+попытки после ошибки (используется кнопкой «Повторить» на экране истории).
+
 #### `_resetForm()` (приватный)
-Сбрасывает поля формы к значениям по умолчанию после успешной отправки.
+Сбрасывает поля формы к значениям по умолчанию после успешной отправки,
+включая выбранный стол и состояние доступности.
 `zones`/`isLoadingZones`/`zonesError` не сбрасываются — список залов не
 зависит от конкретной заявки, перезагружать его на каждую новую бронь не нужно.
 
 ```
 selectedZone = null
+selectedTable = null
+tables = []
+tablesError = null
 guests = 2
 visitDate = null
 visitTime = null
+availabilitySlots = []
+availabilityError = null
 ```
 
 ### Залы
@@ -149,6 +203,34 @@ class BookingZone {
 `booking.zones.isNotEmpty` — при недоступности Remarked (пустой список) блок
 выбора зала просто не показывается, форма не блокируется. Повторный тап по
 уже выбранному залу снимает выбор (`selectedZone = null`).
+
+### Столы
+
+Выбор конкретного стола — необязательный уточняющий шаг **поверх** выбора
+зала, а не независимая от него подсистема: пикер столов появляется только
+после того, как выбран зал и заполнены дата/время визита. Без выбранного
+стола (`selectedTable == null`, «Любой стол») бэкенд подбирает стол
+автоматически внутри выбранного зала — так же, как это происходило и до
+появления этой возможности.
+
+```dart
+class BookingTable {
+  final int id;         // GetSlots.rooms[].tables[].id в Remarked
+  final String? name;   // например, "Стол 5", может отсутствовать
+  final int? capacity;  // вместимость стола, может отсутствовать
+}
+```
+
+Файл: [lib/data/models/booking_table.dart](../../lib/data/models/booking_table.dart).
+Загружается через `BookingProvider.loadTables()` (см. выше) →
+`BookingRepository.fetchTables()` → `GET /bookings/tables/` с параметрами
+даты, времени, кол-ва гостей и `zoneId`. Список перезагружается заново при
+любом изменении зала (`setZone()` вызывает `loadTables()`) и при изменении
+даты/времени/гостей на экране бронирования. Если ранее выбранный стол
+пропадает из свежего списка (уже занят), выбор молча сбрасывается
+(`selectedTable = null`) — форма не блокируется. Смена зала всегда сбрасывает
+выбранный стол (см. `setZone()` выше), так как список столов другого зала
+не пересекается со старым выбором.
 
 ---
 
@@ -180,20 +262,33 @@ try {
 
 ---
 
-## Prefill телефона из профиля
+## Prefill телефона из профиля и инициализация формы
 
-Файл: [lib/screens/booking_screen.dart](../../lib/screens/booking_screen.dart) — метод `initState`, строки 52–60.
+Файл: [lib/screens/booking_screen.dart](../../lib/screens/booking_screen.dart) — метод `initState`, строки 46–66.
 
-При открытии `BookingScreen` форма автоматически заполняется данными авторизованного пользователя:
+При открытии `BookingScreen` весь `addPostFrameCallback` в `initState` делает
+две вещи подряд: заполняет форму данными авторизованного пользователя и
+синхронизирует черновик формы с `BookingProvider`, запуская первую загрузку
+залов и проверку доступности.
 
 ```dart
 WidgetsBinding.instance.addPostFrameCallback((_) {
   if (!mounted) return;
   final auth = context.read<AuthProvider>();
-  if (!auth.isLoggedIn) return;
-  _nameCtrl.text = auth.user.name;
-  final phone = auth.user.phone.replaceAll(RegExp(r'[^\d+]'), '');
-  if (phone.isNotEmpty) _phoneCtrl.text = phone;
+  if (auth.isLoggedIn) {
+    _nameCtrl.text = auth.user.name;
+    final phone = auth.user.phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (phone.isNotEmpty) _phoneCtrl.text = phone;
+  }
+
+  // Синхронизируем черновик формы с провайдером, грузим реальные залы
+  // ресторана и запускаем первую проверку доступности слотов на
+  // дефолтную дату/кол-во гостей.
+  final booking = context.read<BookingProvider>();
+  booking.setVisitDate(_visitDate);
+  booking.setVisitTime(_visitTimeAsDateTime);
+  booking.loadZones();
+  booking.loadAvailability();
 });
 ```
 
@@ -201,30 +296,32 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
 
 - Заполнение происходит в `addPostFrameCallback`, а не в `initState` напрямую, чтобы гарантировать доступность `BuildContext` с провайдерами.
 - Телефон очищается от всех символов кроме цифр и `+` (`RegExp(r'[^\d+]')`), чтобы убрать пробелы и дефисы, которые могут храниться в профиле.
-- Если пользователь не авторизован — форма остаётся пустой; кнопка отправки запустит `guardAuth`, который перенаправит на экран входа.
+- Если пользователь не авторизован — блок prefill просто пропускается (`if (auth.isLoggedIn)`), форма остаётся пустой; кнопка отправки запустит `guardAuth`, который перенаправит на экран входа. Синхронизация с `BookingProvider` при этом всё равно выполняется — она не зависит от авторизации.
 - Prefill можно редактировать — поля остаются обычными `TextEditingController`.
+- Тот же callback сразу после prefill передаёт дефолтные дату/время экрана (`_visitDate`, `_visitTimeAsDateTime`) в провайдер через `setVisitDate`/`setVisitTime`, затем вызывает `loadZones()` (см. «Залы» выше) и `loadAvailability()` (см. «Поля доступности» выше) — так форма и провайдер оказываются синхронизированы уже к первому кадру экрана, без ожидания действий пользователя.
 
 ---
 
 ## Статусы и цветовое кодирование в BookingHistoryScreen
 
-Файл: [lib/screens/booking_history_screen.dart](../../lib/screens/booking_history_screen.dart) — класс `_StatusBadge`, строки 281–331.
+Файл: [lib/screens/booking_history_screen.dart](../../lib/screens/booking_history_screen.dart) — класс `_StatusBadge`, строки 282–336.
 
-Каждая карточка бронирования отображает badge со статусом. Цвет берётся из палитры `PiligrimColors`.
+Каждая карточка бронирования отображает badge со статусом. Цвет берётся из палитры `PiligrimColors` (кроме `canceled` — см. ниже).
 
 | Статус API | Русское название | Цвет | Константа / HEX |
 |---|---|---|---|
 | `pending` | ОЖИДАЕТ | Золотистый | `PiligrimColors.steppe` |
 | `confirmed` | ПОДТВЕРЖДЕНО | Синий (вода) | `PiligrimColors.water` |
-| `completed` | ЗАВЕРШЕНО | Зелёный | `Color(0xFF5A9A6A)` |
+| `completed` | ЗАВЕРШЕНО | Зелёный | `PiligrimColors.success` (константа в `lib/core/theme.dart`, значение `Color(0xFF5A9A6A)`) |
 | `canceled` | ОТМЕНЕНО | Приглушённый серый | `PiligrimColors.sky` с alpha 0.30 |
 
-Badge рендерится как контейнер с:
-- фоном цвета с opacity 0.12 (полупрозрачный),
-- рамкой того же цвета с opacity 0.40,
-- текстом в `UPPERCASE` с `letterSpacing: 1.2` и размером шрифта 9.5.
+Badge — это не контейнер-«пилюля» с фоном и рамкой, а простой `Row` из двух
+элементов:
+- цветной кружок 5×5 (`Container` с `BoxDecoration(shape: BoxShape.circle)`, без фона/рамки вокруг всего badge),
+- текст в `UPPERCASE` (`PiligrimTextStyles.caption`) с `letterSpacing: 1.2` и размером шрифта 9.5, окрашенный в тот же цвет, что и кружок.
 
-Неизвестный статус обрабатывается ветвью `default` — отображается как «Отменено» (серый).
+Неизвестный статус обрабатывается той же веткой `case`, что и `canceled`
+(`case 'canceled': default:`) — отображается как «Отменено» (серый).
 
 ---
 
@@ -245,6 +342,7 @@ Badge рендерится как контейнер с:
 | `guestsCount` | `guests_count` | да | Количество гостей |
 | `zone` | `zone` | нет | Название реального зала (`BookingZone.name`, например «Зал 1») — свободный текст, не enum |
 | `remarkedRoomId` | `remarked_room_id` | нет | `BookingZone.id` — нужен бэкенду, чтобы подобрать стол именно в этом зале |
+| `remarkedTableId` | `remarked_table_id` | нет | `BookingTable.id` — если гость выбрал конкретный стол явно (а не «Любой стол»), бэкенд передаёт его в Remarked напрямую, без автоподбора |
 | `comment` | `comment` | нет | Комментарий гостя |
 
 ### ApiBooking

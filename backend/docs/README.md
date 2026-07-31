@@ -4,28 +4,30 @@
 
 | Технология | Версия | Роль |
 |---|---|---|
-| Django | 5.x | Фреймворк |
+| Django | 5.2 | Фреймворк |
 | Django REST Framework | 3.15 | REST API |
 | PostgreSQL | — | Основная БД |
 | Redis | — | Кэш OTP-кодов, брокер Celery |
-| Celery | 5.x | Фоновые задачи (push-уведомления) |
-| Firebase Admin SDK | 6.x | Отправка FCM push-уведомлений |
+| Celery | 5.6 | Фоновые задачи (push-уведомления) |
+| Firebase Admin SDK | 6.5 | Отправка FCM push-уведомлений |
 | drf-spectacular | 0.29 | Генерация OpenAPI 3.0 документации |
-| Simple JWT | 5.x | JWT авторизация |
+| Simple JWT | 5.3 | JWT авторизация |
 
 ## Архитектура
 
 ```
 backend/
-├── config/              # Настройки Django (base, dev, prod) и роутинг
+├── config/              # Настройки Django (base/dev/prod/test), Celery, роутинг
 ├── apps/
 │   ├── users/           # Авторизация (SMS OTP) и профиль пользователя
 │   ├── menu/            # Категории и блюда меню
 │   ├── events/          # Мероприятия, новости, запись на события
 │   ├── bookings/        # Бронирование столов
 │   ├── core/            # Публичная информация о ресторане
-│   └── notifications/   # FCM push-уведомления и устройства
-├── utils/               # Общие утилиты (пагинация)
+│   ├── notifications/   # FCM push-уведомления и устройства
+│   └── remarked/        # HTTP-клиенты к CRM Remarked (без моделей/вьюх/urls, см. remarked.md)
+├── utils/               # Общие утилиты: пагинация, кэш, идемпотентность, обработка изображений,
+│                        # логирующий middleware, кастомный exception handler, права доступа
 └── docs/                # Эта документация
 ```
 
@@ -37,6 +39,13 @@ backend/
 - [bookings.md](bookings.md) — Бронирование столов
 - [core.md](core.md) — Информация о ресторане
 - [notifications.md](notifications.md) — Push-уведомления (FCM)
+- [remarked.md](remarked.md) — Клиенты к CRM Remarked (`apps/remarked/`), брони/меню/стоп-лист
+- [remarked-push-integration.md](remarked-push-integration.md) — Формат push-уведомлений для прямой отправки через Remarked/FCM
+- [telegram_removal.md](telegram_removal.md) — Чек-лист удаления Telegram-логики после переезда на Remarked
+- [logging.md](logging.md) — Логирование HTTP-запросов и обработка исключений DRF
+- [admin.md](admin.md) — Роли пользователей и матрица разрешений в Django Admin
+- [for_admins.md](for_admins.md) — Руководство для администратора контента (`/admin/`)
+- [DEPLOY.md](DEPLOY.md) — Деплой на staging-сервер через Docker
 - [testing.md](testing.md) — Unit-тесты: запуск локально и в Docker
 
 ## Быстрый старт

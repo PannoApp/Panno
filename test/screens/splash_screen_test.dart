@@ -6,6 +6,7 @@ import 'package:piligrim/data/models/app_version_info.dart';
 import 'package:piligrim/data/repositories/core_repository.dart';
 import 'package:piligrim/data/services/auth_service.dart';
 import 'package:piligrim/providers/auth_provider.dart';
+import 'package:piligrim/providers/core_info_provider.dart';
 import 'package:piligrim/screens/onboarding_screen.dart';
 import 'package:piligrim/screens/splash_screen.dart';
 
@@ -45,6 +46,12 @@ void main() {
           providers: [
             ChangeNotifierProvider<AuthProvider>.value(
               value: auth ?? _fakeAuth(),
+            ),
+            // SplashScreen читает CoreInfoProvider().coreInfo?.conceptDescription
+            // (см. lib/screens/splash_screen.dart) — .load() не вызываем,
+            // coreInfo остаётся null, экран должен работать и без него.
+            ChangeNotifierProvider<CoreInfoProvider>.value(
+              value: CoreInfoProvider(),
             ),
           ],
           child: MaterialApp(

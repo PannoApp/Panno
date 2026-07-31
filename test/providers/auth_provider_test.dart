@@ -136,13 +136,24 @@ void main() {
 
     test('user journeyStartLabel from date_joined', () async {
       storage.access = 'stored-access';
-      adapter.enqueue(200, _sampleProfile());
+      // Дата регистрации — ровно 2 года назад от момента запуска теста.
+      // Фиксированная дата в прошлом (например, '2024-03-15') делала бы тест
+      // хрупким: _formatJourneyStart считает разницу с DateTime.now(), и
+      // ответ менялся бы год от года. День всегда 1-е число — чтобы не
+      // зависеть от поправки на "ещё не наступившую годовщину" в текущем месяце.
+      final now = DateTime.now();
+      final joinedTwoYearsAgo = DateTime(now.year - 2, now.month, 1, 10, 0);
+      adapter.enqueue(200, {
+        ..._sampleProfile(),
+        'date_joined': joinedTwoYearsAgo.toUtc().toIso8601String(),
+      });
       _enqueueEmptyReservations(adapter);
 
       final auth = buildProvider();
       await auth.init();
 
-      expect(auth.user.journeyStartLabel, 'Март 2024');
+      expect(auth.user.journeyStartValue, '2');
+      expect(auth.user.journeyStartLabel, 'Года с нами');
     });
 
     test('updateNotificationPreferences sends notifications_enabled', () async {

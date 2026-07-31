@@ -2,7 +2,7 @@ import logging
 import uuid
 from celery import shared_task
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.db.models import Q
 from utils.cache import safe_cache_add
 
@@ -220,12 +220,25 @@ RESERVE_INNER_STATUS_TO_LOCAL = {
 def sync_reserve_statuses():
     """
     Запускается по расписанию Celery Beat (см. CELERY_BEAT_SCHEDULE) —
-    обратная синхронизация: менеджер меняет статус брони в Remarked, а не
+    обратная синхронизация: менеджер меняет бронь в Remarked напрямую, а не
     в нашем приложении. Для каждой ещё не завершённой локально брони с уже
-    известным remarked_reserve_id дёргает GetReserveByID и при расхождении
-    статуса обновляет локальную запись. save() триггерит существующий
-    post_save-сигнал notify_on_status_change (apps/bookings/signals.py),
-    который сам разошлёт пуш пользователю — сигнал не меняется.
+    известным remarked_reserve_id дёргает GetReserveByID и подтягивает:
+
+    - статус (inner_status → status, как и раньше);
+    - дату и время визита (estimated_time, формат "YYYY-MM-DD HH:MM:SS" —
+      единая строка, не разделённая на date/time);
+    - число гостей (guests_count).
+
+    Раньше синк трогал только статус — если менеджер переносил бронь на
+    другое время прямо в Remarked (не меняя статус), наша БД и приложение
+    гостя молча показывали устаревшие дату/время бессрочно. Формат ответа
+    подтверждён живым вызовом GetReserveByID и совпадает со схемой в
+    openapi.json (см. backend/docs/remarked.md).
+
+    save() триггерит существующий post_save-сигнал notify_on_status_change
+    (apps/bookings/signals.py) — он сравнивает только статус, поэтому правка
+    одних даты/времени/числа гостей (без смены статуса) не шлёт лишний пуш;
+    сигнал не менялся.
 
     Ошибка Remarked по одной брони не прерывает синхронизацию остальных —
     следующий плановый запуск повторит попытку для неё же.
@@ -251,14 +264,46 @@ def sync_reserve_statuses():
             )
             continue
 
-        inner_status = (response.get('reserve') or {}).get('inner_status')
+        reserve = response.get('reserve') or {}
+        changed_fields = []
+
+        inner_status = reserve.get('inner_status')
         new_status = RESERVE_INNER_STATUS_TO_LOCAL.get(inner_status)
-        if not new_status or new_status == booking.status:
+        if new_status and new_status != booking.status:
+            booking.status = new_status
+            changed_fields.append('status')
+
+        estimated_time = reserve.get('estimated_time')
+        if estimated_time:
+            try:
+                parsed = datetime.strptime(estimated_time, '%Y-%m-%d %H:%M:%S')
+            except (ValueError, TypeError):
+                logger.warning(
+                    "sync_reserve_statuses: unparsable estimated_time=%r for booking=%s reserve_id=%s",
+                    estimated_time, booking.pk, booking.remarked_reserve_id,
+                )
+            else:
+                if booking.date != parsed.date():
+                    booking.date = parsed.date()
+                    changed_fields.append('date')
+                if booking.time != parsed.time():
+                    booking.time = parsed.time()
+                    changed_fields.append('time')
+
+        guests_count = reserve.get('guests_count')
+        if isinstance(guests_count, int) and guests_count > 0 and guests_count != booking.guests_count:
+            booking.guests_count = guests_count
+            changed_fields.append('guests_count')
+
+        if not changed_fields:
             continue
 
-        booking.status = new_status
         booking.save()
         updated += 1
+        logger.info(
+            "Booking synced from Remarked: booking=%s reserve_id=%s fields=%s",
+            booking.pk, booking.remarked_reserve_id, changed_fields,
+        )
 
     logger.info("Reserve statuses synced: %d booking(s) updated", updated)
     return updated

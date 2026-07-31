@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
 import '../data/models/api_event_reservation.dart';
-import '../data/repositories/event_reservation_repository.dart';
+import '../providers/events_provider.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_loader.dart';
 import '../widgets/piligrim_tap.dart';
@@ -19,24 +20,18 @@ class EventReservationHistoryScreen extends StatefulWidget {
 
 class _EventReservationHistoryScreenState
     extends State<EventReservationHistoryScreen> {
-  final _repo = EventReservationRepository();
-  late Future<List<ApiEventReservation>> _future;
-
   @override
   void initState() {
     super.initState();
-    _future = _repo.fetchMyReservations();
+    context.read<EventsProvider>().loadMyReservations();
   }
 
-  void _reload() {
-    setState(() {
-      _future = _repo.fetchMyReservations();
-    });
-  }
+  Future<void> _reload() => context.read<EventsProvider>().loadMyReservations();
 
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
+    final events = context.watch<EventsProvider>();
 
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
@@ -49,95 +44,90 @@ class _EventReservationHistoryScreenState
               cinematic: true,
             ),
           ),
-          FutureBuilder<List<ApiEventReservation>>(
-            future: _future,
-            builder: (context, snapshot) {
-              return RefreshIndicator(
-                onRefresh: () async => _reload(),
-                color: PiligrimColors.water,
-                backgroundColor: PiligrimColors.earthDeep,
-                child: CustomScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  slivers: [
-                    SliverToBoxAdapter(child: SizedBox(height: top + 16)),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                        child: Row(
-                          children: [
-                            PiligrimTap(
-                              onTap: () => Navigator.of(context).pop(),
-                              borderRadius: BorderRadius.circular(6),
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.arrow_back_ios_new_rounded,
-                                      size: 12,
-                                      color: PiligrimColors.sky
-                                          .withValues(alpha: 0.45),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      'Назад',
-                                      style: PiligrimTextStyles.caption
-                                          .copyWith(
-                                        color: PiligrimColors.sky
-                                            .withValues(alpha: 0.45),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
+          RefreshIndicator(
+            onRefresh: _reload,
+            color: PiligrimColors.water,
+            backgroundColor: PiligrimColors.earthDeep,
+            child: CustomScrollView(
+              physics: const ClampingScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(child: SizedBox(height: top + 16)),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    child: Row(
+                      children: [
+                        PiligrimTap(
+                          onTap: () => Navigator.of(context).pop(),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 2, 8, 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  size: 12,
+                                  color: PiligrimColors.sky
+                                      .withValues(alpha: 0.45),
                                 ),
-                              ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Назад',
+                                  style: PiligrimTextStyles.caption
+                                      .copyWith(
+                                    color: PiligrimColors.sky
+                                        .withValues(alpha: 0.45),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 14),
-                            Text(
-                              'МОИ МЕРОПРИЯТИЯ',
-                              style: PiligrimTextStyles.heading.copyWith(
-                                fontSize: 17,
-                                color: PiligrimColors.sky,
-                                letterSpacing: 2.0,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate().fadeIn(duration: 400.ms),
-                    ),
-                    if (snapshot.connectionState == ConnectionState.waiting)
-                      const SliverFillRemaining(
-                        child: Center(child: PiligrimLoader()),
-                      )
-                    else if (snapshot.hasError)
-                      SliverFillRemaining(
-                        child: _ErrorState(onRetry: _reload),
-                      )
-                    else if (snapshot.data?.isEmpty ?? true)
-                      const SliverFillRemaining(
-                        child: _EmptyState(),
-                      )
-                    else
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _ReservationCard(
-                                reservation: snapshot.data![index],
-                                index: index,
-                              ),
-                            ),
-                            childCount: snapshot.data!.length,
                           ),
                         ),
-                      ),
-                  ],
+                        const SizedBox(width: 14),
+                        Text(
+                          'МОИ МЕРОПРИЯТИЯ',
+                          style: PiligrimTextStyles.heading.copyWith(
+                            fontSize: 17,
+                            color: PiligrimColors.sky,
+                            letterSpacing: 2.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate().fadeIn(duration: 400.ms),
                 ),
-              );
-            },
+                if (events.isLoadingMyReservations)
+                  const SliverFillRemaining(
+                    child: Center(child: PiligrimLoader()),
+                  )
+                else if (events.myReservationsError != null)
+                  SliverFillRemaining(
+                    child: _ErrorState(onRetry: _reload),
+                  )
+                else if (events.myReservations.isEmpty)
+                  const SliverFillRemaining(
+                    child: _EmptyState(),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ReservationCard(
+                            reservation: events.myReservations[index],
+                            index: index,
+                          ),
+                        ),
+                        childCount: events.myReservations.length,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),

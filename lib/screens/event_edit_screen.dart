@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../data/models/api_event.dart';
-import '../data/repositories/events_repository.dart';
 import '../providers/events_provider.dart';
 import '../widgets/piligrim_back_button.dart';
 import '../widgets/piligrim_loader.dart';
@@ -27,9 +25,7 @@ class EventEditScreen extends StatefulWidget {
 
 class _EventEditScreenState extends State<EventEditScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _repo = EventsRepository();
   File? _localImageFile;
-  bool _isSaving = false;
 
   late final TextEditingController _titleCtrl;
   late final TextEditingController _descriptionCtrl;
@@ -148,60 +144,29 @@ class _EventEditScreenState extends State<EventEditScreen> {
       PiligrimToast.show(context, 'Нельзя создавать мероприятие на прошедшую дату', type: PiligrimToastType.error);
       return;
     }
-    setState(() => _isSaving = true);
-    try {
-      final priceRaw = _priceCtrl.text.trim();
-      final fields = <String, dynamic>{
-        'title': _titleCtrl.text.trim(),
-        'description': _descriptionCtrl.text.trim(),
-        'date_time': _selectedDateTime!.toUtc().toIso8601String(),
-        'format': _selectedFormat.name,
-        'price': priceRaw.isEmpty ? null : priceRaw,
-        'max_places': int.tryParse(_maxPlacesCtrl.text.trim()) ?? 0,
-        'is_active': _isActive,
-      };
-      widget.event == null
-          ? await _repo.createEvent(fields, image: _localImageFile)
-          : await _repo.updateEvent(widget.event!.id, fields, image: _localImageFile);
-      if (mounted) context.read<EventsProvider>().load();
-      if (mounted) Navigator.of(context).pop();
-    } on DioException catch (e) {
-      String errorMessage = 'Произошла сетевая ошибка';
-      if (e.response?.statusCode == 400) {
-        final data = e.response?.data;
-        if (data is Map) {
-          final errorList = <String>[];
-          data.forEach((key, val) {
-            final valStr = val is List ? val.join(', ') : val.toString();
-            if (key == 'non_field_errors' || key == 'detail') {
-              errorList.add(valStr);
-            } else {
-              errorList.add('$key: $valStr');
-            }
-          });
-          errorMessage = errorList.isNotEmpty ? errorList.join('\n') : 'Ошибка валидации данных';
-        } else if (data is String && data.isNotEmpty) {
-          errorMessage = data;
-        } else {
-          errorMessage = 'Ошибка валидации данных';
-        }
-      } else if (e.type == DioExceptionType.connectionTimeout ||
-                 e.type == DioExceptionType.receiveTimeout ||
-                 e.type == DioExceptionType.sendTimeout ||
-                 e.type == DioExceptionType.connectionError) {
-        errorMessage = 'Сетевая ошибка. Проверьте интернет-соединение';
-      } else {
-        errorMessage = 'Ошибка сервера: ${e.response?.statusCode ?? ""} ${e.message ?? ""}';
-      }
-      if (mounted) {
-        PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
-      }
-    } catch (e) {
-      if (mounted) {
-        PiligrimToast.show(context, 'Не удалось сохранить мероприятие: $e', type: PiligrimToastType.error);
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+    final events = context.read<EventsProvider>();
+    final priceRaw = _priceCtrl.text.trim();
+    final fields = <String, dynamic>{
+      'title': _titleCtrl.text.trim(),
+      'description': _descriptionCtrl.text.trim(),
+      'date_time': _selectedDateTime!.toUtc().toIso8601String(),
+      'format': _selectedFormat.name,
+      'price': priceRaw.isEmpty ? null : priceRaw,
+      'max_places': int.tryParse(_maxPlacesCtrl.text.trim()) ?? 0,
+      'is_active': _isActive,
+    };
+    final ok = widget.event == null
+        ? await events.createEvent(fields, image: _localImageFile)
+        : await events.updateEvent(widget.event!.id, fields, image: _localImageFile);
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop();
+    } else {
+      PiligrimToast.show(
+        context,
+        events.saveEventError ?? 'Не удалось сохранить мероприятие',
+        type: PiligrimToastType.error,
+      );
     }
   }
 
@@ -217,6 +182,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isSaving = context.watch<EventsProvider>().isSavingEvent;
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
       appBar: AppBar(
@@ -235,7 +201,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
         actions: [
           if (!_isCreating)
             PiligrimTap(
-              onTap: _isSaving ? null : _deleteEvent,
+              onTap: isSaving ? null : _deleteEvent,
               borderRadius: BorderRadius.circular(6),
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -303,7 +269,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
                 _buildActiveSwitch(),
                 const SizedBox(height: 32),
 
-                _buildSaveButton(),
+                _buildSaveButton(isSaving),
                 const SizedBox(height: 40),
               ],
             ),
@@ -556,8 +522,8 @@ class _EventEditScreenState extends State<EventEditScreen> {
   }
 
   /// Кнопка сохранения / публикации мероприятия.
-  Widget _buildSaveButton() {
-    if (_isSaving) {
+  Widget _buildSaveButton(bool isSaving) {
+    if (isSaving) {
       return const SizedBox(
         height: 52,
         child: Center(child: PiligrimLoader(color: PiligrimColors.steppe)),
@@ -635,30 +601,17 @@ class _EventEditScreenState extends State<EventEditScreen> {
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-              setState(() => _isSaving = true);
-              try {
-                await _repo.deleteEvent(widget.event!.id);
-                if (mounted) context.read<EventsProvider>().load();
-                if (mounted) Navigator.of(context).pop();
-              } on DioException catch (e) {
-                String errorMessage = 'Не удалось удалить мероприятие';
-                if (e.type == DioExceptionType.connectionTimeout ||
-                    e.type == DioExceptionType.receiveTimeout ||
-                    e.type == DioExceptionType.sendTimeout ||
-                    e.type == DioExceptionType.connectionError) {
-                  errorMessage = 'Сетевая ошибка при удалении';
-                } else if (e.response?.statusCode != null) {
-                  errorMessage = 'Ошибка сервера при удалении: ${e.response!.statusCode}';
-                }
-                if (mounted) {
-                  PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
-                }
-              } catch (e) {
-                if (mounted) {
-                  PiligrimToast.show(context, 'Ошибка при удалении: $e', type: PiligrimToastType.error);
-                }
-              } finally {
-                if (mounted) setState(() => _isSaving = false);
+              final events = context.read<EventsProvider>();
+              final ok = await events.deleteEvent(widget.event!.id);
+              if (!mounted) return;
+              if (ok) {
+                Navigator.of(context).pop();
+              } else {
+                PiligrimToast.show(
+                  context,
+                  events.saveEventError ?? 'Не удалось удалить мероприятие',
+                  type: PiligrimToastType.error,
+                );
               }
             },
             child: Text(

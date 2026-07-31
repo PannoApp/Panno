@@ -111,7 +111,17 @@ void main() {
       await tester.pumpWidget(_buildScreen(auth: auth));
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(FloatingActionButton), findsNothing);
+      // FAB не удаляется из дерева — скрывается через
+      // AnimatedOpacity(opacity: 0) для плавного fade при смене роли
+      // (см. lib/screens/events_screen.dart).
+      expect(find.byType(FloatingActionButton), findsOneWidget);
+      final opacityWidget = tester.widget<AnimatedOpacity>(
+        find.ancestor(
+          of: find.byType(FloatingActionButton),
+          matching: find.byType(AnimatedOpacity),
+        ),
+      );
+      expect(opacityWidget.opacity, 0.0);
     });
 
     testWidgets('test_fab_opens_event_edit_in_events_view', (tester) async {

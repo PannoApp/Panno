@@ -3,14 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../data/models/api_allergen.dart';
 import '../data/models/api_category.dart';
 import '../data/models/api_dish.dart';
 import '../data/models/api_tag.dart';
-import '../data/repositories/menu_repository.dart';
 import '../providers/menu_provider.dart';
 import '../widgets/piligrim_back_button.dart';
 import '../widgets/piligrim_loader.dart';
@@ -39,8 +37,6 @@ class _DishEditScreenState extends State<DishEditScreen> {
   final _formKey = GlobalKey<FormState>();
   File? _localImageFile; // Локальный файл выбранного и кадрированного изображения блюда
   File? _localVideoFile; // Локальный файл выбранного видео для ленты
-  final _repo = MenuRepository();
-  bool _isSaving = false;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _descriptionCtrl;
@@ -53,9 +49,9 @@ class _DishEditScreenState extends State<DishEditScreen> {
   final Set<int> _selectedAllergenIds = {};
   bool _isActive = true;
 
-  List<ApiTag> _allTags = [];
-  List<ApiAllergen> _allAllergens = [];
-  bool _isLoadingMetadata = false;
+  // Сопоставление текстовых аллергенов ApiDish с ID из MenuProvider.allergens
+  // выполняется один раз, как только справочник аллергенов загрузится.
+  bool _allergensPreselected = false;
 
   // Обновление состояния экрана при вводе текста в name или price
   void _onTextChanged() {
@@ -82,7 +78,7 @@ class _DishEditScreenState extends State<DishEditScreen> {
       _selectedCategoryId = widget.categories.first.id;
     }
 
-    _loadMetadata();
+    context.read<MenuProvider>().loadDishMetadata();
   }
 
   @override
@@ -97,38 +93,18 @@ class _DishEditScreenState extends State<DishEditScreen> {
     super.dispose();
   }
 
-  /// Загрузка тегов и аллергенов с бэкенда для отображения в форме.
-  Future<void> _loadMetadata() async {
-    setState(() => _isLoadingMetadata = true);
-    try {
-      final repo = MenuRepository();
-      final results = await Future.wait([
-        repo.fetchTags(),
-        repo.fetchAllergens(),
-      ]);
-      if (mounted) {
-        setState(() {
-          _allTags = results[0] as List<ApiTag>;
-          _allAllergens = results[1] as List<ApiAllergen>;
-
-          // Сопоставляем текстовые аллергены из ApiDish с ID полученных аллергенов
-          if (widget.dish != null) {
-            for (final allergenName in widget.dish!.allergens) {
-              final match = _allAllergens.firstWhere(
-                (a) => a.name.toLowerCase().trim() == allergenName.toLowerCase().trim(),
-                orElse: () => const ApiAllergen(id: -1, name: ''),
-              );
-              if (match.id != -1) {
-                _selectedAllergenIds.add(match.id);
-              }
-            }
-          }
-          _isLoadingMetadata = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingMetadata = false);
+  /// Сопоставляет текстовые аллергены из ApiDish с ID справочника аллергенов.
+  /// Идемпотентно — реальную работу делает только при первом непустом списке.
+  void _preselectAllergensOnce(List<ApiAllergen> allergens) {
+    if (_allergensPreselected || widget.dish == null || allergens.isEmpty) return;
+    _allergensPreselected = true;
+    for (final allergenName in widget.dish!.allergens) {
+      final match = allergens.firstWhere(
+        (a) => a.name.toLowerCase().trim() == allergenName.toLowerCase().trim(),
+        orElse: () => const ApiAllergen(id: -1, name: ''),
+      );
+      if (match.id != -1) {
+        _selectedAllergenIds.add(match.id);
       }
     }
   }
@@ -161,68 +137,30 @@ class _DishEditScreenState extends State<DishEditScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSaving = true);
-    try {
-      final fields = {
-        'name': _nameCtrl.text.trim(),
-        'price': int.parse(_priceCtrl.text),
-        'category': _selectedCategoryId,
-        'is_active': _isActive,
-        'description': _descriptionCtrl.text.trim(),
-        'weight': _weightCtrl.text.trim(),
-        'story': _storyCtrl.text.trim(),
-        'tags': _selectedTagIds.toList(),
-        'allergens': _selectedAllergenIds.toList(),
-      };
-      widget.dish == null
-          ? await _repo.createDish(fields, image: _localImageFile, video: _localVideoFile)
-          : await _repo.updateDish(widget.dish!.id, fields, image: _localImageFile, video: _localVideoFile);
-      if (mounted) {
-        context.read<MenuProvider>().load(); // Обновить меню
-      }
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } on DioException catch (e) {
-      String errorMessage = 'Произошла сетевая ошибка';
-      if (e.response?.statusCode == 400) {
-        final data = e.response?.data;
-        if (data is Map) {
-          final errorList = <String>[];
-          data.forEach((key, val) {
-            final valStr = val is List ? val.join(', ') : val.toString();
-            if (key == 'non_field_errors' || key == 'detail') {
-              errorList.add(valStr);
-            } else {
-              errorList.add('$key: $valStr');
-            }
-          });
-          errorMessage = errorList.isNotEmpty ? errorList.join('\n') : 'Ошибка валидации данных';
-        } else if (data is String && data.isNotEmpty) {
-          errorMessage = data;
-        } else {
-          errorMessage = 'Ошибка валидации данных';
-        }
-      } else if (e.type == DioExceptionType.connectionTimeout ||
-                 e.type == DioExceptionType.receiveTimeout ||
-                 e.type == DioExceptionType.sendTimeout ||
-                 e.type == DioExceptionType.connectionError) {
-        errorMessage = 'Сетевая ошибка. Проверьте интернет-соединение';
-      } else {
-        errorMessage = 'Ошибка сервера: ${e.response?.statusCode ?? ""} ${e.message ?? ""}';
-      }
-
-      if (mounted) {
-        PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
-      }
-    } catch (e) {
-      if (mounted) {
-        PiligrimToast.show(context, 'Не удалось сохранить блюдо: $e', type: PiligrimToastType.error);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+    final menu = context.read<MenuProvider>();
+    final fields = {
+      'name': _nameCtrl.text.trim(),
+      'price': int.parse(_priceCtrl.text),
+      'category': _selectedCategoryId,
+      'is_active': _isActive,
+      'description': _descriptionCtrl.text.trim(),
+      'weight': _weightCtrl.text.trim(),
+      'story': _storyCtrl.text.trim(),
+      'tags': _selectedTagIds.toList(),
+      'allergens': _selectedAllergenIds.toList(),
+    };
+    final ok = widget.dish == null
+        ? await menu.createDish(fields, image: _localImageFile, video: _localVideoFile)
+        : await menu.updateDish(widget.dish!.id, fields, image: _localImageFile, video: _localVideoFile);
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop();
+    } else {
+      PiligrimToast.show(
+        context,
+        menu.saveDishError ?? 'Не удалось сохранить блюдо',
+        type: PiligrimToastType.error,
+      );
     }
   }
 
@@ -257,36 +195,17 @@ class _DishEditScreenState extends State<DishEditScreen> {
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop(); // Закрыть диалог
-              setState(() => _isSaving = true);
-              try {
-                await _repo.deleteDish(widget.dish!.id);
-                if (mounted) {
-                  context.read<MenuProvider>().load(); // Обновить меню
-                }
-                if (mounted) {
-                  Navigator.of(context).pop(); // Закрыть экран редактирования
-                }
-              } on DioException catch (e) {
-                String errorMessage = 'Не удалось удалить блюдо';
-                if (e.type == DioExceptionType.connectionTimeout ||
-                    e.type == DioExceptionType.receiveTimeout ||
-                    e.type == DioExceptionType.sendTimeout ||
-                    e.type == DioExceptionType.connectionError) {
-                  errorMessage = 'Сетевая ошибка при удалении';
-                } else if (e.response?.statusCode != null) {
-                  errorMessage = 'Ошибка сервера при удалении: ${e.response!.statusCode}';
-                }
-                if (mounted) {
-                  PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
-                }
-              } catch (e) {
-                if (mounted) {
-                  PiligrimToast.show(context, 'Ошибка при удалении: $e', type: PiligrimToastType.error);
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isSaving = false);
-                }
+              final menu = context.read<MenuProvider>();
+              final ok = await menu.deleteDish(widget.dish!.id);
+              if (!mounted) return;
+              if (ok) {
+                Navigator.of(context).pop(); // Закрыть экран редактирования
+              } else {
+                PiligrimToast.show(
+                  context,
+                  menu.saveDishError ?? 'Не удалось удалить блюдо',
+                  type: PiligrimToastType.error,
+                );
               }
             },
             child: Text(
@@ -301,6 +220,9 @@ class _DishEditScreenState extends State<DishEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final menu = context.watch<MenuProvider>();
+    _preselectAllergensOnce(menu.allergens);
+
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
       appBar: AppBar(
@@ -319,7 +241,7 @@ class _DishEditScreenState extends State<DishEditScreen> {
         actions: [
           if (widget.dish != null)
             PiligrimTap(
-              onTap: _isSaving ? null : _deleteDish,
+              onTap: menu.isSavingDish ? null : _deleteDish,
               borderRadius: BorderRadius.circular(6),
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -399,16 +321,16 @@ class _DishEditScreenState extends State<DishEditScreen> {
                 ),
                 const SizedBox(height: 18),
 
-                _buildTagChips(),
+                _buildTagChips(menu.allTags, menu.isLoadingDishMetadata),
                 const SizedBox(height: 18),
 
-                _buildAllergenChips(),
+                _buildAllergenChips(menu.allergens, menu.isLoadingDishMetadata),
                 const SizedBox(height: 18),
 
                 _buildActiveSwitch(),
                 const SizedBox(height: 32),
 
-                _buildSaveButton(),
+                _buildSaveButton(menu.isSavingDish),
                 const SizedBox(height: 40),
               ],
             ),
@@ -528,13 +450,13 @@ class _DishEditScreenState extends State<DishEditScreen> {
   }
 
   /// Выбор тегов с помощью горизонтального/сеточного набора чипсов.
-  Widget _buildTagChips() {
+  Widget _buildTagChips(List<ApiTag> allTags, bool isLoadingMetadata) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildFieldLabel('Теги'),
         const SizedBox(height: 4),
-        if (_isLoadingMetadata)
+        if (isLoadingMetadata)
           const SizedBox(
             height: 32,
             child: Center(
@@ -548,7 +470,7 @@ class _DishEditScreenState extends State<DishEditScreen> {
               ),
             ),
           )
-        else if (_allTags.isEmpty)
+        else if (allTags.isEmpty)
           Text(
             'Нет доступных тегов',
             style: PiligrimTextStyles.caption.copyWith(
@@ -559,7 +481,7 @@ class _DishEditScreenState extends State<DishEditScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _allTags.map((tag) {
+            children: allTags.map((tag) {
               final isSelected = _selectedTagIds.contains(tag.id);
               return _SelectableChip(
                 label: tag.name,
@@ -581,13 +503,13 @@ class _DishEditScreenState extends State<DishEditScreen> {
   }
 
   /// Выбор аллергенов с помощью набора чипсов.
-  Widget _buildAllergenChips() {
+  Widget _buildAllergenChips(List<ApiAllergen> allAllergens, bool isLoadingMetadata) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildFieldLabel('Аллергены'),
         const SizedBox(height: 4),
-        if (_isLoadingMetadata)
+        if (isLoadingMetadata)
           const SizedBox(
             height: 32,
             child: Center(
@@ -601,7 +523,7 @@ class _DishEditScreenState extends State<DishEditScreen> {
               ),
             ),
           )
-        else if (_allAllergens.isEmpty)
+        else if (allAllergens.isEmpty)
           Text(
             'Нет доступных аллергенов',
             style: PiligrimTextStyles.caption.copyWith(
@@ -612,7 +534,7 @@ class _DishEditScreenState extends State<DishEditScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _allAllergens.map((allergen) {
+            children: allAllergens.map((allergen) {
               final isSelected = _selectedAllergenIds.contains(allergen.id);
               return _SelectableChip(
                 label: allergen.name,
@@ -662,8 +584,8 @@ class _DishEditScreenState extends State<DishEditScreen> {
   }
 
   /// Кнопка сохранения/публикации блюда.
-  Widget _buildSaveButton() {
-    if (_isSaving) {
+  Widget _buildSaveButton(bool isSaving) {
+    if (isSaving) {
       return const SizedBox(
         height: 52,
         child: Center(

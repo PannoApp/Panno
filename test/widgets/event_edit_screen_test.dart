@@ -22,6 +22,10 @@ class _MockSecureStoragePlatform extends Mock
     implements FlutterSecureStoragePlatform {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(<String, dynamic>{});
+  });
+
   final someEvent = ApiEvent(
     id: 42,
     title: 'Вечер казахской музыки',
@@ -47,7 +51,18 @@ void main() {
       DioClient.instance.dio.httpClientAdapter = mockAdapter;
 
       mockEventsProvider = _MockEventsProvider();
-      when(() => mockEventsProvider.load()).thenAnswer((_) async {});
+      when(() => mockEventsProvider.isSavingEvent).thenReturn(false);
+      when(() => mockEventsProvider.saveEventError).thenReturn(null);
+      when(() => mockEventsProvider.createEvent(
+            any(),
+            image: any(named: 'image'),
+          )).thenAnswer((_) async => true);
+      when(() => mockEventsProvider.updateEvent(
+            any(),
+            any(),
+            image: any(named: 'image'),
+          )).thenAnswer((_) async => true);
+      when(() => mockEventsProvider.deleteEvent(any())).thenAnswer((_) async => true);
 
       mockSecureStoragePlatform = _MockSecureStoragePlatform();
       FlutterSecureStoragePlatform.instance = mockSecureStoragePlatform;
@@ -197,10 +212,8 @@ void main() {
     // ─── Save ──────────────────────────────────────────────────────────────────
 
     testWidgets(
-      'test_save_calls_createEvent_in_create_mode — mock repo → createEvent вызван',
+      'test_save_calls_createEvent_in_create_mode — mock provider → createEvent вызван',
       (tester) async {
-        mockAdapter.enqueue(201, null); // POST /events/admin/events/
-
         await tester.pumpWidget(buildApp(event: null));
         await tester.pump();
 
@@ -216,6 +229,15 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(dateField);
         await tester.pumpAndSettle();
+        // Переходим на следующий месяц и берём первое число — иначе выбор
+        // «сегодня» с TimeOfDay.now() почти сразу оказывается «в прошлом»
+        // к моменту вызова _save() (реальное время идёт между кадрами пампа),
+        // и _save() тихо блокирует отправку с тостом «Нельзя создавать
+        // мероприятие на прошедшую дату», не вызывая createEvent.
+        await tester.tap(find.byTooltip('Next month'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('1'));
+        await tester.pumpAndSettle();
         // Подтверждаем дату, затем время
         await tester.tap(find.text('OK'));
         await tester.pumpAndSettle();
@@ -227,21 +249,17 @@ void main() {
         await tester.tap(find.text('ОПУБЛИКОВАТЬ'));
         await settle(tester);
 
-        // POST-запрос на создание мероприятия должен быть выполнен
-        final createReq = mockAdapter.captured.firstWhere(
-          (r) => r.method == 'POST' && r.path.contains('/events/admin/events/'),
-        );
-        expect(createReq, isNotNull);
-
-        verify(() => mockEventsProvider.load()).called(1);
+        // EventsProvider.createEvent должен быть вызван
+        verify(() => mockEventsProvider.createEvent(
+              any(),
+              image: any(named: 'image'),
+            )).called(1);
       },
     );
 
     testWidgets(
-      'test_save_calls_updateEvent_in_edit_mode — mock repo → updateEvent(id, ...) вызван',
+      'test_save_calls_updateEvent_in_edit_mode — mock provider → updateEvent(id, ...) вызван',
       (tester) async {
-        mockAdapter.enqueue(200, null); // PATCH /events/admin/events/42/
-
         await tester.pumpWidget(buildApp(event: someEvent));
         await tester.pump();
 
@@ -250,36 +268,25 @@ void main() {
         await tester.tap(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'));
         await settle(tester);
 
-        // PATCH-запрос с нужным id=42 должен быть выполнен
-        final updateReq = mockAdapter.captured.firstWhere(
-          (r) => r.method == 'PATCH' && r.path.contains('/events/admin/events/42/'),
-        );
-        expect(updateReq, isNotNull);
-
-        verify(() => mockEventsProvider.load()).called(1);
+        // EventsProvider.updateEvent должен быть вызван с id=42
+        verify(() => mockEventsProvider.updateEvent(
+              42,
+              any(),
+              image: any(named: 'image'),
+            )).called(1);
       },
     );
 
     testWidgets(
-      'test_save_disabled_while_saving — при _isSaving кнопка отсутствует, отображается PiligrimLoader',
+      'test_save_disabled_while_saving — при isSavingEvent кнопка отсутствует, отображается PiligrimLoader',
       (tester) async {
-        mockAdapter.enqueue(200, null); // PATCH /events/admin/events/42/
+        when(() => mockEventsProvider.isSavingEvent).thenReturn(true);
 
         await tester.pumpWidget(buildApp(event: someEvent));
         await tester.pump();
 
-        // Нажимаем «СОХРАНИТЬ ИЗМЕНЕНИЯ»
-        await tester.ensureVisible(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'));
-        await tester.tap(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'));
-
-        // Один кадр: _isSaving=true, кнопка заменяется лоадером
-        await tester.pump();
-
         expect(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'), findsNothing);
         expect(find.byType(PiligrimLoader), findsOneWidget);
-
-        // Ждём завершения запроса
-        await settle(tester);
       },
     );
 
@@ -308,8 +315,6 @@ void main() {
     testWidgets(
       'test_delete_confirmed_calls_deleteEvent — подтверждение → deleteEvent вызван с правильным id',
       (tester) async {
-        mockAdapter.enqueue(204, null); // DELETE /events/admin/events/42/
-
         await tester.pumpWidget(buildApp(event: someEvent));
         await tester.pump();
 
@@ -321,13 +326,8 @@ void main() {
         await tester.tap(find.widgetWithText(TextButton, 'Удалить'));
         await settle(tester);
 
-        // DELETE-запрос с id=42 должен быть выполнен
-        final deleteReq = mockAdapter.captured.firstWhere(
-          (r) => r.method == 'DELETE' && r.path.contains('/events/admin/events/42/'),
-        );
-        expect(deleteReq, isNotNull);
-
-        verify(() => mockEventsProvider.load()).called(1);
+        // EventsProvider.deleteEvent должен быть вызван с id=42
+        verify(() => mockEventsProvider.deleteEvent(42)).called(1);
       },
     );
   });

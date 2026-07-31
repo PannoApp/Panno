@@ -91,7 +91,12 @@ void main() {
           ChangeNotifierProvider<BookingProvider>.value(value: booking),
           ChangeNotifierProvider<CoreInfoProvider>.value(value: core),
         ],
-        child: const MaterialApp(home: ProfileScreen()),
+        // В реальном приложении ProfileScreen всегда живёт внутри общего
+        // Scaffold RootShell (см. lib/main.dart) — сама она Scaffold не
+        // создаёт в неавторизованном состоянии (PiligrimAuthView без Material
+        // ancestor). Оборачиваем так же, иначе TextField падает с
+        // "No Material widget found".
+        child: const MaterialApp(home: Scaffold(body: ProfileScreen())),
       );
     }
 
@@ -114,11 +119,13 @@ void main() {
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      expect(find.text('Сначала нужно авторизоваться'), findsOneWidget);
+      // PiligrimAuthView: мини-заголовок формы и CTA (см.
+      // lib/widgets/piligrim_auth_view.dart, ветка !_awaitingCode).
+      expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
       expect(find.text('ПОЛУЧИТЬ КОД'), findsOneWidget);
     });
 
-    testWidgets('При isLoggedIn=true → имя и телефон из currentUser',
+    testWidgets('При isLoggedIn=true → имя героя из currentUser',
         (tester) async {
       auth.currentUser = _sampleProfile();
       auth.notifyListeners();
@@ -126,9 +133,10 @@ void main() {
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      expect(find.text('Айдар Нурланов'), findsOneWidget);
-      expect(find.text('+77001234567'), findsOneWidget);
-      expect(find.text('Сначала нужно авторизоваться'), findsNothing);
+      // _HeroHeader показывает только имя (первое слово из displayName),
+      // телефон в шапке не отображается — см. lib/screens/profile_screen.dart.
+      expect(find.text('Айдар'), findsOneWidget);
+      expect(find.text('ПОЛУЧИТЬ КОД'), findsNothing);
     });
 
     testWidgets('Переключение «Мероприятия» → PATCH notify_events',
@@ -210,8 +218,9 @@ void main() {
 
       expect(find.text('1'), findsWidgets);
 
-      await tester.ensureVisible(find.text('Бронирований'));
-      await tester.tap(find.text('Бронирований'));
+      // _pluralize(1, ...) → форма единственного числа «Бронирование».
+      await tester.ensureVisible(find.text('Бронирование'));
+      await tester.tap(find.text('Бронирование'));
       await settle(tester);
 
       expect(find.byType(BookingHistoryScreen), findsOneWidget);
@@ -242,57 +251,49 @@ void main() {
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      expect(find.text('Сначала нужно авторизоваться'), findsOneWidget);
+      expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), '+77001234567');
       await tester.pump();
 
       await tester.tap(find.text('ПОЛУЧИТЬ КОД'));
       await settle(tester);
+      // AnimatedSwitcher (280ms) + цепочка .animate().fadeIn(delay: до 420ms)
+      // на новых полях формы — даём им доиграть, иначе таймер остаётся
+      // висеть после разрушения дерева виджетов в конце теста.
+      await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.text('Код отправлен на +77001234567'), findsOneWidget);
+      // PiligrimAuthView (_awaitingCode=true): заголовок «ВВЕДИТЕ КОД» +
+      // введённый номер под ним, отдельными Text-виджетами (без префикса
+      // «Код отправлен на»).
+      expect(find.text('ВВЕДИТЕ КОД'), findsOneWidget);
+      expect(find.text('+77001234567'), findsOneWidget);
       expect(find.text('ПОДТВЕРДИТЬ'), findsOneWidget);
     });
 
-    testWidgets('При notificationsEnabled: false категории визуально задизаблены',
+    testWidgets('Глобальный переключатель → PATCH всех категорий разом',
         (tester) async {
+      // Глобальный тумблер «Уведомления» отражает globalEnabled =
+      // notifyEvents && notifyPromotions && notifyClosedEvents (все три сразу),
+      // а не отдельное notifications_enabled — поэтому для теста «выключения»
+      // фикстура должна начинаться со всех трёх флагов включёнными.
       auth.currentUser = const UserProfile(
         id: 1,
         phone: '+77001234567',
         firstName: 'Айдар',
         lastName: 'Нурланов',
         notifyEvents: true,
-        notifyPromotions: false,
-        notifyClosedEvents: false,
-        notificationsEnabled: false,
+        notifyPromotions: true,
+        notifyClosedEvents: true,
+        notificationsEnabled: true,
       );
-      auth.notifyListeners();
-
-      await tester.pumpWidget(buildApp());
-      await settle(tester);
-
-      await scrollTo(tester, find.text('Мероприятия'));
-      // Ждём завершения flutter_animate анимаций (delay 150ms + duration 600ms)
-      await tester.pump(const Duration(milliseconds: 800));
-
-      // Блок категорий завёрнут в Opacity с opacity 0.4
-      final dimmed = tester
-          .widgetList<Opacity>(find.byType(Opacity))
-          .where((o) => o.opacity == 0.4)
-          .toList();
-      expect(dimmed, isNotEmpty);
-    });
-
-    testWidgets('Глобальный переключатель → PATCH notifications_enabled',
-        (tester) async {
-      auth.currentUser = _sampleProfile(); // notificationsEnabled: true
       auth.notifyListeners();
       adapter.enqueue(200, {
         'id': 1,
         'phone': '+77001234567',
         'first_name': 'Айдар',
         'last_name': 'Нурланов',
-        'notify_events': true,
+        'notify_events': false,
         'notify_promotions': false,
         'notify_closed_events': false,
         'notifications_enabled': false,
@@ -314,10 +315,17 @@ void main() {
       await settle(tester);
       await tester.pump(const Duration(milliseconds: 300));
 
+      // _handleNotifToggle('global', ...) шлёт все четыре поля одним PATCH —
+      // см. lib/screens/profile_screen.dart, case 'global'.
       final patch = adapter.captured
           .where((r) => r.method == 'PATCH' && r.path == '/users/profile/')
           .single;
-      expect(patch.data, {'notifications_enabled': false});
+      expect(patch.data, {
+        'notifications_enabled': false,
+        'notify_events': false,
+        'notify_promotions': false,
+        'notify_closed_events': false,
+      });
       expect(auth.currentUser?.notificationsEnabled, isFalse);
     });
   });

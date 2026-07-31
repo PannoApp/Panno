@@ -90,7 +90,18 @@ push. Дублирования логики нет — Remarked-синхрони
 | `guests_count` | Да | от 1 до 50 |
 | `zone` | Нет | Свободный текст — название реального зала ресторана из `GET /api/v1/bookings/zones/` (например, «Зал 1»), не фиксированный enum |
 | `remarked_room_id` | Нет | `id` зала из `GET /api/v1/bookings/zones/`. Используется, чтобы при создании брони в Remarked подобрать стол именно в этом зале (см. «Залы» ниже) |
+| `remarked_table_id` | Нет | `id` конкретного стола из `GET /api/v1/bookings/tables/` (пикер стола после выбора зала). Если гость выбрал «Любой стол» — не передаётся, Remarked/`pick_table_for_room` подберут стол сами (см. «Как зал и стол влияют на создание брони» ниже) |
 | `comment` | Нет | произвольный текст |
+
+**Валидация времени визита:** `TableBookingSerializer.validate()` проверяет
+`date`/`time` против часов работы ресторана (`RestaurantInfo.load().is_open_at(...)`,
+см. `backend/docs/core.md`/`RestaurantInfo`). Если ресторан в это время закрыт —
+`400` с ошибкой на поле `time`:
+```json
+{ "time": ["К сожалению, ресторан не работает в это время. Пожалуйста, выберите другое время."] }
+```
+Если `working_hours` в `RestaurantInfo` не задан/не распознан парсером — проверка
+не блокирует бронь (`is_open_at` возвращает `None`, это не трактуется как «закрыто»).
 
 **Ответ 201:**
 ```json
@@ -129,7 +140,8 @@ push. Дублирования логики нет — Remarked-синхрони
 | `time` | time | Время визита |
 | `guests_count` | int | Количество гостей (1–50) |
 | `zone` | string, null | Название зала — свободный текст (реальные залы ресторана из Remarked, не фиксированный список; см. «Залы» ниже) |
-| `remarked_room_id` | int, null | `id` зала в Remarked (`GetSlots.rooms[].id`) — если гость выбрал зал, используется при создании брони, чтобы забронировать стол именно в нём |
+| `remarked_room_id` | int (bigint), null | `id` зала в Remarked (`GetSlots.rooms[].id`) — если гость выбрал зал, используется при создании брони, чтобы забронировать стол именно в нём |
+| `remarked_table_id` | int (bigint), null | `id` конкретного стола в Remarked (`GetSlots.rooms[].tables[].id`) — гость явно выбрал стол в UI (не «Любой стол»). `BigIntegerField`, т.к. реальные ID столов Remarked — 14-значные числа, не помещаются в 32-битный `IntegerField`. Используется `create_reserve_in_remarked` (см. «Как зал и стол влияют на создание брони») |
 | `comment` | text | Дополнительные пожелания (необязательно) |
 | `status` | string | Статус (см. ниже) |
 | `remarked_reserve_id` | int, null, unique | `reserve_id` этой же брони в Remarked CRM. Заполняется асинхронно после создания (см. «Синхронизация с Remarked»); может быть `null`, пока фоновая задача не отработала или упала после всех ретраев |
@@ -349,6 +361,18 @@ Push уходит только если у пользователя есть з�
 философия «подсказка, не источник истины», что и у `/bookings/availability/`).
 
 **Реализация:**
+- Кеширование здесь двухслойное. `apps/bookings/views.py::BookingZonesView`
+  сам кеширует **готовый ответ эндпоинта** в Redis на час (ключ
+  `reserve_zones`, без параметров — залы одни на весь ресторан), и только при
+  промахе идёт в `list_zones()`. Ниже по стеку `services.py::get_rooms()`
+  (см. следующий пункт) держит **свой отдельный** часовой кеш на сырой ответ
+  `GetSlots` с `rooms` (`remarked_rooms:{point}`). На практике при "тёплом"
+  `reserve_zones` второй кеш вообще не читается; он актуален, когда
+  `reserve_zones` протух, а `remarked_rooms:{point}` — ещё нет (например, кеш
+  зон короче кеша комнат из-за более раннего создания/инвалидации), либо когда
+  в `get_rooms()` заходят напрямую другие потребители (`check_availability`,
+  `pick_table_for_room`, `list_available_tables` — им нужны не только id/name
+  залов, но и столы).
 - `apps/bookings/services.py::get_rooms()` — вызывает `GetSlots` с
   минимальными параметрами (сегодня, 1 гость; сами залы/столы не зависят от
   даты/кол-ва гостей) только чтобы получить `rooms`, кеширует результат в
@@ -463,33 +487,48 @@ Remarked отклоняет **само время** визита по прави
 - **Быстрая смена статуса** прямо в списке через `list_editable` (без перехода в карточку)
 - **Фильтры** по статусу, **зоне**, дате визита, дате создания
 - **Поиск** по имени гостя, **телефону**, комментарию, телефону и имени пользователя
-- **Форма редактирования** сгруппирована по секциям: основная информация (включает телефон), детали визита (включает зону), системные данные (включает `remarked_reserve_id` и `remarked_room_id`)
+- **Форма редактирования** сгруппирована по секциям: основная информация (включает телефон), детали визита (включает зону), системные данные (включает `remarked_reserve_id`, `remarked_room_id` и `remarked_table_id`)
 
 **Права доступа:**
 
-При первой миграции автоматически создаётся группа **«Менеджер зала»** с правами:
-- `view_tablebooking` — просмотр броней
-- `change_tablebooking` — изменение статуса
+Прав через стандартные Django-группы/`Permission` здесь нет — доступ считается
+напрямую по полю `User.role` (`apps/users/models.py`, значения `admin` /
+`hall_manager` / `content_manager`) в переопределённых методах
+`TableBookingAdmin` (`apps/bookings/admin.py`):
 
-Добавить/удалить бронирование менеджер не может (только `admin` и `superuser`).
+| Метод | Кто проходит | Что разрешает |
+|---|---|---|
+| `has_module_permission` / `has_view_permission` / `has_change_permission` | `is_superuser` или `role in ('admin', 'hall_manager')` (хелпер `_has_role`, `utils/permissions.py`) | Видеть раздел брони в админке, открывать/сохранять карточку брони |
+| `has_add_permission` / `has_delete_permission` | `is_superuser` или `role == 'admin'` | Создавать/удалять бронирования |
+
+То есть `hall_manager` может **просматривать и редактировать** все поля
+существующей брони (форма не ограничивает поля по роли — `readonly_fields`
+содержит только `created_at`), но **не может создавать новую бронь через
+админку и не может её удалить** — это доступно только `admin`/`superuser`.
+`content_manager` к бронированиям в админке доступа не имеет вовсе.
 
 ## Файлы модуля
 
 ```
 apps/bookings/
-├── models.py       # TableBooking (remarked_reserve_id, remarked_room_id, zone — свободный текст)
-├── serializers.py  # TableBookingSerializer, Availability*Serializer, BookingZoneSerializer
+├── models.py       # TableBooking (remarked_reserve_id, remarked_room_id, remarked_table_id, zone — свободный текст)
+├── serializers.py  # TableBookingSerializer, BookingZoneSerializer, BookingTableSerializer,
+│                   # AvailabilityQuerySerializer/AvailableTablesQuerySerializer, Availability*Serializer
 ├── services.py     # check_availability (zone_id), get_rooms/list_zones (кеш 1ч),
+│                   # list_available_tables/_free_table_ids_at_slot (свободные столы зала на слот),
 │                   # pick_table_for_room (подбор стола в зале для create_reserve_in_remarked)
 ├── views.py        # TableBookingListCreateView (дёргает create_reserve_in_remarked),
-│                   # BookingAvailabilityView, BookingZonesView, BookingTablesView
-├── admin.py        # TableBookingAdmin (управление бронями персоналом)
-├── signals.py      # push при создании брони и смене статуса (не знает про Remarked)
-├── tasks.py        # send_booking_reminders (Beat, 15 мин),
+│                   # BookingAvailabilityView, BookingZonesView, BookingTablesView, TelegramWebhookView
+├── admin.py        # TableBookingAdmin (has_view/change/add/delete_permission по User.role)
+├── signals.py      # push + Telegram при создании брони и смене статуса (не знает про Remarked)
+├── tasks.py        # send_booking_reminders (Beat, 15 мин), send_telegram_notification,
 │                   # create_reserve_in_remarked (пуш брони в Remarked + подбор стола по залу),
-│                   # sync_reserve_statuses (Beat, 10 мин — обратная синхронизация статуса)
-├── apps.py         # создание группы «Менеджер зала» + подключение signals
-└── urls.py         # /api/v1/bookings/, /bookings/availability/, /bookings/zones/, /bookings/tables/
+│                   # sync_reserve_statuses (Beat, 10 мин — обратная синхронизация статуса),
+│                   # send_event_reservation_telegram_notification (уведомление о записи на
+│                   # мероприятие — используется apps/events/, но живёт здесь),
+│                   # хелперы _build_booking_html, _tg_post
+├── apps.py         # подключение signals (ready())
+└── urls.py         # /api/v1/bookings/, /bookings/availability/, /bookings/zones/, /bookings/tables/, /bookings/telegram-webhook/
 ```
 
 Зависит от `apps/remarked/` (`ReservesClient`) для всех трёх точек
@@ -501,6 +540,14 @@ apps/bookings/
 | Класс | Используется | Поле `status` |
 |---|---|---|
 | `TableBookingSerializer` | `GET/POST /api/v1/bookings/` (пользователь) | Только для чтения |
+| `BookingZoneSerializer` | Схема ответа `GET /bookings/zones/` (drf-spectacular; сам ответ — plain dict) | — |
+| `BookingTableSerializer` | Схема ответа `GET /bookings/tables/` (drf-spectacular; сам ответ — plain dict) | — |
+| `AvailabilityQuerySerializer` / `AvailableTablesQuerySerializer` | Валидация query-параметров `GET /bookings/availability/` и `GET /bookings/tables/` | — |
+
+Отдельного API для персонала (менеджеров) — со своим сериализатором или
+эндпоинтом — в проекте нет. Единственный REST-путь к бронированиям —
+`TableBookingSerializer`/`TableBookingListCreateView`, они работают только со
+своими бронями текущего пользователя.
 
 ## Права доступа
 
@@ -508,16 +555,20 @@ apps/bookings/
 |---|---|
 | `GET /api/v1/bookings/` | Любой авторизованный пользователь (свои брони) |
 | `POST /api/v1/bookings/` | Любой авторизованный пользователь |
+| `GET /api/v1/bookings/availability/`, `/bookings/zones/`, `/bookings/tables/` | Публичные, `AllowAny` |
+| `/admin/bookings/tablebooking/` | Персонал: `hall_manager`/`admin` — просмотр и редактирование; только `admin`/`superuser` — создание и удаление (см. «Django-админка» выше) |
 
-Управление статусами бронирований осуществляется персоналом через Django-админку.
+REST-эндпоинта для управления чужими бронированиями (менеджером/персоналом)
+не существует — управление статусами и данными брони полностью
+осуществляется персоналом через Django-админку (`/admin/bookings/tablebooking/`).
 
 ## Важные нюансы
 
 - `user` в модели — `null=True`. Это сделано намеренно: администратор может создать бронь для гостя без аккаунта.
 - Пользователь через API видит **только свои** бронирования — фильтрация `filter(user=request.user)` в `get_queryset`.
 - `_original_status` сохраняется в `__init__` модели — это нужно сигналу, чтобы понять, изменился ли статус.
-- Нет ограничения на бронирование в прошлом — валидацию дат при необходимости нужно добавить в сериализатор.
-- Менеджер зала не может изменить поле `user` у брони — оно read-only в `TableBookingStaffSerializer`.
+- Нет ограничения на бронирование в прошлом — валидацию дат при необходимости нужно добавить в сериализатор (проверка в `TableBookingSerializer.validate()` сейчас смотрит только на часы работы ресторана, см. «Как зал и стол влияют на создание брони» → раздел POST выше).
+- Менеджер зала (`hall_manager`) в Django-админке может редактировать **все** поля брони, включая `user` — отдельного read-only-ограничения на это поле в коде нет (`TableBookingAdmin.readonly_fields` содержит только `created_at`). Ограничены у `hall_manager` только создание и удаление записи (см. «Права доступа» в разделе админки).
 - `remarked_reserve_id` — eventual consistency, не транзакция: локальная бронь
   создаётся синхронно и сразу видна пользователю, а появление в Remarked может
   занять секунды (обычный путь) или не произойти вовсе при недоступном

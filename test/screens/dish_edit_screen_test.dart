@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:piligrim/core/theme.dart';
+import 'package:piligrim/data/models/api_allergen.dart';
 import 'package:piligrim/data/models/api_category.dart';
 import 'package:piligrim/data/models/api_dish.dart';
 import 'package:piligrim/data/models/api_tag.dart';
@@ -26,6 +27,10 @@ class _MockSecureStoragePlatform extends Mock
     implements FlutterSecureStoragePlatform {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(<String, dynamic>{});
+  });
+
   group('DishEditScreen Widget Tests', () {
     late HttpClientAdapter originalAdapter;
     late MockDioAdapter mockAdapter;
@@ -60,7 +65,24 @@ void main() {
       originalAdapter = DioClient.instance.dio.httpClientAdapter;
       DioClient.instance.dio.httpClientAdapter = mockAdapter;
       mockMenuProvider = _MockMenuProvider();
-      when(() => mockMenuProvider.load()).thenAnswer((_) async {});
+      when(() => mockMenuProvider.loadDishMetadata()).thenAnswer((_) async {});
+      when(() => mockMenuProvider.allTags).thenReturn(const <ApiTag>[]);
+      when(() => mockMenuProvider.allergens).thenReturn(const <ApiAllergen>[]);
+      when(() => mockMenuProvider.isLoadingDishMetadata).thenReturn(false);
+      when(() => mockMenuProvider.isSavingDish).thenReturn(false);
+      when(() => mockMenuProvider.saveDishError).thenReturn(null);
+      when(() => mockMenuProvider.createDish(
+            any(),
+            image: any(named: 'image'),
+            video: any(named: 'video'),
+          )).thenAnswer((_) async => true);
+      when(() => mockMenuProvider.updateDish(
+            any(),
+            any(),
+            image: any(named: 'image'),
+            video: any(named: 'video'),
+          )).thenAnswer((_) async => true);
+      when(() => mockMenuProvider.deleteDish(any())).thenAnswer((_) async => true);
 
       mockSecureStoragePlatform = _MockSecureStoragePlatform();
       FlutterSecureStoragePlatform.instance = mockSecureStoragePlatform;
@@ -116,10 +138,6 @@ void main() {
     }
 
     testWidgets('test_screen_renders_in_create_mode — dish=null → поля пустые', (tester) async {
-      // Подготовка моков для тегов и аллергенов в initState
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-
       await tester.pumpWidget(buildApp(dish: null));
       await settle(tester);
 
@@ -164,13 +182,8 @@ void main() {
     });
 
     testWidgets('test_screen_renders_in_edit_mode — dish=someDish → поля заполнены данными блюда', (tester) async {
-      // Подготовка моков для тегов и аллергенов в initState
-      mockAdapter.enqueue(200, [
-        {'id': 1, 'name': 'Острое'},
-      ]); // GET /menu/tags/
-      mockAdapter.enqueue(200, [
-        {'id': 10, 'name': 'глютен'},
-      ]); // GET /menu/allergens/
+      when(() => mockMenuProvider.allTags).thenReturn(const [ApiTag(id: 1, name: 'Острое')]);
+      when(() => mockMenuProvider.allergens).thenReturn(const [ApiAllergen(id: 10, name: 'глютен')]);
 
       await tester.pumpWidget(buildApp(dish: someDish));
       await settle(tester);
@@ -216,9 +229,6 @@ void main() {
     });
 
     testWidgets('test_validation_name_required — submit без name → ошибка валидации', (tester) async {
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-
       await tester.pumpWidget(buildApp(dish: null));
       await settle(tester);
 
@@ -232,9 +242,6 @@ void main() {
     });
 
     testWidgets('test_validation_price_numeric — price="abc" → ошибка', (tester) async {
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-
       await tester.pumpWidget(buildApp(dish: null));
       await settle(tester);
 
@@ -260,9 +267,6 @@ void main() {
     });
 
     testWidgets('test_live_preview_updates_reactively — ввод названия и цены обновляет превью', (tester) async {
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-
       await tester.pumpWidget(buildApp(dish: null));
       await settle(tester);
 
@@ -292,11 +296,7 @@ void main() {
       expect(find.textContaining('₸'), findsNWidgets(2)); // лейбл + цена в превью
     });
 
-    testWidgets('test_save_calls_createDish_in_create_mode — mock repo, submit → createDish вызван', (tester) async {
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-      mockAdapter.enqueue(201, someDish.toJson());        // POST /menu/admin/dishes/
-
+    testWidgets('test_save_calls_createDish_in_create_mode — mock provider, submit → createDish вызван', (tester) async {
       await tester.pumpWidget(buildApp(dish: null));
       await settle(tester);
 
@@ -316,21 +316,15 @@ void main() {
       await tester.tap(find.text('ОПУБЛИКОВАТЬ'));
       await settle(tester);
 
-      // Проверяем, что был выполнен POST запрос создания
-      final createRequest = mockAdapter.captured.firstWhere(
-        (req) => req.method == 'POST' && req.path.contains('/menu/admin/dishes/'),
-      );
-      expect(createRequest, isNotNull);
-      
-      // Проверяем, что сработал вызов load() в провайдере
-      verify(() => mockMenuProvider.load()).called(1);
+      // Проверяем, что MenuProvider.createDish был вызван
+      verify(() => mockMenuProvider.createDish(
+            any(),
+            image: any(named: 'image'),
+            video: any(named: 'video'),
+          )).called(1);
     });
 
-    testWidgets('test_save_calls_updateDish_in_edit_mode — mock repo, submit → updateDish вызван с id', (tester) async {
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-      mockAdapter.enqueue(200, someDish.toJson());        // PATCH /menu/admin/dishes/101/
-
+    testWidgets('test_save_calls_updateDish_in_edit_mode — mock provider, submit → updateDish вызван с id', (tester) async {
       await tester.pumpWidget(buildApp(dish: someDish));
       await settle(tester);
 
@@ -339,43 +333,27 @@ void main() {
       await tester.tap(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'));
       await settle(tester);
 
-      // Проверяем, что был выполнен PATCH запрос обновления
-      final updateRequest = mockAdapter.captured.firstWhere(
-        (req) => req.method == 'PATCH' && req.path.contains('/menu/admin/dishes/101/'),
-      );
-      expect(updateRequest, isNotNull);
-      
-      // Проверяем, что сработал вызов load() в провайдере
-      verify(() => mockMenuProvider.load()).called(1);
+      // Проверяем, что MenuProvider.updateDish был вызван с id блюда
+      verify(() => mockMenuProvider.updateDish(
+            101,
+            any(),
+            image: any(named: 'image'),
+            video: any(named: 'video'),
+          )).called(1);
     });
 
-    testWidgets('test_save_disabled_while_saving — во время _isSaving кнопка неактивна', (tester) async {
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-      mockAdapter.enqueue(200, someDish.toJson());        // PATCH /menu/admin/dishes/101/
+    testWidgets('test_save_disabled_while_saving — во время isSavingDish кнопка неактивна', (tester) async {
+      // Провайдер сигнализирует «идёт сохранение» — экран должен показать лоадер вместо кнопки.
+      when(() => mockMenuProvider.isSavingDish).thenReturn(true);
 
       await tester.pumpWidget(buildApp(dish: someDish));
       await settle(tester);
 
-      // Жмем кнопку сохранения
-      await tester.ensureVisible(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'));
-      await tester.tap(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'));
-      
-      // Делаем pump без ожидания settle
-      await tester.pump();
-
-      // Проверяем, что кнопка "СОХРАНИТЬ ИЗМЕНЕНИЯ" исчезла, и вместо нее появился PiligrimLoader
       expect(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'), findsNothing);
       expect(find.byType(PiligrimLoader), findsOneWidget);
-
-      // Даем асинхронным операциям завершиться
-      await settle(tester);
     });
 
     testWidgets('test_delete_shows_confirmation_dialog — тап корзины → dialog', (tester) async {
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-
       await tester.pumpWidget(buildApp(dish: someDish));
       await settle(tester);
 
@@ -392,10 +370,6 @@ void main() {
     });
 
     testWidgets('test_delete_confirmed_calls_deleteDish — подтверждение → deleteDish вызван', (tester) async {
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/tags/
-      mockAdapter.enqueue(200, <Map<String, dynamic>>[]); // GET /menu/allergens/
-      mockAdapter.enqueue(204, null);                    // DELETE /menu/admin/dishes/101/
-
       await tester.pumpWidget(buildApp(dish: someDish));
       await settle(tester);
 
@@ -407,14 +381,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Удалить'));
       await settle(tester);
 
-      // Проверяем, что был выполнен DELETE запрос
-      final deleteRequest = mockAdapter.captured.firstWhere(
-        (req) => req.method == 'DELETE' && req.path.contains('/menu/admin/dishes/101/'),
-      );
-      expect(deleteRequest, isNotNull);
-
-      // Проверяем, что сработал вызов load() в провайдере
-      verify(() => mockMenuProvider.load()).called(1);
+      // Проверяем, что MenuProvider.deleteDish был вызван с id блюда
+      verify(() => mockMenuProvider.deleteDish(101)).called(1);
     });
   });
 }

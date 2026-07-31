@@ -51,3 +51,55 @@ String dioErrorMessage(Object error) {
   }
   return 'Что-то пошло не так';
 }
+
+/// Сообщение об ошибке сохранения (создание/обновление) для admin-форм
+/// (блюдо/мероприятие/новость): разворачивает постатейные ошибки валидации
+/// DRF (400) в многострочный текст с именами полей.
+String adminSaveErrorMessage(Object error) {
+  if (error is! DioException) return 'Произошла сетевая ошибка';
+
+  if (error.response?.statusCode == 400) {
+    final data = error.response?.data;
+    if (data is Map) {
+      final errorList = <String>[];
+      data.forEach((key, val) {
+        final valStr = val is List ? val.join(', ') : val.toString();
+        if (key == 'non_field_errors' || key == 'detail') {
+          errorList.add(valStr);
+        } else {
+          errorList.add('$key: $valStr');
+        }
+      });
+      return errorList.isNotEmpty ? errorList.join('\n') : 'Ошибка валидации данных';
+    }
+    if (data is String && data.isNotEmpty) return data;
+    return 'Ошибка валидации данных';
+  }
+
+  if (error.type == DioExceptionType.connectionTimeout ||
+      error.type == DioExceptionType.receiveTimeout ||
+      error.type == DioExceptionType.sendTimeout ||
+      error.type == DioExceptionType.connectionError) {
+    return 'Сетевая ошибка. Проверьте интернет-соединение';
+  }
+
+  return 'Ошибка сервера: ${error.response?.statusCode ?? ""} ${error.message ?? ""}';
+}
+
+/// Сообщение об ошибке удаления для admin-форм. [fallback] — текст по
+/// умолчанию, если ошибка не подходит под известные случаи (например,
+/// «Не удалось удалить блюдо»).
+String adminDeleteErrorMessage(Object error, {required String fallback}) {
+  if (error is! DioException) return fallback;
+
+  if (error.type == DioExceptionType.connectionTimeout ||
+      error.type == DioExceptionType.receiveTimeout ||
+      error.type == DioExceptionType.sendTimeout ||
+      error.type == DioExceptionType.connectionError) {
+    return 'Сетевая ошибка при удалении';
+  }
+  if (error.response?.statusCode != null) {
+    return 'Ошибка сервера при удалении: ${error.response!.statusCode}';
+  }
+  return fallback;
+}
