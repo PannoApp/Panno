@@ -28,15 +28,3 @@ class BulkPushSerializer(serializers.Serializer):
     event_id = serializers.IntegerField(required=False, help_text="Только участники указанного мероприятия")
     registered_after = serializers.DateField(required=False, help_text="Только пользователи, зарегистрированные после даты (YYYY-MM-DD)")
 
-
-class SendPushViaBotSerializer(serializers.Serializer):
-    manager_telegram_id = serializers.CharField(max_length=100)
-    title = serializers.CharField(max_length=255)
-    body = serializers.CharField()
-    category = serializers.ChoiceField(
-        choices=['', 'events', 'promotions', 'closed_events'],
-        required=False,
-        allow_blank=True,
-        default='',
-    )
-

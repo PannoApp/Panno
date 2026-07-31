@@ -1,7 +1,7 @@
 # Деплой бэкенда Panno на сервер (185.129.51.40)
 
 Пошаговая инструкция для тестового/staging-деплоя через Docker.
-Режим: `DEBUG=True` — OTP-коды идут в логи, SMS/Telegram не настраиваются.
+Режим: `DEBUG=True` — OTP-коды идут в логи, SMS не настраивается.
 Раздел «Переход на настоящий production» — в самом конце.
 
 ---
@@ -304,10 +304,6 @@ type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@185.129.51.40 "mkdir -p ~/.
    ALLOWED_HOSTS=твой-домен.kz
    CORS_ALLOWED_ORIGINS=https://твой-домен.kz
    ```
-   ⚠️ В режиме `prod` файл `config/settings/prod.py` требует ещё и Telegram-переменные
-   (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`) — иначе сервер
-   не стартует. Раз Telegram не нужен, эту проверку надо будет убрать в `prod.py`
-   (по плану из `docs/telegram_removal.md`). Напиши — сделаю аккуратно.
 4. **Добавить HTTPS** — поднять nginx + бесплатный сертификат Let's Encrypt
    перед backend. Это отдельная настройка, помогу когда дойдём.
 5. Обновить адрес API в приложении на `https://твой-домен.kz/api/v1/`.

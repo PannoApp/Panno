@@ -56,13 +56,3 @@ def notify_on_reservation_created(sender, instance, created, **kwargs):
             "Celery broker unavailable — push for reservation=%s not queued", instance.pk
         )
 
-    # Отправка уведомления менеджеру в Telegram
-    from apps.bookings.tasks import send_event_reservation_telegram_notification
-    try:
-        send_event_reservation_telegram_notification.delay(instance.pk)
-        logger.info("Telegram notification queued: reservation=%s", instance.pk)
-    except Exception:
-        logger.error(
-            "Celery broker unavailable — telegram notification for reservation=%s not queued", instance.pk
-        )
-
