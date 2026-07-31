@@ -10,7 +10,7 @@
 docker compose exec backend python manage.py seed_demo_content --force
 ```
 
-Создаёт категории, 10 блюд с фото и описаниями (`apps/menu/seed_data/images/`), фото интерьера и hero-слайды (`apps/core/seed_data/interior/`). Повтор без `--force` пропускает, если меню уже есть.
+Создаёт категории, 23 блюда с фото и описаниями (`apps/menu/seed_data/images/`), фото интерьера и hero-слайды (`apps/core/seed_data/interior/`). Повтор без `--force` пропускает, если меню уже есть.
 
 ## Структура данных
 
@@ -188,13 +188,15 @@ Category (Категория)
 ```
 Администратор загружает video
         ↓
-  post_save сигнал
+  video_status = pending (значение по умолчанию модели при создании;
+                          при обновлении явно выставляется в perform_update() views.py)
         ↓
-  video_status = pending
+  post_save сигнал (signals.py): video есть и статус НЕ processing/ready
   → Celery: process_dish_video.delay(dish_id)
         ↓
   video_status = processing
-  FFmpeg: scale 720×1280, H.264 CRF=28, AAC 128k, faststart
+  FFmpeg: scale 720×1280 (force_original_aspect_ratio=decrease) + letterbox pad,
+          H.264 CRF=28, preset=fast, AAC 128k, faststart
         ↓ (успех)          ↓ (ошибка, max 2 retry)
   video_processed = файл   video_status = failed
   video_status = ready
@@ -208,18 +210,18 @@ Category (Категория)
 
 **Авторизация:** `Authorization: Bearer <access_token>` + `is_staff=true`
 
-**Base URL:** `/api/v1/menu/admin/dishes/`
+**Base URL:** `/api/v1/menu/staff/dishes/`
 
 ### Маршруты
 
 | Метод | URL | Действие |
 |---|---|---|
-| `GET` | `/api/v1/menu/admin/dishes/` | Список всех блюд (без пагинации) |
-| `POST` | `/api/v1/menu/admin/dishes/` | Создать блюдо |
-| `GET` | `/api/v1/menu/admin/dishes/{id}/` | Получить блюдо по ID |
-| `PUT` | `/api/v1/menu/admin/dishes/{id}/` | Полное обновление блюда |
-| `PATCH` | `/api/v1/menu/admin/dishes/{id}/` | Частичное обновление блюда |
-| `DELETE` | `/api/v1/menu/admin/dishes/{id}/` | Удалить блюдо |
+| `GET` | `/api/v1/menu/staff/dishes/` | Список всех блюд (без пагинации) |
+| `POST` | `/api/v1/menu/staff/dishes/` | Создать блюдо |
+| `GET` | `/api/v1/menu/staff/dishes/{id}/` | Получить блюдо по ID |
+| `PUT` | `/api/v1/menu/staff/dishes/{id}/` | Полное обновление блюда |
+| `PATCH` | `/api/v1/menu/staff/dishes/{id}/` | Частичное обновление блюда |
+| `DELETE` | `/api/v1/menu/staff/dishes/{id}/` | Удалить блюдо |
 
 **Content-Type:**
 - `POST`, `PUT`, `PATCH` с изображением — `multipart/form-data`
@@ -255,7 +257,7 @@ Category (Категория)
 
 **PATCH с видеофайлом:**
 ```bash
-curl -X PATCH https://piligrim.kz/api/v1/menu/admin/dishes/1/ \
+curl -X PATCH https://piligrim.kz/api/v1/menu/staff/dishes/1/ \
   -H "Authorization: Bearer <access_token>" \
   -F "video=@/path/to/clip.mp4"
 ```
@@ -287,7 +289,7 @@ PATCH video → video_status = pending
 | 1–3 мин | 30–90 сек |
 | > 3 мин | 90–180 сек |
 
-Эти цифры справедливы для CPU-транскодирования внутри Docker-контейнера. На продакшн-сервере время зависит от мощности CPU. Flutter должен периодически опрашивать `GET /api/v1/menu/admin/dishes/{id}/` и читать `video_status` до перехода в `ready` или `failed`.
+Эти цифры справедливы для CPU-транскодирования внутри Docker-контейнера. На продакшн-сервере время зависит от мощности CPU. Flutter должен периодически опрашивать `GET /api/v1/menu/staff/dishes/{id}/` и читать `video_status` до перехода в `ready` или `failed`.
 
 ---
 
@@ -295,7 +297,7 @@ PATCH video → video_status = pending
 
 **Создать блюдо (`multipart/form-data`):**
 ```bash
-curl -X POST http://localhost:8000/api/v1/menu/admin/dishes/ \
+curl -X POST http://localhost:8000/api/v1/menu/staff/dishes/ \
   -H "Authorization: Bearer <access_token>" \
   -F "name=Стейк Рибай" \
   -F "description=Мраморная говядина" \
@@ -310,7 +312,7 @@ curl -X POST http://localhost:8000/api/v1/menu/admin/dishes/ \
 
 **Частичное обновление (`application/json`):**
 ```bash
-curl -X PATCH http://localhost:8000/api/v1/menu/admin/dishes/1/ \
+curl -X PATCH http://localhost:8000/api/v1/menu/staff/dishes/1/ \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{"price": "5000.00", "is_active": false}'
@@ -323,7 +325,8 @@ curl -X PATCH http://localhost:8000/api/v1/menu/admin/dishes/1/ \
 | Код | Причина |
 |---|---|
 | `400 Bad Request` | Нет `image` при создании (`{"image": "Фото обязательно при создании блюда."}`) |
-| `403 Forbidden` | Пользователь не авторизован или `is_staff=False` |
+| `401 Unauthorized` | Запрос без `Authorization`-заголовка или с невалидным/просроченным токеном |
+| `403 Forbidden` | Пользователь авторизован, но `is_staff=False` |
 | `404 Not Found` | Блюдо с указанным `id` не существует |
 
 ---
@@ -353,13 +356,25 @@ curl -X PATCH http://localhost:8000/api/v1/menu/admin/dishes/1/ \
 
 ```
 apps/menu/
-├── models.py       # Category, Tag, Allergen, Dish (+ VideoStatus enum)
-├── serializers.py  # CategorySerializer, TagSerializer, AllergenSerializer, DishSerializer
-├── views.py        # CategoryListView, AllergenListView, TagListView, DishListView, VideoFeedView, StaffDishViewSet
-├── filters.py      # DishFilter (category_id, tag_ids, search)
-├── tasks.py        # process_dish_video — Celery-задача FFmpeg транскодирования
-├── signals.py      # trigger_video_processing, кэш-инвалидация
-└── urls.py         # /categories/, /tags/, /allergens/, /dishes/, /feed/, /admin/dishes/
+├── models.py                       # Category, Tag, Allergen, Dish (+ VideoStatus enum)
+├── serializers.py                  # CategorySerializer, TagSerializer, AllergenSerializer, DishSerializer, StaffDishSerializer
+├── views.py                        # CategoryListView, AllergenListView, TagListView, DishListView, VideoFeedView, StaffDishViewSet
+├── filters.py                      # DishFilter (category_id, tag_ids); search — через SearchFilter в views.py
+├── admin.py                        # ContentManagerMixin + CategoryAdmin/TagAdmin/AllergenAdmin/DishAdmin (staff CRUD в Django-админке)
+├── apps.py                         # MenuConfig.ready() — подключает signals.py
+├── tasks.py                        # process_dish_video — Celery-задача FFmpeg транскодирования
+├── signals.py                      # trigger_video_processing, кэш-инвалидация
+├── urls.py                         # /categories/, /tags/, /allergens/, /dishes/, /feed/, /staff/dishes/
+├── management/commands/
+│   └── seed_demo_content.py        # Демо-контент: категории, теги, аллергены, блюда, интерьер, hero-слайды
+├── seed_data/
+│   ├── images/                     # Фото демо-блюд
+│   └── videos/                     # Демо-видео для feed-ленты
+└── tests/
+    ├── test_public_views.py        # Публичные эндпоинты (categories, tags, dishes, feed)
+    ├── test_allergen_views.py      # /allergens/
+    ├── test_staff_serializer.py    # StaffDishSerializer
+    └── test_staff_views.py         # StaffDishViewSet (CRUD, права доступа)
 ```
 
 ## Кэширование
@@ -369,6 +384,7 @@ apps/menu/
 | Эндпоинт | Стратегия | TTL | Инвалидация |
 |---|---|---|---|
 | `GET /api/v1/menu/categories/` | Единый ключ `menu_categories` | 3600 сек | `post_save` / `post_delete` на `Category` |
+| `GET /api/v1/menu/tags/` | Единый ключ `menu_tags` | 3600 сек | `post_save` / `post_delete` на `Tag` |
 | `GET /api/v1/menu/dishes/` | Версионный ключ `menu_dishes:{version}:{query_string}` | 300 сек | Инкремент `menu_dishes_cache_version` при изменении `Dish`, `Category`, `Tag`, `Allergen` |
 
 **Версионный кэш блюд** — при любом изменении `Dish`/`Category`/`Tag`/`Allergen` сигнал увеличивает счётчик `menu_dishes_cache_version` в Redis. Все старые ключи перестают использоваться и истекают по TTL самостоятельно. Разные наборы query-параметров (`?category_id=`, `?tag_ids=`, `?search=`) кэшируются отдельно.

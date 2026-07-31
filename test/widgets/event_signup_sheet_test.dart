@@ -56,16 +56,26 @@ void main() {
         ),
       );
 
+      // PathCta (кнопка «ЗАПИСАТЬСЯ») крутит бесконечную idle-анимацию
+      // (_idleCtrl..repeat(reverse: true)) — pumpAndSettle() никогда не
+      // «осядет», поэтому продвигаем время вручную фиксированными шагами.
       await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       await tester.tap(find.byIcon(Icons.add_circle_outline));
       await tester.pump();
 
       await tester.tap(find.text('ЗАПИСАТЬСЯ'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       verify(() => events.reserveEvent(42, 2)).called(1);
+
+      // PiligrimToast.show(...) на успехе ставит собственный Timer на 3с
+      // автозакрытия + dismiss-анимацию (400+280ms) — дожидаемся, иначе
+      // таймер остаётся висеть после разрушения дерева виджетов.
+      await tester.pump(const Duration(seconds: 4));
     });
   });
 }

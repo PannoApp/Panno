@@ -41,22 +41,34 @@ static const _baseUrl = String.fromEnvironment(
   'BASE_URL',
   defaultValue: 'https://piligrim.kz/api/v1',
 );
+
+// Origin для сборки абсолютных media-URL из относительных путей (/media/...).
+static const mediaOrigin = String.fromEnvironment(
+  'MEDIA_ORIGIN',
+  defaultValue: 'https://piligrim.kz',
+);
 ```
+
+`mediaOrigin` — второй dart-define (`DioClient.mediaOrigin`), используется там, где бэкенд отдаёт относительные пути `/media/...` и их нужно превратить в абсолютный URL для показа изображений/видео. Задаётся так же, через `--dart-define-from-file` (ключ `MEDIA_ORIGIN`), и по умолчанию совпадает с прод-доменом.
+
+> **Важно:** файлы `dart_defines/dev.json` и `dart_defines/prod.json`, описанные ниже, **пока не существуют в репозитории** — это подготовленная, но не выполненная настройка. Пока их никто не создал и не передаёт `--dart-define-from-file` явно, `BASE_URL` и `MEDIA_ORIGIN` на практике всегда резолвятся в захардкоженные `defaultValue` (прод). Инструкция ниже актуальна для того, кто решит эту настройку добавить.
 
 Создайте файлы с переменными окружения:
 
 **`dart_defines/dev.json`**
 ```json
 {
-  "BASE_URL": "http://10.0.2.2:8000/api/v1"
+  "BASE_URL": "http://10.0.2.2:8000/api/v1",
+  "MEDIA_ORIGIN": "http://10.0.2.2:8000"
 }
 ```
-> `10.0.2.2` — Android-эмулятор. Для iOS-симулятора используйте `http://localhost:8000/api/v1`.
+> `10.0.2.2` — Android-эмулятор. Для iOS-симулятора используйте `http://localhost:8000` (для обоих ключей).
 
 **`dart_defines/prod.json`**
 ```json
 {
-  "BASE_URL": "https://piligrim.kz/api/v1"
+  "BASE_URL": "https://piligrim.kz/api/v1",
+  "MEDIA_ORIGIN": "https://piligrim.kz"
 }
 ```
 
@@ -69,7 +81,7 @@ flutter run --dart-define-from-file=dart_defines/dev.json
 flutter build apk --dart-define-from-file=dart_defines/prod.json
 ```
 
-Если файл не передан — используется `defaultValue` (prod URL).
+Если файл не передан — используется `defaultValue` (prod URL). На сегодняшний день это единственный работающий сценарий, так как файлы `dart_defines/*.json` ещё не созданы (см. предупреждение выше).
 
 ---
 
@@ -147,9 +159,14 @@ await storage.clearTokens();
 | Таймаут отправки | `DioExceptionType.sendTimeout` | `'Нет соединения'` |
 | Нет сети | `DioExceptionType.connectionError` | `'Нет соединения'` |
 | Ошибка сервера | `statusCode >= 500` | `'Сервер временно недоступен'` |
-| Ошибка клиента с `message`/`detail`/`error` в теле | `statusCode >= 400`, поле в `data` | Строка из тела ответа |
-| Прочие 4xx | `statusCode >= 400`, поле не найдено | `'Ошибка запроса'` |
+| Ошибка клиента с `message`/`detail`/`error` (строка) в теле | `statusCode >= 400`, `data` — Map, одно из полей — непустая строка | Строка из тела ответа |
+| DRF `non_field_errors` | `statusCode >= 400`, поле — список или строка | Первый элемент списка / сама строка |
+| DRF `detail` как список | `statusCode >= 400`, `detail` — непустой список | Первый элемент списка |
+| Фолбэк по всем полям тела | `statusCode >= 400`, ничего из выше не подошло | Первое непустое значение (список или строка) среди **всех** полей `data`, в порядке их перебора |
+| Прочие 4xx | `statusCode >= 400`, вообще ничего не найдено | `'Ошибка запроса'` |
 | Всё остальное | — | `'Что-то пошло не так'` |
+
+Порядок проверки внутри `dioErrorMessage()` именно такой: сперва `message`/`detail`/`error` как строка, затем `non_field_errors` (список или строка), затем `detail` как список, и только в конце — общий обход всех полей тела в поисках первого непустого списка/строки.
 
 Использование:
 
@@ -158,6 +175,17 @@ await storage.clearTokens();
   error = dioErrorMessage(e); // всегда возвращает непустую строку
 }
 ```
+
+### Admin-хелперы для CRUD-экранов
+
+Для новых admin-форм (блюдо/мероприятие/новость) в `dio_errors.dart` есть два специализированных хелпера — они не переиспользуют `dioErrorMessage()`, а форматируют ошибку иначе:
+
+| Функция | Сигнатура | Поведение |
+|---|---|---|
+| `adminSaveErrorMessage` | `String adminSaveErrorMessage(Object error)` | При `400` разворачивает **все** поля тела ответа в многострочный текст `"поле: значение"` (для `non_field_errors`/`detail` — без префикса с именем поля); при сетевой ошибке — `'Сетевая ошибка. Проверьте интернет-соединение'`; иначе — `'Ошибка сервера: <код> <message>'`. |
+| `adminDeleteErrorMessage` | `String adminDeleteErrorMessage(Object error, {required String fallback})` | При сетевой ошибке — `'Сетевая ошибка при удалении'`; при наличии `statusCode` — `'Ошибка сервера при удалении: <код>'`; иначе возвращает переданный `fallback` (например, `'Не удалось удалить блюдо'`). |
+
+Используются в провайдерах admin-экранов (`dish`/`event`/`news` edit) вместо `dioErrorMessage()`.
 
 ---
 

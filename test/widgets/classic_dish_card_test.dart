@@ -40,6 +40,8 @@ void main() {
 
       // Classic mode with one visible dish, no loading/error state.
       when(() => menu.loaded).thenReturn(true);
+      when(() => menu.isBootstrapping).thenReturn(false);
+      when(() => menu.bootstrapError).thenReturn(null);
       when(() => menu.mode).thenReturn(MenuViewMode.classic);
       when(() => menu.dishes).thenReturn(const [_dish]);
       when(() => menu.isLoading).thenReturn(false);
@@ -91,6 +93,8 @@ void main() {
       auth = _MockAuthProvider();
 
       when(() => menu.loaded).thenReturn(true);
+      when(() => menu.isBootstrapping).thenReturn(false);
+      when(() => menu.bootstrapError).thenReturn(null);
       when(() => menu.dishes).thenReturn(const [_dish]);
       when(() => menu.isLoading).thenReturn(false);
       when(() => menu.error).thenReturn(null);
@@ -130,7 +134,17 @@ void main() {
       await tester.pumpWidget(buildScreen());
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(FloatingActionButton), findsNothing);
+      // FAB больше не удаляется из дерева — скрывается через
+      // AnimatedOpacity(opacity: 0) + IgnorePointer(ignoring: true) для
+      // плавного fade между режимами (см. lib/screens/menu_screen.dart).
+      expect(find.byType(FloatingActionButton), findsOneWidget);
+      final opacityWidget = tester.widget<AnimatedOpacity>(
+        find.ancestor(
+          of: find.byType(FloatingActionButton),
+          matching: find.byType(AnimatedOpacity),
+        ),
+      );
+      expect(opacityWidget.opacity, 0.0);
     });
 
     testWidgets('test_fab_hidden_in_video_mode', (tester) async {
@@ -144,7 +158,13 @@ void main() {
 
       await tester.pumpWidget(buildScreen());
       // Assert before any animation timer fires.
-      expect(find.byType(FloatingActionButton), findsNothing);
+      final opacityWidget = tester.widget<AnimatedOpacity>(
+        find.ancestor(
+          of: find.byType(FloatingActionButton),
+          matching: find.byType(AnimatedOpacity),
+        ),
+      );
+      expect(opacityWidget.opacity, 0.0);
       // DishVideoCard has flutter_animate chain: delay 1800ms + fadeIn 600ms
       // + then-delay 2000ms + fadeOut 500ms = 4900ms total.
       // Pump past all timers so teardown doesn't fail on pending timers.

@@ -21,6 +21,10 @@ class _MockSecureStoragePlatform extends Mock
     implements FlutterSecureStoragePlatform {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(<String, dynamic>{});
+  });
+
   final someNews = PiligrimNewsPost(
     id: '7',
     title: 'Открытие летней веранды',
@@ -42,7 +46,18 @@ void main() {
       DioClient.instance.dio.httpClientAdapter = mockAdapter;
 
       mockEventsProvider = _MockEventsProvider();
-      when(() => mockEventsProvider.loadNews()).thenAnswer((_) async {});
+      when(() => mockEventsProvider.isSavingNews).thenReturn(false);
+      when(() => mockEventsProvider.saveNewsError).thenReturn(null);
+      when(() => mockEventsProvider.createNews(
+            any(),
+            image: any(named: 'image'),
+          )).thenAnswer((_) async => true);
+      when(() => mockEventsProvider.updateNews(
+            any(),
+            any(),
+            image: any(named: 'image'),
+          )).thenAnswer((_) async => true);
+      when(() => mockEventsProvider.deleteNews(any())).thenAnswer((_) async => true);
 
       mockSecureStoragePlatform = _MockSecureStoragePlatform();
       FlutterSecureStoragePlatform.instance = mockSecureStoragePlatform;
@@ -189,10 +204,8 @@ void main() {
     // ─── Save ──────────────────────────────────────────────────────────────────
 
     testWidgets(
-      'test_save_calls_createNews_in_create_mode — mock repo → createNews вызван',
+      'test_save_calls_createNews_in_create_mode — mock provider → createNews вызван',
       (tester) async {
-        mockAdapter.enqueue(201, null); // POST /events/admin/news/
-
         await tester.pumpWidget(buildApp(news: null));
         await tester.pump();
 
@@ -209,21 +222,17 @@ void main() {
         await tester.tap(find.text('ОПУБЛИКОВАТЬ'));
         await settle(tester);
 
-        // POST-запрос на создание новости должен быть выполнен
-        final createReq = mockAdapter.captured.firstWhere(
-          (r) => r.method == 'POST' && r.path.contains('/events/admin/news/'),
-        );
-        expect(createReq, isNotNull);
-
-        verify(() => mockEventsProvider.loadNews()).called(1);
+        // EventsProvider.createNews должен быть вызван
+        verify(() => mockEventsProvider.createNews(
+              any(),
+              image: any(named: 'image'),
+            )).called(1);
       },
     );
 
     testWidgets(
-      'test_save_calls_updateNews_in_edit_mode — mock repo → updateNews(numericId, ...) вызван',
+      'test_save_calls_updateNews_in_edit_mode — mock provider → updateNews(numericId, ...) вызван',
       (tester) async {
-        mockAdapter.enqueue(200, null); // PATCH /events/admin/news/7/
-
         await tester.pumpWidget(buildApp(news: someNews));
         await tester.pump();
 
@@ -232,13 +241,12 @@ void main() {
         await tester.tap(find.text('СОХРАНИТЬ ИЗМЕНЕНИЯ'));
         await settle(tester);
 
-        // PATCH-запрос с нужным id=7 должен быть выполнен
-        final updateReq = mockAdapter.captured.firstWhere(
-          (r) => r.method == 'PATCH' && r.path.contains('/events/admin/news/7/'),
-        );
-        expect(updateReq, isNotNull);
-
-        verify(() => mockEventsProvider.loadNews()).called(1);
+        // EventsProvider.updateNews должен быть вызван с numericId=7
+        verify(() => mockEventsProvider.updateNews(
+              7,
+              any(),
+              image: any(named: 'image'),
+            )).called(1);
       },
     );
 
@@ -247,8 +255,6 @@ void main() {
     testWidgets(
       'test_delete_confirmed_calls_deleteNews — confirm dialog → deleteNews вызван',
       (tester) async {
-        mockAdapter.enqueue(204, null); // DELETE /events/admin/news/7/
-
         await tester.pumpWidget(buildApp(news: someNews));
         await tester.pump();
 
@@ -264,13 +270,8 @@ void main() {
         await tester.tap(find.widgetWithText(TextButton, 'Удалить'));
         await settle(tester);
 
-        // DELETE-запрос с id=7 должен быть выполнен
-        final deleteReq = mockAdapter.captured.firstWhere(
-          (r) => r.method == 'DELETE' && r.path.contains('/events/admin/news/7/'),
-        );
-        expect(deleteReq, isNotNull);
-
-        verify(() => mockEventsProvider.loadNews()).called(1);
+        // EventsProvider.deleteNews должен быть вызван с numericId=7
+        verify(() => mockEventsProvider.deleteNews(7)).called(1);
       },
     );
   });

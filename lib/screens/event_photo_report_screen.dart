@@ -9,7 +9,6 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../data/models/api_event.dart';
 import '../data/models/api_event_photo.dart';
-import '../data/repositories/events_repository.dart';
 import '../providers/events_provider.dart';
 import '../widgets/piligrim_back_button.dart';
 import '../widgets/piligrim_loader.dart';
@@ -28,30 +27,10 @@ class EventPhotoReportScreen extends StatefulWidget {
 }
 
 class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
-  final _repo = EventsRepository();
-  List<ApiEventPhoto> _photos = const [];
-  bool _isLoading = true;
-  String? _error;
-  bool _isUploading = false;
-
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    try {
-      _photos = await _repo.fetchPhotoReport(widget.event.id);
-    } catch (e) {
-      _error = 'Не удалось загрузить фотоотчёт';
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    context.read<EventsProvider>().loadPhotoReport(widget.event.id);
   }
 
   Future<void> _addPhoto() async {
@@ -65,25 +44,16 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
       ],
     );
     if (cropped == null) return;
+    if (!mounted) return;
 
-    setState(() => _isUploading = true);
-    try {
-      final photo =
-          await _repo.addPhotoToReport(widget.event.id, File(cropped.path));
-      setState(() => _photos = [..._photos, photo]);
-      // Обновляем флаг hasPhotoReport в провайдере
-      if (mounted) context.read<EventsProvider>().loadArchived();
-    } catch (_) {
-      if (mounted) {
-        PiligrimToast.show(
-          context,
-          'Не удалось загрузить фото',
-          type: PiligrimToastType.error,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
-    }
+    final events = context.read<EventsProvider>();
+    final ok = await events.addPhotoToReport(widget.event.id, File(cropped.path));
+    if (!mounted || ok) return;
+    PiligrimToast.show(
+      context,
+      events.uploadPhotoError ?? 'Не удалось загрузить фото',
+      type: PiligrimToastType.error,
+    );
   }
 
   Future<void> _confirmDelete(ApiEventPhoto photo) async {
@@ -123,12 +93,9 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
     try {
-      await _repo.deletePhotoFromReport(widget.event.id, photo.id);
-      setState(() => _photos = _photos.where((p) => p.id != photo.id).toList());
-      if (mounted && _photos.isEmpty) {
-        context.read<EventsProvider>().loadArchived();
-      }
+      await context.read<EventsProvider>().deletePhotoFromReport(widget.event.id, photo.id);
     } catch (_) {
       if (mounted) {
         PiligrimToast.show(
@@ -142,6 +109,7 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final events = context.watch<EventsProvider>();
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
       appBar: AppBar(
@@ -156,7 +124,7 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
         ),
         centerTitle: true,
         actions: [
-          if (_isUploading)
+          if (events.isUploadingPhoto)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Center(
@@ -192,11 +160,11 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            Expanded(child: _buildBody()),
+            Expanded(child: _buildBody(events)),
           ],
         ),
       ),
-      floatingActionButton: _isUploading
+      floatingActionButton: events.isUploadingPhoto
           ? null
           : FloatingActionButton(
               backgroundColor: PiligrimColors.earthWarm,
@@ -211,22 +179,22 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
+  Widget _buildBody(EventsProvider events) {
+    if (events.isLoadingPhotoReport) {
       return const Center(
           child: PiligrimLoader(color: PiligrimColors.steppe));
     }
-    if (_error != null) {
+    if (events.photoReportError != null) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_error!,
+            Text(events.photoReportError ?? 'Не удалось загрузить фотоотчёт',
                 style: PiligrimTextStyles.body.copyWith(
                     color: PiligrimColors.sky.withValues(alpha: 0.55))),
             const SizedBox(height: 16),
             PiligrimTap(
-              onTap: _load,
+              onTap: () => context.read<EventsProvider>().loadPhotoReport(widget.event.id),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -245,7 +213,7 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
         ),
       );
     }
-    if (_photos.isEmpty) {
+    if (events.photoReport.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -279,9 +247,9 @@ class _EventPhotoReportScreenState extends State<EventPhotoReportScreen> {
         mainAxisSpacing: 10,
         childAspectRatio: 1.0,
       ),
-      itemCount: _photos.length,
+      itemCount: events.photoReport.length,
       itemBuilder: (context, i) {
-        final photo = _photos[i];
+        final photo = events.photoReport[i];
         return _PhotoTile(
           photo: photo,
           onDelete: () => _confirmDelete(photo),

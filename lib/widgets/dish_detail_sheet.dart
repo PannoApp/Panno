@@ -4,9 +4,10 @@ import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../data/models/api_dish.dart';
-import '../data/repositories/menu_repository.dart';
+import '../providers/menu_provider.dart';
 import 'dish_elements.dart';
 
 // Дефолтные цвета кинематографического фона (лента / sheet fallback).
@@ -173,10 +174,8 @@ class _DishDetailSheetState extends State<DishDetailSheet> {
   }
 
   Future<void> _fetchFull() async {
-    try {
-      final full = await MenuRepository().fetchDish(_dish.id);
-      if (mounted) setState(() => _dish = full);
-    } catch (_) {}
+    final full = await context.read<MenuProvider>().fetchDishDetail(_dish.id);
+    if (mounted && full != null) setState(() => _dish = full);
   }
 
   @override

@@ -32,6 +32,16 @@ Future<File> _createTempFile(String name) async {
   return file;
 }
 
+// На Windows Dio ещё может держать файл открытым сразу после отправки
+// multipart-запроса (закрытие хендла асинхронно) — delete сразу после этого
+// может упасть с PathAccessException. Это чистка временного файла, не часть
+// проверяемого поведения, поэтому ошибку можно проигнорировать.
+Future<void> _tryDelete(File file) async {
+  try {
+    await file.delete();
+  } catch (_) {}
+}
+
 void main() {
   group('EventsRepository', () {
     late MockDioAdapter adapter;
@@ -132,7 +142,7 @@ void main() {
         final form = req.data as FormData;
         expect(form.files.any((e) => e.key == 'image'), isTrue);
 
-        await tmpFile.delete();
+        await _tryDelete(tmpFile);
       });
 
       test('createEvent without image sends FormData without image key', () async {
@@ -159,7 +169,7 @@ void main() {
         final form = req.data as FormData;
         expect(form.files.any((e) => e.key == 'image'), isTrue);
 
-        await tmpFile.delete();
+        await _tryDelete(tmpFile);
       });
 
       test('updateEvent without image sends PATCH JSON body', () async {

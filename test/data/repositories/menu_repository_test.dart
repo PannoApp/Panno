@@ -9,6 +9,16 @@ import 'package:piligrim/data/repositories/menu_repository.dart';
 
 import '../../support/mock_dio_adapter.dart';
 
+// На Windows Dio ещё может держать файл открытым сразу после отправки
+// multipart-запроса (закрытие хендла асинхронно) — synchronous delete в
+// finally может упасть с PathAccessException. Это чистка временного файла,
+// не часть проверяемого поведения, поэтому ошибку можно проигнорировать.
+void _tryDeleteSync(File file) {
+  try {
+    file.deleteSync();
+  } catch (_) {}
+}
+
 // Тестовый JSON-блюда — структура соответствует реальному ответу DishSerializer.
 // category и tags — вложенные объекты, как шлёт бекенд.
 Map<String, dynamic> _dishJson({int id = 1, int categoryId = 2}) => {
@@ -169,7 +179,7 @@ void main() {
       expect(dishes.first.id, 5);
     });
 
-    test('createDish() отправляет POST на /menu/admin/dishes/ и возвращает ApiDish',
+    test('createDish() отправляет POST на /menu/staff/dishes/ и возвращает ApiDish',
         () async {
       adapter.enqueue(201, _dishJson(id: 99));
 
@@ -182,11 +192,11 @@ void main() {
       expect(dish, isA<ApiDish>());
       expect(dish.id, 99);
       final req = adapter.captured.single;
-      expect(req.path, contains('/menu/admin/dishes/'));
+      expect(req.path, contains('/menu/staff/dishes/'));
       expect(req.method, 'POST');
     });
 
-    test('updateDish() без image отправляет PATCH JSON с _json-полями для списков',
+    test('updateDish() без image отправляет PATCH JSON со списками как есть',
         () async {
       adapter.enqueue(200, _dishJson(id: 7));
 
@@ -199,21 +209,23 @@ void main() {
       expect(dish.id, 7);
       final req = adapter.captured.single;
       expect(req.method, 'PATCH');
-      expect(req.path, contains('/menu/admin/dishes/7/'));
+      expect(req.path, contains('/menu/staff/dishes/7/'));
       final body = req.data as Map<String, dynamic>;
-      expect(body['tags_json'], '[3]');
-      expect(body['allergens_json'], '[1,2]');
+      // _encodeListFields больше не переименовывает поля в *_json — списки
+      // передаются как есть, Dio сам сериализует их в JSON-массив при отправке.
+      expect(body['tags'], [3]);
+      expect(body['allergens'], [1, 2]);
       expect(body['name'], 'Обновлённое');
     });
 
-    test('deleteDish() отправляет DELETE на /menu/admin/dishes/id/', () async {
+    test('deleteDish() отправляет DELETE на /menu/staff/dishes/id/', () async {
       adapter.enqueue(204, null);
 
       await repository.deleteDish(42);
 
       final req = adapter.captured.single;
       expect(req.method, 'DELETE');
-      expect(req.path, contains('/menu/admin/dishes/42/'));
+      expect(req.path, contains('/menu/staff/dishes/42/'));
     });
 
     // ── Расширенные admin-тесты ───────────────────────────────────────────────
@@ -238,7 +250,7 @@ void main() {
     });
 
     // test_createDish_sends_multipart
-    test('createDish() отправляет FormData с полями и закодированными списками',
+    test('createDish() отправляет FormData со списками как повторяющиеся поля',
         () async {
       adapter.enqueue(201, _dishJson(id: 10));
 
@@ -254,8 +266,13 @@ void main() {
       final fd = req.data as FormData;
       expect(fd.fields.any((e) => e.key == 'name' && e.value == 'Блюдо'), isTrue);
       expect(fd.fields.any((e) => e.key == 'price' && e.value == '1000'), isTrue);
-      expect(fd.fields.any((e) => e.key == 'tags_json' && e.value == '[1,3]'), isTrue);
-      expect(fd.fields.any((e) => e.key == 'allergens_json' && e.value == '[2]'), isTrue);
+      // FormData.fromMap разворачивает List в повторяющиеся поля: tags=1&tags=3
+      // (см. комментарий в MenuRepository._encodeListFields) — DRF понимает
+      // этот формат так же, как JSON-массив.
+      final tagValues = fd.fields.where((e) => e.key == 'tags').map((e) => e.value).toList();
+      expect(tagValues, containsAll(['1', '3']));
+      final allergenValues = fd.fields.where((e) => e.key == 'allergens').map((e) => e.value).toList();
+      expect(allergenValues, ['2']);
     });
 
     // test_updateDish_with_image_sends_multipart
@@ -270,13 +287,13 @@ void main() {
 
         final req = adapter.captured.single;
         expect(req.method, 'PATCH');
-        expect(req.path, contains('/menu/admin/dishes/3/'));
+        expect(req.path, contains('/menu/staff/dishes/3/'));
         expect(req.data, isA<FormData>());
         final fd = req.data as FormData;
         expect(fd.files.any((e) => e.key == 'image'), isTrue);
         expect(fd.fields.any((e) => e.key == 'name' && e.value == 'С фото'), isTrue);
       } finally {
-        tmpFile.deleteSync();
+        _tryDeleteSync(tmpFile);
       }
     });
 
@@ -293,14 +310,14 @@ void main() {
     });
 
     // test_deleteDish_calls_delete
-    test('deleteDish() вызывает DELETE точно на /menu/admin/dishes/7/', () async {
+    test('deleteDish() вызывает DELETE точно на /menu/staff/dishes/7/', () async {
       adapter.enqueue(204, null);
 
       await repository.deleteDish(7);
 
       final req = adapter.captured.single;
       expect(req.method, 'DELETE');
-      expect(req.path, endsWith('/menu/admin/dishes/7/'));
+      expect(req.path, endsWith('/menu/staff/dishes/7/'));
     });
 
     // test_createDish_with_video_sends_multipart
@@ -322,7 +339,7 @@ void main() {
         final fd = req.data as FormData;
         expect(fd.files.any((e) => e.key == 'video'), isTrue);
       } finally {
-        tmpVideo.deleteSync();
+        _tryDeleteSync(tmpVideo);
       }
     });
 
@@ -362,7 +379,7 @@ void main() {
 
         expect(dish.videoStatus, 'pending');
       } finally {
-        tmpVideo.deleteSync();
+        _tryDeleteSync(tmpVideo);
       }
     });
   });

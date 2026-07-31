@@ -11,8 +11,10 @@ import 'package:image_picker_platform_interface/image_picker_platform_interface.
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:piligrim/core/theme.dart';
+import 'package:piligrim/data/models/api_allergen.dart';
 import 'package:piligrim/data/models/api_category.dart';
 import 'package:piligrim/data/models/api_dish.dart';
+import 'package:piligrim/data/models/api_tag.dart';
 import 'package:piligrim/data/services/api_client.dart';
 import 'package:piligrim/providers/menu_provider.dart';
 import 'package:piligrim/screens/dish_edit_screen.dart';
@@ -51,25 +53,12 @@ ApiDish _makeDish({
       videoStatus: videoStatus,
     );
 
-// JSON минимального валидного блюда для ответа сервера на create
-const _dishJson = {
-  'id': 99,
-  'name': 'Тест',
-  'description': '',
-  'price': 1000,
-  'category': {'id': 1, 'name': 'Горячее', 'order': 0},
-  'tags': [],
-  'allergens': [],
-  'weight': '',
-  'story': '',
-  'is_active': true,
-};
-
 void main() {
   setUpAll(() {
     // Mocktail требует fallback-значения для non-nullable типов в any()
     registerFallbackValue(ImageSource.gallery);
     registerFallbackValue(CameraDevice.rear);
+    registerFallbackValue(<String, dynamic>{});
   });
 
   group('DishEditScreen video tests', () {
@@ -87,7 +76,24 @@ void main() {
       DioClient.instance.dio.httpClientAdapter = mockAdapter;
 
       mockMenuProvider = _MockMenuProvider();
-      when(() => mockMenuProvider.load()).thenAnswer((_) async {});
+      when(() => mockMenuProvider.loadDishMetadata()).thenAnswer((_) async {});
+      when(() => mockMenuProvider.allTags).thenReturn(const <ApiTag>[]);
+      when(() => mockMenuProvider.allergens).thenReturn(const <ApiAllergen>[]);
+      when(() => mockMenuProvider.isLoadingDishMetadata).thenReturn(false);
+      when(() => mockMenuProvider.isSavingDish).thenReturn(false);
+      when(() => mockMenuProvider.saveDishError).thenReturn(null);
+      when(() => mockMenuProvider.createDish(
+            any(),
+            image: any(named: 'image'),
+            video: any(named: 'video'),
+          )).thenAnswer((_) async => true);
+      when(() => mockMenuProvider.updateDish(
+            any(),
+            any(),
+            image: any(named: 'image'),
+            video: any(named: 'video'),
+          )).thenAnswer((_) async => true);
+      when(() => mockMenuProvider.deleteDish(any())).thenAnswer((_) async => true);
 
       // Сохраняем и подменяем ImagePickerPlatform
       originalImagePickerPlatform = ImagePickerPlatform.instance;
@@ -144,21 +150,10 @@ void main() {
       );
     }
 
-    // Ожидает завершения _loadMetadata (теги + аллергены)
+    // Ожидает завершения loadDishMetadata (теги + аллергены)
     Future<void> pumpAfterMetadata(WidgetTester tester) async {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-    }
-
-    // Скроллирует форму вниз и нажимает кнопку
-    Future<void> scrollAndTap(WidgetTester tester, String text) async {
-      await tester.drag(
-        find.byType(SingleChildScrollView),
-        const Offset(0, -3000),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      await tester.tap(find.text(text));
     }
 
     // ─── Video status badge tests ──────────────────────────────────────────────
@@ -166,9 +161,6 @@ void main() {
     testWidgets(
       'test_video_section_shows_ready_badge — dish.videoStatus=ready → badge «ГОТОВО»',
       (tester) async {
-        mockAdapter.enqueue(200, []); // GET /menu/tags/
-        mockAdapter.enqueue(200, []); // GET /menu/allergens/
-
         await tester.pumpWidget(buildApp(dish: _makeDish(videoStatus: 'ready')));
         await pumpAfterMetadata(tester);
 
@@ -179,9 +171,6 @@ void main() {
     testWidgets(
       'test_video_section_shows_pending_badge — dish.videoStatus=pending → badge «ОЖИДАЕТ»',
       (tester) async {
-        mockAdapter.enqueue(200, []); // GET /menu/tags/
-        mockAdapter.enqueue(200, []); // GET /menu/allergens/
-
         await tester.pumpWidget(buildApp(dish: _makeDish(videoStatus: 'pending')));
         await pumpAfterMetadata(tester);
 
@@ -192,9 +181,6 @@ void main() {
     testWidgets(
       'test_video_section_shows_failed_badge — dish.videoStatus=failed → badge «ОШИБКА», цвет PiligrimColors.fruit',
       (tester) async {
-        mockAdapter.enqueue(200, []); // GET /menu/tags/
-        mockAdapter.enqueue(200, []); // GET /menu/allergens/
-
         await tester.pumpWidget(buildApp(dish: _makeDish(videoStatus: 'failed')));
         await pumpAfterMetadata(tester);
 
@@ -215,9 +201,6 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
         tester.view.physicalSize = const Size(800, 2000);
         addTearDown(tester.view.resetPhysicalSize);
-
-        mockAdapter.enqueue(200, []); // GET /menu/tags/
-        mockAdapter.enqueue(200, []); // GET /menu/allergens/
 
         // Синхронная запись — не нарушает fake event loop Flutter tests
         final tempFile = File('/tmp/test_piligrim_video.mp4');
@@ -254,10 +237,6 @@ void main() {
         tester.view.physicalSize = const Size(800, 3000);
         addTearDown(tester.view.resetPhysicalSize);
 
-        mockAdapter.enqueue(200, []); // GET /menu/tags/
-        mockAdapter.enqueue(200, []); // GET /menu/allergens/
-        mockAdapter.enqueue(201, _dishJson); // POST /menu/admin/dishes/
-
         // Синхронная запись — не нарушает fake event loop Flutter tests
         final tempFile = File('/tmp/test_piligrim_video_save.mp4');
         tempFile.writeAsBytesSync([0, 1, 2]);
@@ -291,13 +270,13 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 500));
 
-        // Проверяем, что POST-запрос содержит поле video
-        final createReq = mockAdapter.captured.firstWhere(
-          (r) => r.method == 'POST' && r.path.contains('/menu/admin/dishes/'),
-        );
-        expect(createReq.data, isA<FormData>());
-        final formData = createReq.data as FormData;
-        expect(formData.files.any((f) => f.key == 'video'), isTrue);
+        // MenuProvider.createDish должен быть вызван с video-файлом
+        final captured = verify(() => mockMenuProvider.createDish(
+              captureAny(),
+              image: any(named: 'image'),
+              video: captureAny(named: 'video'),
+            )).captured;
+        expect(captured[1], isA<File>());
 
         tempFile.deleteSync();
       },

@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../data/events_news_data.dart';
-import '../data/repositories/events_repository.dart';
 import '../providers/events_provider.dart';
 import '../widgets/piligrim_back_button.dart';
 import '../widgets/piligrim_loader.dart';
@@ -27,9 +25,7 @@ class NewsEditScreen extends StatefulWidget {
 
 class _NewsEditScreenState extends State<NewsEditScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _repo = EventsRepository();
   File? _localImageFile;
-  bool _isSaving = false;
 
   late final TextEditingController _titleCtrl;
   late final TextEditingController _contentCtrl;
@@ -69,54 +65,23 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSaving = true);
-    try {
-      final fields = <String, dynamic>{
-        'title': _titleCtrl.text.trim(),
-        'content': _contentCtrl.text.trim(),
-      };
-      widget.news == null
-          ? await _repo.createNews(fields, image: _localImageFile)
-          : await _repo.updateNews(widget.news!.numericId, fields, image: _localImageFile);
-      if (mounted) context.read<EventsProvider>().loadNews();
-      if (mounted) Navigator.of(context).pop();
-    } on DioException catch (e) {
-      String errorMessage = 'Произошла сетевая ошибка';
-      if (e.response?.statusCode == 400) {
-        final data = e.response?.data;
-        if (data is Map) {
-          final errorList = <String>[];
-          data.forEach((key, val) {
-            final valStr = val is List ? val.join(', ') : val.toString();
-            if (key == 'non_field_errors' || key == 'detail') {
-              errorList.add(valStr);
-            } else {
-              errorList.add('$key: $valStr');
-            }
-          });
-          errorMessage = errorList.isNotEmpty ? errorList.join('\n') : 'Ошибка валидации данных';
-        } else if (data is String && data.isNotEmpty) {
-          errorMessage = data;
-        } else {
-          errorMessage = 'Ошибка валидации данных';
-        }
-      } else if (e.type == DioExceptionType.connectionTimeout ||
-                 e.type == DioExceptionType.receiveTimeout ||
-                 e.type == DioExceptionType.sendTimeout ||
-                 e.type == DioExceptionType.connectionError) {
-        errorMessage = 'Сетевая ошибка. Проверьте интернет-соединение';
-      } else {
-        errorMessage = 'Ошибка сервера: ${e.response?.statusCode ?? ""} ${e.message ?? ""}';
-      }
-      if (mounted) {
-        PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
-      }
-    } catch (e) {
-      if (mounted) {
-        PiligrimToast.show(context, 'Не удалось сохранить новость: $e', type: PiligrimToastType.error);
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+    final events = context.read<EventsProvider>();
+    final fields = <String, dynamic>{
+      'title': _titleCtrl.text.trim(),
+      'content': _contentCtrl.text.trim(),
+    };
+    final ok = widget.news == null
+        ? await events.createNews(fields, image: _localImageFile)
+        : await events.updateNews(widget.news!.numericId, fields, image: _localImageFile);
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop();
+    } else {
+      PiligrimToast.show(
+        context,
+        events.saveNewsError ?? 'Не удалось сохранить новость',
+        type: PiligrimToastType.error,
+      );
     }
   }
 
@@ -150,30 +115,17 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-              setState(() => _isSaving = true);
-              try {
-                await _repo.deleteNews(widget.news!.numericId);
-                if (mounted) context.read<EventsProvider>().loadNews();
-                if (mounted) Navigator.of(context).pop();
-              } on DioException catch (e) {
-                String errorMessage = 'Не удалось удалить новость';
-                if (e.type == DioExceptionType.connectionTimeout ||
-                    e.type == DioExceptionType.receiveTimeout ||
-                    e.type == DioExceptionType.sendTimeout ||
-                    e.type == DioExceptionType.connectionError) {
-                  errorMessage = 'Сетевая ошибка при удалении';
-                } else if (e.response?.statusCode != null) {
-                  errorMessage = 'Ошибка сервера при удалении: ${e.response!.statusCode}';
-                }
-                if (mounted) {
-                  PiligrimToast.show(context, errorMessage, type: PiligrimToastType.error);
-                }
-              } catch (e) {
-                if (mounted) {
-                  PiligrimToast.show(context, 'Ошибка при удалении: $e', type: PiligrimToastType.error);
-                }
-              } finally {
-                if (mounted) setState(() => _isSaving = false);
+              final events = context.read<EventsProvider>();
+              final ok = await events.deleteNews(widget.news!.numericId);
+              if (!mounted) return;
+              if (ok) {
+                Navigator.of(context).pop();
+              } else {
+                PiligrimToast.show(
+                  context,
+                  events.saveNewsError ?? 'Не удалось удалить новость',
+                  type: PiligrimToastType.error,
+                );
               }
             },
             child: Text(
@@ -188,6 +140,7 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isSaving = context.watch<EventsProvider>().isSavingNews;
     return Scaffold(
       backgroundColor: PiligrimColors.earth,
       appBar: AppBar(
@@ -206,7 +159,7 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
         actions: [
           if (!_isCreating)
             PiligrimTap(
-              onTap: _isSaving ? null : _deleteNews,
+              onTap: isSaving ? null : _deleteNews,
               borderRadius: BorderRadius.circular(6),
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -255,7 +208,7 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                _buildSaveButton(),
+                _buildSaveButton(isSaving),
                 const SizedBox(height: 40),
               ],
             ),
@@ -369,8 +322,8 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
   }
 
   /// Кнопка сохранения / публикации новости.
-  Widget _buildSaveButton() {
-    if (_isSaving) {
+  Widget _buildSaveButton(bool isSaving) {
+    if (isSaving) {
       return const SizedBox(
         height: 52,
         child: Center(child: PiligrimLoader(color: PiligrimColors.steppe)),

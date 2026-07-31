@@ -94,6 +94,11 @@
 { "error": "Неверный или просроченный код." }
 ```
 
+**Ответ 403** — если аккаунт заблокирован (`is_active=False`):
+```json
+{ "error": "Ваш аккаунт заблокирован." }
+```
+
 ---
 
 ### GET /api/v1/users/profile/
@@ -115,15 +120,20 @@
   "notifications_enabled": true,
   "notify_events": true,
   "notify_promotions": true,
-  "notify_closed_events": true
+  "notify_closed_events": true,
+  "is_staff": false,
+  "role": "",
+  "cashback": "0.00"
 }
 ```
+
+`is_staff`, `role` и `cashback` — только для чтения (см. модель ниже).
 
 ---
 
 ### PATCH /api/v1/users/profile/
 
-Частичное обновление профиля. `id` и `phone` — только для чтения, изменить нельзя.
+Частичное обновление профиля. `id`, `phone`, `is_staff`, `role` и `cashback` — только для чтения, изменить их через этот эндпоинт нельзя.
 
 **Авторизация:** Bearer JWT (access токен)
 
@@ -157,13 +167,15 @@
 | `email` | string | Email (необязательный, `blank=True`) |
 | `birthday` | date | Дата рождения (необязательная, `null=True`) |
 | `remarked_guest_id` | string | `gid` гостя в CRM Remarked; пусто — гость ещё не синхронизирован. Не отдаётся в `UserProfileSerializer`, виден только в Django Admin |
+| `cashback` | decimal | Баланс бонусов гостя из CRM Remarked (поле `bonuses`), обновляется при синхронизации. Отдаётся в `UserProfileSerializer` только для чтения |
 | `is_active` | bool | Активен ли пользователь |
-| `is_staff` | bool | Доступ в Django-админку (**не задавать вручную** — синхронизируется с `role`) |
-| `role` | string | Роль: `admin`, `hall_manager`, `content_manager` или пусто |
+| `is_staff` | bool | Доступ в Django-админку (**не задавать вручную** — синхронизируется с `role`). Отдаётся в `UserProfileSerializer` только для чтения |
+| `role` | string | Роль: `admin`, `hall_manager`, `content_manager` или пусто. Отдаётся в `UserProfileSerializer` только для чтения |
 | `notifications_enabled` | bool | Мастер-флаг согласия на push-уведомления |
 | `notify_events` | bool | Уведомления о мероприятиях (default: true) |
 | `notify_promotions` | bool | Уведомления об акциях (default: true) |
 | `notify_closed_events` | bool | Уведомления о закрытых событиях (default: true) |
+| `telegram_id` | string | Legacy-поле: ID чата менеджера в Telegram для авторизации в боте. По плану [telegram_removal.md](./telegram_removal.md) подлежит удалению вместе со всей Telegram-логикой, но на данный момент ещё присутствует в модели и используется в `apps/users/admin.py` (`list_display`, `search_fields`, `fieldsets`) |
 | `date_joined` | datetime | Дата регистрации |
 
 > Сервисные уведомления (подтверждение/изменение брони, напоминание о визите) не управляются флагами — они всегда доставляются.
@@ -184,8 +196,8 @@ Remarked в обе стороны:
     │   ├─ найден → перезаписать              │   ├─ remarked_guest_id есть → upsert
     │   │   first_name/last_name/email/       │   │   (customer/create с текущим
     │   │   birthday/gender, сохранить        │   │   состоянием User)
-    │   │   remarked_guest_id                 │   ├─ гостя ещё нет, но name+gender
-    │   ├─ не найден → ничего не менять       │   │   уже заполнены → создать
+    │   │   remarked_guest_id и cashback      │   ├─ гостя ещё нет, но name+gender
+    │   │   (из `bonuses`)                    │   │   уже заполнены → создать
     │   └─ сбой Remarked → не роняем логин,   │   │   (первый customer/create,
     │       fallback: sync_guest_from_remarked│   │   сохранить gid в
     │       (та же логика, в Celery)          │   │   remarked_guest_id)
@@ -202,6 +214,10 @@ Remarked в обе стороны:
 `last_name`, `email`, `birthday`, `gender`. Это осознанное решение: Remarked
 считается основной CRM, местные правки в самом Remarked (менеджером ресторана)
 должны долетать до приложения.
+
+Поле `cashback` синхронизируется по тому же принципу — при каждой синхронизации
+перезаписывается значением `bonuses` из ответа Remarked (это read-only поле,
+локально пользователь его не редактирует, конфликтов не возникает).
 
 Пустые/отсутствующие в ответе Remarked поля локальные данные **не затирают** —
 иначе первый же логин гостя с неполной карточкой в CRM обнулил бы то, что
@@ -309,6 +325,33 @@ Remarked» — ставит `sync_guest_from_remarked` в очередь для 
 
 **Ответ 400** — если поле `refresh` не передано.
 
+> Этот эндпоинт зарегистрирован не в `apps/users/urls.py`, а напрямую в
+> `config/urls.py` — используется стоковый `TokenRefreshView` из
+> `rest_framework_simplejwt.views`, кастомной вьюхи в `apps/users` для него нет.
+
+---
+
+### DELETE /api/v1/users/account/
+
+Безвозвратно удаляет учётную запись текущего пользователя и связанные
+персональные данные (брони, записи на события, FCM-устройства удаляются
+каскадом).
+
+**Авторизация:** Bearer JWT (access токен)
+
+**Ответ 204:** тело пустое — аккаунт удалён.
+
+После успешного ответа клиент должен очистить локальные JWT-токены и показать
+экран неавторизованного пользователя.
+
+**Ответ 401** — не передан или недействителен access-токен в заголовке.
+
+**Ответ 403** — учётные записи персонала (`is_staff` или `is_superuser`) через
+приложение удалить нельзя:
+```json
+{ "error": "Этот аккаунт нельзя удалить через приложение." }
+```
+
 ---
 
 ## JWT-токены
@@ -326,12 +369,16 @@ Remarked» — ставит `sync_guest_from_remarked` в очередь для 
 apps/users/
 ├── models.py       # Кастомная модель User (AbstractBaseUser)
 ├── serializers.py  # RequestSMSSerializer, VerifySMSSerializer, LogoutSerializer, UserProfileSerializer
-├── views.py        # RequestSMSView, VerifySMSView, LogoutView, UserProfileView
+├── views.py        # RequestSMSView, VerifySMSView, LogoutView, UserProfileView, DeleteAccountView
 ├── services.py     # SMSService, RemarkedGuestService, apply_guest_data_to_user, maybe_push_guest_to_remarked
 ├── tasks.py        # send_sms_task, sync_guest_from_remarked, push_guest_to_remarked
-├── throttles.py    # PhoneSMSThrottle — троттлинг по номеру телефона (5 запросов / 10 мин)
-└── urls.py         # Маршруты /api/v1/users/...
+├── throttles.py    # SafeScopedRateThrottle (fail-open ScopedRateThrottle), PhoneSMSThrottle — троттлинг по номеру телефона (5 запросов / 10 мин)
+└── urls.py         # Маршруты /api/v1/users/... (кроме token/refresh/ — см. ниже)
 ```
+
+> `POST /api/v1/users/auth/token/refresh/` в этот список не входит — маршрут
+> подключён напрямую в `config/urls.py` стоковым `TokenRefreshView` из
+> `rest_framework_simplejwt`, минуя `apps/users/urls.py` и `apps/users/views.py`.
 
 ## SMS-сервис
 
@@ -392,14 +439,27 @@ SMS_PASSWORD=your_password
 
 | Уровень | Ключ в Redis | Лимит |
 |---|---|---|
-| По IP (ScopedRateThrottle) | стандартный DRF-ключ по IP | 3 запроса / 1 минута |
+| По IP (SafeScopedRateThrottle) | стандартный DRF-ключ по IP | 3 запроса / 1 минута |
 | По номеру телефона (PhoneSMSThrottle) | `throttle_sms_request_phone_{phone}` | 5 запросов / 10 минут |
+
+`POST /api/v1/users/auth/verify-sms/` защищён тем же `SafeScopedRateThrottle`
+(scope `sms_verify`, 5 запросов в минуту с одного IP).
 
 Если превышен любой из лимитов — возвращается `HTTP 429 Too Many Requests`.
 
 Двухуровневый подход защищает от:
 - **Спама с одного IP** — первый уровень (IP-счётчик)
 - **Распределённых атак** — разные IP атакуют один номер, первый уровень не срабатывает, но второй блокирует по номеру
+
+### Fail-open при недоступном Redis
+
+И `SafeScopedRateThrottle`, и `PhoneSMSThrottle` (`apps/users/throttles.py`)
+используют общий `_RedisResistantThrottleMixin`: если при проверке лимита
+Redis недоступен и вызов `allow_request()` падает с исключением — throttle
+**пропускает запрос**, а не блокирует его. Это осознанный выбор в пользу
+доступности: при отказе Redis лучше временно снять лимиты, чем отказывать
+всем пользователям в SMS-авторизации. Событие логируется предупреждением
+(`Redis unavailable — throttle skipped for ...`).
 
 ## JWT Blacklist
 
