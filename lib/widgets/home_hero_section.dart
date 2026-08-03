@@ -81,7 +81,7 @@ class _CrossfadingHeroInteriorState extends State<CrossfadingHeroInterior>
         return CachedNetworkImage(
           imageUrl: widget.networkUrls[i % len],
           fit: BoxFit.cover,
-          alignment: const Alignment(0.0, 0.14),
+          alignment: Alignment.center,
           memCacheWidth: widget.cacheWidth,
           memCacheHeight: widget.cacheHeight,
           placeholder: (_, __) => const PiligrimShimmer(),
@@ -91,7 +91,7 @@ class _CrossfadingHeroInteriorState extends State<CrossfadingHeroInterior>
       return Image.asset(
         widget.assetPaths[i % len],
         fit: BoxFit.cover,
-        alignment: const Alignment(0.0, 0.14),
+        alignment: Alignment.center,
         isAntiAlias: true,
         filterQuality: FilterQuality.medium,
         gaplessPlayback: true,
@@ -142,7 +142,7 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
   late Timer _heroVisualTimer;
 
   static const double _heroImageScrollParallax = 0.10;
-  static const double _heroImageScale = 1.26;
+  static const double _heroImageScale = 1.15;
   static const _heroVisuals = PiligrimInteriorAssets.homeHeroCycle;
 
   List<String> get _networkUrls =>

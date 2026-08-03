@@ -33,6 +33,15 @@ class EventsProvider extends ChangeNotifier {
   bool isLoadingNews = false;
   bool isReserving = false;
   bool isLoadingPhotoReport = false;
+  bool isOfflineMode = false;
+
+  bool get _isRepoOffline {
+    try {
+      return _repository.isOfflineMode;
+    } catch (_) {
+      return false;
+    }
+  }
 
   String? upcomingError;
   String? archivedError;
@@ -52,9 +61,11 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       upcoming = upcomingApiSorted(await _repository.fetchUpcoming());
+      isOfflineMode = _isRepoOffline;
     } catch (e) {
       upcomingError = dioErrorMessage(e);
       upcoming = const [];
+      isOfflineMode = _isRepoOffline;
     } finally {
       isLoadingUpcoming = false;
       notifyListeners();
@@ -69,9 +80,11 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       archived = pastApiSorted(await _repository.fetchArchived());
+      isOfflineMode = _isRepoOffline;
     } catch (e) {
       archivedError = dioErrorMessage(e);
       archived = const [];
+      isOfflineMode = _isRepoOffline;
     } finally {
       isLoadingArchived = false;
       notifyListeners();
@@ -86,9 +99,11 @@ class EventsProvider extends ChangeNotifier {
 
     try {
       news = await _repository.fetchNews();
+      isOfflineMode = _isRepoOffline;
     } catch (e) {
       newsError = dioErrorMessage(e);
       news = const [];
+      isOfflineMode = _isRepoOffline;
     } finally {
       isLoadingNews = false;
       notifyListeners();
@@ -123,9 +138,11 @@ class EventsProvider extends ChangeNotifier {
     try {
       _photoReport = await _repository.fetchPhotoReport(eventId);
       photoReportError = null;
+      isOfflineMode = _isRepoOffline;
     } catch (e) {
       photoReportError = dioErrorMessage(e);
       _photoReport = const [];
+      isOfflineMode = _isRepoOffline;
     } finally {
       isLoadingPhotoReport = false;
       notifyListeners();

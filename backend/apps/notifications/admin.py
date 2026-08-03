@@ -1,6 +1,6 @@
 from django.contrib.admin import ModelAdmin
 from django.contrib import admin
-from .models import UserDevice, PushCampaign
+from .models import PushCampaign, PushReceipt, UserDevice
 
 try:
     from rest_framework_simplejwt.token_blacklist.admin import (
@@ -50,6 +50,31 @@ class UserDeviceAdmin(ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(PushReceipt)
+class PushReceiptAdmin(ModelAdmin):
+    """Только просмотр — это лог с клиента, а не то, что редактируют вручную."""
+
+    def has_module_permission(self, request):
+        return _is_content_or_admin(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return _is_content_or_admin(request.user)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    list_display = ('created_at', 'user', 'title', 'context', 'is_own_channel')
+    list_filter = ('context', 'is_own_channel', 'created_at')
+    search_fields = ('user__phone', 'fcm_token', 'title')
+    readonly_fields = ('user', 'fcm_token', 'title', 'body', 'data', 'context', 'is_own_channel', 'created_at')
 
 
 from django import forms

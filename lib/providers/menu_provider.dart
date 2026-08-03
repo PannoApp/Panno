@@ -33,6 +33,15 @@ class MenuProvider extends ChangeNotifier {
   String? error;
   bool isBootstrapping = false;
   String? bootstrapError;
+  bool isOfflineMode = false;
+
+  bool get _isRepoOffline {
+    try {
+      return _repository.isOfflineMode;
+    } catch (_) {
+      return false;
+    }
+  }
 
   int _page = 1;
   int? activeCategoryId;
@@ -134,8 +143,10 @@ class MenuProvider extends ChangeNotifier {
   Future<void> loadCategories() async {
     try {
       categories = await _repository.fetchCategories();
+      isOfflineMode = _isRepoOffline;
     } catch (_) {
       categories = const [];
+      isOfflineMode = _isRepoOffline;
     }
     notifyListeners();
   }
@@ -143,8 +154,10 @@ class MenuProvider extends ChangeNotifier {
   Future<void> loadTags() async {
     try {
       allTags = await _repository.fetchTags();
+      isOfflineMode = _isRepoOffline;
     } catch (_) {
       allTags = const [];
+      isOfflineMode = _isRepoOffline;
     }
     notifyListeners();
   }
@@ -196,9 +209,11 @@ class MenuProvider extends ChangeNotifier {
 
       hasMore = result.hasMore;
       _page++;
+      isOfflineMode = _isRepoOffline;
     } catch (e) {
       error = dioErrorMessage(e);
       hasMore = false;
+      isOfflineMode = _isRepoOffline;
     } finally {
       isLoading = false;
       isLoadingMore = false;
@@ -231,9 +246,11 @@ class MenuProvider extends ChangeNotifier {
       feedDishes = [...feedDishes, ...result.dishes];
       _feedNextCursor = result.nextCursor;
       hasMoreFeed = result.nextCursor != null;
+      isOfflineMode = _isRepoOffline;
     } catch (e) {
       feedError = dioErrorMessage(e);
       hasMoreFeed = false;
+      isOfflineMode = _isRepoOffline;
     } finally {
       isLoadingFeed = false;
       if (!isBootstrapping) _syncBootstrapError();

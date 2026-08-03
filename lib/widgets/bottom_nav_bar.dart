@@ -32,39 +32,48 @@ class PiligrimNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        // Верх совпадает с earth — граница растворяется.
-        // Мягкий тёплый акцент в средней зоне: фон ощущается как материал, не как слой.
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF151210),  // = earth — нулевой разрыв с экраном
-            Color(0xFF1D1611),  // лёгкий тёплый акцент (−6R от прежнего)
-            Color(0xFF161110),  // спокойный земляной
-            Color(0xFF0D0B09),  // якорное дно
-          ],
-          stops: [0.0, 0.32, 0.66, 1.0],
+    return Transform.translate(
+      offset: const Offset(0, 0.5),
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Color(0xFF151210),
+              width: 0.5,
+            ),
+          ),
+          // Верх совпадает с earth — граница растворяется.
+          // Мягкий тёплый акцент в средней зоне: фон ощущается как материал, не как слой.
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF151210),  // = earth — нулевой разрыв с экраном
+              Color(0xFF1D1611),  // лёгкий тёплый акцент (−6R от прежнего)
+              Color(0xFF161110),  // спокойный земляной
+              Color(0xFF0D0B09),  // якорное дно
+            ],
+            stops: [0.0, 0.32, 0.66, 1.0],
+          ),
+          boxShadow: PiligrimShadows.nav,
         ),
-        boxShadow: PiligrimShadows.nav,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 5, 4, 0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: List.generate(_items.length, (i) {
-              final item = _items[i];
-              final active = i == currentIndex;
-              return Expanded(
-                child: PiligrimTap(
-                  onTap: () => onTap(i),
-                  child: _NavTabCell(item: item, active: active),
-                ),
-              );
-            }),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 5, 4, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: List.generate(_items.length, (i) {
+                final item = _items[i];
+                final active = i == currentIndex;
+                return Expanded(
+                  child: PiligrimTap(
+                    onTap: () => onTap(i),
+                    child: _NavTabCell(item: item, active: active),
+                  ),
+                );
+              }),
+            ),
           ),
         ),
       ),

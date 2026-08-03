@@ -350,7 +350,7 @@ class AuthProvider extends ChangeNotifier {
     return ('$months', 'Месяцев с нами');
   }
 
-  if (totalDays == 1) return ('1', 'День с нами');
+  if (totalDays <= 1) return ('1', 'День с нами');
   if (totalDays >= 2 && totalDays <= 4) return ('$totalDays', 'Дня с нами');
   return ('$totalDays', 'Дней с нами');
 }

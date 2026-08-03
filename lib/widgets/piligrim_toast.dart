@@ -1,10 +1,27 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 
 enum PiligrimToastType { info, success, error }
 
+class _ToastRequest {
+  final BuildContext context;
+  final String message;
+  final PiligrimToastType type;
+  final Duration duration;
+
+  _ToastRequest({
+    required this.context,
+    required this.message,
+    required this.type,
+    required this.duration,
+  });
+}
+
 class PiligrimToast {
+  static final List<_ToastRequest> _queue = [];
+  static bool _isShowing = false;
   static OverlayEntry? _entry;
   static Timer? _timer;
   static final _key = GlobalKey<_ToastWidgetState>();
@@ -15,21 +32,51 @@ class PiligrimToast {
     PiligrimToastType type = PiligrimToastType.info,
     Duration duration = const Duration(seconds: 3),
   }) {
-    _cancelTimer();
-    _entry?.remove();
-    _entry = null;
+    _queue.add(_ToastRequest(
+      context: context,
+      message: message,
+      type: type,
+      duration: duration,
+    ));
+    if (!_isShowing) {
+      _showNext();
+    }
+  }
 
-    final overlay = Overlay.of(context, rootOverlay: true);
+  static void _showNext() {
+    if (_queue.isEmpty) {
+      _isShowing = false;
+      return;
+    }
+    _isShowing = true;
+    final request = _queue.first;
+
+    if (!request.context.mounted) {
+      _queue.removeAt(0);
+      _showNext();
+      return;
+    }
+
+    final overlay = Overlay.of(request.context, rootOverlay: true);
     _entry = OverlayEntry(
       builder: (_) => _ToastWidget(
         key: _key,
-        message: message,
-        type: type,
+        message: request.message,
+        type: request.type,
         onAnimatedDismiss: _animatedDismiss,
+        onDismissed: () {
+          _cancelTimer();
+          _entry?.remove();
+          _entry = null;
+          if (_queue.isNotEmpty) {
+            _queue.removeAt(0);
+          }
+          _showNext();
+        },
       ),
     );
     overlay.insert(_entry!);
-    _timer = Timer(duration, _animatedDismiss);
+    _timer = Timer(request.duration, _animatedDismiss);
   }
 
   static void _animatedDismiss() {
@@ -37,6 +84,10 @@ class PiligrimToast {
     _key.currentState?.animateOut().then((_) {
       _entry?.remove();
       _entry = null;
+      if (_queue.isNotEmpty) {
+        _queue.removeAt(0);
+      }
+      _showNext();
     });
   }
 
@@ -50,12 +101,14 @@ class _ToastWidget extends StatefulWidget {
   final String message;
   final PiligrimToastType type;
   final VoidCallback onAnimatedDismiss;
+  final VoidCallback onDismissed;
 
   const _ToastWidget({
     super.key,
     required this.message,
     required this.type,
     required this.onAnimatedDismiss,
+    required this.onDismissed,
   });
 
   @override
@@ -122,43 +175,81 @@ class _ToastWidgetState extends State<_ToastWidget>
           position: _slide,
           child: FadeTransition(
             opacity: _fade,
-            child: GestureDetector(
-              onTap: widget.onAnimatedDismiss,
-              child: Container(
-                margin: EdgeInsets.fromLTRB(16, safeTop + 10, 16, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                decoration: BoxDecoration(
-                  color: PiligrimColors.earthDeep,
-                  borderRadius: PiligrimRadius.cardAll,
-                  border: Border.all(
-                    color: _accent.withValues(alpha: 0.28),
-                    width: 1,
+            child: Dismissible(
+              key: ValueKey(widget.message),
+              direction: DismissDirection.horizontal,
+              onDismissed: (_) => widget.onDismissed(),
+              child: Dismissible(
+                key: ValueKey('${widget.message}_up'),
+                direction: DismissDirection.up,
+                onDismissed: (_) => widget.onDismissed(),
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(16, safeTop + 10, 16, 0),
+                  decoration: BoxDecoration(
+                    borderRadius: PiligrimRadius.cardAll,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _accent.withValues(alpha: 0.10),
+                        blurRadius: 24,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 6),
+                      ),
+                      ...PiligrimShadows.card,
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _accent.withValues(alpha: 0.10),
-                      blurRadius: 24,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 6),
-                    ),
-                    ...PiligrimShadows.card,
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Icon(_icon, color: _accent, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        widget.message,
-                        style: PiligrimTextStyles.body.copyWith(
-                          fontSize: 14,
-                          height: 1.45,
-                          color: PiligrimColors.sky,
+                  child: ClipRRect(
+                    borderRadius: PiligrimRadius.cardAll,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: PiligrimColors.earthDeep.withValues(alpha: 0.72),
+                          borderRadius: PiligrimRadius.cardAll,
+                          border: Border.all(
+                            color: _accent.withValues(alpha: 0.28),
+                            width: 1,
+                          ),
+                        ),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Container(
+                                width: 4,
+                                decoration: BoxDecoration(
+                                  color: _accent,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(2),
+                                    bottomLeft: Radius.circular(2),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                child: Icon(_icon, color: _accent, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                                  child: Text(
+                                    widget.message,
+                                    style: PiligrimTextStyles.body.copyWith(
+                                      fontSize: 14,
+                                      height: 1.45,
+                                      color: PiligrimColors.sky,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

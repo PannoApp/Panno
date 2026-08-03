@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../events_news_data.dart';
 import '../models/api_event.dart';
 import '../models/api_event_photo.dart';
@@ -11,47 +13,159 @@ class EventsRepository {
   EventsRepository({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
 
   final Dio _dio;
+  bool isOfflineMode = false;
+
+  Future<SharedPreferences?> _getPrefs() async {
+    try {
+      return await SharedPreferences.getInstance();
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<List<ApiEvent>> fetchUpcoming({int page = 1}) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/events/upcoming/',
-      queryParameters: {'page': page},
-    );
-    return PaginatedResponse.parse(
-      response.data ?? {},
-      (json) => ApiEvent.fromJson(json, isPast: false),
-    ).results;
+    final isDefaultRequest = page == 1;
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/events/upcoming/',
+        queryParameters: {'page': page},
+      );
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      if (isDefaultRequest) {
+        final prefs = await _getPrefs();
+        if (prefs != null) {
+          await prefs.setString('cache_events_upcoming', jsonEncode(response.data));
+        }
+      }
+      return PaginatedResponse.parse(
+        response.data ?? {},
+        (json) => ApiEvent.fromJson(json, isPast: false),
+      ).results;
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      if (isDefaultRequest || e.type != DioExceptionType.badResponse) {
+        final prefs = await _getPrefs();
+        final cached = prefs?.getString('cache_events_upcoming');
+        if (cached != null) {
+          return PaginatedResponse.parse(
+            jsonDecode(cached) as Map<String, dynamic>,
+            (json) => ApiEvent.fromJson(json, isPast: false),
+          ).results;
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<List<ApiEvent>> fetchArchived({int page = 1}) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/events/archived/',
-      queryParameters: {'page': page},
-    );
-    return PaginatedResponse.parse(
-      response.data ?? {},
-      (json) => ApiEvent.fromJson(json, isPast: true),
-    ).results;
+    final isDefaultRequest = page == 1;
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/events/archived/',
+        queryParameters: {'page': page},
+      );
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      if (isDefaultRequest) {
+        final prefs = await _getPrefs();
+        if (prefs != null) {
+          await prefs.setString('cache_events_archived', jsonEncode(response.data));
+        }
+      }
+      return PaginatedResponse.parse(
+        response.data ?? {},
+        (json) => ApiEvent.fromJson(json, isPast: true),
+      ).results;
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      if (isDefaultRequest || e.type != DioExceptionType.badResponse) {
+        final prefs = await _getPrefs();
+        final cached = prefs?.getString('cache_events_archived');
+        if (cached != null) {
+          return PaginatedResponse.parse(
+            jsonDecode(cached) as Map<String, dynamic>,
+            (json) => ApiEvent.fromJson(json, isPast: true),
+          ).results;
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<List<PiligrimNewsPost>> fetchNews({int page = 1}) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/events/news/',
-      queryParameters: {'page': page},
-    );
-    return PaginatedResponse.parse(
-      response.data ?? {},
-      PiligrimNewsPost.fromJson,
-    ).results;
+    final isDefaultRequest = page == 1;
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/events/news/',
+        queryParameters: {'page': page},
+      );
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      if (isDefaultRequest) {
+        final prefs = await _getPrefs();
+        if (prefs != null) {
+          await prefs.setString('cache_news', jsonEncode(response.data));
+        }
+      }
+      return PaginatedResponse.parse(
+        response.data ?? {},
+        PiligrimNewsPost.fromJson,
+      ).results;
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      if (isDefaultRequest || e.type != DioExceptionType.badResponse) {
+        final prefs = await _getPrefs();
+        final cached = prefs?.getString('cache_news');
+        if (cached != null) {
+          return PaginatedResponse.parse(
+            jsonDecode(cached) as Map<String, dynamic>,
+            PiligrimNewsPost.fromJson,
+          ).results;
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<List<ApiEventPhoto>> fetchPhotoReport(int eventId) async {
-    final response = await _dio.get<List<dynamic>>(
-      '/events/$eventId/photo-report/',
-    );
-    return (response.data ?? [])
-        .map((e) => ApiEventPhoto.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final response = await _dio.get<List<dynamic>>(
+        '/events/$eventId/photo-report/',
+      );
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      final prefs = await _getPrefs();
+      if (prefs != null) {
+        await prefs.setString('cache_photo_report_$eventId', jsonEncode(response.data));
+      }
+      return (response.data ?? [])
+          .map((e) => ApiEventPhoto.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      final prefs = await _getPrefs();
+      final cached = prefs?.getString('cache_photo_report_$eventId');
+      if (cached != null) {
+        final list = jsonDecode(cached) as List<dynamic>;
+        return list
+            .map((e) => ApiEventPhoto.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      rethrow;
+    }
   }
 
   Future<void> createReservation({

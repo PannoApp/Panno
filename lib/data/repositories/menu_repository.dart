@@ -1,9 +1,11 @@
 // MenuRepository — HTTP-запросы к API меню (/menu/categories/, /menu/tags/, /menu/dishes/)
 // Паттерн аналогичен EventsRepository: DioClient.instance.dio по умолчанию.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/api_allergen.dart';
 import '../models/api_category.dart';
@@ -16,37 +18,115 @@ class MenuRepository {
   MenuRepository({Dio? dio}) : _dio = dio ?? DioClient.instance.dio;
 
   final Dio _dio;
+  bool isOfflineMode = false;
+
+  Future<SharedPreferences?> _getPrefs() async {
+    try {
+      return await SharedPreferences.getInstance();
+    } catch (_) {
+      return null;
+    }
+  }
 
   // Загружает список категорий меню. Эндпоинт возвращает плоский массив (без пагинации).
   Future<List<ApiCategory>> fetchCategories() async {
-    final response = await _dio.get<List<dynamic>>('/menu/categories/');
-    final list = response.data;
-    if (list == null) return const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map(ApiCategory.fromJson)
-        .toList(growable: false);
+    try {
+      final response = await _dio.get<List<dynamic>>('/menu/categories/');
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      final prefs = await _getPrefs();
+      if (prefs != null) {
+        await prefs.setString('cache_categories', jsonEncode(response.data));
+      }
+      final list = response.data;
+      if (list == null) return const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(ApiCategory.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      final prefs = await _getPrefs();
+      final cached = prefs?.getString('cache_categories');
+      if (cached != null) {
+        final list = jsonDecode(cached) as List<dynamic>;
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(ApiCategory.fromJson)
+            .toList(growable: false);
+      }
+      return const [];
+    }
   }
 
   // Загружает все теги меню. Эндпоинт возвращает плоский массив (без пагинации).
   Future<List<ApiTag>> fetchTags() async {
-    final response = await _dio.get<List<dynamic>>('/menu/tags/');
-    final list = response.data;
-    if (list == null) return const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map(ApiTag.fromJson)
-        .toList(growable: false);
+    try {
+      final response = await _dio.get<List<dynamic>>('/menu/tags/');
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      final prefs = await _getPrefs();
+      if (prefs != null) {
+        await prefs.setString('cache_tags', jsonEncode(response.data));
+      }
+      final list = response.data;
+      if (list == null) return const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(ApiTag.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      final prefs = await _getPrefs();
+      final cached = prefs?.getString('cache_tags');
+      if (cached != null) {
+        final list = jsonDecode(cached) as List<dynamic>;
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(ApiTag.fromJson)
+            .toList(growable: false);
+      }
+      return const [];
+    }
   }
 
   Future<List<ApiAllergen>> fetchAllergens() async {
-    final response = await _dio.get<List<dynamic>>('/menu/allergens/');
-    final list = response.data;
-    if (list == null) return const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map(ApiAllergen.fromJson)
-        .toList(growable: false);
+    try {
+      final response = await _dio.get<List<dynamic>>('/menu/allergens/');
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      final prefs = await _getPrefs();
+      if (prefs != null) {
+        await prefs.setString('cache_allergens', jsonEncode(response.data));
+      }
+      final list = response.data;
+      if (list == null) return const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(ApiAllergen.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      final prefs = await _getPrefs();
+      final cached = prefs?.getString('cache_allergens');
+      if (cached != null) {
+        final list = jsonDecode(cached) as List<dynamic>;
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(ApiAllergen.fromJson)
+            .toList(growable: false);
+      }
+      return const [];
+    }
   }
 
   // Загружает страницу блюд с опциональными фильтрами.
@@ -62,15 +142,44 @@ class MenuRepository {
     if (tagIds != null && tagIds.isNotEmpty) query['tag_ids'] = tagIds.join(',');
     if (search != null && search.isNotEmpty) query['search'] = search;
 
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/menu/dishes/',
-      queryParameters: query,
-    );
-    final paginated = PaginatedResponse.parse(
-      response.data ?? {},
-      ApiDish.fromJson,
-    );
-    return (dishes: paginated.results, hasMore: paginated.hasMore);
+    final isDefaultRequest = categoryId == null && (tagIds == null || tagIds.isEmpty) && (search == null || search.isEmpty) && page == 1;
+
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/menu/dishes/',
+        queryParameters: query,
+      );
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      if (isDefaultRequest) {
+        final prefs = await _getPrefs();
+        if (prefs != null) {
+          await prefs.setString('cache_dishes_default', jsonEncode(response.data));
+        }
+      }
+      final paginated = PaginatedResponse.parse(
+        response.data ?? {},
+        ApiDish.fromJson,
+      );
+      return (dishes: paginated.results, hasMore: paginated.hasMore);
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      if (isDefaultRequest || e.type != DioExceptionType.badResponse) {
+        final prefs = await _getPrefs();
+        final cached = prefs?.getString('cache_dishes_default');
+        if (cached != null) {
+          final paginated = PaginatedResponse.parse(
+            jsonDecode(cached) as Map<String, dynamic>,
+            ApiDish.fromJson,
+          );
+          return (dishes: paginated.results, hasMore: false);
+        }
+      }
+      rethrow;
+    }
   }
 
   /// Загружает страницу видео-ленты с cursor-based пагинацией.
@@ -83,21 +192,69 @@ class MenuRepository {
     final query = <String, dynamic>{};
     if (cursor != null) query['cursor'] = cursor;
 
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/menu/feed/',
-      queryParameters: query.isEmpty ? null : query,
-    );
-    final paginated = PaginatedResponse.parseCursor(
-      response.data ?? {},
-      ApiDish.fromJson,
-    );
-    return (dishes: paginated.results, nextCursor: paginated.nextCursor);
+    final isDefaultRequest = cursor == null;
+
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/menu/feed/',
+        queryParameters: query.isEmpty ? null : query,
+      );
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      if (isDefaultRequest) {
+        final prefs = await _getPrefs();
+        if (prefs != null) {
+          await prefs.setString('cache_feed_default', jsonEncode(response.data));
+        }
+      }
+      final paginated = PaginatedResponse.parseCursor(
+        response.data ?? {},
+        ApiDish.fromJson,
+      );
+      return (dishes: paginated.results, nextCursor: paginated.nextCursor);
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      if (isDefaultRequest || e.type != DioExceptionType.badResponse) {
+        final prefs = await _getPrefs();
+        final cached = prefs?.getString('cache_feed_default');
+        if (cached != null) {
+          final paginated = PaginatedResponse.parseCursor(
+            jsonDecode(cached) as Map<String, dynamic>,
+            ApiDish.fromJson,
+          );
+          return (dishes: paginated.results, nextCursor: null);
+        }
+      }
+      rethrow;
+    }
   }
 
   /// Загружает полные данные одного блюда по id, включая теги и аллергены.
   Future<ApiDish> fetchDish(int id) async {
-    final response = await _dio.get<Map<String, dynamic>>('/menu/dishes/$id/');
-    return ApiDish.fromJson(response.data!);
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/menu/dishes/$id/');
+      isOfflineMode = false;
+      DioClient.isOfflineNotifier.value = false;
+      final prefs = await _getPrefs();
+      if (prefs != null) {
+        await prefs.setString('cache_dish_$id', jsonEncode(response.data));
+      }
+      return ApiDish.fromJson(response.data!);
+    } on DioException catch (e) {
+      isOfflineMode = true;
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+      final prefs = await _getPrefs();
+      final cached = prefs?.getString('cache_dish_$id');
+      if (cached != null) {
+        return ApiDish.fromJson(jsonDecode(cached) as Map<String, dynamic>);
+      }
+      rethrow;
+    }
   }
 
   // ── Admin CRUD ─────────────────────────────────────────────────────────────

@@ -346,7 +346,16 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.bookings.tasks.sync_reserve_statuses',
         'schedule': 60 * 10,  # каждые 10 минут
     },
+    'cleanup-old-push-receipts': {
+        'task': 'apps.notifications.tasks.cleanup_old_push_receipts',
+        'schedule': 60 * 60 * 24,  # раз в сутки
+    },
 }
+
+# Сколько хранить PushReceipt (лог фактов получения push с клиента) — это
+# диагностический лог, не бизнес-данные, поэтому храним недолго, чтобы таблица
+# не росла бесконечно на каждый пуш каждому гостю (см. cleanup_old_push_receipts).
+PUSH_RECEIPT_RETENTION_DAYS = env.int('PUSH_RECEIPT_RETENTION_DAYS', default=60)
 
 CELERY_TASK_ROUTES = {
     'apps.menu.tasks.process_dish_video': {'queue': 'video'},

@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from firebase_admin import messaging
 
-from .models import UserDevice
+from .models import OWN_CHANNEL_DATA_KEY, OWN_CHANNEL_DATA_VALUE, PushReceipt, UserDevice
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +113,8 @@ def send_push_notification(user_id, title, body, data=None, category=None, campa
     # 2. Формируем сообщение
     # FCM требует, чтобы все значения data были строками
     str_data = {k: str(v) for k, v in (data or {}).items()}
+    # Метка "это отправили мы" — см. PushReceipt.is_own_channel в apps/notifications/models.py.
+    str_data[OWN_CHANNEL_DATA_KEY] = OWN_CHANNEL_DATA_VALUE
 
     message = messaging.MulticastMessage(
         notification=messaging.Notification(
@@ -195,3 +197,21 @@ def send_bulk_push_notification(user_ids, title, body, data=None, category=None,
         queued, len(user_ids), category, campaign_id,
     )
     return queued
+
+
+@shared_task(
+    name='apps.notifications.tasks.cleanup_old_push_receipts',
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=300,
+)
+def cleanup_old_push_receipts():
+    """
+    Раз в сутки (см. CELERY_BEAT_SCHEDULE) удаляет PushReceipt старше
+    PUSH_RECEIPT_RETENTION_DAYS — это диагностический лог, а не бизнес-данные,
+    хранить его бессрочно незачем и накладно при большом объёме пушей.
+    """
+    cutoff = timezone.now() - timedelta(days=settings.PUSH_RECEIPT_RETENTION_DAYS)
+    deleted_count, _ = PushReceipt.objects.filter(created_at__lt=cutoff).delete()
+    logger.info("Cleaned up %d old PushReceipt row(s) older than %s days", deleted_count, settings.PUSH_RECEIPT_RETENTION_DAYS)
+    return deleted_count

@@ -23,6 +23,8 @@ import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/menu_screen.dart';
 import 'screens/interior_screen.dart';
+import 'data/services/api_client.dart';
+import 'package:dio/dio.dart';
 import 'screens/events_screen.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/bottom_nav_bar.dart';
@@ -153,19 +155,22 @@ class RootShell extends StatefulWidget {
   State<RootShell> createState() => _RootShellState();
 }
 
-class _RootShellState extends State<RootShell> {
+class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
   late int _currentIndex;
   final _scrollControllers = List.generate(5, (_) => ScrollController());
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentIndex = widget.initialIndex;
     PushNavigationHandler.onPushType = _onPushType;
+    _checkConnectivity();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (PushNavigationHandler.onPushType == _onPushType) {
       PushNavigationHandler.onPushType = null;
     }
@@ -173,6 +178,32 @@ class _RootShellState extends State<RootShell> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkConnectivity();
+    }
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      await DioClient.instance.dio.get(
+        '/core/info/',
+        options: Options(
+          sendTimeout: const Duration(seconds: 3),
+          receiveTimeout: const Duration(seconds: 3),
+        ),
+      );
+      DioClient.isOfflineNotifier.value = false;
+    } on DioException catch (e) {
+      if (e.type != DioExceptionType.badResponse) {
+        DioClient.isOfflineNotifier.value = true;
+      }
+    } catch (_) {
+      DioClient.isOfflineNotifier.value = true;
+    }
   }
 
   void _onPushType(String type) {
@@ -206,38 +237,88 @@ class _RootShellState extends State<RootShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      backgroundColor: PiligrimColors.earth,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          PrimaryScrollController(
-            controller: _scrollControllers[0],
-            child: HomeScreen(onNavigate: _navigate),
+    return ValueListenableBuilder<bool>(
+      valueListenable: DioClient.isOfflineNotifier,
+      builder: (context, isOffline, _) {
+        return Scaffold(
+          extendBody: true,
+          backgroundColor: PiligrimColors.earth,
+          body: Stack(
+            children: [
+              IndexedStack(
+                index: _currentIndex,
+                children: [
+                  PrimaryScrollController(
+                    controller: _scrollControllers[0],
+                    child: HomeScreen(onNavigate: _navigate),
+                  ),
+                  PrimaryScrollController(
+                    controller: _scrollControllers[1],
+                    child: MenuScreen(isTabActive: _currentIndex == 1),
+                  ),
+                  PrimaryScrollController(
+                    controller: _scrollControllers[2],
+                    child: InteriorScreen(isTabActive: _currentIndex == 2),
+                  ),
+                  PrimaryScrollController(
+                    controller: _scrollControllers[3],
+                    child: const EventsScreen(),
+                  ),
+                  PrimaryScrollController(
+                    controller: _scrollControllers[4],
+                    child: ProfileScreen(onNavigate: _navigate),
+                  ),
+                ],
+              ),
+              if (isOffline)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.only(
+                      top: MediaQuery.paddingOf(context).top + 6,
+                      bottom: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: PiligrimColors.earthWarm.withValues(alpha: 0.92),
+                      border: const Border(
+                        bottom: BorderSide(
+                          color: PiligrimColors.divider,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          color: PiligrimColors.steppe,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Офлайн-режим. Данные могут быть неактуальными',
+                          style: PiligrimTextStyles.caption.copyWith(
+                            color: PiligrimColors.sky,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
-          PrimaryScrollController(
-            controller: _scrollControllers[1],
-            child: MenuScreen(isTabActive: _currentIndex == 1),
+          bottomNavigationBar: PiligrimNavBar(
+            currentIndex: _currentIndex,
+            onTap: _navigate,
           ),
-          PrimaryScrollController(
-            controller: _scrollControllers[2],
-            child: InteriorScreen(isTabActive: _currentIndex == 2),
-          ),
-          PrimaryScrollController(
-            controller: _scrollControllers[3],
-            child: const EventsScreen(),
-          ),
-          PrimaryScrollController(
-            controller: _scrollControllers[4],
-            child: ProfileScreen(onNavigate: _navigate),
-          ),
-        ],
-      ),
-      bottomNavigationBar: PiligrimNavBar(
-        currentIndex: _currentIndex,
-        onTap: _navigate,
-      ),
+        );
+      },
     );
   }
 }

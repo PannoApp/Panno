@@ -2,28 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- ВРЕМЕННО: разрешаем HTTP к тестовому серверу 185.129.51.40 (API :8000 и медиа MinIO :9000).
-	     ATS сопоставляет по хосту, поэтому одно исключение покрывает оба порта.
-	     Убрать, когда появится домен + HTTPS. -->
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>185.129.51.40</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-				<key>NSIncludesSubdomains</key>
-				<false/>
-			</dict>
-		</dict>
-	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Выберите фото блюда из галереи</string>
+	<string>Приложению требуется доступ к вашей галерее для выбора и загрузки фотографий блюд и мероприятий в панель управления.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Выберите вертикальное видео блюда из галереи</string>
+	<string>Приложению требуется разрешение на сохранение и добавление фотографий и видеороликов блюд и мероприятий в вашу галерею.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Сделайте фото блюда</string>
+	<string>Приложению требуется доступ к камере для съемки новых фотографий блюд и мероприятий для добавления в меню и афишу.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>whatsapp</string>

@@ -474,9 +474,9 @@ abstract final class PiligrimShadows {
   /// Тень навбара (направлена вверх) — отделяет контент от нижней панели.
   static const List<BoxShadow> nav = [
     BoxShadow(
-      color: Color(0x18000000),
+      color: Color(0x08000000),
       blurRadius: 8,
-      offset: Offset(0, -3),
+      offset: Offset(0, -1),
       spreadRadius: 0,
     ),
   ];

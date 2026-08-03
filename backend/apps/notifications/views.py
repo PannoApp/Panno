@@ -2,11 +2,11 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework import status, views
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from utils.permissions import IsContentManager
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from .models import UserDevice, PushCampaign
-from .serializers import UserDeviceSerializer, BulkPushSerializer
+from .serializers import BulkPushSerializer, PushReceiptSerializer, UserDeviceSerializer
 
 
 @extend_schema(tags=['Notifications'])
@@ -86,6 +86,37 @@ class RegisterDeviceView(views.APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(tags=['Notifications'])
+class PushReceiptView(views.APIView):
+    """
+    Фиксирует факт получения push на устройстве (клиент сам об этом сообщает).
+    Без авторизации — см. докстринг PushReceiptSerializer, почему. Единственная
+    защита от спама — глобальный AnonRateThrottle ('anon', см. settings) по IP,
+    отдельного лимита для этого эндпоинта не заводили: событие штучное (один
+    push — один вызов), 60/мин с одного IP более чем достаточно даже при
+    нескольких устройствах за NAT.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Записать факт получения push на устройстве',
+        description=(
+            'Клиент вызывает это при получении push через FCM — как отправленного '
+            'нашим backend\'ом, так и пришедшего в обход него (например, от Remarked '
+            'напрямую через Firebase). Нужен, чтобы иметь видимость: что и когда '
+            'реально дошло до конкретного устройства.'
+        ),
+        request=PushReceiptSerializer,
+        responses={201: OpenApiResponse(description='Записано')},
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = PushReceiptSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(status=status.HTTP_201_CREATED)
 
 
 @extend_schema(

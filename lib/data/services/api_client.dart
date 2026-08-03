@@ -9,6 +9,8 @@ class DioClient {
   DioClient._();
   static final DioClient instance = DioClient._();
 
+  static final ValueNotifier<bool> isOfflineNotifier = ValueNotifier<bool>(false);
+
   // Значение вшивается при сборке через --dart-define-from-file.
   // Android эмулятор: http://10.0.2.2:8000/api/v1
   // iOS симулятор:    http://localhost:8000/api/v1
@@ -17,6 +19,11 @@ class DioClient {
     'BASE_URL',
     defaultValue: 'https://piligrim.kz/api/v1',
   );
+
+  /// Тот же base URL, но доступный без построения полного [DioClient] —
+  /// нужен фоновому FCM-изоляту (см. firebaseMessagingBackgroundHandler в
+  /// fcm_service.dart), у которого нет состояния основного изолята.
+  static const String baseUrlForBackgroundIsolate = _baseUrl;
 
   // Origin для сборки абсолютных media-URL из относительных путей (/media/...).
   // Android эмулятор: http://10.0.2.2:8000

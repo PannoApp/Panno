@@ -17,6 +17,7 @@ class CoreInfoProvider extends ChangeNotifier {
   List<InteriorSlide> interiorSlides = const [];
   bool isLoading = false;
   String? error;
+  bool isOfflineMode = false;
 
   bool get isLoaded => coreInfo != null;
   bool get isOpenNow => coreInfo?.isOpenNow ?? kRestaurantInfo.isOpen;
@@ -28,6 +29,14 @@ class CoreInfoProvider extends ChangeNotifier {
     final urls = coreInfo?.heroImageUrls ?? const [];
     if (urls.isNotEmpty) return urls;
     return const [];
+  }
+
+  bool get _isRepoOffline {
+    try {
+      return _repository.isOfflineMode;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> load() async {
@@ -44,9 +53,11 @@ class CoreInfoProvider extends ChangeNotifier {
       ]);
       coreInfo = results[0] as CoreInfo;
       interiorSlides = results[1] as List<InteriorSlide>;
+      isOfflineMode = _isRepoOffline;
     } catch (e) {
       error = dioErrorMessage(e);
       coreInfo = null;
+      isOfflineMode = _isRepoOffline;
     } finally {
       isLoading = false;
       notifyListeners();

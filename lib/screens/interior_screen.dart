@@ -140,8 +140,20 @@ class _InteriorScreenState extends State<InteriorScreen>
     super.build(context);
     return Consumer<CoreInfoProvider>(
       builder: (context, core, _) {
-        final slides = core.interiorSlides;
-        final useApi = slides.isNotEmpty;
+        final rawSlides = core.interiorSlides;
+        final useApi = rawSlides.isNotEmpty;
+        final slides = useApi
+            ? rawSlides
+            : PiligrimInteriorAssets.allInteriorPngs.asMap().entries.map((e) {
+                return InteriorSlide(
+                  id: e.key,
+                  zone: 'зал',
+                  zoneDisplay: 'Зал',
+                  imageUrl: e.value,
+                  order: e.key,
+                );
+              }).toList();
+
         final cacheW = PiligrimInteriorAssets.decodeCacheWidth(context);
         final tourLink = core.coreInfo?.tourLink;
 
@@ -154,17 +166,17 @@ class _InteriorScreenState extends State<InteriorScreen>
             : <({String zone, String label})>[];
 
         // Фото для текущего фильтра
-        final filtered = (_selectedZone == null || !useApi)
-            ? (useApi ? slides : <InteriorSlide>[])
+        final filtered = (_selectedZone == null)
+            ? slides
             : slides.where((s) => s.zone == _selectedZone).toList();
 
         // Hero — первое фото текущего фильтра; сетка показывает остальные
-        final heroSlide = (useApi && filtered.isNotEmpty) ? filtered[0] : null;
+        final heroSlide = filtered.isNotEmpty ? filtered[0] : null;
         final gridSlides =
-            (useApi && filtered.length > 1) ? filtered.sublist(1) : <InteriorSlide>[];
-        final itemCount = useApi ? gridSlides.length : 0;
+            (filtered.length > 1) ? filtered.sublist(1) : <InteriorSlide>[];
+        final itemCount = gridSlides.length;
         // Нечётные плитки — последняя одна, рендерим её полноширокой
-        final hasOrphan = useApi && itemCount.isOdd && itemCount > 0;
+        final hasOrphan = itemCount.isOdd && itemCount > 0;
         final pairCount = hasOrphan ? itemCount - 1 : itemCount;
 
         return Scaffold(
@@ -389,14 +401,20 @@ class _HeroPhotoBlock extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              CachedNetworkImage(
-                imageUrl: slide.imageUrl,
-                fit: BoxFit.cover,
-                memCacheWidth: cacheWidth,
-                placeholder: (_, __) => const PiligrimShimmer(),
-                errorWidget: (_, __, ___) =>
-                    const ColoredBox(color: PiligrimColors.earthDeep),
-              ),
+              slide.imageUrl.startsWith('assets/')
+                  ? Image.asset(
+                      slide.imageUrl,
+                      fit: BoxFit.cover,
+                      cacheWidth: cacheWidth,
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: slide.imageUrl,
+                      fit: BoxFit.cover,
+                      memCacheWidth: cacheWidth,
+                      placeholder: (_, __) => const PiligrimShimmer(),
+                      errorWidget: (_, __, ___) =>
+                          const ColoredBox(color: PiligrimColors.earthDeep),
+                    ),
               // Верхняя виньетка — плавный переход к тёмному фону сверху
               Positioned.fill(
                 child: DecoratedBox(
@@ -513,14 +531,20 @@ class _InteriorSlideTile extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CachedNetworkImage(
-              imageUrl: slide.imageUrl,
-              fit: BoxFit.cover,
-              memCacheWidth: cacheWidth,
-              placeholder: (_, __) => const PiligrimShimmer(),
-              errorWidget: (_, __, ___) =>
-                  const ColoredBox(color: PiligrimColors.earthDeep),
-            ),
+            slide.imageUrl.startsWith('assets/')
+                ? Image.asset(
+                    slide.imageUrl,
+                    fit: BoxFit.cover,
+                    cacheWidth: cacheWidth,
+                  )
+                : CachedNetworkImage(
+                    imageUrl: slide.imageUrl,
+                    fit: BoxFit.cover,
+                    memCacheWidth: cacheWidth,
+                    placeholder: (_, __) => const PiligrimShimmer(),
+                    errorWidget: (_, __, ___) =>
+                        const ColoredBox(color: PiligrimColors.earthDeep),
+                  ),
             // Градиент снизу — создаёт «кино» ощущение
             Positioned.fill(
               child: DecoratedBox(

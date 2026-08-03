@@ -112,17 +112,22 @@ class _InteriorPhotoViewerState extends State<InteriorPhotoViewer> {
                     clipBehavior: Clip.none,
                     boundaryMargin: const EdgeInsets.all(20),
                     child: SizedBox.expand(
-                      child: CachedNetworkImage(
-                        imageUrl: widget.slides[i].imageUrl,
-                        // fitWidth — фото всегда занимает полную ширину экрана,
-                        // для portrait-кадров заполняет и высоту
-                        fit: BoxFit.fitWidth,
-                        memCacheWidth: MediaQuery.sizeOf(context).width.toInt(),
-                        placeholder: (_, __) => const PiligrimShimmer(),
-                        errorWidget: (_, __, ___) => const ColoredBox(
-                          color: PiligrimColors.earthDeep,
-                        ),
-                      ),
+                      child: widget.slides[i].imageUrl.startsWith('assets/')
+                          ? Image.asset(
+                              widget.slides[i].imageUrl,
+                              fit: BoxFit.fitWidth,
+                            )
+                          : CachedNetworkImage(
+                              imageUrl: widget.slides[i].imageUrl,
+                              // fitWidth — фото всегда занимает полную ширину экрана,
+                              // для portrait-кадров заполняет и высоту
+                              fit: BoxFit.fitWidth,
+                              memCacheWidth: MediaQuery.sizeOf(context).width.toInt(),
+                              placeholder: (_, __) => const PiligrimShimmer(),
+                              errorWidget: (_, __, ___) => const ColoredBox(
+                                color: PiligrimColors.earthDeep,
+                              ),
+                            ),
                     ),
                   ),
                 );

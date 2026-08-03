@@ -164,10 +164,13 @@ class SendPushNotificationTaskTest(TestCase):
         send_push_notification(user_id=self.user.pk, title='T', body='B', data=extra)
 
         _, kwargs = mock_messaging.MulticastMessage.call_args
-        self.assertEqual(kwargs['data'], extra)
+        # _source добавляется автоматически (см. test_marks_own_channel_in_data ниже) —
+        # проверяем, что переданные поля дошли, не требуя точного совпадения словаря.
+        self.assertEqual(kwargs['data']['booking_id'], '7')
+        self.assertEqual(kwargs['data']['status'], 'confirmed')
 
     @patch('apps.notifications.tasks.messaging')
-    def test_empty_data_defaults_to_empty_dict(self, mock_messaging):
+    def test_empty_data_defaults_to_source_marker_only(self, mock_messaging):
         UserDevice.objects.create(user=self.user, fcm_token='tok')
 
         mock_response = MagicMock()
@@ -179,7 +182,25 @@ class SendPushNotificationTaskTest(TestCase):
         send_push_notification(user_id=self.user.pk, title='T', body='B')
 
         _, kwargs = mock_messaging.MulticastMessage.call_args
-        self.assertEqual(kwargs['data'], {})
+        from apps.notifications.models import OWN_CHANNEL_DATA_KEY, OWN_CHANNEL_DATA_VALUE
+        self.assertEqual(kwargs['data'], {OWN_CHANNEL_DATA_KEY: OWN_CHANNEL_DATA_VALUE})
+
+    @patch('apps.notifications.tasks.messaging')
+    def test_marks_own_channel_in_data(self, mock_messaging):
+        """PushReceipt.is_own_channel опирается на эту метку — см. serializers.py."""
+        UserDevice.objects.create(user=self.user, fcm_token='tok')
+
+        mock_response = MagicMock()
+        mock_response.failure_count = 0
+        mock_response.success_count = 1
+        mock_messaging.send_each_for_multicast.return_value = mock_response
+
+        from apps.notifications.models import OWN_CHANNEL_DATA_KEY, OWN_CHANNEL_DATA_VALUE
+        from apps.notifications.tasks import send_push_notification
+        send_push_notification(user_id=self.user.pk, title='T', body='B')
+
+        _, kwargs = mock_messaging.MulticastMessage.call_args
+        self.assertEqual(kwargs['data'][OWN_CHANNEL_DATA_KEY], OWN_CHANNEL_DATA_VALUE)
 
 
 # ---------------------------------------------------------------------------
@@ -742,4 +763,118 @@ class FirebaseStartupValidationTest(TestCase):
                     config.ready()
             finally:
                 firebase_admin._apps.update(saved_apps)
+
+
+# =============================================================================
+# POST /api/v1/notifications/push-receipt/
+# =============================================================================
+
+class PushReceiptViewTest(APITestCase):
+    URL = '/api/v1/notifications/push-receipt/'
+
+    def setUp(self):
+        self.user = make_user('+77005555555')
+
+    def test_no_auth_required(self):
+        """Публичный эндпоинт — фоновый FCM-обработчик не может надёжно нести JWT."""
+        UserDevice.objects.create(user=self.user, fcm_token='tok-a')
+        response = self.client.post(self.URL, {
+            'fcm_token': 'tok-a', 'title': 'T', 'body': 'B', 'context': 'foreground',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_resolves_user_by_fcm_token(self):
+        from .models import PushReceipt
+        UserDevice.objects.create(user=self.user, fcm_token='tok-b')
+        self.client.post(self.URL, {
+            'fcm_token': 'tok-b', 'title': 'T', 'body': 'B', 'context': 'opened_app',
+        }, format='json')
+        receipt = PushReceipt.objects.get(fcm_token='tok-b')
+        self.assertEqual(receipt.user, self.user)
+
+    def test_unknown_token_still_recorded_without_user(self):
+        """Токен не найден в UserDevice (устройство уже удалено и т.п.) — всё равно логируем, user=None."""
+        from .models import PushReceipt
+        response = self.client.post(self.URL, {
+            'fcm_token': 'ghost-token', 'title': 'T', 'body': 'B', 'context': 'background',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        receipt = PushReceipt.objects.get(fcm_token='ghost-token')
+        self.assertIsNone(receipt.user)
+
+    def test_own_channel_marker_detected(self):
+        from .models import PushReceipt, OWN_CHANNEL_DATA_KEY, OWN_CHANNEL_DATA_VALUE
+        UserDevice.objects.create(user=self.user, fcm_token='tok-c')
+        self.client.post(self.URL, {
+            'fcm_token': 'tok-c', 'title': 'T', 'body': 'B', 'context': 'foreground',
+            'data': {OWN_CHANNEL_DATA_KEY: OWN_CHANNEL_DATA_VALUE, 'booking_id': '7'},
+        }, format='json')
+        receipt = PushReceipt.objects.get(fcm_token='tok-c')
+        self.assertTrue(receipt.is_own_channel)
+
+    def test_external_push_without_marker_is_not_own_channel(self):
+        """Пуш от Remarked напрямую — без нашей метки в data."""
+        from .models import PushReceipt
+        UserDevice.objects.create(user=self.user, fcm_token='tok-d')
+        self.client.post(self.URL, {
+            'fcm_token': 'tok-d', 'title': 'Акция', 'body': 'Скидка', 'context': 'background',
+            'data': {'promo_id': '1'},
+        }, format='json')
+        receipt = PushReceipt.objects.get(fcm_token='tok-d')
+        self.assertFalse(receipt.is_own_channel)
+
+    def test_missing_context_returns_400(self):
+        response = self.client.post(self.URL, {'fcm_token': 'tok-e'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_invalid_context_choice_returns_400(self):
+        response = self.client.post(self.URL, {
+            'fcm_token': 'tok-f', 'context': 'not_a_real_context',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_missing_fcm_token_returns_400(self):
+        response = self.client.post(self.URL, {'context': 'foreground'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+# =============================================================================
+# cleanup_old_push_receipts (Celery Beat, ежедневно)
+# =============================================================================
+
+class CleanupOldPushReceiptsTaskTest(TestCase):
+    def setUp(self):
+        self.user = make_user('+77006666666')
+
+    def _make_receipt(self, days_old):
+        from .models import PushReceipt
+        receipt = PushReceipt.objects.create(
+            user=self.user, fcm_token='tok', title='T', context='foreground',
+        )
+        if days_old:
+            from datetime import timedelta
+            from django.utils import timezone
+            PushReceipt.objects.filter(pk=receipt.pk).update(
+                created_at=timezone.now() - timedelta(days=days_old)
+            )
+        return receipt
+
+    @override_settings(PUSH_RECEIPT_RETENTION_DAYS=60)
+    def test_deletes_only_receipts_older_than_retention(self):
+        from .models import PushReceipt
+        old = self._make_receipt(days_old=61)
+        recent = self._make_receipt(days_old=10)
+
+        from apps.notifications.tasks import cleanup_old_push_receipts
+        deleted = cleanup_old_push_receipts()
+
+        self.assertEqual(deleted, 1)
+        self.assertFalse(PushReceipt.objects.filter(pk=old.pk).exists())
+        self.assertTrue(PushReceipt.objects.filter(pk=recent.pk).exists())
+
+    def test_registered_in_beat_schedule(self):
+        from django.conf import settings
+        entry = settings.CELERY_BEAT_SCHEDULE.get('cleanup-old-push-receipts')
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry['task'], 'apps.notifications.tasks.cleanup_old_push_receipts')
 
