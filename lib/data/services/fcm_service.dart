@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -159,14 +158,20 @@ class FcmService {
   Future<void> registerTokenWithServer(Dio dio) async {
     final token = await getToken();
     if (token == null || token.isEmpty) return;
+    unawaited(_cacheFcmToken(token));
     await dio.post<Map<String, dynamic>>(
       '/notifications/device/register/',
       data: {'fcm_token': token},
     );
   }
 
+  Future<void> _logReceipt(RemoteMessage message, {required String context}) async {
+    final token = await getToken();
+    await logPushReceipt(DioClient.instance.dio, message, context: context, fcmToken: token);
+  }
+
   void _onForegroundMessage(RemoteMessage message) {
-    unawaited(logPushReceipt(DioClient.instance.dio, message, context: 'foreground'));
+    unawaited(_logReceipt(message, context: 'foreground'));
 
     final title = message.notification?.title ?? 'PILIGRIM';
     final body = message.notification?.body ?? '';
@@ -181,7 +186,7 @@ class FcmService {
   }
 
   void _onMessageOpened(RemoteMessage message) {
-    unawaited(logPushReceipt(DioClient.instance.dio, message, context: 'opened_app'));
+    unawaited(_logReceipt(message, context: 'opened_app'));
     _handleNavigation(message.data);
   }
 

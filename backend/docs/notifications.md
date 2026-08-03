@@ -330,18 +330,109 @@ push на смену статуса через свой прямой канал;
    Отсутствие активности = Remarked не смогли им воспользоваться; наличие
    активности без реальной доставки = ключ рабочий, но что-то не так дальше
    в их запросе (например, как раз отсутствие `subscriptions`).
-4. Полноценного «доставлено/не доставлено на устройство X» отчёта в
-   Firebase/Google Cloud нет — единственный источник истины на этом шаге —
-   сам телефон.
+4. ⚠️ Устарело с добавлением `PushReceipt` (см. ниже, 2026-08-03): раньше
+   единственным источником истины было "посмотреть на сам телефон", потому
+   что ни в Firebase, ни в Google Cloud нет отчёта "доставлено/не доставлено
+   на устройство X". Теперь для этого есть `PushReceipt` — см. следующий
+   раздел, это быстрее шагов 1-3 выше и не требует доступа в Google Cloud.
+
+## PushReceipt — лог фактов получения push с клиента
+
+Модель `PushReceipt` (`apps/notifications/models.py`) — запись о том, что
+push реально получен на конкретном устройстве, репортится самим клиентом.
+Появилась, чтобы не гадать и не лезть в Google Cloud Console каждый раз,
+когда непонятно, дошёл ли push от Remarked (см. предыдущий раздел) — вместо
+этого можно посмотреть в Django Admin (`Notifications → Факты получения
+push`) или прямо в базе.
+
+**Как это работает:**
+
+```
+Приложение получает push (любой — наш или от Remarked)
+        ↓
+FcmService (foreground/opened_app) или firebaseMessagingBackgroundHandler (фон)
+        ↓
+POST /api/v1/notifications/push-receipt/  (без JWT — см. ниже, почему)
+        ↓
+PushReceipt.objects.create(...) — user резолвится по fcm_token через UserDevice
+```
+
+### POST /api/v1/notifications/push-receipt/
+
+Публичный эндпоинт (без авторизации) — это осознанное решение, не недосмотр:
+фоновый обработчик FCM (`firebaseMessagingBackgroundHandler` в
+`lib/data/services/fcm_service.dart`) работает в отдельном Dart-изоляте с
+очень ограниченным временем на выполнение и не может надёжно нести/обновлять
+JWT. Вместо авторизации пользователь резолвится по `fcm_token` (уникален,
+уже есть в `UserDevice`) — если токен не найден, запись всё равно создаётся,
+просто с `user=null`. Единственная защита от спама — общий `AnonRateThrottle`
+(`60/мин` с IP, см. `DEFAULT_THROTTLE_RATES` в settings), отдельного лимита
+не заводили.
+
+**Тело запроса:**
+```json
+{
+  "fcm_token": "fFYyJA2sTu-qYMS5iXVoS1:APA91b...",
+  "title": "Специальное предложение",
+  "body": "Скидка 20%",
+  "data": {"type": "promo"},
+  "context": "foreground"
+}
+```
+
+| Поле | Обязательное | Описание |
+|---|---|---|
+| `fcm_token` | Да | Токен устройства, получившего push |
+| `title` / `body` | Нет | Из `RemoteMessage.notification` (может быть пусто у data-only сообщений) |
+| `data` | Нет | Словарь строк из `RemoteMessage.data` |
+| `context` | Да | `foreground` (получено при открытом приложении) / `opened_app` (открыли тапом по уведомлению, из фона или из `getInitialMessage`) / `background` (получено в фоне, без тапа — единственный способ вообще узнать про такие) |
+
+### `is_own_channel` — как отличить наш пуш от Remarked
+
+Наш собственный `send_push_notification` (`apps/notifications/tasks.py`)
+теперь всегда добавляет в `data` внутреннюю метку
+`{OWN_CHANNEL_DATA_KEY: OWN_CHANNEL_DATA_VALUE}` = `{"_source":
+"panno_backend"}`. При записи `PushReceipt` эта метка проверяется — если она
+есть, `is_own_channel=True`. Пуши Remarked (или что угодно ещё, отправленное
+не через наш `send_push_notification`) этой метки не содержат, поэтому в
+логе видно, откуда реально пришёл конкретный push, без необходимости лезть в
+Google Cloud за активностью сервисных ключей.
+
+### Хранение и очистка
+
+Это диагностический лог, не бизнес-данные — хранится
+`PUSH_RECEIPT_RETENTION_DAYS` дней (по умолчанию 60), затем удаляется
+Celery Beat задачей `cleanup_old_push_receipts` (раз в сутки). Это намеренно —
+без очистки таблица растёт на каждый полученный push каждым устройством
+каждого гостя, бессрочно.
+
+### Клиентская сторона (Flutter)
+
+`lib/data/services/fcm_service.dart`:
+- `logPushReceipt()` — общая функция отправки, best-effort (сетевые ошибки
+  проглатываются, таймаут 5 с) — это диагностика, а не критичная для
+  пользователя операция, ронять/блокировать UI из-за неё нельзя.
+- Вызывается из `_onForegroundMessage`, `_onMessageOpened` и обработки
+  `getInitialMessage()` в `initEarly()` — контексты `foreground`/`opened_app`.
+- `firebaseMessagingBackgroundHandler` — **обязательно** top-level функция
+  (не метод класса), потому что плагин вызывает её в отдельном изоляте без
+  доступа к состоянию основного (включая `FcmService.instance`). Токен
+  устройства в этом изоляте берётся не через
+  `FirebaseMessaging.instance.getToken()` (потребовало бы поднимать
+  `Firebase.initializeApp()` заново в изоляте), а из кеша в
+  `SharedPreferences` — записывается туда при каждом успешном
+  `registerTokenWithServer()`.
 
 ## Файлы модуля
 
 ```
 apps/notifications/
-├── models.py       # UserDevice
-├── serializers.py  # UserDeviceSerializer, BulkPushSerializer
-├── views.py        # RegisterDeviceView, BulkPushView
-├── tasks.py        # send_push_notification, send_bulk_push_notification (Celery)
+├── models.py       # UserDevice, PushCampaign, PushReceipt
+├── serializers.py  # UserDeviceSerializer, BulkPushSerializer, PushReceiptSerializer
+├── views.py        # RegisterDeviceView, BulkPushView, PushReceiptView
+├── tasks.py        # send_push_notification, send_bulk_push_notification,
+│                   # cleanup_old_push_receipts (все — Celery)
+├── admin.py        # UserDeviceAdmin, PushCampaignAdmin, PushReceiptAdmin (read-only)
 ├── apps.py         # инициализация Firebase в ready()
 └── urls.py         # Маршруты /api/v1/notifications/
 ```
