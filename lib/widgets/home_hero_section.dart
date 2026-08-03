@@ -172,10 +172,16 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
 
   /// Альфа-растворение — только нижняя четверть hero.
   static Shader _photoDissolveShader(Rect bounds) {
+    final alignedBounds = Rect.fromLTRB(
+      bounds.left.roundToDouble(),
+      bounds.top.roundToDouble(),
+      bounds.right.roundToDouble(),
+      bounds.bottom.roundToDouble(),
+    );
     return const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      tileMode: TileMode.decal,
+      tileMode: TileMode.clamp,
       stops: [
         0.0,
         0.74,
@@ -198,7 +204,7 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
         Color(0x00FFFFFF),
         Color(0x00FFFFFF),
       ],
-    ).createShader(bounds);
+    ).createShader(alignedBounds);
   }
 
   @override
@@ -248,10 +254,14 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
           fit: StackFit.expand,
           children: [
             // Фото + затемнение внутри ShaderMask (dissolve снизу)
-            ShaderMask(
-              shaderCallback: _photoDissolveShader,
-              blendMode: BlendMode.dstIn,
-              child: ClipRect(
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: -20,
+              child: ShaderMask(
+                shaderCallback: _photoDissolveShader,
+                blendMode: BlendMode.dstIn,
                 child: Transform.translate(
                   offset: Offset(
                     widget.tiltX * 8,
