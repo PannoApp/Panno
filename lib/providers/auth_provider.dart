@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/dio_errors.dart';
 import '../core/profile_data.dart';
@@ -75,16 +77,41 @@ class AuthProvider extends ChangeNotifier {
       if (access == null || access.isEmpty) {
         currentUser = null;
         eventsCount = 0;
+        await _cacheProfile(null);
         return;
       }
+
+      // Загружаем сохранённый профиль из кэша перед сетевым запросом
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedJson = prefs.getString('cached_user_profile');
+        if (cachedJson != null) {
+          currentUser = UserProfile.fromJson(jsonDecode(cachedJson));
+          notifyListeners();
+        }
+      } catch (e) {
+        debugPrint('Error reading cached profile: $e');
+      }
+
       await _loadProfile();
       await _loadEventsCount();
       await _registerFcmIfPossible();
     } catch (e) {
       error = dioErrorMessage(e);
-      currentUser = null;
-      eventsCount = 0;
-      await _tokenStorage.clearTokens();
+
+      // Проверяем, является ли ошибка сетевой (таймаут, отсутствие соединения)
+      final isNetworkError = e is DioException &&
+          (e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.receiveTimeout ||
+              e.type == DioExceptionType.sendTimeout ||
+              e.type == DioExceptionType.connectionError);
+
+      if (!isNetworkError) {
+        currentUser = null;
+        eventsCount = 0;
+        await _tokenStorage.clearTokens();
+        await _cacheProfile(null);
+      }
     } finally {
       isLoading = false;
       notifyListeners();
@@ -137,6 +164,7 @@ class AuthProvider extends ChangeNotifier {
 
     // Немедленно очищаем локальную сессию — не ждём сервер.
     await _tokenStorage.clearTokens();
+    await _cacheProfile(null);
     currentUser = null;
     isNewUser = false;
     eventsCount = 0;
@@ -157,6 +185,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authService.deleteAccount();
       await _tokenStorage.clearTokens();
+      await _cacheProfile(null);
       currentUser = null;
       isNewUser = false;
       eventsCount = 0;
@@ -176,6 +205,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       currentUser = await _profileRepository.updateProfile({'first_name': firstName});
+      await _cacheProfile(currentUser);
     } catch (e) {
       error = dioErrorMessage(e);
       rethrow;
@@ -208,6 +238,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       currentUser = await _profileRepository.updateProfile(body);
+      await _cacheProfile(currentUser);
     } catch (e) {
       error = dioErrorMessage(e);
       rethrow;
@@ -236,6 +267,7 @@ class AuthProvider extends ChangeNotifier {
       notificationsEnabled: notificationsEnabled,
     );
     notifyListeners();
+    await _cacheProfile(currentUser);
 
     try {
       final body = <String, dynamic>{};
@@ -247,8 +279,10 @@ class AuthProvider extends ChangeNotifier {
       }
 
       currentUser = await _profileRepository.updateProfile(body);
+      await _cacheProfile(currentUser);
     } catch (e) {
       currentUser = previous;
+      await _cacheProfile(currentUser);
       error = dioErrorMessage(e);
       rethrow;
     } finally {
@@ -258,6 +292,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _loadProfile() async {
     currentUser = await _profileRepository.fetchProfile();
+    await _cacheProfile(currentUser);
   }
 
   Future<void> _loadEventsCount() async {
@@ -278,6 +313,19 @@ class AuthProvider extends ChangeNotifier {
       await FcmService.instance.registerTokenWithServer(_dio);
     } catch (_) {
       // FCM опционален до полной настройки Firebase.
+    }
+  }
+
+  Future<void> _cacheProfile(UserProfile? profile) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (profile != null) {
+        await prefs.setString('cached_user_profile', jsonEncode(profile.toJson()));
+      } else {
+        await prefs.remove('cached_user_profile');
+      }
+    } catch (e) {
+      debugPrint('Error caching user profile: $e');
     }
   }
 }

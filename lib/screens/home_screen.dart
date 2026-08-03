@@ -131,36 +131,27 @@ class _HomeScreenState extends State<HomeScreen> {
             physics: null,
             slivers: [
               SliverToBoxAdapter(
-                child: RepaintBoundary(
-                  child: AnimatedBuilder(
-                    animation: _parallax,
-                    builder: (context, _) {
-                      return HomeHeroSection(
-                        height: heroHeight,
-                        scrollOffset: _scrollY.value,
-                        tiltX: _tiltXn.value,
-                        tiltY: _tiltYn.value,
-                        heroNetworkUrls:
-                            heroUrls.isEmpty ? null : heroUrls,
-                      );
-                    },
-                  ),
-                ),
-              ),
-              // Контент на PiligrimBackground — без ColoredBox / серой плашки.
-              SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const RepaintBoundary(child: HomeHeroIntroBlock()),
-                    const RepaintBoundary(
-                      child: HomeActionBlock(bottomPadding: 0),
+                    AnimatedBuilder(
+                      animation: _parallax,
+                      builder: (context, _) {
+                        return HomeHeroSection(
+                          height: heroHeight,
+                          scrollOffset: _scrollY.value,
+                          tiltX: _tiltXn.value,
+                          tiltY: _tiltYn.value,
+                          heroNetworkUrls:
+                              heroUrls.isEmpty ? null : heroUrls,
+                        );
+                      },
                     ),
-                    RepaintBoundary(
-                      child: HomeStatusLine(
-                        isOpen: core.isOpenNow,
-                        hoursLabel: hoursLine,
-                      ),
+                    const HomeHeroIntroBlock(),
+                    const HomeActionBlock(bottomPadding: 0),
+                    HomeStatusLine(
+                      isOpen: core.isOpenNow,
+                      hoursLabel: hoursLine,
                     ),
                     if (core.error != null && !core.isLoading)
                       Padding(
@@ -176,9 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
               SliverToBoxAdapter(
-                child: RepaintBoundary(
-                  child: HomeEventBlock(onNavigate: widget.onNavigate),
-                ),
+                child: HomeEventBlock(onNavigate: widget.onNavigate),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],

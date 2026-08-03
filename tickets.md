@@ -1,0 +1,192 @@
+# ТЕХНИЧЕСКИЕ ЗАДАЧИ (ТИКЕТЫ) ДЛЯ РАЗРАБОТКИ · PILIGRIM APP
+
+---
+
+## 1. Сделать нормальный и красивый Toast с уведомлениями
+**Статус**: Готов к реализации  
+**Приоритет**: Высокий  
+
+### Описание задачи
+Текущий `PiligrimToast` отображается в самом верху по центру экрана, накладываясь на системный статус-бар и кнопки навигации в `AppBar`. Кроме того, при вызове нового уведомления старое резко исчезает, вызывая мерцание, и его нельзя смахнуть пальцем.
+
+### Техническое решение
+1. **Жесты и поведение**:
+   * Обернуть виджет уведомления `_ToastWidget` в `Dismissible` (или использовать `GestureDetector` с отслеживанием свайпов), чтобы пользователь мог смахнуть уведомление влево/вправо или вверх.
+2. **Премиальный UI-стиль ("Quiet Luxury")**:
+   * Использовать `BackdropFilter` с `ImageFilter.blur(sigmaX: 12, sigmaY: 12)` для создания матового стекла (glassmorphism).
+   * Цвет фона сделать полупрозрачным: `PiligrimColors.earthDeep.withValues(alpha: 0.72)`.
+   * Слева добавить тонкую вертикальную полосу акцентного цвета (в зависимости от типа тоста: `water` для инфо, зеленый `success` для успешных операций, красный `fruit` для ошибок).
+3. **Очередь уведомлений**:
+   * Изменить логику в `PiligrimToast.show`. Вместо мгновенного удаления `_entry?.remove()` сделать плавную анимацию исчезновения, либо организовать простой стек уведомлений, чтобы сообщения не перекрывали друг друга резко.
+
+### Файлы для изменения
+* [lib/widgets/piligrim_toast.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/widgets/piligrim_toast.dart)
+
+---
+
+## 2. Временно скрыть возможность записи на мероприятия
+**Статус**: Готов к реализации  
+**Приоритет**: Средний  
+
+### Описание задачи
+Необходимо временно убрать возможность записываться на мероприятия (вкладка «Афиша»), сделав так, чтобы при необходимости эту функцию можно было вернуть за минуту изменением одного параметра.
+
+### Техническое решение
+1. **Глобальный переключатель**:
+   * В файле настроек темы или констант (например, [lib/core/theme.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/core/theme.dart)) объявить статический флаг:
+     ```dart
+     abstract final class AppConfig {
+       static const bool enableEventRegistration = false; // Поменять на true для возврата
+     }
+     ```
+2. **Скрытие интерфейса**:
+   * В [event_detail_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/event_detail_screen.dart) в дереве виджетов рендерить нижнюю кнопку записи `_CtaOverlay` только если флаг равен `true`:
+     ```dart
+     if (!event.isPast && AppConfig.enableEventRegistration)
+       Positioned(
+         left: 0,
+         right: 0,
+         bottom: 0,
+         child: _CtaOverlay(...),
+       ),
+     ```
+   * Сделать нижний отступ скролл-контента динамическим:
+     ```dart
+     SliverPadding(
+       padding: EdgeInsets.fromLTRB(20, 8, 20, AppConfig.enableEventRegistration ? 140 : 20),
+       sliver: SliverList(...),
+     )
+     ```
+     (Это уберет пустую полосу внизу страницы детального просмотра, когда кнопка скрыта).
+
+### Файлы для изменения
+* [lib/core/theme.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/core/theme.dart) (или новый `lib/core/config.dart`)
+* [lib/screens/event_detail_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/event_detail_screen.dart)
+
+---
+
+## 3. Стабильная работа приложения без интернета (Офлайн-режим)
+**Статус**: Готов к реализации  
+**Приоритет**: Высокий  
+
+### Описание задачи
+При отключении сети приложение должно плавно переходить в автономный режим: не падать, не показывать белые экраны и корректно информировать пользователя.
+
+### Техническое решение
+1. **Локальный кэш данных (Репозитории)**:
+   * В репозиториях ([core_repository.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/data/repositories/core_repository.dart), `menu_repository.dart`, `events_repository.dart`) при успешном получении ответов от API сохранять JSON в `SharedPreferences`.
+   * При перехвате `DioException` (ошибка сети/таймаут) считывать сохраненный кэш из `SharedPreferences` и возвращать его.
+   * Передавать в провайдеры флаг `isOfflineMode = true`.
+2. **Информирование**:
+   * Если приложение работает на кэшированных данных, показывать вверху экрана аккуратный статус-бар: *"Офлайн-режим. Данные могут быть неактуальными"*.
+3. **Заглушка для экрана «Интерьер»**:
+   * В [interior_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/interior_screen.dart), если список слайдов пуст из-за сбоя сети, загружать локальные фотографии из [PiligrimInteriorAssets.allInteriorPngs](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/core/interior_assets.dart#L31) в качестве элементов галереи, чтобы экран не оставался пустым.
+
+### Файлы для изменения
+* Репозитории в `lib/data/repositories/`
+* Провайдеры in `lib/providers/` (`CoreInfoProvider`, `MenuProvider`, `EventsProvider`)
+* [lib/screens/interior_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/interior_screen.dart)
+
+---
+
+## 4. Корректировка отображения и загрузки фотографий на главном экране
+**Статус**: Готов к реализации  
+**Приоритет**: Средний  
+
+### Описание задачи
+На главном экране картинки в блоке Hero имеют вертикальный формат. При загрузке горизонтальных фото (например, 16:9) они сильно обрезаются по бокам из-за фиксированного выравнивания `alignment: Alignment(0.0, 0.14)` и искусственного увеличения `1.26` под эффект параллакса гироскопа.
+
+### Техническое решение
+1. **Панель администратора (веб-интерфейс React/Django)**:
+   * Настроить кроппер (кадрирование) или добавить валидацию при загрузке картинок для главного экрана, рекомендуя формат **9:16 (Portrait)**. Добавить подсказку: *"Загружайте вертикальные фото, важный контент по центру"*.
+2. **Оптимизация во Flutter**:
+   * В [home_hero_section.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/widgets/home_hero_section.dart) уменьшить масштаб изображения `_heroImageScale` с `1.26` до `1.12` - `1.15`. Это сохранит эффект параллакса, но значительно уменьшит обрезку боковых областей.
+   * Изменить смещение `alignment` с `const Alignment(0.0, 0.14)` на центральное `Alignment.center`.
+
+### Файлы для изменения
+* [lib/widgets/home_hero_section.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/widgets/home_hero_section.dart)
+* Код веб-панели управления (вне текущего репозитория Flutter)
+
+---
+
+## 5. Исключение платных мероприятий
+**Статус**: Готов к реализации  
+**Приоритет**: Средний  
+
+### Описание задачи
+Убрать возможность создания и указания стоимости для мероприятий. Все мероприятия по умолчанию должны быть бесплатными.
+
+### Техническое решение
+1. **Скрытие поля цены при редактировании**:
+   * В [event_edit_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/event_edit_screen.dart) удалить или скрыть блок ввода цены:
+     ```dart
+     // Линии 253-259
+     // _buildFieldLabel('Цена (₸)'),
+     // _buildInput(controller: _priceCtrl, ...),
+     ```
+   * В методе сохранения `_save` отправлять бэкенду `'price': null`.
+2. **Корректировка надписей о стоимости**:
+   * В [event_detail_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/event_detail_screen.dart) и [events_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/events_screen.dart) изменить метод `_priceLine()`. Если цена равна `null`, возвращать текст *"Вход свободный"* или *"Участие бесплатное"* вместо *"Стоимость уточняется при записи"*.
+
+### Файлы для изменения
+* [lib/screens/event_edit_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/event_edit_screen.dart)
+* [lib/screens/event_detail_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/event_detail_screen.dart)
+* [lib/screens/events_screen.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/screens/events_screen.dart)
+
+---
+
+## 6. Устранение 1-пиксельной полосы на физических устройствах
+**Статус**: Готов к реализации  
+**Приоритет**: Высокий  
+
+### Описание задачи
+На физических устройствах (особенно iOS с OLED-экранами) над/под панелью навигации `PiligrimNavBar` отображается тонкая серая или светлая полоса толщиной в 1 пиксель, которой нет на эмуляторе.
+
+### Техническое решение
+1. **Прозрачность системного разделителя (Android)**:
+   * В [lib/main.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/main.dart) в параметрах `SystemUiOverlayStyle` явно задать:
+     ```dart
+     systemNavigationBarDividerColor: Colors.transparent,
+     ```
+2. **Коррекция тени навбара (OLED-эффект)**:
+   * На OLED-экранах мягкие темные тени со смещением вверх могут выглядеть как резкие серые линии. В [lib/core/theme.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/core/theme.dart) ослабить тень `PiligrimShadows.nav` (сделать ее прозрачнее, например `0x08000000` вместо `0x18000000`, либо уменьшить offset до `Offset(0, -1)`).
+3. **Устранение субпиксельного зазора (Rounding rounding gap)**:
+   * В [lib/widgets/bottom_nav_bar.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/widgets/bottom_nav_bar.dart) добавить декоративному контейнеру микро-смещение вниз: `margin: const EdgeInsets.only(bottom: -0.5)`, либо наложить верхнюю тонкую рамку (border) цвета `Color(0xFF151210)` для сглаживания границы с экраном при прокрутке списка «под» навбаром (`extendBody: true`).
+
+### Файлы для изменения
+* [lib/main.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/main.dart)
+* [lib/core/theme.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/core/theme.dart)
+* [lib/widgets/bottom_nav_bar.dart](file:///c:/Users/amanz/OneDrive/Desktop/Panno/lib/widgets/bottom_nav_bar.dart)
+
+---
+
+## 7. Подготовка нативных конфигураций и разрешений для деплоя в App Store & Google Play
+**Статус**: Готов к реализации  
+**Приоритет**: Высокий  
+
+### Описание задачи
+Перед публикацией приложения в App Store и Google Play необходимо привести нативные конфигурационные файлы в полное соответствие с требованиями модераторов обеих платформ. Это включает настройку обязательных системных разрешений, политик приватности и видимости пакетов для корректной работы офлайн-режима, пуш-уведомлений и интеграции с внешними сервисами.
+
+### Техническое решение
+1. **Google Play (Android)**:
+   * В [AndroidManifest.xml](file:///c:/Users/amanz/OneDrive/Desktop/Panno/android/app/src/main/AndroidManifest.xml) объявить разрешение на Интернет: `<uses-permission android:name="android.permission.INTERNET"/>` (для релизной сборки).
+   * Добавить разрешение на отправку уведомлений (для Android 13+): `<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>`.
+   * Добавить разрешение на отслеживание сети: `<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>`.
+   * Дополнить блок `<queries>` схемами `tel`, `https`, `tg`, `dgis` для обеспечения Package Visibility на Android 11+.
+   * Перевести `android:usesCleartextTraffic` в `false` после перехода API-сервера на HTTPS.
+   * Настроить релизную подпись (Keystore) в [build.gradle.kts](file:///c:/Users/amanz/OneDrive/Desktop/Panno/android/app/build.gradle.kts).
+
+2. **App Store (iOS)**:
+   * В [Info.plist](file:///c:/Users/amanz/OneDrive/Desktop/Panno/ios/Runner/Info.plist) расширить описания разрешений (`NSPhotoLibraryUsageDescription`, `NSCameraUsageDescription`, `NSPhotoLibraryAddUsageDescription`), сделав их подробными и понятными для модераторов Apple.
+   * Удалить временные HTTP-исключения `NSAppTransportSecurity` после перехода на HTTPS-домен.
+   * Добавить скачанный из консоли Firebase файл `GoogleService-Info.plist` в Xcode-проект Runner.
+
+3. **Модерация и доступ**:
+   * Создать на бэкенде тестовый профиль с фиксированным номером телефона и статичным кодом подтверждения для прохождения проверки входа по SMS модераторами App Store и Google Play.
+   * Проверить регулярное обновление номеров сборки (build numbers) в `pubspec.yaml` при отправке новых версий.
+
+### Файлы для изменения
+* [android/app/src/main/AndroidManifest.xml](file:///c:/Users/amanz/OneDrive/Desktop/Panno/android/app/src/main/AndroidManifest.xml)
+* [android/app/build.gradle.kts](file:///c:/Users/amanz/OneDrive/Desktop/Panno/android/app/build.gradle.kts)
+* [ios/Runner/Info.plist](file:///c:/Users/amanz/OneDrive/Desktop/Panno/ios/Runner/Info.plist)
+* [pubspec.yaml](file:///c:/Users/amanz/OneDrive/Desktop/Panno/pubspec.yaml)

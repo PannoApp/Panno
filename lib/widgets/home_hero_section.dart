@@ -175,16 +175,16 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
     return const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
+      tileMode: TileMode.decal,
       stops: [
         0.0,
-        0.76,
-        0.80,
+        0.74,
+        0.78,
+        0.81,
         0.84,
-        0.88,
-        0.91,
-        0.94,
-        0.96,
-        0.98,
+        0.87,
+        0.90,
+        0.92,
         1.0,
       ],
       colors: [
@@ -195,8 +195,7 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
         Color(0x88FFFFFF),
         Color(0x50FFFFFF),
         Color(0x28FFFFFF),
-        Color(0x10FFFFFF),
-        Color(0x04FFFFFF),
+        Color(0x00FFFFFF),
         Color(0x00FFFFFF),
       ],
     ).createShader(bounds);
@@ -252,35 +251,37 @@ class _HomeHeroSectionState extends State<HomeHeroSection> {
             ShaderMask(
               shaderCallback: _photoDissolveShader,
               blendMode: BlendMode.dstIn,
-              child: Transform.translate(
-                offset: Offset(
-                  widget.tiltX * 8,
-                  widget.tiltY * 6 +
-                      widget.scrollOffset * _heroImageScrollParallax,
-                ),
-                child: Transform.scale(
-                  scale: _heroImageScale,
-                  alignment: const Alignment(0.0, 0.32),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CrossfadingHeroInterior(
-                        assetPaths: _heroVisuals,
-                        networkUrls: _networkUrls,
-                        index: _heroVisualIndex,
-                        cacheWidth:
-                            PiligrimInteriorAssets.decodeCacheWidth(context),
-                        cacheHeight:
-                            PiligrimInteriorAssets.decodeCacheHeight(
-                          context,
-                          widget.height * 1.18,
+              child: ClipRect(
+                child: Transform.translate(
+                  offset: Offset(
+                    widget.tiltX * 8,
+                    widget.tiltY * 6 +
+                        widget.scrollOffset * _heroImageScrollParallax,
+                  ),
+                  child: Transform.scale(
+                    scale: _heroImageScale,
+                    alignment: const Alignment(0.0, 0.32),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CrossfadingHeroInterior(
+                          assetPaths: _heroVisuals,
+                          networkUrls: _networkUrls,
+                          index: _heroVisualIndex,
+                          cacheWidth:
+                              PiligrimInteriorAssets.decodeCacheWidth(context),
+                          cacheHeight:
+                              PiligrimInteriorAssets.decodeCacheHeight(
+                            context,
+                            widget.height * 1.18,
+                          ),
                         ),
-                      ),
-                      const DecoratedBox(
-                        decoration:
-                            BoxDecoration(gradient: _warmInteriorDarken),
-                      ),
-                    ],
+                        const DecoratedBox(
+                          decoration:
+                              BoxDecoration(gradient: _warmInteriorDarken),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
