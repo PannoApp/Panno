@@ -34,6 +34,15 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Обязательно ДО runApp(), см. докстринг initializeFirebaseCore() — иначе
+  // FcmService.instance (static final, конструируется лениво при первом
+  // обращении) может словить необработанное исключение, если что-то (чаще
+  // всего AuthProvider.init() при быстром восстановлении сессии/логине)
+  // обратится к FirebaseMessaging.instance раньше, чем отработает
+  // bootstrapFirebase() в фоне — раньше он запускался только через
+  // addPostFrameCallback, без гарантии, что успеет до первого обращения.
+  await initializeFirebaseCore();
+
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   SystemChrome.setSystemUIOverlayStyle(
@@ -53,8 +62,14 @@ Future<void> main() async {
   runApp(const PiligrimApp());
 }
 
-/// Firebase/FCM не блокируют первый кадр (splash).
-Future<void> bootstrapFirebase() async {
+/// Только Firebase.initializeApp() — быстрый, локальный вызов (без диалогов
+/// разрешений и сетевых стримов), поэтому можно позволить себе подождать его
+/// перед runApp() без заметной задержки первого кадра. Это тот самый вызов,
+/// без которого FirebaseMessaging.instance (внутри FcmService) кидает
+/// исключение — гарантируя, что он завершится до runApp(), мы гарантируем,
+/// что ЛЮБОЙ код приложения (включая раннюю инициализацию провайдеров)
+/// может безопасно трогать FcmService.instance, когда бы он до него ни добрался.
+Future<void> initializeFirebaseCore() async {
   if (!DefaultFirebaseOptions.isConfigured) {
     debugPrint(
       'Firebase: заглушка (placeholder). Пуши отключены. '
@@ -66,6 +81,18 @@ Future<void> bootstrapFirebase() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(const Duration(seconds: 15));
+  } catch (e, st) {
+    debugPrint('Firebase.initializeApp() skipped: $e\n$st');
+  }
+}
+
+/// Остальная часть — подписка на стримы FCM и диалог разрешений. Это уже
+/// можно безопасно откладывать в фон (не блокирует первый кадр/splash) —
+/// в отличие от initializeFirebaseCore(), сама доступность
+/// FirebaseMessaging.instance тут уже ни от чего не зависит по времени.
+Future<void> bootstrapFirebase() async {
+  if (Firebase.apps.isEmpty) return; // initializeFirebaseCore() не отработал
+  try {
     await FcmService.instance
         .initEarly(navigatorKey: rootNavigatorKey)
         .timeout(const Duration(seconds: 5));
