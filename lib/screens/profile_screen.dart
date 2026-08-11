@@ -556,42 +556,22 @@ class _LoyaltyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('ГОСТЬ', style: PiligrimTextStyles.sectionLabel),
-                    const SizedBox(height: 3),
-                    Text(
-                      user.name,
-                      style: PiligrimTextStyles.heading.copyWith(
-                        fontSize: 17,
-                        color: PiligrimColors.sky,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
               Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('БАЛАНС', style: PiligrimTextStyles.sectionLabel),
                   const SizedBox(height: 3),
                   Text(
                     '${_formatCashback(user.cashback)} ₸',
                     style: PiligrimTextStyles.heading.copyWith(
-                      fontSize: 15,
+                      fontSize: 16,
                       color: PiligrimColors.steppe,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 14),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -600,8 +580,8 @@ class _LoyaltyCard extends StatelessWidget {
                   Text(
                     user.loyaltyPercent ?? '—',
                     style: PiligrimTextStyles.heading.copyWith(
-                      fontSize: 15,
-                      color: PiligrimColors.ember,
+                      fontSize: 16,
+                      color: PiligrimColors.steppe,
                     ),
                   ),
                 ],
@@ -660,14 +640,14 @@ class _LoyaltyQrTile extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [PiligrimColors.ember, PiligrimColors.steppe],
+          colors: [PiligrimColors.steppe, PiligrimColors.emberDeep],
         ),
         boxShadow: [
           BoxShadow(
-            color: PiligrimColors.ember.withValues(alpha: 0.28),
-            blurRadius: 28,
+            color: PiligrimColors.steppe.withValues(alpha: 0.22),
+            blurRadius: 24,
             spreadRadius: -6,
-            offset: const Offset(0, 10),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
