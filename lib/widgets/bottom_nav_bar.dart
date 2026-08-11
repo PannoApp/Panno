@@ -22,13 +22,20 @@ class PiligrimNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
+  // index — позиция экрана в IndexedStack RootShell (lib/main.dart), фиксирована
+  // независимо от того, какие пункты видны в доке.
   static const _items = [
-    _NavItem(label: 'Главная',  asset: 'assets/images/star_totem (1).svg'),
-    _NavItem(label: 'Меню',     asset: 'assets/images/bird_totem (1).svg'),
-    _NavItem(label: 'Интерьер', asset: 'assets/images/wheel_totem (1).svg'),
-    _NavItem(label: 'Афиша',    asset: 'assets/images/tree_totem (1).svg'),
-    _NavItem(label: 'Профиль',  asset: 'assets/images/shaman.svg'),
+    _NavItem(label: 'Главная',  asset: 'assets/images/star_totem (1).svg', index: 0),
+    _NavItem(label: 'Меню',     asset: 'assets/images/bird_totem (1).svg', index: 1),
+    _NavItem(label: 'Интерьер', asset: 'assets/images/wheel_totem (1).svg', index: 2),
+    // Афиша скрыта из дока (не удалена — экран и пуши на него продолжают работать,
+    // возможно понадобится в будущем).
+    _NavItem(label: 'Афиша',    asset: 'assets/images/tree_totem (1).svg', index: 3, hidden: true),
+    _NavItem(label: 'Профиль',  asset: 'assets/images/shaman.svg', index: 4),
   ];
+
+  static Iterable<_NavItem> get _visibleItems =>
+      _items.where((item) => !item.hidden);
 
   @override
   Widget build(BuildContext context) {
@@ -63,16 +70,15 @@ class PiligrimNavBar extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(4, 5, 4, 0),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
-              children: List.generate(_items.length, (i) {
-                final item = _items[i];
-                final active = i == currentIndex;
+              children: _visibleItems.map((item) {
+                final active = item.index == currentIndex;
                 return Expanded(
                   child: PiligrimTap(
-                    onTap: () => onTap(i),
+                    onTap: () => onTap(item.index),
                     child: _NavTabCell(item: item, active: active),
                   ),
                 );
-              }),
+              }).toList(),
             ),
           ),
         ),
@@ -187,7 +193,14 @@ class _NavTotemIcon extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _NavItem {
-  const _NavItem({required this.label, required this.asset});
+  const _NavItem({
+    required this.label,
+    required this.asset,
+    required this.index,
+    this.hidden = false,
+  });
   final String label;
   final String asset;
+  final int index;
+  final bool hidden;
 }

@@ -139,7 +139,8 @@ void main() {
       expect(find.text('ПОЛУЧИТЬ КОД'), findsNothing);
     });
 
-    testWidgets('Кэшбек из профиля отображается отформатированной суммой',
+    testWidgets(
+        '_LoyaltyCard отображает баланс, % кешбэка и имя гостя из профиля',
         (tester) async {
       auth.currentUser = const UserProfile(
         id: 1,
@@ -151,14 +152,22 @@ void main() {
         notifyClosedEvents: false,
         notificationsEnabled: true,
         cashback: 12500,
+        loyaltyPercent: '3%',
       );
       auth.notifyListeners();
 
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      expect(find.text('Кэшбек'), findsOneWidget);
+      expect(find.text('БАЛАНС'), findsOneWidget);
       expect(find.text('12 500 ₸'), findsOneWidget);
+      expect(find.text('ГОСТЬ'), findsOneWidget);
+      expect(find.text('Айдар Нурланов'), findsOneWidget);
+      expect(find.text('КЕШБЭК'), findsOneWidget);
+      expect(find.text('3%'), findsOneWidget);
+
+      // loyaltyCardUrl не задан → карта QR ещё не пришла из Remarked, показан placeholder.
+      expect(find.text('Карта появится после первого визита'), findsOneWidget);
     });
 
     testWidgets('Тап «Бронирований» → BookingHistoryScreen', (tester) async {
@@ -228,9 +237,10 @@ void main() {
 
       // PiligrimAuthView (_awaitingCode=true): заголовок «ВВЕДИТЕ КОД» +
       // введённый номер под ним, отдельными Text-виджетами (без префикса
-      // «Код отправлен на»).
+      // «Код отправлен на»). KzPhoneInputFormatter форматирует ввод с
+      // пробелами: '+7 700 123 45 67' — тот же номер, что и '+77001234567'.
       expect(find.text('ВВЕДИТЕ КОД'), findsOneWidget);
-      expect(find.text('+77001234567'), findsOneWidget);
+      expect(find.text('+7 700 123 45 67'), findsOneWidget);
       expect(find.text('ПОДТВЕРДИТЬ'), findsOneWidget);
     });
   });

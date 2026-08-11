@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -155,7 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onNavigate: widget.onNavigate,
                           ),
                           const SizedBox(height: 12),
-                          _CashbackCard(cashback: user.cashback),
+                          _LoyaltyCard(user: user),
                           const SizedBox(height: 28),
                         ],
 
@@ -168,19 +169,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _ContactsCard(
                       coreInfo: coreInfo,
                       onLaunch: _launch,
-                    ),
-                    const SizedBox(height: 28),
-
-                    // Правила посещения
-                    const PiligrimSectionHeader(
-                      label: 'ПРАВИЛА ПОСЕЩЕНИЯ',
-                      icon: 'assets/images/shaman.svg',
-                    ),
-                    const SizedBox(height: 14),
-                    _RulesCard(
-                      rules: coreInfo?.visitRules.isNotEmpty == true
-                          ? coreInfo!.visitRules
-                          : null,
                     ),
                     const SizedBox(height: 28),
 
@@ -517,45 +505,258 @@ class _StatCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CASHBACK CARD — баланс бонусов гостя, синхронизированный из Remarked CRM
+// LOYALTY CARD — карта лояльности: баланс, % кешбэка и QR из Remarked CRM
 // ─────────────────────────────────────────────────────────────────────────────
 String _formatCashback(double value) => value.round().toString().replaceAllMapped(
       RegExp(r'(\d)(?=(\d{3})+$)'),
       (m) => '${m[1]} ',
     );
 
-class _CashbackCard extends StatelessWidget {
-  const _CashbackCard({required this.cashback});
-  final double cashback;
+/// Матрица `ColorFilter`, перекрашивающая ч/б-растр (0 → [dark], 255 → [light])
+/// в два цвета бренда. Работает по значению R-канала входного пикселя, поэтому
+/// годится только для действительно серых/ч-б изображений (QR из Remarked —
+/// именно такой). Контраст между [dark] и [light] сохраняется, что важно для
+/// читаемости кода сканером на кассе.
+List<double> _duotoneMatrix({required int darkHex, required int lightHex}) {
+  double channel(int hex, int shift) => ((hex >> shift) & 0xFF).toDouble();
+  final dr = channel(darkHex, 16), dg = channel(darkHex, 8), db = channel(darkHex, 0);
+  final lr = channel(lightHex, 16), lg = channel(lightHex, 8), lb = channel(lightHex, 0);
+  final sr = (lr - dr) / 255, sg = (lg - dg) / 255, sb = (lb - db) / 255;
+  return [
+    sr, 0, 0, 0, dr,
+    sg, 0, 0, 0, dg,
+    sb, 0, 0, 0, db,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+class _LoyaltyCard extends StatelessWidget {
+  const _LoyaltyCard({required this.user});
+  final HeroUser user;
 
   @override
   Widget build(BuildContext context) {
-    return _ProfileGlassCard(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
-      child: Row(
+    final hasCode = user.loyaltyCardUrl?.isNotEmpty == true;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+      decoration: BoxDecoration(
+        borderRadius: PiligrimRadius.lgAll,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [PiligrimColors.earthWarm, PiligrimColors.earthDeep],
+        ),
+        border: Border.all(
+          color: PiligrimColors.steppe.withValues(alpha: 0.16),
+          width: 0.5,
+        ),
+        boxShadow: PiligrimShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Кэшбек',
-                  style: PiligrimTextStyles.caption.copyWith(fontSize: 11),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SvgPicture.asset(
+                'assets/images/piligrim.svg',
+                height: 20,
+                colorFilter: const ColorFilter.mode(
+                  PiligrimColors.nomadCream,
+                  BlendMode.srcIn,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${_formatCashback(cashback)} ₸',
-                  style: PiligrimTextStyles.heading.copyWith(
-                    fontSize: 20,
-                    color: PiligrimColors.steppe,
+              ),
+              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('БАЛАНС', style: PiligrimTextStyles.sectionLabel),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_formatCashback(user.cashback)} ₸',
+                    style: PiligrimTextStyles.heading.copyWith(
+                      fontSize: 18,
+                      color: PiligrimColors.sky,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Center(
+            child: SvgPicture.asset(
+              'assets/images/bird_totem (1).svg',
+              height: 52,
+              colorFilter: ColorFilter.mode(
+                PiligrimColors.nomadCream.withValues(alpha: 0.85),
+                BlendMode.srcIn,
+              ),
             ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ГОСТЬ', style: PiligrimTextStyles.sectionLabel),
+                    const SizedBox(height: 2),
+                    Text(
+                      user.name,
+                      style: PiligrimTextStyles.heading.copyWith(fontSize: 16),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('КЕШБЭК', style: PiligrimTextStyles.sectionLabel),
+                  const SizedBox(height: 2),
+                  Text(
+                    user.loyaltyPercent ?? '—',
+                    style: PiligrimTextStyles.heading.copyWith(
+                      fontSize: 16,
+                      color: PiligrimColors.steppe,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: hasCode
+                ? _LoyaltyQrTile(url: user.loyaltyCardUrl!)
+                : const _LoyaltyQrPlaceholder(),
           ),
         ],
       ),
     ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.06, end: 0, duration: 500.ms);
+  }
+}
+
+/// QR карты лояльности — картинка приходит готовой из Remarked (ч/б PNG),
+/// здесь она перекрашивается под палитру бренда через [_duotoneMatrix]:
+/// чёрные модули → [PiligrimColors.textDark], белый фон → [PiligrimColors.nomadCream].
+class _LoyaltyQrTile extends StatelessWidget {
+  const _LoyaltyQrTile({required this.url});
+  final String url;
+
+  static const double _size = 156;
+
+  static final List<double> _tint = _duotoneMatrix(
+    darkHex: 0x2C2825, // PiligrimColors.textDark
+    lightHex: 0xF2ECE1, // PiligrimColors.nomadCream
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        color: PiligrimColors.nomadCream,
+        borderRadius: PiligrimRadius.mdAll,
+      ),
+      child: CachedNetworkImage(
+        imageUrl: url,
+        width: _size,
+        height: _size,
+        fit: BoxFit.contain,
+        imageBuilder: (context, imageProvider) => ColorFiltered(
+          colorFilter: ColorFilter.matrix(_tint),
+          child: Image(
+            image: imageProvider,
+            width: _size,
+            height: _size,
+            fit: BoxFit.contain,
+          ),
+        ),
+        placeholder: (context, _) => const SizedBox(
+          width: _size,
+          height: _size,
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: PiligrimColors.textDark,
+              ),
+            ),
+          ),
+        ),
+        errorWidget: (context, _, __) => SizedBox(
+          width: _size,
+          height: _size,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.qr_code_2_rounded,
+                size: 28,
+                color: PiligrimColors.textDark.withValues(alpha: 0.35),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Не удалось загрузить QR',
+                textAlign: TextAlign.center,
+                style: PiligrimTextStyles.caption.copyWith(
+                  fontSize: 10,
+                  color: PiligrimColors.textDark.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Показывается, пока у гостя ещё нет карты/QR в Remarked (первая синхронизация
+/// ещё не произошла или гость только что зарегистрирован).
+class _LoyaltyQrPlaceholder extends StatelessWidget {
+  const _LoyaltyQrPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _LoyaltyQrTile._size,
+      height: _LoyaltyQrTile._size,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: PiligrimColors.nomadCream.withValues(alpha: 0.06),
+        borderRadius: PiligrimRadius.mdAll,
+        border: Border.all(
+          color: PiligrimColors.nomadCream.withValues(alpha: 0.14),
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.qr_code_2_rounded,
+            size: 32,
+            color: PiligrimColors.nomadCream.withValues(alpha: 0.35),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Карта появится после первого визита',
+            textAlign: TextAlign.center,
+            style: PiligrimTextStyles.caption.copyWith(fontSize: 10, height: 1.4),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -800,118 +1001,6 @@ class _ContactsCard extends StatelessWidget {
         .animate()
         .fadeIn(delay: 150.ms, duration: 600.ms)
         .slideY(begin: 0.05, end: 0, duration: 600.ms);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RULES CARD — раскрываемые пункты
-// ─────────────────────────────────────────────────────────────────────────────
-class _RulesCard extends StatefulWidget {
-  const _RulesCard({this.rules});
-
-  /// Если null или пусто — fallback на [kVisitRules].
-  final List<VisitRuleItem>? rules;
-
-  @override
-  State<_RulesCard> createState() => _RulesCardState();
-}
-
-class _RulesCardState extends State<_RulesCard> {
-  int? _expanded;
-
-  List<({String title, String body, String iconAsset})> get _items {
-    final api = widget.rules;
-    if (api != null && api.isNotEmpty) {
-      return api
-          .map(
-            (r) => (
-              title: r.title,
-              body: r.body,
-              iconAsset: 'assets/images/shaman.svg',
-            ),
-          )
-          .toList();
-    }
-    return kVisitRules
-        .map((r) => (title: r.title, body: r.body, iconAsset: r.iconAsset))
-        .toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final items = _items;
-    return _ProfileGlassCard(
-      child: Column(
-        children: items.asMap().entries.map((entry) {
-          final i = entry.key;
-          final rule = entry.value;
-          final isOpen = _expanded == i;
-
-          return Column(
-            children: [
-              PiligrimTap(
-                onTap: () =>
-                    setState(() => _expanded = isOpen ? null : i),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        rule.title,
-                        style: PiligrimTextStyles.body.copyWith(
-                          fontSize: 14,
-                          color: isOpen
-                              ? PiligrimColors.sky
-                              : PiligrimColors.sky.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const Spacer(),
-                      AnimatedRotation(
-                        turns: isOpen ? 0.25 : 0,
-                        duration: 250.ms,
-                        child: Text(
-                          '›',
-                          style: PiligrimTextStyles.heading.copyWith(
-                            fontSize: 20,
-                            color: isOpen
-                                ? PiligrimColors.steppe
-                                : PiligrimColors.sky.withValues(alpha: 0.2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              AnimatedSize(
-                duration: 280.ms,
-                curve: Curves.easeInOut,
-                child: isOpen
-                    ? Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: Text(
-                          rule.body,
-                          style: PiligrimTextStyles.body.copyWith(
-                            fontSize: 13,
-                            color: PiligrimColors.sky.withValues(alpha: 0.5),
-                            height: 1.6,
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              if (i < items.length - 1)
-                const _ProfileHairlineDivider(inset: 18),
-            ],
-          );
-        }).toList(),
-      ),
-    )
-        .animate()
-        .fadeIn(delay: 200.ms, duration: 600.ms);
   }
 }
 

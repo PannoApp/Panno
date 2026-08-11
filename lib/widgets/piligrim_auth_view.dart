@@ -10,6 +10,59 @@ import 'piligrim_background.dart';
 import 'path_cta.dart';
 import 'piligrim_cta.dart';
 
+/// Маска ввода номера для казахстанского рынка: префикс `+7 ` подставляется
+/// автоматически, пользователь набирает только оставшиеся 10 цифр.
+///
+/// Цифры считаются от текста без статического префикса — иначе цифра '7'
+/// из самого префикса каждый раз попадала бы в счёт вместе с набранными.
+class KzPhoneInputFormatter extends TextInputFormatter {
+  static const _prefix = '+7 ';
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var raw = newValue.text;
+    if (raw.startsWith(_prefix)) {
+      raw = raw.substring(_prefix.length);
+    } else if (raw.startsWith('+7')) {
+      raw = raw.substring(2);
+    } else if (raw.startsWith('+')) {
+      raw = raw.substring(1);
+    }
+
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+
+    // Вставили номер целиком (напр. из буфера обмена) вместе с кодом страны
+    // или домашней восьмёркой — убираем этот ведущий символ.
+    if (oldValue.text.isEmpty &&
+        digits.length == 11 &&
+        (digits.startsWith('7') || digits.startsWith('8'))) {
+      digits = digits.substring(1);
+    }
+
+    if (digits.length > 10) {
+      digits = digits.substring(0, 10);
+    }
+
+    if (digits.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+
+    final buffer = StringBuffer(_prefix);
+    for (var i = 0; i < digits.length; i++) {
+      if (i == 3 || i == 6 || i == 8) buffer.write(' ');
+      buffer.write(digits[i]);
+    }
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 /// Экран авторизации PILIGRIM.
 /// Бренд-блок и форма — единая вертикальная композиция, центрированная на экране.
 class PiligrimAuthView extends StatefulWidget {
@@ -38,6 +91,10 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
     super.dispose();
   }
 
+  /// Номер в чистом E.164-формате (+7XXXXXXXXXX) для отправки на бэкенд —
+  /// поле хранит его с пробелами для читаемости, серверный regex пробелов не допускает.
+  String get _cleanPhone => _phoneCtrl.text.replaceAll(RegExp(r'[^\d+]'), '');
+
   Future<void> _requestCode() async {
     final digits = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
     if (digits.length < 11) {
@@ -49,7 +106,7 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
       _error = null;
     });
     try {
-      await context.read<AuthProvider>().sendOtp(_phoneCtrl.text.trim());
+      await context.read<AuthProvider>().sendOtp(_cleanPhone);
       if (!mounted) return;
       setState(() => _awaitingCode = true);
     } catch (_) {
@@ -73,7 +130,7 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
       _error = null;
     });
     final auth = context.read<AuthProvider>();
-    final ok = await auth.confirmOtp(_phoneCtrl.text.trim(), code);
+    final ok = await auth.confirmOtp(_cleanPhone, code);
     if (!mounted) return;
     setState(() => _submitting = false);
     if (ok) {
@@ -220,10 +277,7 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
                     maxLength: _awaitingCode ? 4 : null,
                     inputFormatters: _awaitingCode
                         ? [FilteringTextInputFormatter.digitsOnly]
-                        : [
-                            FilteringTextInputFormatter.allow(
-                                RegExp(r'[\d+\s\-()]')),
-                          ],
+                        : [KzPhoneInputFormatter()],
                     textAlign:
                         _awaitingCode ? TextAlign.center : TextAlign.start,
                     style: PiligrimTextStyles.body.copyWith(

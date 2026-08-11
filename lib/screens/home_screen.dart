@@ -17,7 +17,6 @@ import '../widgets/home_cinematic_ambient.dart';
 import '../widgets/home_hero_section.dart';
 import '../widgets/home_hero_intro_block.dart';
 import '../widgets/home_action_block.dart';
-import '../widgets/home_event_block.dart';
 import '../widgets/error_view.dart';
 import '../widgets/home_status_line.dart';
 
@@ -165,10 +164,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 28)),
-              SliverToBoxAdapter(
-                child: HomeEventBlock(onNavigate: widget.onNavigate),
-              ),
+              // HomeEventBlock (блок «ближайшие события») временно скрыт вместе
+              // с вкладкой «Афиша» в доке — виджет не удалён, может понадобиться позже.
               const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],
           ),

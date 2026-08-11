@@ -57,7 +57,7 @@ List<Widget> _screens() => _kScreenKeys
 
 void main() {
   group('PiligrimNavBar — метки табов (Блок 3)', () {
-    testWidgets('порядок: Главная / Меню / Интерьер / Афиша / Профиль',
+    testWidgets('порядок: Главная / Меню / Интерьер / Профиль, Афиша скрыта',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -70,8 +70,11 @@ void main() {
       expect(find.text('Главная'), findsOneWidget);
       expect(find.text('Меню'), findsOneWidget);
       expect(find.text('Интерьер'), findsOneWidget);
-      expect(find.text('Афиша'), findsOneWidget);
       expect(find.text('Профиль'), findsOneWidget);
+
+      // Афиша временно скрыта из дока (см. bottom_nav_bar.dart) — экран
+      // и его индекс в IndexedStack при этом не удалены.
+      expect(find.text('Афиша'), findsNothing);
 
       // «Стол» больше не таб в Блоке 3.
       expect(find.text('Стол'), findsNothing);
@@ -107,7 +110,12 @@ void main() {
       expect(find.text('sc0', skipOffstage: false), findsOneWidget);
     });
 
-    testWidgets('таб 3 (Афиша) показывает screen sc3', (tester) async {
+    testWidgets(
+        'таб «Профиль» (index 4) показывает screen sc4 несмотря на скрытый таб 3',
+        (tester) async {
+      // Афиша (index 3) скрыта из дока, но не удалена из IndexedStack — этот
+      // тест проверяет, что следующий видимый таб (Профиль) по-прежнему ведёт
+      // на свой настоящий индекс 4, а не «сдвигается» на освободившееся место 3.
       await tester.pumpWidget(
         ChangeNotifierProvider<AuthProvider>.value(
           value: auth,
@@ -119,15 +127,15 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.text('Афиша'));
+      await tester.tap(find.text('Профиль'));
       await tester.pump();
 
-      expect(find.text('sc3'), findsOneWidget);
+      expect(find.text('sc4'), findsOneWidget);
     });
 
-    testWidgets('пять нажатий на табы не открывают sc-booking', (tester) async {
-      // BookingScreen не входит в IndexedStack — убеждаемся, что пять
-      // стандартных табов не приводят к появлению «sc-booking».
+    testWidgets('четыре нажатия на видимые табы не открывают sc-booking', (tester) async {
+      // BookingScreen не входит в IndexedStack — убеждаемся, что видимые
+      // табы дока не приводят к появлению «sc-booking».
       await tester.pumpWidget(
         ChangeNotifierProvider<AuthProvider>.value(
           value: auth,
@@ -139,7 +147,7 @@ void main() {
       );
       await tester.pump();
 
-      for (final label in ['Меню', 'Интерьер', 'Афиша', 'Профиль', 'Главная']) {
+      for (final label in ['Меню', 'Интерьер', 'Профиль', 'Главная']) {
         await tester.tap(find.text(label));
         await tester.pump();
       }
