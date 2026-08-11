@@ -49,6 +49,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'gender', 'email', 'birthday',
             'notifications_enabled',
             'notify_events', 'notify_promotions', 'notify_closed_events',
-            'is_staff', 'role', 'cashback', 'date_joined',
+            'is_staff', 'role', 'cashback', 'loyalty_percent', 'loyalty_card_url', 'date_joined',
         )
-        read_only_fields = ('id', 'phone', 'is_staff', 'role', 'cashback', 'date_joined')
+        read_only_fields = (
+            'id', 'phone', 'is_staff', 'role', 'cashback',
+            'loyalty_percent', 'loyalty_card_url', 'date_joined',
+        )

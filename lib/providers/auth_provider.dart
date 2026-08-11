@@ -59,6 +59,8 @@ class AuthProvider extends ChangeNotifier {
       journeyStartLabel: journey.$2,
       eventsCount: eventsCount,
       cashback: profile.cashback,
+      loyaltyPercent: profile.loyaltyPercent,
+      loyaltyCardUrl: profile.loyaltyCardUrl,
     );
   }
 

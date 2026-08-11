@@ -15,6 +15,8 @@ class HeroUser {
     this.bookingsCount = 0,
     this.eventsCount = 0,
     this.cashback = 0,
+    this.loyaltyPercent,
+    this.loyaltyCardUrl,
   });
 
   final String name;
@@ -24,6 +26,8 @@ class HeroUser {
   final int bookingsCount;
   final int eventsCount;
   final double cashback;
+  final String? loyaltyPercent;
+  final String? loyaltyCardUrl;
 
   bool get isAuthorized => name.isNotEmpty;
 }

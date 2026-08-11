@@ -432,6 +432,20 @@ class UserProfileSerializerTest(APITestCase):
         self.assertFalse(response.data['is_staff'])
         self.assertEqual(response.data['role'], '')
 
+    def test_profile_response_includes_loyalty_fields(self):
+        user = User.objects.create_user(phone='+77009990004')
+        user.loyalty_percent = '3%'
+        user.loyalty_card_url = 'https://app.remarked.ru/api/v1/getQRcodeFile/cards/303450_1_100.png'
+        user.save()
+        self._auth(user)
+        response = self.client.get(self.PROFILE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['loyalty_percent'], '3%')
+        self.assertEqual(
+            response.data['loyalty_card_url'],
+            'https://app.remarked.ru/api/v1/getQRcodeFile/cards/303450_1_100.png',
+        )
+
     def test_profile_role_readonly(self):
         """PATCH с role='admin' игнорируется — поле только для чтения."""
         regular = User.objects.create_user(phone='+77009990004')
@@ -1042,6 +1056,27 @@ class ApplyGuestDataToUserTest(TestCase):
         self.assertFalse(apply_guest_data_to_user(self.user, {'bonuses': 'not-a-number'}))
         self.user.refresh_from_db()
         self.assertEqual(self.user.cashback, Decimal('0'))
+
+    def test_cat_name_saved_as_loyalty_percent(self):
+        """cat_name — незадокументированное в openapi.json поле, но реально приходит от Remarked."""
+        apply_guest_data_to_user(self.user, {'cat_name': '3%'})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.loyalty_percent, '3%')
+
+    def test_card_shortcode_saved_as_loyalty_card_url(self):
+        url = 'https://app.remarked.ru/api/v1/getQRcodeFile/cards/303450_56873673_100.png'
+        apply_guest_data_to_user(self.user, {'card_shortcode': url})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.loyalty_card_url, url)
+
+    def test_missing_loyalty_fields_do_not_erase_local_data(self):
+        self.user.loyalty_percent = '5%'
+        self.user.loyalty_card_url = 'https://app.remarked.ru/existing.png'
+        self.user.save()
+        apply_guest_data_to_user(self.user, {'name': 'Алихан'})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.loyalty_percent, '5%')
+        self.assertEqual(self.user.loyalty_card_url, 'https://app.remarked.ru/existing.png')
 
 
 class RemarkedGuestServiceSyncOnLoginTest(TestCase):

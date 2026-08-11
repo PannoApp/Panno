@@ -62,6 +62,28 @@ class User(AbstractBaseUser, PermissionsMixin):
         default=0,
         help_text="Баланс бонусов гостя из CRM Remarked (поле `bonuses`). Обновляется при синхронизации.",
     )
+    loyalty_percent = models.CharField(
+        "Процент лояльности",
+        max_length=16,
+        blank=True,
+        null=True,
+        help_text=(
+            "Категория гостя из CRM Remarked (поле `cat_name`, например `3%`). "
+            "Не задокументировано в openapi.json — найдено эмпирически 2026-08-11 "
+            "прямым запросом к /store/customer/get-info."
+        ),
+    )
+    loyalty_card_url = models.URLField(
+        "QR-код карты лояльности",
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text=(
+            "Публичная ссылка на готовое изображение QR-кода карты лояльности "
+            "из CRM Remarked (поле `card_shortcode`). Как и `loyalty_percent`, "
+            "не задокументировано в openapi.json."
+        ),
+    )
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

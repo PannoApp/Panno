@@ -117,6 +117,12 @@ def apply_guest_data_to_user(user, guest):
             changed_fields.append('cashback')
         except InvalidOperation:
             logger.warning("Remarked bonuses value not a number: %r", guest['bonuses'])
+    if guest.get('cat_name'):
+        user.loyalty_percent = guest['cat_name']
+        changed_fields.append('loyalty_percent')
+    if guest.get('card_shortcode'):
+        user.loyalty_card_url = guest['card_shortcode']
+        changed_fields.append('loyalty_card_url')
 
     if not changed_fields:
         return False

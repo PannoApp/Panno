@@ -65,6 +65,8 @@ class UserProfile {
     this.email = '',
     this.birthday,
     this.cashback = 0,
+    this.loyaltyPercent,
+    this.loyaltyCardUrl,
   });
 
   final int id;
@@ -82,6 +84,8 @@ class UserProfile {
   final String email;
   final DateTime? birthday;
   final double cashback;
+  final String? loyaltyPercent;
+  final String? loyaltyCardUrl;
 
   String get displayName => '$firstName $lastName'.trim();
   bool get isAdmin => isStaff;
@@ -113,6 +117,12 @@ class UserProfile {
       email: (json['email'] ?? '').toString(),
       birthday: _parseDateJoined(json['birthday']),
       cashback: json['cashback'] == null ? 0 : parseDouble(json['cashback'], field: 'cashback'),
+      loyaltyPercent: (json['loyalty_percent'] as String?)?.trim().isNotEmpty == true
+          ? json['loyalty_percent'] as String
+          : null,
+      loyaltyCardUrl: (json['loyalty_card_url'] as String?)?.trim().isNotEmpty == true
+          ? json['loyalty_card_url'] as String
+          : null,
     );
   }
 
@@ -138,6 +148,8 @@ class UserProfile {
         'email': email,
         if (birthday != null) 'birthday': formatDateOnly(birthday!),
         'cashback': cashback,
+        if (loyaltyPercent != null) 'loyalty_percent': loyaltyPercent,
+        if (loyaltyCardUrl != null) 'loyalty_card_url': loyaltyCardUrl,
       };
 
   UserProfile copyWith({
@@ -170,6 +182,8 @@ class UserProfile {
       email: email ?? this.email,
       birthday: birthday ?? this.birthday,
       cashback: cashback,
+      loyaltyPercent: loyaltyPercent,
+      loyaltyCardUrl: loyaltyCardUrl,
     );
   }
 }
