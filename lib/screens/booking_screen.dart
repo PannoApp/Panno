@@ -5,12 +5,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/auth_guard.dart';
+import '../core/booking_floor_plans.dart';
 import '../core/interior_assets.dart';
 import '../core/theme.dart';
 import '../data/models/booking_request.dart';
 import '../data/models/booking_zone.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
+import '../widgets/booking_floor_plan.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/path_cta.dart';
 import '../widgets/piligrim_toast.dart';
@@ -177,71 +179,153 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _pickTable(BookingProvider booking) async {
+    final plan = resolveFloorPlan(booking.selectedZone, booking.tables);
+
+    // Схема зала занимает заметно больше места, чем плоский список, и на
+    // маленьких телефонах не помещается в фиксированную долю экрана —
+    // isScrollControlled обязателен, иначе Flutter молча ограничивает
+    // высоту шторки ~9/16 экрана независимо от заданных constraints.
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: PiligrimColors.earthDeep,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) {
+        final handle = Container(
+          width: 36,
+          height: 4,
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: PiligrimColors.sky.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        );
+
+        // true — «Любой стол» и есть текущий выбор (стол не уточнён).
+        Widget header(bool isAnyTableActive) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'ВЫБОР СТОЛА',
+                  style: PiligrimTextStyles.sectionLabel.copyWith(
+                    color: PiligrimColors.sky.withValues(alpha: 0.50),
+                    letterSpacing: 1.6,
+                  ),
+                ),
+                if (plan != null)
+                  PiligrimTap(
+                    onTap: () {
+                      booking.setTable(null);
+                      Navigator.of(sheetContext).pop();
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Text(
+                      'Любой стол',
+                      style: PiligrimTextStyles.caption.copyWith(
+                        // Подсвечиваем золотым, когда это и есть текущий
+                        // выбор — раньше чип выглядел одинаково независимо
+                        // от состояния.
+                        color: isAnyTableActive ? PiligrimColors.steppe : PiligrimColors.water,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }
+
+        if (plan == null) {
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.6,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    handle,
+                    header(booking.selectedTable == null),
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        children: [
+                          _TableOptionTile(
+                            label: 'Любой стол',
+                            subtitle: null,
+                            isSelected: booking.selectedTable == null,
+                            onTap: () {
+                              booking.setTable(null);
+                              Navigator.of(sheetContext).pop();
+                            },
+                          ),
+                          ...booking.tables.map(
+                            (table) => _TableOptionTile(
+                              label: table.name != null ? 'Стол ${table.name}' : '№${table.id}',
+                              subtitle: table.capacity != null ? 'до ${table.capacity} гостей' : null,
+                              isSelected: booking.selectedTable?.id == table.id,
+                              onTap: () {
+                                booking.setTable(table);
+                                Navigator.of(sheetContext).pop();
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Схема зала физически не может быть выше ~30-40% экрана (её высота
+        // жёстко завязана на ширину через реальные пропорции комнаты — это
+        // геометрия, а не то, что можно «дотянуть» растягиванием шторки).
+        // Поэтому шторка размером под контент, без растягивания на весь
+        // экран и без ручки драг-ресайза — тянуть там нечего.
+        // maxHeight — не целевой размер, а лишь потолок на случай, если
+        // контент неожиданно окажется выше (SingleChildScrollView ниже —
+        // подстраховка на этот случай, а не основной механизм).
         return SafeArea(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.6,
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: PiligrimColors.sky.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'ВЫБОР СТОЛА',
-                        style: PiligrimTextStyles.sectionLabel.copyWith(
-                          color: PiligrimColors.sky.withValues(alpha: 0.50),
-                          letterSpacing: 1.6,
-                        ),
-                      ),
-                    ),
+                  handle,
+                  Consumer<BookingProvider>(
+                    builder: (context, liveBooking, _) => header(liveBooking.selectedTable == null),
                   ),
                   Flexible(
-                    child: ListView(
-                      shrinkWrap: true,
-                      padding: EdgeInsets.zero,
-                      children: [
-                        _TableOptionTile(
-                          label: 'Любой стол',
-                          subtitle: null,
-                          isSelected: booking.selectedTable == null,
-                          onTap: () {
-                            booking.setTable(null);
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+                      child: Consumer<BookingProvider>(
+                        builder: (context, liveBooking, _) => BookingFloorPlan(
+                          config: plan,
+                          zoneName: liveBooking.selectedZone?.name ?? plan.roomLabel,
+                          freeTables: liveBooking.tables,
+                          selectedTable: liveBooking.selectedTable,
+                          isLoading: liveBooking.isLoadingTables,
+                          onSelect: (table) {
+                            liveBooking.setTable(table);
                             Navigator.of(sheetContext).pop();
                           },
                         ),
-                        ...booking.tables.map(
-                          (table) => _TableOptionTile(
-                            label: table.name != null ? 'Стол ${table.name}' : '№${table.id}',
-                            subtitle: table.capacity != null ? 'до ${table.capacity} гостей' : null,
-                            isSelected: booking.selectedTable?.id == table.id,
-                            onTap: () {
-                              booking.setTable(table);
-                              Navigator.of(sheetContext).pop();
-                            },
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ],

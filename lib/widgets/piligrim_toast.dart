@@ -24,7 +24,14 @@ class PiligrimToast {
   static bool _isShowing = false;
   static OverlayEntry? _entry;
   static Timer? _timer;
-  static final _key = GlobalKey<_ToastWidgetState>();
+  // Свой GlobalKey на каждый показанный тост (не общий статический) —
+  // общий ключ ломал очередь: при быстрой смене одного тоста на следующий
+  // (сразу remove() старого entry + insert() нового в одном и том же
+  // вызове) Flutter иногда на мгновение видит два элемента с одним и тем
+  // же GlobalKey и кидает исключение — а оно молча проглатывалось в
+  // try/catch ниже, поэтому второй и третий тост из очереди просто не
+  // появлялись, без видимой ошибки.
+  static GlobalKey<_ToastWidgetState>? _currentKey;
 
   static void show(
     BuildContext context,
@@ -32,6 +39,7 @@ class PiligrimToast {
     PiligrimToastType type = PiligrimToastType.info,
     Duration duration = const Duration(seconds: 3),
   }) {
+    debugPrint('[PiligrimToast] show() called, message: "$message", queue length before: ${_queue.length}, isShowing: $_isShowing');
     _queue.add(_ToastRequest(
       context: context,
       message: message,
@@ -44,51 +52,72 @@ class PiligrimToast {
   }
 
   static void _showNext() {
+    debugPrint('[PiligrimToast] _showNext() called, queue length: ${_queue.length}');
     if (_queue.isEmpty) {
       _isShowing = false;
+      debugPrint('[PiligrimToast] Queue is empty, resetting isShowing to false');
       return;
     }
     _isShowing = true;
     final request = _queue.first;
 
     if (!request.context.mounted) {
+      debugPrint('[PiligrimToast] Context not mounted, skipping this request');
       _queue.removeAt(0);
       _showNext();
       return;
     }
 
-    final overlay = Overlay.of(request.context, rootOverlay: true);
-    _entry = OverlayEntry(
-      builder: (_) => _ToastWidget(
-        key: _key,
-        message: request.message,
-        type: request.type,
-        onAnimatedDismiss: _animatedDismiss,
-        onDismissed: () {
-          _cancelTimer();
-          _entry?.remove();
-          _entry = null;
-          if (_queue.isNotEmpty) {
-            _queue.removeAt(0);
-          }
-          _showNext();
-        },
-      ),
-    );
-    overlay.insert(_entry!);
-    _timer = Timer(request.duration, _animatedDismiss);
+    try {
+      final overlay = Overlay.of(request.context, rootOverlay: true);
+      debugPrint('[PiligrimToast] Overlay found: $overlay');
+      final key = GlobalKey<_ToastWidgetState>();
+      _currentKey = key;
+      _entry = OverlayEntry(
+        builder: (_) => _ToastWidget(
+          key: key,
+          message: request.message,
+          type: request.type,
+          onAnimatedDismiss: _animatedDismiss,
+          onDismissed: () {
+            debugPrint('[PiligrimToast] onDismissed called from widget gesture');
+            _cancelTimer();
+            _entry?.remove();
+            _entry = null;
+            if (_queue.isNotEmpty) {
+              _queue.removeAt(0);
+            }
+            _showNext();
+          },
+        ),
+      );
+      overlay.insert(_entry!);
+      debugPrint('[PiligrimToast] Overlay entry inserted successfully');
+      _timer = Timer(request.duration, _animatedDismiss);
+    } catch (e, stack) {
+      debugPrint('[PiligrimToast] Exception in _showNext: $e\n$stack');
+    }
   }
 
   static void _animatedDismiss() {
     _cancelTimer();
-    _key.currentState?.animateOut().then((_) {
-      _entry?.remove();
-      _entry = null;
-      if (_queue.isNotEmpty) {
-        _queue.removeAt(0);
-      }
-      _showNext();
-    });
+    final state = _currentKey?.currentState;
+    if (state != null && state.mounted) {
+      state.animateOut().then((_) {
+        _removeEntryAndShowNext();
+      });
+    } else {
+      _removeEntryAndShowNext();
+    }
+  }
+
+  static void _removeEntryAndShowNext() {
+    _entry?.remove();
+    _entry = null;
+    if (_queue.isNotEmpty) {
+      _queue.removeAt(0);
+    }
+    _showNext();
   }
 
   static void _cancelTimer() {
@@ -153,9 +182,15 @@ class _ToastWidgetState extends State<_ToastWidget>
   }
 
   Color get _accent => switch (widget.type) {
+        // error/success оставлены как есть — это универсальная сигнальная
+        // семантика (красный/зелёный), трогать её ради «теплоты» вредно для
+        // читаемости. info — самый частый, «нейтральный» тип (дефолт у
+        // show()), и раньше был холодным water; steppe (тёплое золото —
+        // основной акцент бренда на CTA/выборе) делает обычные тосты
+        // заметно менее «стандартными».
         PiligrimToastType.error => PiligrimColors.fruit,
         PiligrimToastType.success => PiligrimColors.success,
-        PiligrimToastType.info => PiligrimColors.water,
+        PiligrimToastType.info => PiligrimColors.steppe,
       };
 
   IconData get _icon => switch (widget.type) {
@@ -189,10 +224,10 @@ class _ToastWidgetState extends State<_ToastWidget>
                     borderRadius: PiligrimRadius.cardAll,
                     boxShadow: [
                       BoxShadow(
-                        color: _accent.withValues(alpha: 0.10),
-                        blurRadius: 24,
+                        color: _accent.withValues(alpha: 0.18),
+                        blurRadius: 28,
                         spreadRadius: 0,
-                        offset: const Offset(0, 6),
+                        offset: const Offset(0, 8),
                       ),
                       ...PiligrimShadows.card,
                     ],
@@ -203,11 +238,18 @@ class _ToastWidgetState extends State<_ToastWidget>
                       filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: PiligrimColors.earthDeep.withValues(alpha: 0.72),
+                          // earthDeep — самый тёмный тон в палитре, почти
+                          // не отличим от текстурного фона приложения на
+                          // глаз — тост сливался с экраном под ним. surfaceClay
+                          // заметно светлее (и всё ещё тёплый, «глиняный»
+                          // тон из той же палитры), плюс выше непрозрачность —
+                          // карточка теперь читается как отдельный,
+                          // приподнятый над контентом слой.
+                          color: PiligrimColors.surfaceClay.withValues(alpha: 0.94),
                           borderRadius: PiligrimRadius.cardAll,
                           border: Border.all(
-                            color: _accent.withValues(alpha: 0.28),
-                            width: 1,
+                            color: _accent.withValues(alpha: 0.45),
+                            width: 1.3,
                           ),
                         ),
                         child: IntrinsicHeight(

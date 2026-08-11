@@ -248,48 +248,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updateNotificationPreferences({
-    bool? events,
-    bool? promotions,
-    bool? closedEvents,
-    bool? notificationsEnabled,
-  }) async {
-    if (currentUser == null) return;
-
-    final previous = currentUser!;
-    error = null;
-
-    // Optimistic update — UI reacts immediately, no network wait
-    currentUser = previous.copyWith(
-      notifyEvents: events,
-      notifyPromotions: promotions,
-      notifyClosedEvents: closedEvents,
-      notificationsEnabled: notificationsEnabled,
-    );
-    notifyListeners();
-    await _cacheProfile(currentUser);
-
-    try {
-      final body = <String, dynamic>{};
-      if (events != null) body['notify_events'] = events;
-      if (promotions != null) body['notify_promotions'] = promotions;
-      if (closedEvents != null) body['notify_closed_events'] = closedEvents;
-      if (notificationsEnabled != null) {
-        body['notifications_enabled'] = notificationsEnabled;
-      }
-
-      currentUser = await _profileRepository.updateProfile(body);
-      await _cacheProfile(currentUser);
-    } catch (e) {
-      currentUser = previous;
-      await _cacheProfile(currentUser);
-      error = dioErrorMessage(e);
-      rethrow;
-    } finally {
-      notifyListeners();
-    }
-  }
-
   Future<void> _loadProfile() async {
     currentUser = await _profileRepository.fetchProfile();
     await _cacheProfile(currentUser);

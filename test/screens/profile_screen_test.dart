@@ -139,43 +139,6 @@ void main() {
       expect(find.text('ПОЛУЧИТЬ КОД'), findsNothing);
     });
 
-    testWidgets('Переключение «Мероприятия» → PATCH notify_events',
-        (tester) async {
-      auth.currentUser = _sampleProfile();
-      auth.notifyListeners();
-      adapter.enqueue(200, {
-        'id': 1,
-        'phone': '+77001234567',
-        'first_name': 'Айдар',
-        'last_name': 'Нурланов',
-        'notify_events': false,
-        'notify_promotions': false,
-        'notify_closed_events': false,
-      });
-
-      await tester.pumpWidget(buildApp());
-      await settle(tester);
-
-      final eventsLabel = find.text('Мероприятия');
-      await scrollTo(tester, eventsLabel);
-      final toggle = find.descendant(
-        of: find.ancestor(
-          of: eventsLabel,
-          matching: find.byType(Row),
-        ),
-        matching: find.byType(GestureDetector),
-      );
-      await tester.tap(toggle);
-      await settle(tester);
-      await tester.pump(const Duration(milliseconds: 300));
-
-      final patch = adapter.captured
-          .where((r) => r.method == 'PATCH' && r.path == '/users/profile/')
-          .single;
-      expect(patch.data, {'notify_events': false});
-      expect(auth.currentUser?.notifyEvents, isFalse);
-    });
-
     testWidgets('Кэшбек из профиля отображается отформатированной суммой',
         (tester) async {
       auth.currentUser = const UserProfile(
@@ -269,64 +232,6 @@ void main() {
       expect(find.text('ВВЕДИТЕ КОД'), findsOneWidget);
       expect(find.text('+77001234567'), findsOneWidget);
       expect(find.text('ПОДТВЕРДИТЬ'), findsOneWidget);
-    });
-
-    testWidgets('Глобальный переключатель → PATCH всех категорий разом',
-        (tester) async {
-      // Глобальный тумблер «Уведомления» отражает globalEnabled =
-      // notifyEvents && notifyPromotions && notifyClosedEvents (все три сразу),
-      // а не отдельное notifications_enabled — поэтому для теста «выключения»
-      // фикстура должна начинаться со всех трёх флагов включёнными.
-      auth.currentUser = const UserProfile(
-        id: 1,
-        phone: '+77001234567',
-        firstName: 'Айдар',
-        lastName: 'Нурланов',
-        notifyEvents: true,
-        notifyPromotions: true,
-        notifyClosedEvents: true,
-        notificationsEnabled: true,
-      );
-      auth.notifyListeners();
-      adapter.enqueue(200, {
-        'id': 1,
-        'phone': '+77001234567',
-        'first_name': 'Айдар',
-        'last_name': 'Нурланов',
-        'notify_events': false,
-        'notify_promotions': false,
-        'notify_closed_events': false,
-        'notifications_enabled': false,
-      });
-
-      await tester.pumpWidget(buildApp());
-      await settle(tester);
-
-      final globalLabel = find.text('Уведомления');
-      await scrollTo(tester, globalLabel);
-      final toggle = find.descendant(
-        of: find.ancestor(
-          of: globalLabel,
-          matching: find.byType(Row),
-        ),
-        matching: find.byType(GestureDetector),
-      );
-      await tester.tap(toggle.first);
-      await settle(tester);
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // _handleNotifToggle('global', ...) шлёт все четыре поля одним PATCH —
-      // см. lib/screens/profile_screen.dart, case 'global'.
-      final patch = adapter.captured
-          .where((r) => r.method == 'PATCH' && r.path == '/users/profile/')
-          .single;
-      expect(patch.data, {
-        'notifications_enabled': false,
-        'notify_events': false,
-        'notify_promotions': false,
-        'notify_closed_events': false,
-      });
-      expect(auth.currentUser?.notificationsEnabled, isFalse);
     });
   });
 }

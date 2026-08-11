@@ -56,47 +56,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  bool _notifValue(AuthProvider auth, String id) {
-    final user = auth.currentUser;
-    if (user == null) return false;
-    return switch (id) {
-      'events' => user.notifyEvents,
-      'promo' => user.notifyPromotions,
-      'private' => user.notifyClosedEvents,
-      _ => false,
-    };
-  }
-
-  Future<void> _handleNotifToggle(String id, bool value) async {
-    final auth = context.read<AuthProvider>();
-    if (!auth.isLoggedIn) return;
-
-    try {
-      switch (id) {
-        case 'global':
-          await auth.updateNotificationPreferences(
-            notificationsEnabled: value,
-            events: value,
-            promotions: value,
-            closedEvents: value,
-          );
-        case 'events':
-          await auth.updateNotificationPreferences(events: value);
-        case 'promo':
-          await auth.updateNotificationPreferences(promotions: value);
-        case 'private':
-          await auth.updateNotificationPreferences(closedEvents: value);
-      }
-    } catch (_) {
-      if (!mounted) return;
-      PiligrimToast.show(
-        context,
-        auth.error ?? 'Не удалось сохранить настройки',
-        type: PiligrimToastType.error,
-      );
-    }
-  }
-
   Future<void> _confirmDeleteAccount() async {
     final confirmed = await showPiligrimDeleteAccountDialog(context);
 
@@ -199,23 +158,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _CashbackCard(cashback: user.cashback),
                           const SizedBox(height: 28),
                         ],
-
-                    // Push-уведомления
-                    const PiligrimSectionHeader(
-                      label: 'УВЕДОМЛЕНИЯ',
-                      icon: 'assets/images/star_totem (1).svg',
-                    ),
-                    const SizedBox(height: 14),
-                    _NotificationsCard(
-                      enabled: auth.isLoggedIn,
-                      globalEnabled:
-                          (auth.currentUser?.notifyEvents ?? false) &&
-                          (auth.currentUser?.notifyPromotions ?? false) &&
-                          (auth.currentUser?.notifyClosedEvents ?? false),
-                      isOn: (id) => _notifValue(auth, id),
-                      onToggle: _handleNotifToggle,
-                    ),
-                    const SizedBox(height: 28),
 
                     // Контакты
                     const PiligrimSectionHeader(
@@ -404,12 +346,41 @@ class _HeroHeaderState extends State<_HeroHeader> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Ваш путь в PILIGRIM',
-                      style: PiligrimTextStyles.caption.copyWith(
-                        fontSize: 12,
-                        color: PiligrimColors.steppe.withValues(alpha: 0.50),
-                        letterSpacing: 1.2,
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        PiligrimToast.show(
+                          context,
+                          'Успешно: Настройки сохранены!',
+                          type: PiligrimToastType.success,
+                        );
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (!mounted) return;
+                          PiligrimToast.show(
+                            context,
+                            'Информация: Новое мероприятие добавлено',
+                            type: PiligrimToastType.info,
+                          );
+                        });
+                        Future.delayed(const Duration(milliseconds: 600), () {
+                          if (!mounted) return;
+                          PiligrimToast.show(
+                            context,
+                            'Ошибка: Не удалось обновить профиль',
+                            type: PiligrimToastType.error,
+                          );
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                        child: Text(
+                          'Ваш путь в PILIGRIM',
+                          style: PiligrimTextStyles.caption.copyWith(
+                            fontSize: 12,
+                            color: PiligrimColors.steppe.withValues(alpha: 0.50),
+                            letterSpacing: 1.2,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -585,177 +556,6 @@ class _CashbackCard extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.06, end: 0, duration: 500.ms);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NOTIFICATIONS CARD
-// ─────────────────────────────────────────────────────────────────────────────
-class _NotificationsCard extends StatelessWidget {
-  const _NotificationsCard({
-    required this.enabled,
-    required this.globalEnabled,
-    required this.isOn,
-    required this.onToggle,
-  });
-
-  final bool enabled;
-  // Глобальный флаг из UserProfile.notificationsEnabled
-  final bool globalEnabled;
-  final bool Function(String id) isOn;
-  final Future<void> Function(String id, bool value) onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!enabled) {
-      return _ProfileGlassCard(
-        variant: ProfileGlassVariant.integrated,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'Войдите, чтобы управлять уведомлениями',
-            style: PiligrimTextStyles.body.copyWith(
-              fontSize: 13,
-              color: PiligrimColors.sky.withValues(alpha: 0.5),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return _ProfileGlassCard(
-      variant: ProfileGlassVariant.integrated,
-      child: Column(
-        children: [
-          // Главный переключатель — отражает notifications_enabled с сервера
-          _NotifRow(
-            category: const NotifCategory(
-              id: 'global',
-              label: 'Уведомления',
-              subtitle: 'Включить все push-уведомления',
-              iconAsset: 'assets/images/moon_totem (1).svg',
-            ),
-            isOn: globalEnabled,
-            onChanged: (val) => onToggle('global', val),
-          ),
-          const _ProfileHairlineDivider(),
-          Column(
-            children: kNotifCategories.asMap().entries.map((entry) {
-              final i = entry.key;
-              final cat = entry.value;
-              final on = isOn(cat.id);
-              return Column(
-                children: [
-                  _NotifRow(
-                    category: cat,
-                    isOn: on,
-                    onChanged: (val) => onToggle(cat.id, val),
-                  ),
-                  if (i < kNotifCategories.length - 1)
-                    const _ProfileHairlineDivider(),
-                ],
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Строка настройки одного типа уведомлений (вкл/выкл переключатель)
-class _NotifRow extends StatelessWidget {
-  const _NotifRow({
-    required this.category,
-    required this.isOn,
-    required this.onChanged,
-  });
-
-  final NotifCategory category;
-  final bool isOn;
-  final ValueChanged<bool>? onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  category.label,
-                  style: PiligrimTextStyles.body.copyWith(
-                    fontSize: 14,
-                    color: isOn
-                        ? PiligrimColors.sky
-                        : PiligrimColors.sky.withValues(alpha: 0.45),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  category.subtitle,
-                  style: PiligrimTextStyles.caption.copyWith(
-                    fontSize: 11,
-                    color: PiligrimColors.sky.withValues(alpha: 0.38),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          // iOS-style toggle — тихий, без gaming glow
-          PiligrimTap(
-            onTap: onChanged != null ? () => onChanged!(!isOn) : null,
-            child: AnimatedContainer(
-              duration: 250.ms,
-              width: 46,
-              height: 26,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(13),
-                color: isOn
-                    ? PiligrimColors.steppe.withValues(alpha: 0.32)
-                    : PiligrimColors.sky.withValues(alpha: 0.08),
-                border: Border.all(
-                  color: isOn
-                      ? PiligrimColors.steppe.withValues(alpha: 0.45)
-                      : PiligrimColors.sky.withValues(alpha: 0.10),
-                  width: 0.5,
-                ),
-              ),
-              child: AnimatedAlign(
-                duration: 250.ms,
-                curve: Curves.easeInOut,
-                alignment:
-                    isOn ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.all(3),
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isOn
-                        ? PiligrimColors.nomadCream
-                        : PiligrimColors.sky.withValues(alpha: 0.35),
-                    boxShadow: [
-                      BoxShadow(
-                        color: PiligrimColors.shadow.withValues(
-                          alpha: isOn ? 0.22 : 0.12,
-                        ),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -1229,6 +1029,46 @@ class _AccountSessionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          PiligrimTap(
+            borderRadius: BorderRadius.circular(PiligrimRadius.md),
+            onTap: () {
+              debugPrint('[PiligrimToastTest] Tapped test button');
+              PiligrimToast.show(
+                context,
+                'Успешно: Тестовый тост!',
+                type: PiligrimToastType.success,
+              );
+              Future.delayed(const Duration(milliseconds: 400), () {
+                PiligrimToast.show(
+                  context,
+                  'Информация: Новое сообщение',
+                  type: PiligrimToastType.info,
+                );
+              });
+              Future.delayed(const Duration(milliseconds: 800), () {
+                PiligrimToast.show(
+                  context,
+                  'Ошибка: Соединение прервано',
+                  type: PiligrimToastType.error,
+                );
+              });
+            },
+            child: Padding(
+              padding: _rowPadding,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Проверить тосты (тест)',
+                  style: PiligrimTextStyles.body.copyWith(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: PiligrimColors.steppe,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const _ProfileHairlineDivider(inset: 18),
           PiligrimTap(
             borderRadius: BorderRadius.circular(PiligrimRadius.md),
             onTap: onLogout,

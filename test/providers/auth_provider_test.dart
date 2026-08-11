@@ -102,23 +102,6 @@ void main() {
       expect(storage.refresh, isNull);
     });
 
-    test('updateNotificationPreferences patches profile', () async {
-      storage.access = 'stored-access';
-      storage.refresh = 'stored-refresh';
-      adapter.enqueue(200, _sampleProfile());
-      _enqueueEmptyReservations(adapter);
-      adapter.enqueue(200, {
-        ..._sampleProfile(),
-        'notify_promotions': true,
-      });
-
-      final auth = buildProvider();
-      await auth.init();
-      await auth.updateNotificationPreferences(promotions: true);
-
-      expect(auth.currentUser?.notifyPromotions, isTrue);
-    });
-
     test('confirmOtp sets isNewUser from verify response', () async {
       adapter.enqueue(200, {
         'access': 'access-token',
@@ -154,26 +137,6 @@ void main() {
 
       expect(auth.user.journeyStartValue, '2');
       expect(auth.user.journeyStartLabel, 'Года с нами');
-    });
-
-    test('updateNotificationPreferences sends notifications_enabled', () async {
-      storage.access = 'stored-access';
-      adapter.enqueue(200, _sampleProfile());
-      _enqueueEmptyReservations(adapter);
-      adapter.enqueue(200, {
-        ..._sampleProfile(),
-        'notifications_enabled': false,
-      });
-
-      final auth = buildProvider();
-      await auth.init();
-      await auth.updateNotificationPreferences(notificationsEnabled: false);
-
-      final patch = adapter.captured
-          .where((r) => r.method == 'PATCH' && r.path == '/users/profile/')
-          .single;
-      expect(patch.data, {'notifications_enabled': false});
-      expect(auth.currentUser?.notificationsEnabled, isFalse);
     });
 
     test('updateDisplayProfile sends gender/email/birthday in PATCH body', () async {
