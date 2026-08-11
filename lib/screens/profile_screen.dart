@@ -155,7 +155,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             user: user,
                             onNavigate: widget.onNavigate,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 24),
+                          const PiligrimSectionHeader(
+                            label: 'КАРТА ЛОЯЛЬНОСТИ',
+                            icon: 'assets/images/shaman.svg',
+                          ),
+                          const SizedBox(height: 14),
                           _LoyaltyCard(user: user),
                           const SizedBox(height: 28),
                         ],
@@ -406,6 +411,10 @@ String _pluralize(int n, String one, String few, String many) {
 // ─────────────────────────────────────────────────────────────────────────────
 // STATS ROW
 // ─────────────────────────────────────────────────────────────────────────────
+// Мероприятия временно скрыты в профиле — фича ещё не готова к показу.
+// Вернуть: поставить true.
+const bool _showEventsStatCard = false;
+
 class _StatsRow extends StatelessWidget {
   const _StatsRow({required this.user, this.onNavigate});
   final HeroUser user;
@@ -427,17 +436,19 @@ class _StatsRow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 12),
-        _StatCard(
-          value: '${user.eventsCount}',
-          label: _pluralize(user.eventsCount, 'Мероприятие', 'Мероприятия', 'Мероприятий'),
-          delay: 80.ms,
-          onTap: () => Navigator.of(context).push(
-            PiligrimPageRoute(
-              builder: (_) => const EventReservationHistoryScreen(),
+        if (_showEventsStatCard) ...[
+          const SizedBox(width: 12),
+          _StatCard(
+            value: '${user.eventsCount}',
+            label: _pluralize(user.eventsCount, 'Мероприятие', 'Мероприятия', 'Мероприятий'),
+            delay: 80.ms,
+            onTap: () => Navigator.of(context).push(
+              PiligrimPageRoute(
+                builder: (_) => const EventReservationHistoryScreen(),
+              ),
             ),
           ),
-        ),
+        ],
         const SizedBox(width: 12),
         _StatCard(
           value: user.journeyStartValue ?? '—',
@@ -538,65 +549,12 @@ class _LoyaltyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasCode = user.loyaltyCardUrl?.isNotEmpty == true;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-      decoration: BoxDecoration(
-        borderRadius: PiligrimRadius.lgAll,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [PiligrimColors.earthWarm, PiligrimColors.earthDeep],
-        ),
-        border: Border.all(
-          color: PiligrimColors.steppe.withValues(alpha: 0.16),
-          width: 0.5,
-        ),
-        boxShadow: PiligrimShadows.card,
-      ),
+    return _ProfileGlassCard(
+      variant: ProfileGlassVariant.panel,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SvgPicture.asset(
-                'assets/images/piligrim.svg',
-                height: 20,
-                colorFilter: const ColorFilter.mode(
-                  PiligrimColors.nomadCream,
-                  BlendMode.srcIn,
-                ),
-              ),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('БАЛАНС', style: PiligrimTextStyles.sectionLabel),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${_formatCashback(user.cashback)} ₸',
-                    style: PiligrimTextStyles.heading.copyWith(
-                      fontSize: 18,
-                      color: PiligrimColors.sky,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Center(
-            child: SvgPicture.asset(
-              'assets/images/bird_totem (1).svg',
-              height: 52,
-              colorFilter: ColorFilter.mode(
-                PiligrimColors.nomadCream.withValues(alpha: 0.85),
-                BlendMode.srcIn,
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -605,38 +563,66 @@ class _LoyaltyCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('ГОСТЬ', style: PiligrimTextStyles.sectionLabel),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       user.name,
-                      style: PiligrimTextStyles.heading.copyWith(fontSize: 16),
+                      style: PiligrimTextStyles.heading.copyWith(
+                        fontSize: 17,
+                        color: PiligrimColors.sky,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('БАЛАНС', style: PiligrimTextStyles.sectionLabel),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${_formatCashback(user.cashback)} ₸',
+                    style: PiligrimTextStyles.heading.copyWith(
+                      fontSize: 15,
+                      color: PiligrimColors.steppe,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 14),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text('КЕШБЭК', style: PiligrimTextStyles.sectionLabel),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     user.loyaltyPercent ?? '—',
                     style: PiligrimTextStyles.heading.copyWith(
-                      fontSize: 16,
-                      color: PiligrimColors.steppe,
+                      fontSize: 15,
+                      color: PiligrimColors.ember,
                     ),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 22),
           Center(
             child: hasCode
                 ? _LoyaltyQrTile(url: user.loyaltyCardUrl!)
                 : const _LoyaltyQrPlaceholder(),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              hasCode ? 'Покажите QR-код на кассе' : 'Появится после первого визита',
+              style: PiligrimTextStyles.caption.copyWith(
+                fontSize: 11,
+                color: PiligrimColors.steppe.withValues(alpha: 0.55),
+              ),
+            ),
           ),
         ],
       ),
@@ -644,14 +630,21 @@ class _LoyaltyCard extends StatelessWidget {
   }
 }
 
-/// QR карты лояльности — картинка приходит готовой из Remarked (ч/б PNG),
-/// здесь она перекрашивается под палитру бренда через [_duotoneMatrix]:
-/// чёрные модули → [PiligrimColors.textDark], белый фон → [PiligrimColors.nomadCream].
+/// QR карты лояльности — картинка приходит готовой из Remarked (ч/б PNG).
+///
+/// Сами модули кода намеренно остаются близко к тёмно-нейтральному цвету
+/// ([PiligrimColors.textDark] на [PiligrimColors.nomadCream]) — это вопрос
+/// надёжности сканирования на кассе, не эстетики: сильно окрашивать пиксели
+/// кода в яркий акцент бренда рискованно (снижает контраст, скан может не
+/// сработать в плохом освещении зала). Поэтому «бренд» несёт не сам код,
+/// а рамка вокруг него — градиентная окантовка ember→steppe и тёплое
+/// свечение под плиткой, в духе остальных акцентных карточек этого экрана.
 class _LoyaltyQrTile extends StatelessWidget {
   const _LoyaltyQrTile({required this.url});
   final String url;
 
-  static const double _size = 156;
+  static const double _size = 148;
+  static const double _borderWidth = 2.5;
 
   static final List<double> _tint = _duotoneMatrix(
     darkHex: 0x2C2825, // PiligrimColors.textDark
@@ -661,60 +654,79 @@ class _LoyaltyQrTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        color: PiligrimColors.nomadCream,
-        borderRadius: PiligrimRadius.mdAll,
-      ),
-      child: CachedNetworkImage(
-        imageUrl: url,
-        width: _size,
-        height: _size,
-        fit: BoxFit.contain,
-        imageBuilder: (context, imageProvider) => ColorFiltered(
-          colorFilter: ColorFilter.matrix(_tint),
-          child: Image(
-            image: imageProvider,
-            width: _size,
-            height: _size,
-            fit: BoxFit.contain,
-          ),
+      padding: const EdgeInsets.all(_borderWidth),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [PiligrimColors.ember, PiligrimColors.steppe],
         ),
-        placeholder: (context, _) => const SizedBox(
+        boxShadow: [
+          BoxShadow(
+            color: PiligrimColors.ember.withValues(alpha: 0.28),
+            blurRadius: 28,
+            spreadRadius: -6,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: const BoxDecoration(
+          color: PiligrimColors.nomadCream,
+          borderRadius: PiligrimRadius.mdAll,
+        ),
+        child: CachedNetworkImage(
+          imageUrl: url,
           width: _size,
           height: _size,
-          child: Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: PiligrimColors.textDark,
+          fit: BoxFit.contain,
+          imageBuilder: (context, imageProvider) => ColorFiltered(
+            colorFilter: ColorFilter.matrix(_tint),
+            child: Image(
+              image: imageProvider,
+              width: _size,
+              height: _size,
+              fit: BoxFit.contain,
+            ),
+          ),
+          placeholder: (context, _) => const SizedBox(
+            width: _size,
+            height: _size,
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: PiligrimColors.textDark,
+                ),
               ),
             ),
           ),
-        ),
-        errorWidget: (context, _, __) => SizedBox(
-          width: _size,
-          height: _size,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.qr_code_2_rounded,
-                size: 28,
-                color: PiligrimColors.textDark.withValues(alpha: 0.35),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Не удалось загрузить QR',
-                textAlign: TextAlign.center,
-                style: PiligrimTextStyles.caption.copyWith(
-                  fontSize: 10,
-                  color: PiligrimColors.textDark.withValues(alpha: 0.5),
+          errorWidget: (context, _, __) => SizedBox(
+            width: _size,
+            height: _size,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.qr_code_2_rounded,
+                  size: 28,
+                  color: PiligrimColors.textDark.withValues(alpha: 0.35),
                 ),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  'Не удалось загрузить QR',
+                  textAlign: TextAlign.center,
+                  style: PiligrimTextStyles.caption.copyWith(
+                    fontSize: 10,
+                    color: PiligrimColors.textDark.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -723,21 +735,24 @@ class _LoyaltyQrTile extends StatelessWidget {
 }
 
 /// Показывается, пока у гостя ещё нет карты/QR в Remarked (первая синхронизация
-/// ещё не произошла или гость только что зарегистрирован).
+/// ещё не произошла или гость только что зарегистрирован). Пунктирная рамка
+/// вместо градиентной — визуально читается как «неактивно», в отличие от
+/// «живой» карты в [_LoyaltyQrTile].
 class _LoyaltyQrPlaceholder extends StatelessWidget {
   const _LoyaltyQrPlaceholder();
 
   @override
   Widget build(BuildContext context) {
+    const size = _LoyaltyQrTile._size + _LoyaltyQrTile._borderWidth * 2 + 24;
     return Container(
-      width: _LoyaltyQrTile._size,
-      height: _LoyaltyQrTile._size,
+      width: size,
+      height: size,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: PiligrimColors.nomadCream.withValues(alpha: 0.06),
-        borderRadius: PiligrimRadius.mdAll,
+        color: PiligrimColors.nomadCream.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(PiligrimRadius.md + _LoyaltyQrTile._borderWidth),
         border: Border.all(
-          color: PiligrimColors.nomadCream.withValues(alpha: 0.14),
+          color: PiligrimColors.steppe.withValues(alpha: 0.22),
         ),
       ),
       child: Column(
@@ -746,7 +761,7 @@ class _LoyaltyQrPlaceholder extends StatelessWidget {
           Icon(
             Icons.qr_code_2_rounded,
             size: 32,
-            color: PiligrimColors.nomadCream.withValues(alpha: 0.35),
+            color: PiligrimColors.steppe.withValues(alpha: 0.35),
           ),
           const SizedBox(height: 8),
           Text(
