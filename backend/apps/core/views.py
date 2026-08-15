@@ -75,8 +75,8 @@ class AppVersionView(generics.RetrieveAPIView):
     description=(
         'Возвращает фотографии интерьера ресторана, сгруппированные по зонам.\n\n'
         'Доступен без авторизации.\n\n'
-        '**Зоны:** `main_hall` — Главный зал, `bar` — Бар, '
-        '`private` — Приватная комната, `terrace` — Терраса, `other` — Другое.'
+        '**Зоны:** `bar` — Бар, `cave` — Пещера, '
+        '`event_space` — Ауа, `veranda` — Веранда.'
     ),
     responses={200: InteriorPhotoSerializer(many=True)},
 )

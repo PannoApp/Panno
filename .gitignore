@@ -82,10 +82,15 @@ lib/firebase_options.dart
 
 # Backend (Django)
 backend/.venv/
+backend/.venv*/
 backend/__pycache__/
 backend/**/*.pyc
 backend/db.sqlite3
 backend/.env
+
+# Контент меню, ещё не готовый к коммиту (сиды/изображения из визуализаций)
+backend/apps/menu/management/commands/seed_piligrim_menu.py
+backend/apps/menu/seed_data/images/piligrim/
 
 firebase.json
 .env.device.json

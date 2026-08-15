@@ -74,5 +74,43 @@ void main() {
       expect(json['twogis_link'], 'https://2gis.kz/out');
       expect(json.containsKey('tour_link'), isFalse);
     });
+
+    test('parses concept_description_kz when present', () {
+      final info = CoreInfo.fromJson({
+        ..._minimalCoreInfoJson(),
+        'concept_description_kz': 'Өмір дәмі.',
+      });
+
+      expect(info.conceptDescriptionKz, 'Өмір дәмі.');
+    });
+
+    test('concept_description_kz is null when absent from JSON', () {
+      final info = CoreInfo.fromJson(_minimalCoreInfoJson());
+
+      expect(info.conceptDescriptionKz, isNull);
+    });
+
+    test('whatsapp/telegram/instagram keys are ignored — контакты убраны из приложения', () {
+      final info = CoreInfo.fromJson({
+        ..._minimalCoreInfoJson(),
+        'whatsapp': 'https://wa.me/77000000000',
+        'telegram': 'https://t.me/piligrim_astana',
+        'instagram': 'https://instagram.com/piligrim.astana',
+      });
+
+      expect(info.socialLinks, isEmpty);
+    });
+
+    test('social_links array (если бэкенд когда-нибудь его отдаст) продолжает парситься', () {
+      final info = CoreInfo.fromJson({
+        ..._minimalCoreInfoJson(),
+        'social_links': [
+          {'label': 'Facebook', 'url': 'https://facebook.com/piligrim'},
+        ],
+      });
+
+      expect(info.socialLinks, hasLength(1));
+      expect(info.socialLinks.first.label, 'Facebook');
+    });
   });
 }

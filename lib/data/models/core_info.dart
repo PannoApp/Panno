@@ -34,20 +34,14 @@ class VisitRuleItem {
 }
 
 List<SocialLink> _parseSocialLinks(Map<String, dynamic> json) {
+  // WhatsApp/Telegram/Instagram убраны из контактов профиля — бэкенд больше
+  // не отдаёт эти поля, но серверный `social_links` (если когда-нибудь
+  // появится) по-прежнему поддерживается.
   final raw = json['social_links'] ?? json['socialLinks'];
   if (raw is List && raw.isNotEmpty) {
     return asJsonMapList(raw).map(SocialLink.fromJson).toList(growable: false);
   }
-  final links = <SocialLink>[];
-  void add(String label, dynamic value) {
-    final url = parseStringOrNull(value);
-    if (url != null) links.add(SocialLink(label: label, url: url));
-  }
-
-  add('WhatsApp', json['whatsapp']);
-  add('Telegram', json['telegram']);
-  add('Instagram', json['instagram']);
-  return links;
+  return const [];
 }
 
 List<VisitRuleItem> _parseVisitRules(dynamic raw) {
@@ -83,6 +77,9 @@ class CoreInfo {
     required this.visitRules,
     required this.privacyPolicy,
     this.conceptDescription,
+    this.conceptDescriptionKz,
+    this.loyaltyRecoveryWhatsapp,
+    this.loyaltyRecoveryMessage,
     this.twogisLink,
     this.feedbackUrl,
     this.termsOfService,
@@ -99,6 +96,9 @@ class CoreInfo {
   final List<VisitRuleItem> visitRules;
   final String privacyPolicy;
   final String? conceptDescription;
+  final String? conceptDescriptionKz;
+  final String? loyaltyRecoveryWhatsapp;
+  final String? loyaltyRecoveryMessage;
   final String? twogisLink;
   final String? feedbackUrl;
   final String? termsOfService;
@@ -131,6 +131,15 @@ class CoreInfo {
       conceptDescription: parseStringOrNull(
         json['concept_description'] ?? json['conceptDescription'],
       ),
+      conceptDescriptionKz: parseStringOrNull(
+        json['concept_description_kz'] ?? json['conceptDescriptionKz'],
+      ),
+      loyaltyRecoveryWhatsapp: parseStringOrNull(
+        json['loyalty_recovery_whatsapp'] ?? json['loyaltyRecoveryWhatsapp'],
+      ),
+      loyaltyRecoveryMessage: parseStringOrNull(
+        json['loyalty_recovery_message'] ?? json['loyaltyRecoveryMessage'],
+      ),
       twogisLink: parseStringOrNull(json['twogis_link'] ?? json['twogisLink']),
       feedbackUrl: parseStringOrNull(json['feedback_url'] ?? json['feedbackUrl']),
       termsOfService: parseStringOrNull(
@@ -151,6 +160,11 @@ class CoreInfo {
         'visit_rules': visitRules.map((e) => e.toJson()).toList(),
         'privacy_policy': privacyPolicy,
         if (conceptDescription != null) 'concept_description': conceptDescription,
+        if (conceptDescriptionKz != null) 'concept_description_kz': conceptDescriptionKz,
+        if (loyaltyRecoveryWhatsapp != null)
+          'loyalty_recovery_whatsapp': loyaltyRecoveryWhatsapp,
+        if (loyaltyRecoveryMessage != null)
+          'loyalty_recovery_message': loyaltyRecoveryMessage,
         if (twogisLink != null) 'twogis_link': twogisLink,
         if (feedbackUrl != null) 'feedback_url': feedbackUrl,
         if (termsOfService != null) 'terms_of_service': termsOfService,

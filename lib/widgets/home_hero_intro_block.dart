@@ -1,5 +1,4 @@
 // Типографика под hero — на textured background, не на фотографии.
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -8,54 +7,14 @@ import '../core/theme.dart';
 import '../core/home_data.dart';
 import '../providers/core_info_provider.dart';
 
-class HomeHeroIntroBlock extends StatefulWidget {
+class HomeHeroIntroBlock extends StatelessWidget {
   const HomeHeroIntroBlock({super.key});
 
   @override
-  State<HomeHeroIntroBlock> createState() => _HomeHeroIntroBlockState();
-}
-
-class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
-  int _phraseIndex = 0;
-  late Timer _phraseTimer;
-
-  static const _titleSwitchDuration = Duration(milliseconds: 1600);
-  static const _titleCurve = Cubic(0.33, 0.0, 0.18, 1.0);
-
-  @override
-  void initState() {
-    super.initState();
-    _phraseTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (mounted) {
-        setState(() => _phraseIndex = (_phraseIndex + 1) % kHeroPhrases.length);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _phraseTimer.cancel();
-    super.dispose();
-  }
-
-  Widget _titleTransition(Widget child, Animation<double> animation) {
-    final curved = CurvedAnimation(parent: animation, curve: _titleCurve);
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.028),
-          end: Offset.zero,
-        ).animate(curved),
-        child: child,
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final concept = context.watch<CoreInfoProvider>().coreInfo?.conceptDescription
-        ?? kModernNomadConcept;
+    final coreInfo = context.watch<CoreInfoProvider>().coreInfo;
+    final concept = coreInfo?.conceptDescription ?? kModernNomadConcept;
+    final conceptKz = coreInfo?.conceptDescriptionKz;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
       child: Column(
@@ -76,31 +35,17 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
 
           const SizedBox(height: 36),
 
-          SizedBox(
-            height: 76,
-            width: double.infinity,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: AnimatedSwitcher(
-                duration: _titleSwitchDuration,
-                switchInCurve: _titleCurve,
-                switchOutCurve: Curves.easeInCubic,
-                layoutBuilder: (currentChild, _) =>
-                    currentChild ?? const SizedBox.shrink(),
-                transitionBuilder: _titleTransition,
-                child: Text(
-                  kHeroPhrases[_phraseIndex],
-                  key: ValueKey<int>(_phraseIndex),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: PiligrimTextStyles.display.copyWith(
-                    fontSize: 28,
-                    height: 1.18,
-                    color: PiligrimColors.sky,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
+          // Заголовок теперь статичный (раньше ротировались 3 фразы) —
+          // kHeroTitle уже совпадает с первыми предложениями нового текста.
+          Text(
+            kHeroTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: PiligrimTextStyles.display.copyWith(
+              fontSize: 28,
+              height: 1.18,
+              color: PiligrimColors.sky,
+              letterSpacing: 0.2,
             ),
           )
               .animate()
@@ -120,6 +65,25 @@ class _HomeHeroIntroBlockState extends State<HomeHeroIntroBlock> {
           )
               .animate()
               .fadeIn(delay: 420.ms, duration: 1000.ms, curve: Curves.easeOut),
+
+          // Казахский блок — только если перевод заполнен на бэкенде
+          // (RestaurantInfo.concept_description_kz). Пока перевода нет,
+          // блок просто не рендерится.
+          if (conceptKz != null && conceptKz.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              conceptKz,
+              style: PiligrimTextStyles.body.copyWith(
+                fontSize: 13.5,
+                height: 1.6,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 0.35,
+                color: PiligrimColors.sky.withValues(alpha: 0.6),
+              ),
+            )
+                .animate()
+                .fadeIn(delay: 560.ms, duration: 1000.ms, curve: Curves.easeOut),
+          ],
         ],
       ),
     );

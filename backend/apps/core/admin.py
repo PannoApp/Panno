@@ -48,7 +48,7 @@ class RestaurantInfoAdmin(ModelAdmin):
     # Группировка полей по смысловым блокам — удобнее для менеджера
     fieldsets = (
         ('Контакты и адрес', {
-            'fields': ('address', 'phone', 'whatsapp', 'telegram', 'instagram', 'feedback_url'),
+            'fields': ('address', 'phone', 'feedback_url'),
         }),
         ('Часы работы', {
             'fields': ('working_hours', 'working_hours_note'),
@@ -62,7 +62,14 @@ class RestaurantInfoAdmin(ModelAdmin):
             'fields': ('twogis_link', 'tour_link'),
         }),
         ('Контент главной', {
-            'fields': ('concept_description',),
+            'fields': ('concept_description', 'concept_description_kz'),
+        }),
+        ('Восстановление номера лояльности', {
+            'fields': ('loyalty_recovery_whatsapp', 'loyalty_recovery_message'),
+            'description': (
+                'Ссылка «Забыл свой номер лояльности» на экране входа открывает WhatsApp '
+                'с этим номером и заготовленным текстом обращения.'
+            ),
         }),
         ('Юридические тексты', {
             'fields': ('privacy_policy', 'terms_of_service'),

@@ -69,6 +69,39 @@ void main() {
       await tester.pump(); // обрабатываем showDialog / setState
     }
 
+    testWidgets(
+        'Показывает новый RU-текст (заголовок + концепция), старый KZ-тэглайн убран',
+        (tester) async {
+      // Стаб версии обязателен: pumpPastSplash доводит время до срабатывания
+      // навигационного таймера (3200мс), который дёргает fetchAppVersion —
+      // без стаба Mocktail бросит MissingStubError и таймер останется висеть.
+      when(() => mockRepo.fetchAppVersion(any()))
+          .thenAnswer((_) async => _versionInfo(min: '1.0.0', latest: '1.0.0'));
+
+      await tester.pumpWidget(buildSplash());
+      // Проверяем текст ДО навигационного таймера — достаточно одного pump,
+      // чтобы дерево построилось (FadeTransition на AnimationController не
+      // требует довыполнения для присутствия текста в дереве).
+      await tester.pump();
+
+      // kHeroTitle (см. lib/core/home_data.dart) — статичный заголовок,
+      // общий со splash и главным экраном.
+      expect(find.textContaining('Вкус жизни'), findsOneWidget);
+      expect(find.textContaining('Путь героя'), findsOneWidget);
+      // kModernNomadConcept — RU-продолжение (фолбэк, пока concept_description
+      // на бэкенде не задан).
+      expect(find.textContaining('У жизни есть вкус'), findsOneWidget);
+
+      // Старый казахский тэглайн (_buildTagline, убран задачей 3) — сплэш
+      // теперь только на русском.
+      expect(find.text('дәстүрдің дәмі'), findsNothing);
+      expect(find.text('еркіндік лебі'), findsNothing);
+
+      // Доводим до конца навигационный таймер и shimmer-делей — иначе тест
+      // падает с "A Timer is still pending" при разрушении дерева.
+      await pumpPastSplash(tester);
+    });
+
     testWidgets('Если текущая версия < minVersion → AlertDialog показан',
         (tester) async {
       // kAppVersion = '1.0.0'; minVersion = '2.0.0' → текущая устарела

@@ -333,6 +333,251 @@ class VerifySMSViewTest(APITestCase):
 
 
 # ---------------------------------------------------------------------------
+# POST /api/v1/users/auth/loyalty-login/
+# ---------------------------------------------------------------------------
+
+class LoyaltyLoginViewTest(APITestCase):
+    PHONE = '+77003333333'
+    MEMBER_NUMBER = '100'
+
+    def setUp(self):
+        cache.clear()
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_valid_pair_returns_jwt_tokens(self, mock_get_info):
+        mock_get_info.return_value = {'id': '56873673', 'cards': ['100'], 'name': 'Тест'}
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': self.MEMBER_NUMBER,
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_valid_pair_creates_new_local_user(self, mock_get_info):
+        mock_get_info.return_value = {'id': '56873673', 'cards': ['100']}
+        self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': self.MEMBER_NUMBER,
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_new_user'])
+        self.assertTrue(User.objects.filter(phone=self.PHONE).exists())
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_valid_pair_existing_local_user_not_duplicated(self, mock_get_info):
+        User.objects.create_user(phone=self.PHONE)
+        mock_get_info.return_value = {'id': '56873673', 'cards': ['100']}
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': self.MEMBER_NUMBER,
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['is_new_user'])
+        self.assertEqual(User.objects.filter(phone=self.PHONE).count(), 1)
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_valid_pair_applies_guest_data(self, mock_get_info):
+        mock_get_info.return_value = {
+            'id': '56873673', 'cards': ['100'], 'name': 'Айдар', 'cat_name': '3%',
+        }
+        self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': self.MEMBER_NUMBER,
+        })
+        user = User.objects.get(phone=self.PHONE)
+        self.assertEqual(user.first_name, 'Айдар')
+        self.assertEqual(user.loyalty_percent, '3%')
+        self.assertEqual(user.remarked_guest_id, '56873673')
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_member_number_not_in_cards_returns_400(self, mock_get_info):
+        mock_get_info.return_value = {'id': '56873673', 'cards': ['100']}
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': '999',
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Неверный номер участника.')
+        self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_guest_not_found_returns_404(self, mock_get_info):
+        mock_get_info.return_value = None
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': self.MEMBER_NUMBER,
+        })
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_remarked_api_error_returns_503(self, mock_get_info):
+        mock_get_info.side_effect = RemarkedAPIError(code=500, message='boom')
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': self.MEMBER_NUMBER,
+        })
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_inactive_user_returns_403(self, mock_get_info):
+        User.objects.create_user(phone=self.PHONE, is_active=False)
+        mock_get_info.return_value = {'id': '56873673', 'cards': ['100']}
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': self.MEMBER_NUMBER,
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_missing_member_number_returns_400(self):
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE,
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_card_number_as_int_still_matches_string_input(self, mock_get_info):
+        """cards может прийти как числа (не только строки) — сравнение через str()."""
+        mock_get_info.return_value = {'id': '56873673', 'cards': [100]}
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': '100',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class LoyaltyLoginPhoneThrottleTest(APITestCase):
+    """
+    Номер участника — по сути пароль (см. LoyaltyLoginView) — лимит по
+    телефону должен реально блокировать подбор, независимо от IP.
+    """
+    PHONE = '+77003333333'
+
+    def setUp(self):
+        cache.clear()
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_sixth_attempt_on_same_phone_within_window_is_throttled(self, mock_get_info):
+        mock_get_info.return_value = {'id': '1', 'cards': ['100']}
+        for _ in range(5):
+            response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+                'phone': self.PHONE, 'member_number': '999',
+            })
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.post('/api/v1/users/auth/loyalty-login/', {
+            'phone': self.PHONE, 'member_number': '999',
+        })
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/users/auth/loyalty-register/
+# ---------------------------------------------------------------------------
+
+class LoyaltyRegisterViewTest(APITestCase):
+    PHONE = '+77004444444'
+
+    def setUp(self):
+        cache.clear()
+
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_new_guest_registers_and_returns_member_number(self, mock_get_info, mock_create):
+        # Первый вызов (проверка "уже существует?") — гостя нет.
+        # Второй вызов (после create) — Remarked уже назначил карту.
+        mock_get_info.side_effect = [None, {'id': '999', 'cards': ['113'], 'name': 'Айдар'}]
+        mock_create.return_value = 999
+
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE,
+            'first_name': 'Айдар',
+            'last_name': 'Нурланов',
+            'birthday': '1995-03-14',
+            'gender': 'male',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['member_number'], '113')
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+        mock_create.assert_called_once()
+
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_new_guest_creates_local_user(self, mock_get_info, mock_create):
+        mock_get_info.side_effect = [None, {'id': '999', 'cards': ['113']}]
+        mock_create.return_value = 999
+
+        self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
+        self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+        self.assertTrue(User.objects.filter(phone=self.PHONE).exists())
+
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_only_gender_and_phone_and_first_name_required(self, mock_get_info, mock_create):
+        """last_name/birthday опциональны — соответствует openapi.json requestBody.required."""
+        mock_get_info.side_effect = [None, {'id': '999', 'cards': ['1']}]
+        mock_create.return_value = 999
+
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_missing_first_name_returns_400(self):
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE,
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_existing_guest_returns_400(self, mock_get_info):
+        mock_get_info.return_value = {'id': '999', 'cards': ['113']}
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('уже зарегистрирован', response.data['error'])
+        self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_remarked_lookup_error_returns_503(self, mock_get_info):
+        mock_get_info.side_effect = RemarkedAPIError(code=500, message='boom')
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_remarked_create_error_returns_503(self, mock_get_info, mock_create):
+        mock_get_info.return_value = None
+        mock_create.side_effect = RemarkedAPIError(code=500, message='boom')
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
+
+
+class LoyaltyRegisterPhoneThrottleTest(APITestCase):
+    PHONE = '+77004444444'
+
+    def setUp(self):
+        cache.clear()
+
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_fourth_attempt_on_same_phone_within_window_is_throttled(self, mock_get_info):
+        mock_get_info.return_value = {'id': '999', 'cards': ['1']}  # "уже существует" — 400 каждый раз
+        for _ in range(3):
+            response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+                'phone': self.PHONE, 'first_name': 'Айдар',
+            })
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+# ---------------------------------------------------------------------------
 # GET/PATCH /api/users/profile/
 # ---------------------------------------------------------------------------
 

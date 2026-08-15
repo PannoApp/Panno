@@ -237,7 +237,7 @@ class FileCollisionTest(TestCase):
         from apps.core.models import InteriorPhoto
         p1 = InteriorPhoto.objects.create(
             image=_make_jpeg_stub("room.jpg"),
-            zone="main_hall",
+            zone="cave",
         )
         p2 = InteriorPhoto.objects.create(
             image=_make_jpeg_stub("room.jpg"),

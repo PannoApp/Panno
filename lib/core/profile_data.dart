@@ -1,7 +1,6 @@
 // Данные экрана Профиль / Контакты — отделены от UI
 // Согласно ТЗ раздел 4.5 и brand concept «Герой»
 import 'package:flutter/material.dart';
-import 'theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Герой приложения
@@ -60,8 +59,14 @@ class MapTarget {
 }
 
 const kRestaurantAddress = 'Астана, ул. Туран 24, НП «Шала»';
-const kRestaurantPhone = '+7 (700) 000-00-00';
+const kRestaurantPhone = '+7 (775) 007-62-70';
 const kRestaurantVersion = '1.0.0 (build 1)';
+
+// Восстановление номера лояльности (ТЗ по входу, п.4) — фолбэк, пока
+// RestaurantInfo.loyalty_recovery_whatsapp/_message не заполнены в админке.
+const kLoyaltyRecoveryWhatsapp = '+77713333044';
+const kLoyaltyRecoveryMessage =
+    'Здравствуйте! Не могу найти номер участника лояльности в приложении Piligrim, помогите, пожалуйста.';
 
 class Messenger {
   const Messenger({
@@ -76,26 +81,10 @@ class Messenger {
   final String iconAsset;
 }
 
-const kMessengers = [
-  Messenger(
-    label: 'WhatsApp',
-    url: 'https://wa.me/77000000000',
-    color: PiligrimColors.steppe,
-    iconAsset: 'assets/images/whatsapp_generic.svg',
-  ),
-  Messenger(
-    label: 'Telegram',
-    url: 'https://t.me/piligrim_astana',
-    color: PiligrimColors.steppe,
-    iconAsset: 'assets/images/telegram_generic.svg',
-  ),
-  Messenger(
-    label: 'Instagram',
-    url: 'https://instagram.com/piligrim.astana',
-    color: PiligrimColors.steppe,
-    iconAsset: 'assets/images/instagram_generic.svg',
-  ),
-];
+// WhatsApp/Telegram/Instagram убраны из контактов профиля — оставляем
+// класс Messenger (используется в _ContactsCard как fallback-тип), но
+// список пуст, пока бэкенд не отдаёт social_links.
+const kMessengers = <Messenger>[];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Правила посещения

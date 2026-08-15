@@ -45,6 +45,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // когда авторизация восстановится.
   bool _historyRequested = false;
 
+  // QR-код лояльности должен открываться и при плохом интернете (ТЗ п.5) —
+  // прогреваем дисковый кэш картинки заранее, как только известен URL,
+  // а не только когда гость долистает до _LoyaltyQrTile.
+  String? _precachedQrUrl;
+
+  void _precacheLoyaltyQr(String? url) {
+    if (url == null || url.isEmpty || url == _precachedQrUrl) return;
+    _precachedQrUrl = url;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) precacheImage(CachedNetworkImageProvider(url), context);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -120,6 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         }
         final user = auth.user;
+        _precacheLoyaltyQr(user.loyaltyCardUrl);
         final bottomPad = MediaQuery.paddingOf(context).bottom + 32;
         return Scaffold(
           backgroundColor: PiligrimColors.earthSurface,
@@ -651,64 +665,95 @@ class _LoyaltyQrTile extends StatelessWidget {
           ),
         ],
       ),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: const BoxDecoration(
-          color: PiligrimColors.nomadCream,
-          borderRadius: PiligrimRadius.mdAll,
-        ),
-        child: CachedNetworkImage(
-          imageUrl: url,
-          width: _size,
-          height: _size,
-          fit: BoxFit.contain,
-          imageBuilder: (context, imageProvider) => ColorFiltered(
-            colorFilter: ColorFilter.matrix(_tint),
-            child: Image(
-              image: imageProvider,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: PiligrimColors.nomadCream,
+              borderRadius: PiligrimRadius.mdAll,
+            ),
+            child: CachedNetworkImage(
+              imageUrl: url,
               width: _size,
               height: _size,
               fit: BoxFit.contain,
-            ),
-          ),
-          placeholder: (context, _) => const SizedBox(
-            width: _size,
-            height: _size,
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: PiligrimColors.textDark,
+              imageBuilder: (context, imageProvider) => ColorFiltered(
+                colorFilter: ColorFilter.matrix(_tint),
+                child: Image(
+                  image: imageProvider,
+                  width: _size,
+                  height: _size,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              placeholder: (context, _) => const SizedBox(
+                width: _size,
+                height: _size,
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: PiligrimColors.textDark,
+                    ),
+                  ),
+                ),
+              ),
+              errorWidget: (context, _, __) => SizedBox(
+                width: _size,
+                height: _size,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 28,
+                      color: PiligrimColors.textDark.withValues(alpha: 0.35),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Не удалось загрузить QR',
+                      textAlign: TextAlign.center,
+                      style: PiligrimTextStyles.caption.copyWith(
+                        fontSize: 10,
+                        color: PiligrimColors.textDark.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          errorWidget: (context, _, __) => SizedBox(
-            width: _size,
-            height: _size,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.qr_code_2_rounded,
-                  size: 28,
-                  color: PiligrimColors.textDark.withValues(alpha: 0.35),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Не удалось загрузить QR',
-                  textAlign: TextAlign.center,
-                  style: PiligrimTextStyles.caption.copyWith(
-                    fontSize: 10,
-                    color: PiligrimColors.textDark.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+          // Орнаментальные звёзды в углах рамки — брендовый акцент, не
+          // затрагивает читаемость самого кода сканером.
+          const Positioned(top: 2, left: 2, child: _CornerOrnament()),
+          const Positioned(top: 2, right: 2, child: _CornerOrnament()),
+          const Positioned(bottom: 2, left: 2, child: _CornerOrnament()),
+          const Positioned(bottom: 2, right: 2, child: _CornerOrnament()),
+        ],
+      ),
+    );
+  }
+}
+
+/// Орнаментальный акцент в углу рамки QR (мотив звезды со сплэша/входа —
+/// см. `assets/images/star_totem (1).svg` в splash_screen.dart /
+/// piligrim_auth_view.dart) — не касается самого QR-кода, только рамки.
+class _CornerOrnament extends StatelessWidget {
+  const _CornerOrnament();
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      'assets/images/star_totem (1).svg',
+      width: 12,
+      height: 12,
+      colorFilter: ColorFilter.mode(
+        PiligrimColors.nomadCream.withValues(alpha: 0.55),
+        BlendMode.srcIn,
       ),
     );
   }
@@ -837,13 +882,41 @@ class _ContactsCard extends StatelessWidget {
     // Карта — только 2ГИС (основной картографический сервис для аудитории РК)
     final mapLinks = [
       if (coreInfo?.twogisLink != null)
-        (label: '2ГИС', icon: 'assets/images/map_pin_generic.svg', url: coreInfo!.twogisLink!),
+        (label: 'карты', icon: 'assets/images/map_pin_generic.svg', url: coreInfo!.twogisLink!),
     ];
     final address = coreInfo?.address ?? '';
 
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
         ? coreInfo!.socialLinks
         : null;
+
+    // Мессенджеры — список строк с иконками. WhatsApp/Telegram/Instagram
+    // убраны из фолбэка (kMessengers пуст), список наполняется только если
+    // бэкенд когда-нибудь начнёт отдавать social_links.
+    final messengerItems = (messengers != null
+        ? messengers.map((link) {
+            return _MessengerChip(
+              label: link.label,
+              url: link.url,
+              iconAsset: _resolveMessengerIcon(link.label),
+              onLaunch: onLaunch,
+            );
+          }).toList()
+        : kMessengers
+            .map((m) => _MessengerChip(
+                  label: m.label,
+                  url: m.url,
+                  iconAsset: m.iconAsset,
+                  onLaunch: onLaunch,
+                ))
+            .toList());
+    final List<Widget> messengerRows = [];
+    for (int i = 0; i < messengerItems.length; i++) {
+      messengerRows.add(messengerItems[i]);
+      if (i < messengerItems.length - 1) {
+        messengerRows.add(const _ProfileHairlineDivider(inset: 48));
+      }
+    }
 
     return _ProfileGlassCard(
       variant: ProfileGlassVariant.integrated,
@@ -887,36 +960,12 @@ class _ContactsCard extends StatelessWidget {
             ),
           ),
 
-          const _ProfileHairlineDivider(inset: 18),
-
-          // Мессенджеры — список строк с иконками
-          ...() {
-            final items = (messengers != null
-                ? messengers.map((link) {
-                    return _MessengerChip(
-                      label: link.label,
-                      url: link.url,
-                      iconAsset: _resolveMessengerIcon(link.label),
-                      onLaunch: onLaunch,
-                    );
-                  }).toList()
-                : kMessengers
-                    .map((m) => _MessengerChip(
-                          label: m.label,
-                          url: m.url,
-                          iconAsset: m.iconAsset,
-                          onLaunch: onLaunch,
-                        ))
-                    .toList());
-            final List<Widget> rows = [];
-            for (int i = 0; i < items.length; i++) {
-              rows.add(items[i]);
-              if (i < items.length - 1) {
-                rows.add(const _ProfileHairlineDivider(inset: 48));
-              }
-            }
-            return rows;
-          }(),
+          // Разделитель + мессенджеры — рендерятся только если список непуст,
+          // иначе между телефоном и адресом остаётся «осиротевший» разделитель.
+          if (messengerRows.isNotEmpty) ...[
+            const _ProfileHairlineDivider(inset: 18),
+            ...messengerRows,
+          ],
 
           // Адрес + карта — в самом низу карточки
           if (address.isNotEmpty || mapLinks.isNotEmpty) ...[

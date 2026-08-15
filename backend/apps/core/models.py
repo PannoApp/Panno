@@ -41,6 +41,29 @@ class RestaurantInfo(models.Model):
     instagram = models.CharField("Instagram", max_length=100, blank=True)
 
     concept_description = models.TextField("Описание концепции", blank=True, default='')
+    concept_description_kz = models.TextField(
+        "Описание концепции (KZ)",
+        blank=True,
+        default='',
+        help_text="Казахский перевод. Если пусто — блок на казахском не показывается.",
+    )
+
+    # Восстановление номера лояльности (ТЗ по входу, п.4): ссылка «Забыл свой
+    # номер лояльности» на экране входа открывает WhatsApp-чат администратора
+    # с заготовленным текстом обращения.
+    loyalty_recovery_whatsapp = models.CharField(
+        "WhatsApp администратора (восстановление номера лояльности)",
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Номер в международном формате, напр. +77713333044.",
+    )
+    loyalty_recovery_message = models.TextField(
+        "Текст обращения в WhatsApp",
+        blank=True,
+        default='',
+        help_text="Подставляется в чат автоматически, чтобы гость не формулировал запрос сам.",
+    )
 
     privacy_policy = models.URLField("Политика обработки ПД", blank=True)
     terms_of_service = models.URLField("Пользовательское соглашение", blank=True)
@@ -196,14 +219,13 @@ class InteriorPhoto(models.Model):
     """
 
     ZONE_CHOICES = [
-        ('main_hall', 'Главный зал'),
-        ('bar',       'Бар'),
-        ('private',   'Приватная комната'),
-        ('terrace',   'Терраса'),
-        ('other',     'Другое'),
+        ('bar',         'Бар'),
+        ('cave',        'Пещера'),
+        ('event_space', 'Ауа'),
+        ('veranda',     'Веранда'),
     ]
 
-    zone    = models.CharField("Зона", max_length=20, choices=ZONE_CHOICES, default='main_hall')
+    zone    = models.CharField("Зона", max_length=20, choices=ZONE_CHOICES, default='bar')
     image   = models.ImageField(
         "Фото",
         upload_to=interior_image_upload,

@@ -254,6 +254,35 @@ class RestaurantInfoHeroFieldsTest(APITestCase):
         response = self.client.get('/api/v1/core/info/')
         self.assertEqual(response.data['concept_description'], 'Modern Nomad — кухня кочевников')
 
+    def test_concept_description_kz_defaults_to_empty_string(self):
+        response = self.client.get('/api/v1/core/info/')
+        self.assertIn('concept_description_kz', response.data)
+        self.assertEqual(response.data['concept_description_kz'], '')
+
+    def test_concept_description_kz_reflects_saved_value(self):
+        # Тестовая строка произвольная (не финальный перевод) — проверяем
+        # только сохранение/отдачу поля через API, а не корректность перевода.
+        self.info.concept_description_kz = 'Өмір дәмі. Батыр жолы.'
+        self.info.save()
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['concept_description_kz'], 'Өмір дәмі. Батыр жолы.')
+
+    def test_loyalty_recovery_fields_default_to_empty_string(self):
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['loyalty_recovery_whatsapp'], '')
+        self.assertEqual(response.data['loyalty_recovery_message'], '')
+
+    def test_loyalty_recovery_fields_reflect_saved_values(self):
+        self.info.loyalty_recovery_whatsapp = '+77713333044'
+        self.info.loyalty_recovery_message = 'Забыл номер участника, помогите найти.'
+        self.info.save()
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['loyalty_recovery_whatsapp'], '+77713333044')
+        self.assertEqual(
+            response.data['loyalty_recovery_message'],
+            'Забыл номер участника, помогите найти.',
+        )
+
 
 # ---------------------------------------------------------------------------
 # GET /api/v1/core/app-version/
@@ -336,6 +365,27 @@ class RestaurantInfoMapLinksTest(APITestCase):
         self.assertIsNone(response.data['feedback_url'])
 
 
+class RestaurantInfoSocialFieldsRemovedTest(APITestCase):
+    """
+    WhatsApp/Telegram/Instagram убраны из контактов профиля — сериализатор
+    не должен отдавать эти поля, даже если они заполнены в БД (значения
+    могли остаться от старых записей).
+    """
+
+    def setUp(self):
+        self.info = RestaurantInfo.load()
+        self.info.whatsapp = 'https://wa.me/77000000000'
+        self.info.telegram = 'https://t.me/piligrim_astana'
+        self.info.instagram = 'https://instagram.com/piligrim.astana'
+        self.info.save()
+
+    def test_response_omits_whatsapp_telegram_instagram(self):
+        response = self.client.get('/api/v1/core/info/')
+        self.assertNotIn('whatsapp', response.data)
+        self.assertNotIn('telegram', response.data)
+        self.assertNotIn('instagram', response.data)
+
+
 # ---------------------------------------------------------------------------
 # GET /api/v1/core/interior/ — Галерея интерьера (ТЗ 4.3)
 # ---------------------------------------------------------------------------
@@ -343,9 +393,9 @@ class RestaurantInfoMapLinksTest(APITestCase):
 class InteriorPhotoListViewTest(APITestCase):
     def setUp(self):
         # Создаём фото в разных зонах для тестирования группировки и порядка
-        InteriorPhoto.objects.create(zone='main_hall', order=1, caption='Главный зал, вид 1')
-        InteriorPhoto.objects.create(zone='terrace',   order=1, caption='Терраса')
-        InteriorPhoto.objects.create(zone='main_hall', order=2, caption='Главный зал, вид 2')
+        InteriorPhoto.objects.create(zone='bar',     order=1, caption='Бар, вид 1')
+        InteriorPhoto.objects.create(zone='veranda', order=1, caption='Веранда')
+        InteriorPhoto.objects.create(zone='bar',     order=2, caption='Бар, вид 2')
 
     def test_returns_200_without_auth(self):
         """Галерея доступна без авторизации."""
@@ -367,19 +417,19 @@ class InteriorPhotoListViewTest(APITestCase):
     def test_zone_display_is_human_readable(self):
         """zone_display содержит читаемое название зоны, а не код."""
         response = self.client.get('/api/v1/core/interior/')
-        # Все zone_display для main_hall должны быть 'Главный зал'
-        main_hall_photos = [p for p in response.data if p['zone'] == 'main_hall']
-        self.assertTrue(all(p['zone_display'] == 'Главный зал' for p in main_hall_photos))
+        # Все zone_display для bar должны быть 'Бар'
+        bar_photos = [p for p in response.data if p['zone'] == 'bar']
+        self.assertTrue(all(p['zone_display'] == 'Бар' for p in bar_photos))
 
     def test_sorted_by_zone_then_order(self):
         """Фотографии отсортированы: сначала по зоне, внутри зоны — по order."""
         response = self.client.get('/api/v1/core/interior/')
         zones = [p['zone'] for p in response.data]
-        orders_in_main_hall = [p['order'] for p in response.data if p['zone'] == 'main_hall']
-        # Зона main_hall идёт раньше terrace (алфавитный порядок m < t)
-        self.assertEqual(zones[0], 'main_hall')
+        orders_in_bar = [p['order'] for p in response.data if p['zone'] == 'bar']
+        # Зона bar идёт раньше veranda (алфавитный порядок b < v)
+        self.assertEqual(zones[0], 'bar')
         # Внутри зоны order должен быть возрастающим
-        self.assertEqual(orders_in_main_hall, sorted(orders_in_main_hall))
+        self.assertEqual(orders_in_bar, sorted(orders_in_bar))
 
     def test_empty_gallery_returns_empty_list(self):
         """Если фотографий нет, возвращается пустой список."""
@@ -792,7 +842,7 @@ class InteriorPhotoCacheTest(APITestCase):
 
     def setUp(self):
         cache.clear()
-        InteriorPhoto.objects.create(zone='main_hall', order=1, caption='Вид 1')
+        InteriorPhoto.objects.create(zone='cave', order=1, caption='Вид 1')
         InteriorPhoto.objects.create(zone='bar', order=1, caption='Бар')
 
     def tearDown(self):
@@ -808,7 +858,7 @@ class InteriorPhotoCacheTest(APITestCase):
         """Добавление новой фотографии инвалидирует кэш."""
         self.client.get('/api/v1/core/interior/')
         self.assertIsNotNone(cache.get('interior_photos'))
-        InteriorPhoto.objects.create(zone='terrace', order=1, caption='Терраса')
+        InteriorPhoto.objects.create(zone='veranda', order=1, caption='Веранда')
         self.assertIsNone(cache.get('interior_photos'))
         response = self.client.get('/api/v1/core/interior/')
         self.assertEqual(len(response.data), 3)
@@ -846,7 +896,7 @@ class CoreRedisResilienceTest(APITestCase):
 
     def test_interior_photos_works_when_redis_unavailable(self):
         """GET /api/v1/core/interior/ должен вернуть 200 даже если Redis недоступен."""
-        InteriorPhoto.objects.create(zone='main_hall', order=1)
+        InteriorPhoto.objects.create(zone='bar', order=1)
         with patch('utils.cache.cache') as mock_cache:
             mock_cache.get.return_value = None
             mock_cache.set.side_effect = Exception("Redis down")
@@ -868,7 +918,7 @@ class CoreFileCleanupTest(TestCase):
     # --- InteriorPhoto (plain ImageField, без AutoCropImageMixin) ---
 
     def test_interior_photo_old_file_deleted_on_update(self):
-        photo = InteriorPhoto.objects.create(image=_make_image('a.png'), zone='main_hall')
+        photo = InteriorPhoto.objects.create(image=_make_image('a.png'), zone='bar')
         old_name = photo.image.name
         self.assertTrue(default_storage.exists(old_name))
 
@@ -879,7 +929,7 @@ class CoreFileCleanupTest(TestCase):
         self.assertFalse(default_storage.exists(old_name))
 
     def test_interior_photo_file_deleted_on_instance_delete(self):
-        photo = InteriorPhoto.objects.create(image=_make_image(), zone='main_hall')
+        photo = InteriorPhoto.objects.create(image=_make_image(), zone='bar')
         name = photo.image.name
         self.assertTrue(default_storage.exists(name))
 
