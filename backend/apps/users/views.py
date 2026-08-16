@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 import logging
+import time
 
 from .throttles import (
     PhoneSMSThrottle,
@@ -28,6 +29,12 @@ from .services import SMSService, RemarkedGuestService, apply_guest_data_to_user
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+# LoyaltyRegisterView: сколько раз пробовать get_info_by_phone сразу после
+# успешного create_or_update, и пауза между попытками (см. комментарий в
+# LoyaltyRegisterView.post).
+REMARKED_POST_CREATE_LOOKUP_ATTEMPTS = 3
+REMARKED_POST_CREATE_LOOKUP_DELAY = 0.7
 
 
 _error_401 = OpenApiResponse(description='Токен не передан или недействителен')
@@ -274,8 +281,11 @@ class LoyaltyLoginView(APIView):
 
         try:
             guest = RemarkedMobileClient().get_info_by_phone(phone)
-        except RemarkedAPIError:
-            logger.warning("LoyaltyLoginView: Remarked lookup failed for phone=%s", phone)
+        except RemarkedAPIError as exc:
+            logger.warning(
+                "LoyaltyLoginView: Remarked lookup failed for phone=%s code=%s message=%s",
+                phone, exc.code, exc.message,
+            )
             return Response(
                 {'error': 'Сервис лояльности временно недоступен. Попробуйте позже.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -403,8 +413,11 @@ class LoyaltyRegisterView(APIView):
 
         try:
             existing_guest = client.get_info_by_phone(phone)
-        except RemarkedAPIError:
-            logger.warning("LoyaltyRegisterView: Remarked lookup failed for phone=%s", phone)
+        except RemarkedAPIError as exc:
+            logger.warning(
+                "LoyaltyRegisterView: Remarked lookup failed for phone=%s code=%s message=%s",
+                phone, exc.code, exc.message,
+            )
             return Response(
                 {'error': 'Сервис лояльности временно недоступен. Попробуйте позже.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -429,13 +442,36 @@ class LoyaltyRegisterView(APIView):
 
         try:
             client.create_or_update(temp_user)
-            guest = client.get_info_by_phone(phone)
-        except RemarkedAPIError:
-            logger.warning("LoyaltyRegisterView: Remarked create failed for phone=%s", phone)
+        except RemarkedAPIError as exc:
+            logger.warning(
+                "LoyaltyRegisterView: Remarked create failed for phone=%s code=%s message=%s",
+                phone, exc.code, exc.message,
+            )
             return Response(
                 {'error': 'Сервис лояльности временно недоступен. Попробуйте позже.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+
+        # Гость только что создан в Remarked — сразу после create_or_update
+        # get_info_by_phone иногда не находит его (задержка индексации на
+        # стороне Remarked, обнаружено эмпирически 2026-08-16). create_or_update
+        # уже необратимо создал гостя, поэтому здесь НЕ возвращаем 503 —
+        # просто пробуем прочитать карту с несколькими короткими попытками;
+        # если не получится совсем, регистрация всё равно считается успешной
+        # (без номера карты в ответе — гость сможет узнать его при следующем входе).
+        guest = None
+        for attempt in range(REMARKED_POST_CREATE_LOOKUP_ATTEMPTS):
+            try:
+                guest = client.get_info_by_phone(phone)
+                break
+            except RemarkedAPIError as exc:
+                if attempt + 1 >= REMARKED_POST_CREATE_LOOKUP_ATTEMPTS:
+                    logger.warning(
+                        "LoyaltyRegisterView: post-create lookup failed for phone=%s after %d attempts: code=%s message=%s",
+                        phone, REMARKED_POST_CREATE_LOOKUP_ATTEMPTS, exc.code, exc.message,
+                    )
+                else:
+                    time.sleep(REMARKED_POST_CREATE_LOOKUP_DELAY)
 
         user, _ = User.objects.get_or_create(phone=phone)
         if guest:

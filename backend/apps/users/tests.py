@@ -555,6 +555,55 @@ class LoyaltyRegisterViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
 
+    @patch('time.sleep')
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_post_create_lookup_retries_and_succeeds(self, mock_get_info, mock_create, mock_sleep):
+        """
+        Regression: create_or_update успешен, но Remarked не сразу отдаёт
+        созданного гостя через get_info_by_phone (задержка индексации,
+        обнаружено эмпирически 2026-08-16 на staging). Должны повторить
+        попытку, а не сразу падать в 503.
+        """
+        mock_get_info.side_effect = [
+            None,  # проверка "уже существует?" — нет
+            RemarkedAPIError(code=500, message='not indexed yet'),  # 1-я попытка после create
+            {'id': '999', 'cards': ['113'], 'name': 'Айдар'},  # 2-я попытка — успех
+        ]
+        mock_create.return_value = 999
+
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['member_number'], '113')
+        mock_sleep.assert_called_once()
+
+    @patch('time.sleep')
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_post_create_lookup_exhausts_retries_still_returns_200(self, mock_get_info, mock_create, mock_sleep):
+        """
+        create_or_update — необратимое действие (гость уже создан в CRM).
+        Если все попытки прочитать его карту после этого проваливаются,
+        регистрация всё равно должна считаться успешной (без 503) — иначе
+        гость думает, что регистрация не прошла, хотя она прошла, и не
+        может повторить попытку (get_info_by_phone на следующем заходе
+        найдёт гостя и вернёт "уже зарегистрирован").
+        """
+        mock_get_info.side_effect = [None] + [RemarkedAPIError(code=500, message='boom')] * 3
+        mock_create.return_value = 999
+
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data['member_number'])
+        self.assertTrue(User.objects.filter(phone=self.PHONE).exists())
+        self.assertEqual(mock_sleep.call_count, 2)
+
 
 class LoyaltyRegisterPhoneThrottleTest(APITestCase):
     PHONE = '+77004444444'
