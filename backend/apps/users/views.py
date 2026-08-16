@@ -440,25 +440,26 @@ class LoyaltyRegisterView(APIView):
             birthday=data.get('birthday'),
         )
 
+        # Статус ответа create_or_update ненадёжен как единственный сигнал:
+        # на staging наблюдалось (2026-08-16), что Remarked возвращает
+        # HTTP 500 на /store/customer/create, даже когда гость фактически
+        # создаётся (подтверждено — гость находился через get_info_by_phone
+        # сразу после "неудачного" create, с корректным cards/registration_date).
+        # Поэтому исключение из create_or_update НЕ приводит к немедленному
+        # 503 — ниже мы в любом случае проверяем реальное состояние через
+        # get_info_by_phone и доверяем только ему.
         try:
             client.create_or_update(temp_user)
         except RemarkedAPIError as exc:
             logger.warning(
-                "LoyaltyRegisterView: Remarked create failed for phone=%s code=%s message=%s",
+                "LoyaltyRegisterView: create_or_update raised for phone=%s code=%s message=%s "
+                "(проверяем ниже, не создался ли гость всё же)",
                 phone, exc.code, exc.message,
             )
-            return Response(
-                {'error': 'Сервис лояльности временно недоступен. Попробуйте позже.'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
 
-        # Гость только что создан в Remarked — сразу после create_or_update
-        # get_info_by_phone иногда не находит его (задержка индексации на
-        # стороне Remarked, обнаружено эмпирически 2026-08-16). create_or_update
-        # уже необратимо создал гостя, поэтому здесь НЕ возвращаем 503 —
-        # просто пробуем прочитать карту с несколькими короткими попытками;
-        # если не получится совсем, регистрация всё равно считается успешной
-        # (без номера карты в ответе — гость сможет узнать его при следующем входе).
+        # Читаем реальное состояние с несколькими короткими попытками — либо
+        # из-за задержки индексации на стороне Remarked после успешного
+        # создания, либо потому что create_or_update выше правда не удался.
         guest = None
         for attempt in range(REMARKED_POST_CREATE_LOOKUP_ATTEMPTS):
             try:
@@ -473,15 +474,21 @@ class LoyaltyRegisterView(APIView):
                 else:
                     time.sleep(REMARKED_POST_CREATE_LOOKUP_DELAY)
 
+        if not guest:
+            # Ни create_or_update, ни повторные попытки чтения не подтвердили
+            # гостя — вот теперь это действительно похоже на настоящий сбой.
+            return Response(
+                {'error': 'Сервис лояльности временно недоступен. Попробуйте позже.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         user, _ = User.objects.get_or_create(phone=phone)
-        if guest:
-            apply_guest_data_to_user(user, guest)
+        apply_guest_data_to_user(user, guest)
 
         member_number = None
-        if guest:
-            cards = guest.get('cards') or []
-            if cards:
-                member_number = str(cards[0])
+        cards = guest.get('cards') or []
+        if cards:
+            member_number = str(cards[0])
 
         update_last_login(None, user)
         refresh = RefreshToken.for_user(user)

@@ -546,7 +546,8 @@ class LoyaltyRegisterViewTest(APITestCase):
 
     @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
     @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
-    def test_remarked_create_error_returns_503(self, mock_get_info, mock_create):
+    def test_remarked_create_error_and_guest_truly_absent_returns_503(self, mock_get_info, mock_create):
+        """create_or_update упал, и повторные проверки тоже не находят гостя — реальный сбой."""
         mock_get_info.return_value = None
         mock_create.side_effect = RemarkedAPIError(code=500, message='boom')
         response = self.client.post('/api/v1/users/auth/loyalty-register/', {
@@ -554,6 +555,31 @@ class LoyaltyRegisterViewTest(APITestCase):
         })
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
+
+    @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
+    @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
+    def test_create_raises_but_guest_actually_created_still_returns_200(self, mock_get_info, mock_create):
+        """
+        Regression (staging, 2026-08-16): create_or_update бросил
+        RemarkedAPIError(500), но гость фактически был создан — подтверждено
+        находкой через get_info_by_phone сразу после, с корректным cards и
+        временем регистрации, совпадающим с моментом "неудачного" create.
+        Статус ответа create_or_update ненадёжен сам по себе — доверяем
+        только последующей проверке через get_info_by_phone.
+        """
+        mock_get_info.side_effect = [
+            None,  # проверка "уже существует?" — нет
+            {'id': '999', 'cards': ['116'], 'name': 'Айдар'},  # после "неудачного" create — гость есть
+        ]
+        mock_create.side_effect = RemarkedAPIError(code=500, message='')
+
+        response = self.client.post('/api/v1/users/auth/loyalty-register/', {
+            'phone': self.PHONE, 'first_name': 'Айдар',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['member_number'], '116')
+        self.assertTrue(User.objects.filter(phone=self.PHONE).exists())
 
     @patch('time.sleep')
     @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
@@ -583,14 +609,17 @@ class LoyaltyRegisterViewTest(APITestCase):
     @patch('time.sleep')
     @patch('apps.remarked.client.RemarkedMobileClient.create_or_update')
     @patch('apps.remarked.client.RemarkedMobileClient.get_info_by_phone')
-    def test_post_create_lookup_exhausts_retries_still_returns_200(self, mock_get_info, mock_create, mock_sleep):
+    def test_create_succeeds_but_lookup_never_confirms_returns_503(self, mock_get_info, mock_create, mock_sleep):
         """
-        create_or_update — необратимое действие (гость уже создан в CRM).
-        Если все попытки прочитать его карту после этого проваливаются,
-        регистрация всё равно должна считаться успешной (без 503) — иначе
-        гость думает, что регистрация не прошла, хотя она прошла, и не
-        может повторить попытку (get_info_by_phone на следующем заходе
-        найдёт гостя и вернёт "уже зарегистрирован").
+        Статус create_or_update сам по себе ничего не доказывает (см.
+        test_create_raises_but_guest_actually_created_still_returns_200 —
+        он может соврать и про успех, и про неудачу). Если ни create, ни
+        все попытки get_info_by_phone так и не подтвердили гостя реальными
+        данными — у нас физически нет номера карты, который можно отдать
+        гостю, поэтому это 503, а не "успех без номера". При повторной
+        попытке регистрации той же паре telefon/данные первая же проверка
+        "уже существует?" либо найдёт гостя (если он всё-таки был создан),
+        либо позволит создать его заново.
         """
         mock_get_info.side_effect = [None] + [RemarkedAPIError(code=500, message='boom')] * 3
         mock_create.return_value = 999
@@ -599,9 +628,8 @@ class LoyaltyRegisterViewTest(APITestCase):
             'phone': self.PHONE, 'first_name': 'Айдар',
         })
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsNone(response.data['member_number'])
-        self.assertTrue(User.objects.filter(phone=self.PHONE).exists())
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertFalse(User.objects.filter(phone=self.PHONE).exists())
         self.assertEqual(mock_sleep.call_count, 2)
 
 
