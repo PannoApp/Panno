@@ -35,6 +35,24 @@ void main() {
       expect(info.tourLink, isNull);
     });
 
+    test('parses latitude/longitude when present', () {
+      final info = CoreInfo.fromJson({
+        ..._minimalCoreInfoJson(),
+        'latitude': 51.128207,
+        'longitude': 71.430411,
+      });
+
+      expect(info.latitude, 51.128207);
+      expect(info.longitude, 71.430411);
+    });
+
+    test('latitude/longitude are null when absent from JSON', () {
+      final info = CoreInfo.fromJson(_minimalCoreInfoJson());
+
+      expect(info.latitude, isNull);
+      expect(info.longitude, isNull);
+    });
+
     test('supports camelCase keys for new fields', () {
       final info = CoreInfo.fromJson({
         ..._minimalCoreInfoJson(),

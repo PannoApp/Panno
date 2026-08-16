@@ -59,7 +59,12 @@ class RestaurantInfoAdmin(ModelAdmin):
             ),
         }),
         ('Маршруты', {
-            'fields': ('twogis_link', 'tour_link'),
+            'fields': ('twogis_link', 'tour_link', 'latitude', 'longitude'),
+            'description': (
+                'Широта/долгота — чтобы кнопка «карты» в приложении вела точно на заведение '
+                '(Google/Яндекс/Apple Maps), а не на неточный поиск по тексту адреса. '
+                'Найти координаты можно, например, кликнув правой кнопкой по точке на Google Maps.'
+            ),
         }),
         ('Контент главной', {
             'fields': ('concept_description', 'concept_description_kz'),

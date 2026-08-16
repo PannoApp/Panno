@@ -883,7 +883,12 @@ class _ContactsCard extends StatelessWidget {
     final address = coreInfo?.address ?? '';
     // Кнопка «карты» теперь открывает выбор приложения (2ГИС/Google/Яндекс/
     // Apple), а не жёстко 2ГИС — см. lib/widgets/piligrim_map_picker_sheet.dart.
-    final mapOptions = buildMapOptions(address: address, twogisLink: coreInfo?.twogisLink);
+    final mapOptions = buildMapOptions(
+      address: address,
+      twogisLink: coreInfo?.twogisLink,
+      latitude: coreInfo?.latitude,
+      longitude: coreInfo?.longitude,
+    );
 
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
         ? coreInfo!.socialLinks

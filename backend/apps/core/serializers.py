@@ -37,6 +37,8 @@ class RestaurantInfoSerializer(serializers.ModelSerializer):
             'is_open_now',
             'tour_link',
             'twogis_link',
+            'latitude',
+            'longitude',
             'phone',
             'concept_description',
             'concept_description_kz',

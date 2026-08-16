@@ -267,6 +267,19 @@ class RestaurantInfoHeroFieldsTest(APITestCase):
         response = self.client.get('/api/v1/core/info/')
         self.assertEqual(response.data['concept_description_kz'], 'Өмір дәмі. Батыр жолы.')
 
+    def test_latitude_longitude_default_to_null(self):
+        response = self.client.get('/api/v1/core/info/')
+        self.assertIsNone(response.data['latitude'])
+        self.assertIsNone(response.data['longitude'])
+
+    def test_latitude_longitude_reflect_saved_values(self):
+        self.info.latitude = 51.128207
+        self.info.longitude = 71.430411
+        self.info.save()
+        response = self.client.get('/api/v1/core/info/')
+        self.assertEqual(response.data['latitude'], 51.128207)
+        self.assertEqual(response.data['longitude'], 71.430411)
+
     def test_loyalty_recovery_fields_default_to_empty_string(self):
         response = self.client.get('/api/v1/core/info/')
         self.assertEqual(response.data['loyalty_recovery_whatsapp'], '')

@@ -26,6 +26,11 @@ double parseDouble(dynamic value, {String field = 'value'}) {
   throw FormatException('Cannot parse double for $field from $value');
 }
 
+double? parseDoubleOrNull(dynamic value) {
+  if (value == null) return null;
+  return parseDouble(value);
+}
+
 bool parseBool(dynamic value, {bool defaultValue = false}) {
   if (value == null) return defaultValue;
   if (value is bool) return value;

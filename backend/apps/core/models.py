@@ -32,6 +32,13 @@ class RestaurantInfo(models.Model):
     # Ссылка для кнопки «Построить маршрут» (2ГИС — основной картографический сервис для аудитории РК)
     twogis_link = models.URLField(blank=True, null=True, verbose_name="Ссылка на 2GIS")
 
+    # Точные координаты — чтобы кнопка «карты» (Google/Яндекс/Apple) вела
+    # прямо на заведение, а не на текстовый поиск по адресу (который может
+    # промахнуться мимо нужного здания/входа). Пока не заполнены — фронт
+    # использует адрес как менее точный фолбэк (см. buildMapOptions в Flutter).
+    latitude = models.FloatField("Широта", null=True, blank=True)
+    longitude = models.FloatField("Долгота", null=True, blank=True)
+
     # URL для обратной связи (форма, email-ссылка mailto:, WhatsApp и т.п.)
     feedback_url = models.URLField("Обратная связь (URL)", blank=True, null=True)
 

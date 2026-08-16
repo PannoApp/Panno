@@ -12,34 +12,46 @@ class MapOption {
   final String url;
 }
 
-/// Строит варианты карт из адреса ресторана (Google/Яндекс/Apple — поиск по
-/// адресу, универсальные ссылки работают без API-ключей) и точной ссылки
-/// 2ГИС из админки (RestaurantInfo.twogis_link), если она задана.
-/// Раньше кнопка «карты» жёстко открывала только 2ГИС — теперь гость сам
-/// выбирает, каким приложением пользоваться.
+/// Строит варианты карт: 2ГИС — по точной ссылке из админки
+/// (RestaurantInfo.twogis_link), Google/Яндекс/Apple — по координатам
+/// (RestaurantInfo.latitude/longitude), если они заполнены, иначе — по
+/// тексту адреса (менее точный текстовый поиск, может промахнуться мимо
+/// нужного здания). Раньше кнопка «карты» жёстко открывала только 2ГИС —
+/// теперь гость сам выбирает, каким приложением пользоваться, и ссылка
+/// всегда ведёт в одно и то же заведение, а не «куда-то рядом».
 List<MapOption> buildMapOptions({
   required String address,
   String? twogisLink,
+  double? latitude,
+  double? longitude,
 }) {
+  final hasCoordinates = latitude != null && longitude != null;
   final query = Uri.encodeComponent(address);
+
+  String googleUrl() => hasCoordinates
+      ? 'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude'
+      : 'https://www.google.com/maps/search/?api=1&query=$query';
+
+  // Яндекс.Карты принимает координаты в порядке «долгота,широта» для pt/ll.
+  String yandexUrl() => hasCoordinates
+      ? 'https://yandex.ru/maps/?pt=$longitude,$latitude&z=17&l=map'
+      : 'https://yandex.ru/maps/?text=$query';
+
+  String appleUrl() => hasCoordinates
+      ? 'https://maps.apple.com/?ll=$latitude,$longitude&q=$query'
+      : 'https://maps.apple.com/?q=$query';
+
   final options = <MapOption>[
     if (twogisLink != null && twogisLink.isNotEmpty)
       MapOption(label: '2ГИС', url: twogisLink),
-    if (address.isNotEmpty)
-      MapOption(
-        label: 'Google Карты',
-        url: 'https://www.google.com/maps/search/?api=1&query=$query',
-      ),
-    if (address.isNotEmpty)
-      MapOption(
-        label: 'Яндекс Карты',
-        url: 'https://yandex.ru/maps/?text=$query',
-      ),
-    if (address.isNotEmpty && !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
-      MapOption(
-        label: 'Apple Карты',
-        url: 'https://maps.apple.com/?q=$query',
-      ),
+    if (hasCoordinates || address.isNotEmpty)
+      MapOption(label: 'Google Карты', url: googleUrl()),
+    if (hasCoordinates || address.isNotEmpty)
+      MapOption(label: 'Яндекс Карты', url: yandexUrl()),
+    if ((hasCoordinates || address.isNotEmpty) &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.iOS)
+      MapOption(label: 'Apple Карты', url: appleUrl()),
   ];
   return options;
 }

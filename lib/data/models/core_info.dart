@@ -81,6 +81,8 @@ class CoreInfo {
     this.loyaltyRecoveryWhatsapp,
     this.loyaltyRecoveryMessage,
     this.twogisLink,
+    this.latitude,
+    this.longitude,
     this.feedbackUrl,
     this.termsOfService,
     this.tourLink,
@@ -100,6 +102,8 @@ class CoreInfo {
   final String? loyaltyRecoveryWhatsapp;
   final String? loyaltyRecoveryMessage;
   final String? twogisLink;
+  final double? latitude;
+  final double? longitude;
   final String? feedbackUrl;
   final String? termsOfService;
   final String? tourLink;
@@ -141,6 +145,8 @@ class CoreInfo {
         json['loyalty_recovery_message'] ?? json['loyaltyRecoveryMessage'],
       ),
       twogisLink: parseStringOrNull(json['twogis_link'] ?? json['twogisLink']),
+      latitude: parseDoubleOrNull(json['latitude']),
+      longitude: parseDoubleOrNull(json['longitude']),
       feedbackUrl: parseStringOrNull(json['feedback_url'] ?? json['feedbackUrl']),
       termsOfService: parseStringOrNull(
         json['terms_of_service'] ?? json['termsOfService'],
@@ -166,6 +172,8 @@ class CoreInfo {
         if (loyaltyRecoveryMessage != null)
           'loyalty_recovery_message': loyaltyRecoveryMessage,
         if (twogisLink != null) 'twogis_link': twogisLink,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
         if (feedbackUrl != null) 'feedback_url': feedbackUrl,
         if (termsOfService != null) 'terms_of_service': termsOfService,
         if (tourLink != null) 'tour_link': tourLink,
