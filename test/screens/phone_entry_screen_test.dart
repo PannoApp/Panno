@@ -1,6 +1,7 @@
-// Виджет-тесты PhoneEntryScreen — телефон → вход по номеру участника лояльности
-// / регистрация (SMS-код полностью убран из UI, см.
-// docs/piligrim_improvements_plan.md, Фаза D).
+// Виджет-тесты PhoneEntryScreen — единый экран: телефон + номер участника
+// лояльности видны сразу (вход), либо телефон + форма регистрации — без
+// промежуточного шага «сначала телефон, потом остальное» (SMS-код полностью
+// убран из UI, см. docs/piligrim_improvements_plan.md, Фаза D).
 //
 // ВАЖНО: EmberCta и PiligrimBackground используют бесконечные AnimationController
 // с repeat(), поэтому pumpAndSettle() всегда тайм-аутится.
@@ -49,7 +50,7 @@ Future<void> _settle(WidgetTester tester) async {
 }
 
 void main() {
-  group('PhoneEntryScreen — ввод телефона', () {
+  group('PhoneEntryScreen — вход по номеру участника (экран по умолчанию)', () {
     late MockDioAdapter adapter;
     late AuthProvider auth;
 
@@ -59,70 +60,46 @@ void main() {
       auth = _buildAuth(adapter);
     });
 
-    testWidgets('поле пустое — нажатие не переключает шаг', (tester) async {
+    testWidgets('оба поля видны сразу, без промежуточного шага',
+        (tester) async {
       await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
-      await tester.pump();
-
-      await tester.tap(find.text('ПРОДОЛЖИТЬ'));
       await _settle(tester);
 
       expect(find.text('ВХОД ПО НОМЕРУ УЧАСТНИКА'), findsNothing);
-      expect(adapter.captured, isEmpty);
-    });
-
-    testWidgets('короткий номер < 11 цифр — нет перехода к шагу входа',
-        (tester) async {
-      await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
-      await tester.pump();
-
-      await tester.enterText(find.byType(TextField).first, '79991234');
-      await tester.tap(find.text('ПРОДОЛЖИТЬ'));
-      await _settle(tester);
-
-      expect(find.text('ВХОД ПО НОМЕРУ УЧАСТНИКА'), findsNothing);
-    });
-
-    testWidgets('корректный номер 11 цифр — переход на шаг входа (без сети)',
-        (tester) async {
-      await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
-      await tester.pump();
-
-      await tester.enterText(find.byType(TextField).first, '+77771234567');
-      await tester.tap(find.text('ПРОДОЛЖИТЬ'));
-      await _settle(tester);
-
-      // Переход на шаг телефон → номер участника — чисто локальный,
-      // никакого запроса на бэкенд не происходит (в отличие от старого
-      // sendOtp).
-      expect(find.text('ВХОД ПО НОМЕРУ УЧАСТНИКА'), findsOneWidget);
+      expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
       expect(find.text('ВОЙТИ'), findsOneWidget);
-      expect(adapter.captured, isEmpty);
-    });
-  });
-
-  group('PhoneEntryScreen — вход по номеру участника', () {
-    late MockDioAdapter adapter;
-    late AuthProvider auth;
-
-    setUp(() {
-      SharedPreferences.setMockInitialValues({});
-      adapter = MockDioAdapter();
-      auth = _buildAuth(adapter);
+      expect(find.byType(TextField), findsNWidgets(2));
     });
 
-    // Переводит экран на шаг «номер участника».
-    Future<void> navigateToLoginStage(WidgetTester tester) async {
+    testWidgets('пустой телефон — нажатие «Войти» не уходит в сеть',
+        (tester) async {
       await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
       await tester.pump();
-      await tester.enterText(find.byType(TextField).first, '+77771234567');
-      await tester.tap(find.text('ПРОДОЛЖИТЬ'));
+
+      await tester.tap(find.text('ВОЙТИ'));
       await _settle(tester);
-    }
 
-    testWidgets('пустой номер участника — loginWithMemberNumber не вызван',
+      expect(adapter.captured, isEmpty);
+    });
+
+    testWidgets('короткий телефон < 11 цифр — нет запроса на бэкенд',
         (tester) async {
-      await navigateToLoginStage(tester);
+      await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
+      await tester.pump();
 
+      await tester.enterText(find.byType(TextField).at(0), '79991234');
+      await tester.tap(find.text('ВОЙТИ'));
+      await _settle(tester);
+
+      expect(adapter.captured, isEmpty);
+    });
+
+    testWidgets('корректный телефон, но пустой номер участника — loginWithMemberNumber не вызван',
+        (tester) async {
+      await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).at(0), '+77771234567');
       await tester.tap(find.text('ВОЙТИ'));
       await _settle(tester);
 
@@ -134,7 +111,8 @@ void main() {
 
     testWidgets('успешный вход — AuthProvider.isLoggedIn == true',
         (tester) async {
-      await navigateToLoginStage(tester);
+      await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
+      await tester.pump();
 
       // loyalty-login
       adapter.enqueue(200, {
@@ -153,7 +131,9 @@ void main() {
         'notify_closed_events': false,
       });
 
-      await tester.enterText(find.byType(TextField).first, '113');
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '+77771234567');
+      await tester.enterText(fields.at(1), '113');
       await tester.tap(find.text('ВОЙТИ'));
       await _settle(tester);
 
@@ -167,9 +147,12 @@ void main() {
 
     testWidgets('«У меня нет карты — регистрация» переключает на форму регистрации',
         (tester) async {
-      await navigateToLoginStage(tester);
+      await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
+      await tester.pump();
 
-      await tester.tap(find.text('У меня нет карты — регистрация'));
+      final registerLink = find.text('У меня нет карты — регистрация');
+      await tester.ensureVisible(registerLink);
+      await tester.tap(registerLink);
       await _settle(tester);
 
       expect(find.text('РЕГИСТРАЦИЯ'), findsOneWidget);
@@ -187,19 +170,41 @@ void main() {
       auth = _buildAuth(adapter);
     });
 
+    // Переводит экран на форму регистрации (телефон остаётся общим полем).
     Future<void> navigateToRegisterStage(WidgetTester tester) async {
       await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
       await tester.pump();
-      await tester.enterText(find.byType(TextField).first, '+77771234567');
-      await tester.tap(find.text('ПРОДОЛЖИТЬ'));
-      await _settle(tester);
-      await tester.tap(find.text('У меня нет карты — регистрация'));
+      await tester.enterText(find.byType(TextField).at(0), '+77771234567');
+      final registerLink = find.text('У меня нет карты — регистрация');
+      await tester.ensureVisible(registerLink);
+      await tester.tap(registerLink);
       await _settle(tester);
     }
 
     testWidgets('пустое имя — register не вызван', (tester) async {
       await navigateToRegisterStage(tester);
 
+      await tester.ensureVisible(find.text('ЗАРЕГИСТРИРОВАТЬСЯ'));
+      await tester.tap(find.text('ЗАРЕГИСТРИРОВАТЬСЯ'));
+      await _settle(tester);
+
+      expect(
+        adapter.captured.any((r) => r.path.contains('loyalty-register')),
+        isFalse,
+      );
+    });
+
+    testWidgets('пустой телефон на форме регистрации — register не вызван',
+        (tester) async {
+      await tester.pumpWidget(_wrap(const PhoneEntryScreen(), auth));
+      await tester.pump();
+      final registerLink = find.text('У меня нет карты — регистрация');
+      await tester.ensureVisible(registerLink);
+      await tester.tap(registerLink);
+      await _settle(tester);
+
+      // Телефон не был введён на предыдущем шаге — поле остаётся пустым.
+      await tester.enterText(find.byType(TextField).at(1), 'Айдар');
       await tester.ensureVisible(find.text('ЗАРЕГИСТРИРОВАТЬСЯ'));
       await tester.tap(find.text('ЗАРЕГИСТРИРОВАТЬСЯ'));
       await _settle(tester);
@@ -233,7 +238,8 @@ void main() {
         'notify_closed_events': false,
       });
 
-      final nameField = find.byType(TextField).first;
+      // Поле имени — первое из полей формы регистрации, после телефона.
+      final nameField = find.byType(TextField).at(1);
       await tester.enterText(nameField, 'Айдар');
       await tester.ensureVisible(find.text('ЗАРЕГИСТРИРОВАТЬСЯ'));
       await tester.tap(find.text('ЗАРЕГИСТРИРОВАТЬСЯ'));
@@ -250,6 +256,19 @@ void main() {
       await _settle(tester);
 
       expect(auth.isLoggedIn, isTrue);
+    });
+
+    testWidgets('«У меня уже есть номер лояльности» возвращает на вход',
+        (tester) async {
+      await navigateToRegisterStage(tester);
+
+      final loginLink = find.text('У меня уже есть номер лояльности');
+      await tester.ensureVisible(loginLink);
+      await tester.tap(loginLink);
+      await _settle(tester);
+
+      expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
+      expect(find.text('ВОЙТИ'), findsOneWidget);
     });
   });
 }

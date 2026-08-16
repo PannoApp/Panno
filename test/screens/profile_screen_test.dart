@@ -126,10 +126,11 @@ void main() {
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      // PiligrimAuthView: мини-заголовок формы и CTA шага «телефон» (см.
-      // lib/widgets/piligrim_auth_view.dart, _AuthStep.phone).
+      // PiligrimAuthView: единый экран входа — телефон + номер участника
+      // видны сразу, без промежуточного шага (см. lib/widgets/piligrim_auth_view.dart).
       expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
-      expect(find.text('ПРОДОЛЖИТЬ'), findsOneWidget);
+      expect(find.text('ВОЙТИ'), findsOneWidget);
+      expect(find.byType(TextField), findsNWidgets(2));
     });
 
     testWidgets('При isLoggedIn=true → имя героя из currentUser',
@@ -254,7 +255,7 @@ void main() {
     });
 
     testWidgets(
-        'Ввод телефона → шаг входа по номеру участника → успешный вход',
+        'Телефон + номер участника видны сразу на одном экране → успешный вход',
         (tester) async {
       adapter.enqueue(200, {
         'access': 'access-token',
@@ -268,27 +269,18 @@ void main() {
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
+      // PiligrimAuthView (_AuthStep.login, по умолчанию): оба поля — телефон
+      // и номер участника — видны одновременно, без промежуточного шага.
       expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
-
-      await tester.enterText(find.byType(TextField), '+77001234567');
-      await tester.pump();
-
-      await tester.tap(find.text('ПРОДОЛЖИТЬ'));
-      await settle(tester);
-      // AnimatedSwitcher (280ms) + цепочка .animate().fadeIn(delay: до 420ms)
-      // на новых полях формы — даём им доиграть, иначе таймер остаётся
-      // висеть после разрушения дерева виджетов в конце теста.
-      await tester.pump(const Duration(milliseconds: 500));
-
-      // PiligrimAuthView (_AuthStep.login): заголовок «ВХОД ПО НОМЕРУ
-      // УЧАСТНИКА» + введённый номер под ним. KzPhoneInputFormatter
-      // форматирует ввод с пробелами: '+7 700 123 45 67'.
-      expect(find.text('ВХОД ПО НОМЕРУ УЧАСТНИКА'), findsOneWidget);
-      expect(find.text('+7 700 123 45 67'), findsOneWidget);
       expect(find.text('ВОЙТИ'), findsOneWidget);
+      final fields = find.byType(TextField);
+      expect(fields, findsNWidgets(2));
 
-      await tester.enterText(find.byType(TextField), '113');
+      await tester.enterText(fields.at(0), '+77001234567');
       await tester.pump();
+      await tester.enterText(fields.at(1), '113');
+      await tester.pump();
+
       await tester.tap(find.text('ВОЙТИ'));
       // Долгий settle: без мока платформенного канала Firebase Messaging
       // AuthProvider._registerFcmIfPossible() висит до собственного
@@ -321,12 +313,8 @@ void main() {
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      await tester.enterText(find.byType(TextField), '+77001234567');
-      await tester.pump();
-      await tester.tap(find.text('ПРОДОЛЖИТЬ'));
-      await settle(tester);
-      await tester.pump(const Duration(milliseconds: 500));
-
+      // Ссылка видна сразу на экране входа (_AuthStep.login по умолчанию) —
+      // не нужно сначала вводить телефон и жать «Продолжить».
       final recoveryLink = find.text('Забыл свой номер лояльности');
       expect(recoveryLink, findsOneWidget);
       await tester.tap(recoveryLink);

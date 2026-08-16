@@ -68,10 +68,12 @@ class KzPhoneInputFormatter extends TextInputFormatter {
   }
 }
 
-/// Шаг экрана входа/регистрации PILIGRIM (см. docs/piligrim_improvements_plan.md,
+/// Режим экрана входа/регистрации PILIGRIM (см. docs/piligrim_improvements_plan.md,
 /// Фаза D). SMS-код полностью убран из UI — основной путь теперь «телефон +
 /// номер участника лояльности», для новых гостей — короткая регистрация.
-enum _AuthStep { phone, login, register }
+/// Телефон — общее поле для обоих режимов, отдельного шага под него нет:
+/// гость сразу видит и его, и поле номера участника (или форму регистрации).
+enum _AuthStep { login, register }
 
 /// Экран авторизации PILIGRIM.
 /// Бренд-блок и форма — единая вертикальная композиция, центрированная на экране.
@@ -93,7 +95,7 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
 
-  _AuthStep _step = _AuthStep.phone;
+  _AuthStep _step = _AuthStep.login;
   bool _submitting = false;
   String? _error;
   UserGender? _gender;
@@ -112,19 +114,13 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
   /// поле хранит его с пробелами для читаемости, серверный regex пробелов не допускает.
   String get _cleanPhone => _phoneCtrl.text.replaceAll(RegExp(r'[^\d+]'), '');
 
-  void _continueFromPhone() {
+  bool _validatePhone() {
     final digits = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
     if (digits.length < 11) {
       setState(() => _error = 'Укажите номер телефона');
-      return;
+      return false;
     }
-    // По умолчанию предполагаем, что у гостя уже есть карта лояльности
-    // (программа существовала до приложения) — регистрация доступна
-    // отдельной ссылкой на этом шаге.
-    setState(() {
-      _error = null;
-      _step = _AuthStep.login;
-    });
+    return true;
   }
 
   void _switchToRegister() {
@@ -141,15 +137,8 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
     });
   }
 
-  void _changePhone() {
-    setState(() {
-      _error = null;
-      _memberNumberCtrl.clear();
-      _step = _AuthStep.phone;
-    });
-  }
-
   Future<void> _login() async {
+    if (!_validatePhone()) return;
     final memberNumber = _memberNumberCtrl.text.trim();
     if (memberNumber.isEmpty) {
       setState(() => _error = 'Введите номер участника');
@@ -171,6 +160,7 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
   }
 
   Future<void> _register() async {
+    if (!_validatePhone()) return;
     final firstName = _firstNameCtrl.text.trim();
     if (firstName.isEmpty) {
       setState(() => _error = 'Укажите имя');
@@ -255,31 +245,41 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
   }
 
   String get _headline => switch (_step) {
-        _AuthStep.phone => 'НАЧАТЬ ПУТЬ',
-        _AuthStep.login => 'ВХОД ПО НОМЕРУ УЧАСТНИКА',
+        _AuthStep.login => 'НАЧАТЬ ПУТЬ',
         _AuthStep.register => 'РЕГИСТРАЦИЯ',
       };
 
+  // Телефон — общее поле для обоих режимов, показывается всегда первым;
+  // ниже него — либо номер участника (вход), либо форма регистрации.
   Widget _buildStepFields() {
     switch (_step) {
-      case _AuthStep.phone:
-        return _PhoneField(controller: _phoneCtrl);
       case _AuthStep.login:
-        return _MemberNumberField(controller: _memberNumberCtrl);
+        return Column(
+          children: [
+            _PhoneField(controller: _phoneCtrl),
+            const SizedBox(height: 10),
+            _MemberNumberField(controller: _memberNumberCtrl),
+          ],
+        );
       case _AuthStep.register:
-        return _RegisterFields(
-          firstNameCtrl: _firstNameCtrl,
-          lastNameCtrl: _lastNameCtrl,
-          birthday: _birthday,
-          gender: _gender,
-          onPickBirthday: _pickBirthday,
-          onSelectGender: (g) => setState(() => _gender = g),
+        return Column(
+          children: [
+            _PhoneField(controller: _phoneCtrl),
+            const SizedBox(height: 10),
+            _RegisterFields(
+              firstNameCtrl: _firstNameCtrl,
+              lastNameCtrl: _lastNameCtrl,
+              birthday: _birthday,
+              gender: _gender,
+              onPickBirthday: _pickBirthday,
+              onSelectGender: (g) => setState(() => _gender = g),
+            ),
+          ],
         );
     }
   }
 
   String get _ctaLabel => switch (_step) {
-        _AuthStep.phone => _submitting ? 'ЗАГРУЖАЕМ...' : 'ПРОДОЛЖИТЬ',
         _AuthStep.login => _submitting ? 'ВХОДИМ...' : 'ВОЙТИ',
         _AuthStep.register =>
           _submitting ? 'РЕГИСТРИРУЕМ...' : 'ЗАРЕГИСТРИРОВАТЬСЯ',
@@ -288,7 +288,6 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
   VoidCallback? get _ctaAction {
     if (_submitting) return null;
     return switch (_step) {
-      _AuthStep.phone => _continueFromPhone,
       _AuthStep.login => _login,
       _AuthStep.register => _register,
     };
@@ -393,19 +392,6 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
                     ),
                   ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
 
-                  if (_step != _AuthStep.phone) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      _phoneCtrl.text.trim(),
-                      textAlign: TextAlign.center,
-                      style: PiligrimTextStyles.caption.copyWith(
-                        color: PiligrimColors.sky.withValues(alpha: 0.28),
-                        fontSize: 11,
-                        letterSpacing: 0.5,
-                      ),
-                    ).animate().fadeIn(duration: 350.ms, delay: 280.ms),
-                  ],
-
                   if (_error != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -439,41 +425,32 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
                     onTap: _ctaAction,
                   ).animate().fadeIn(duration: 400.ms, delay: 360.ms),
 
-                  if (_step == _AuthStep.phone) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      'Номер используется только\nдля бронирований и участия в событиях',
-                      textAlign: TextAlign.center,
-                      style: PiligrimTextStyles.caption.copyWith(
-                        color: PiligrimColors.sky.withValues(alpha: 0.20),
-                        fontSize: 11,
-                        height: 1.6,
-                        letterSpacing: 0.2,
-                      ),
-                    ).animate().fadeIn(duration: 400.ms, delay: 420.ms),
-                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Номер используется только\nдля бронирований и участия в событиях',
+                    textAlign: TextAlign.center,
+                    style: PiligrimTextStyles.caption.copyWith(
+                      color: PiligrimColors.sky.withValues(alpha: 0.20),
+                      fontSize: 11,
+                      height: 1.6,
+                      letterSpacing: 0.2,
+                    ),
+                  ).animate().fadeIn(duration: 400.ms, delay: 420.ms),
 
                   if (_step == _AuthStep.login) ...[
                     const SizedBox(height: 14),
                     Center(
                       child: TextCtaButton(
-                        label: 'Изменить номер телефона',
-                        onTap: _changePhone,
-                      ).animate().fadeIn(duration: 300.ms),
-                    ),
-                    const SizedBox(height: 6),
-                    Center(
-                      child: TextCtaButton(
                         label: 'Забыл свой номер лояльности',
                         onTap: _openLoyaltyRecoveryChat,
-                      ).animate().fadeIn(duration: 300.ms, delay: 60.ms),
+                      ).animate().fadeIn(duration: 300.ms),
                     ),
                     const SizedBox(height: 6),
                     Center(
                       child: TextCtaButton(
                         label: 'У меня нет карты — регистрация',
                         onTap: _switchToRegister,
-                      ).animate().fadeIn(duration: 300.ms, delay: 120.ms),
+                      ).animate().fadeIn(duration: 300.ms, delay: 60.ms),
                     ),
                   ],
 
@@ -481,16 +458,9 @@ class _PiligrimAuthViewState extends State<PiligrimAuthView> {
                     const SizedBox(height: 14),
                     Center(
                       child: TextCtaButton(
-                        label: 'Изменить номер телефона',
-                        onTap: _changePhone,
-                      ).animate().fadeIn(duration: 300.ms),
-                    ),
-                    const SizedBox(height: 6),
-                    Center(
-                      child: TextCtaButton(
                         label: 'У меня уже есть номер лояльности',
                         onTap: _switchToLogin,
-                      ).animate().fadeIn(duration: 300.ms, delay: 60.ms),
+                      ).animate().fadeIn(duration: 300.ms),
                     ),
                   ],
 
