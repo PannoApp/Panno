@@ -348,7 +348,8 @@ void main() {
       expect(find.text('Instagram'), findsNothing);
     });
 
-    testWidgets('Кнопка карты подписана «карты» (не «2ГИС») и открывает twogisLink',
+    testWidgets(
+        'Кнопка «карты» (не «2ГИС») открывает шторку выбора приложения',
         (tester) async {
       auth.currentUser = _sampleProfile();
       auth.notifyListeners();
@@ -361,6 +362,16 @@ void main() {
       final mapButton = find.text('карты');
       await scrollTo(tester, mapButton);
       await tester.tap(mapButton);
+      await settle(tester);
+
+      // Тап не запускает ссылку напрямую — открывает шторку с вариантами.
+      expect(launchedUrl, isNull);
+      expect(find.text('Открыть в приложении'), findsOneWidget);
+      expect(find.text('2ГИС'), findsOneWidget);
+      expect(find.text('Google Карты'), findsOneWidget);
+      expect(find.text('Яндекс Карты'), findsOneWidget);
+
+      await tester.tap(find.text('2ГИС'));
       await settle(tester);
 
       expect(launchedUrl, 'https://2gis.kz/astana/firm/piligrim');

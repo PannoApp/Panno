@@ -20,6 +20,7 @@ import '../providers/core_info_provider.dart';
 import '../widgets/path_cta.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_delete_account_dialog.dart';
+import '../widgets/piligrim_map_picker_sheet.dart';
 import '../widgets/piligrim_toast.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
@@ -879,12 +880,10 @@ class _ContactsCard extends StatelessWidget {
     final phone = coreInfo?.phone.isNotEmpty == true
         ? coreInfo!.phone
         : kRestaurantPhone;
-    // Карта — только 2ГИС (основной картографический сервис для аудитории РК)
-    final mapLinks = [
-      if (coreInfo?.twogisLink != null)
-        (label: 'карты', icon: 'assets/images/map_pin_generic.svg', url: coreInfo!.twogisLink!),
-    ];
     final address = coreInfo?.address ?? '';
+    // Кнопка «карты» теперь открывает выбор приложения (2ГИС/Google/Яндекс/
+    // Apple), а не жёстко 2ГИС — см. lib/widgets/piligrim_map_picker_sheet.dart.
+    final mapOptions = buildMapOptions(address: address, twogisLink: coreInfo?.twogisLink);
 
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
         ? coreInfo!.socialLinks
@@ -968,13 +967,13 @@ class _ContactsCard extends StatelessWidget {
           ],
 
           // Адрес + карта — в самом низу карточки
-          if (address.isNotEmpty || mapLinks.isNotEmpty) ...[
+          if (address.isNotEmpty || mapOptions.isNotEmpty) ...[
             const _ProfileHairlineDivider(inset: 18),
 
             // Адрес — показываем только если пришёл непустым с бэкенда
             if (address.isNotEmpty)
               Padding(
-                padding: EdgeInsets.fromLTRB(18, 18, 18, mapLinks.isNotEmpty ? 10 : 18),
+                padding: EdgeInsets.fromLTRB(18, 18, 18, mapOptions.isNotEmpty ? 10 : 18),
                 child: Text(
                   'Наш адрес: $address',
                   style: PiligrimTextStyles.body.copyWith(
@@ -984,58 +983,53 @@ class _ContactsCard extends StatelessWidget {
                 ),
               ),
 
-            // Кнопка 2ГИС — скрываем если ссылка null
-            if (mapLinks.isNotEmpty)
+            // Кнопка «карты» — тап открывает шторку выбора приложения
+            // (2ГИС/Google/Яндекс/Apple), а не жёстко открывает 2ГИС.
+            if (mapOptions.isNotEmpty)
               Padding(
                 padding: EdgeInsets.fromLTRB(18, address.isNotEmpty ? 0 : 18, 18, 18),
-                child: Row(
-                  children: mapLinks.map((t) {
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: t == mapLinks.last ? 0 : 8,
-                        ),
-                        child: PiligrimTap(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () => onLaunch(t.url),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: PiligrimColors.steppe.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: PiligrimColors.steppe.withValues(alpha: 0.16),
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SvgPicture.asset(
-                                  t.icon,
-                                  width: 20,
-                                  height: 20,
-                                  colorFilter: ColorFilter.mode(
-                                    PiligrimColors.steppe.withValues(alpha: 0.85),
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  t.label,
-                                  style: PiligrimTextStyles.caption.copyWith(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: PiligrimColors.steppe.withValues(alpha: 0.75),
-                                    letterSpacing: 0.4,
-                                  ),
-                                ),
-                              ],
-                            ),
+                child: PiligrimTap(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => showPiligrimMapPickerSheet(
+                    context,
+                    options: mapOptions,
+                    onLaunch: onLaunch,
+                  ),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: PiligrimColors.steppe.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: PiligrimColors.steppe.withValues(alpha: 0.16),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/images/map_pin_generic.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter: ColorFilter.mode(
+                            PiligrimColors.steppe.withValues(alpha: 0.85),
+                            BlendMode.srcIn,
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                        const SizedBox(height: 6),
+                        Text(
+                          'карты',
+                          style: PiligrimTextStyles.caption.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: PiligrimColors.steppe.withValues(alpha: 0.75),
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
           ],
