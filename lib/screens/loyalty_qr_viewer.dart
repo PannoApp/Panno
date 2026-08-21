@@ -69,14 +69,14 @@ class _LoyaltyQrViewerState extends State<LoyaltyQrViewer> {
     final size = (MediaQuery.sizeOf(context).width - 96).clamp(200.0, 320.0);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: PiligrimColors.earth,
       body: Stack(
         children: [
           Positioned.fill(
             child: AnimatedOpacity(
               opacity: _bgOpacity,
               duration: Duration.zero,
-              child: const ColoredBox(color: Colors.black),
+              child: const ColoredBox(color: PiligrimColors.earth),
             ),
           ),
           GestureDetector(
@@ -157,7 +157,7 @@ class _LoyaltyQrViewerState extends State<LoyaltyQrViewer> {
             top: topPad + 8,
             left: 8,
             child: PiligrimNavButton(
-              icon: Icons.close,
+              icon: Icons.close_rounded,
               onTap: () => Navigator.of(context).pop(),
             ),
           ),

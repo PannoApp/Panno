@@ -203,42 +203,18 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
         );
 
-        // true — «Любой стол» и есть текущий выбор (стол не уточнён).
-        Widget header(bool isAnyTableActive) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'ВЫБОР СТОЛА',
-                  style: PiligrimTextStyles.sectionLabel.copyWith(
-                    color: PiligrimColors.sky.withValues(alpha: 0.50),
-                    letterSpacing: 1.6,
-                  ),
-                ),
-                if (plan != null)
-                  PiligrimTap(
-                    onTap: () {
-                      booking.setTable(null);
-                      Navigator.of(sheetContext).pop();
-                    },
-                    borderRadius: BorderRadius.circular(6),
-                    child: Text(
-                      'Любой стол',
-                      style: PiligrimTextStyles.caption.copyWith(
-                        // Подсвечиваем золотым, когда это и есть текущий
-                        // выбор — раньше чип выглядел одинаково независимо
-                        // от состояния.
-                        color: isAnyTableActive ? PiligrimColors.steppe : PiligrimColors.water,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-              ],
+        // Кнопки сброса тут больше нет — сбросить выбор можно тапом по уже
+        // выбранному (золотому) столу на схеме, он снимает выделение сам.
+        final header = Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+          child: Text(
+            'ВЫБОР СТОЛА',
+            style: PiligrimTextStyles.sectionLabel.copyWith(
+              color: PiligrimColors.sky.withValues(alpha: 0.50),
+              letterSpacing: 1.6,
             ),
-          );
-        }
+          ),
+        );
 
         if (plan == null) {
           return SafeArea(
@@ -252,7 +228,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     handle,
-                    header(booking.selectedTable == null),
+                    header,
                     Flexible(
                       child: ListView(
                         shrinkWrap: true,
@@ -307,9 +283,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   handle,
-                  Consumer<BookingProvider>(
-                    builder: (context, liveBooking, _) => header(liveBooking.selectedTable == null),
-                  ),
+                  header,
                   Flexible(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
