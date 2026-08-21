@@ -42,7 +42,7 @@ class LoyaltyLoginSerializer(serializers.Serializer):
         max_length=32,
         min_length=1,
         trim_whitespace=True,
-        help_text="Номер участника программы лояльности (см. карту в Apple Wallet)",
+        help_text="Номер участника программы лояльности",
     )
 
 

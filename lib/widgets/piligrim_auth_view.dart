@@ -543,7 +543,7 @@ class _MemberNumberField extends StatelessWidget {
         letterSpacing: 3,
       ),
       cursorColor: PiligrimColors.water,
-      decoration: _authFieldDecoration('Номер участника (см. карту в Apple Wallet)'),
+      decoration: _authFieldDecoration('Введите номер участника'),
     );
   }
 }

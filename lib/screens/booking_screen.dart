@@ -40,7 +40,7 @@ class _BookingScreenState extends State<BookingScreen> {
   final _commentCtrl = TextEditingController();
   final _guestsCtrl = TextEditingController(text: '2');
 
-  DateTime _visitDate = DateTime.now().add(const Duration(days: 1));
+  DateTime _visitDate = DateTime.now();
   TimeOfDay _visitTime = const TimeOfDay(hour: 19, minute: 30);
   Timer? _guestsDebounce;
 
@@ -395,7 +395,7 @@ class _BookingScreenState extends State<BookingScreen> {
       _nameCtrl.clear();
       _commentCtrl.clear();
       setState(() {
-        _visitDate = DateTime.now().add(const Duration(days: 1));
+        _visitDate = DateTime.now();
         _visitTime = const TimeOfDay(hour: 19, minute: 0);
       });
 

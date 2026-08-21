@@ -28,6 +28,7 @@ import '../core/piligrim_route.dart';
 import '../widgets/piligrim_auth_view.dart';
 import 'booking_history_screen.dart';
 import 'event_reservation_history_screen.dart';
+import 'loyalty_qr_viewer.dart';
 import 'onboarding_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -639,7 +640,7 @@ class _LoyaltyQrTile extends StatelessWidget {
   final String url;
 
   static const double _size = 148;
-  static const double _borderWidth = 2.5;
+  static const double _borderWidth = 1.2;
 
   static final List<double> _tint = _duotoneMatrix(
     darkHex: 0x2C2825, // PiligrimColors.textDark
@@ -648,113 +649,93 @@ class _LoyaltyQrTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(_borderWidth),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [PiligrimColors.steppe, PiligrimColors.emberDeep],
+    // Рамка и подсветка нарочно приглушены (тонкая линия + мягкое тёплое
+    // свечение вместо сплошного золотого градиента) — светлая плашка под
+    // QR и так даёт самый сильный контраст на тёмном экране профиля,
+    // яркая окантовка поверх неё превращала карточку в «пятно». Сам QR
+    // (тёмные модули на светлом) не трогаем — это вопрос надёжности
+    // сканирования на кассе, см. комментарий у [_tint].
+    return PiligrimTap(
+      borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
+      onTap: () => Navigator.of(context).push(
+        PiligrimPageRoute<void>(
+          builder: (_) => LoyaltyQrViewer(url: url, tint: _tint),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: PiligrimColors.steppe.withValues(alpha: 0.22),
-            blurRadius: 24,
-            spreadRadius: -6,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: PiligrimColors.nomadCream,
-              borderRadius: PiligrimRadius.mdAll,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: PiligrimColors.nomadCream,
+          borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
+          border: Border.all(
+            color: PiligrimColors.steppe.withValues(alpha: 0.30),
+            width: _borderWidth,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: PiligrimColors.shadow.withValues(alpha: 0.24),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            child: CachedNetworkImage(
-              imageUrl: url,
+            BoxShadow(
+              color: PiligrimColors.steppe.withValues(alpha: 0.10),
+              blurRadius: 28,
+              spreadRadius: -4,
+            ),
+          ],
+        ),
+        child: CachedNetworkImage(
+          imageUrl: url,
+          width: _size,
+          height: _size,
+          fit: BoxFit.contain,
+          imageBuilder: (context, imageProvider) => ColorFiltered(
+            colorFilter: ColorFilter.matrix(_tint),
+            child: Image(
+              image: imageProvider,
               width: _size,
               height: _size,
               fit: BoxFit.contain,
-              imageBuilder: (context, imageProvider) => ColorFiltered(
-                colorFilter: ColorFilter.matrix(_tint),
-                child: Image(
-                  image: imageProvider,
-                  width: _size,
-                  height: _size,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              placeholder: (context, _) => const SizedBox(
-                width: _size,
-                height: _size,
-                child: Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: PiligrimColors.textDark,
-                    ),
-                  ),
-                ),
-              ),
-              errorWidget: (context, _, __) => SizedBox(
-                width: _size,
-                height: _size,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.qr_code_2_rounded,
-                      size: 28,
-                      color: PiligrimColors.textDark.withValues(alpha: 0.35),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Не удалось загрузить QR',
-                      textAlign: TextAlign.center,
-                      style: PiligrimTextStyles.caption.copyWith(
-                        fontSize: 10,
-                        color: PiligrimColors.textDark.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
+            ),
+          ),
+          placeholder: (context, _) => const SizedBox(
+            width: _size,
+            height: _size,
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: PiligrimColors.textDark,
                 ),
               ),
             ),
           ),
-          // Орнаментальные звёзды в углах рамки — брендовый акцент, не
-          // затрагивает читаемость самого кода сканером.
-          const Positioned(top: 2, left: 2, child: _CornerOrnament()),
-          const Positioned(top: 2, right: 2, child: _CornerOrnament()),
-          const Positioned(bottom: 2, left: 2, child: _CornerOrnament()),
-          const Positioned(bottom: 2, right: 2, child: _CornerOrnament()),
-        ],
-      ),
-    );
-  }
-}
-
-/// Орнаментальный акцент в углу рамки QR (мотив звезды со сплэша/входа —
-/// см. `assets/images/star_totem (1).svg` в splash_screen.dart /
-/// piligrim_auth_view.dart) — не касается самого QR-кода, только рамки.
-class _CornerOrnament extends StatelessWidget {
-  const _CornerOrnament();
-
-  @override
-  Widget build(BuildContext context) {
-    return SvgPicture.asset(
-      'assets/images/star_totem (1).svg',
-      width: 12,
-      height: 12,
-      colorFilter: ColorFilter.mode(
-        PiligrimColors.nomadCream.withValues(alpha: 0.55),
-        BlendMode.srcIn,
+          errorWidget: (context, _, __) => SizedBox(
+            width: _size,
+            height: _size,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.qr_code_2_rounded,
+                  size: 28,
+                  color: PiligrimColors.textDark.withValues(alpha: 0.35),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Не удалось загрузить QR',
+                  textAlign: TextAlign.center,
+                  style: PiligrimTextStyles.caption.copyWith(
+                    fontSize: 10,
+                    color: PiligrimColors.textDark.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -769,7 +750,7 @@ class _LoyaltyQrPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const size = _LoyaltyQrTile._size + _LoyaltyQrTile._borderWidth * 2 + 24;
+    const size = _LoyaltyQrTile._size + 24;
     return Container(
       width: size,
       height: size,
@@ -1161,46 +1142,6 @@ class _AccountSessionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PiligrimTap(
-            borderRadius: BorderRadius.circular(PiligrimRadius.md),
-            onTap: () {
-              debugPrint('[PiligrimToastTest] Tapped test button');
-              PiligrimToast.show(
-                context,
-                'Успешно: Тестовый тост!',
-                type: PiligrimToastType.success,
-              );
-              Future.delayed(const Duration(milliseconds: 400), () {
-                PiligrimToast.show(
-                  context,
-                  'Информация: Новое сообщение',
-                  type: PiligrimToastType.info,
-                );
-              });
-              Future.delayed(const Duration(milliseconds: 800), () {
-                PiligrimToast.show(
-                  context,
-                  'Ошибка: Соединение прервано',
-                  type: PiligrimToastType.error,
-                );
-              });
-            },
-            child: Padding(
-              padding: _rowPadding,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Проверить тосты (тест)',
-                  style: PiligrimTextStyles.body.copyWith(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: PiligrimColors.steppe,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const _ProfileHairlineDivider(inset: 18),
           PiligrimTap(
             borderRadius: BorderRadius.circular(PiligrimRadius.md),
             onTap: onLogout,
