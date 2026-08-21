@@ -41,6 +41,8 @@ dependencies:
   image_picker: ^1.1.2
   # Кадрирование выбранного фото перед загрузкой
   image_cropper: ^8.0.2
+  # Временное повышение яркости экрана на весь экран QR — легче отсканировать
+  screen_brightness: ^2.1.0
 
 dev_dependencies:
   flutter_test:

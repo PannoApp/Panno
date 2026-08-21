@@ -2,7 +2,8 @@
 // Согласно ТЗ раздел 4.5 | Luxury member lounge · cinematic glass
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -181,19 +182,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 28),
                         ],
 
-                    // Контакты
-                    const PiligrimSectionHeader(
-                      label: 'КОНТАКТЫ',
-                      icon: 'assets/images/bird_totem (1).svg',
-                    ),
-                    const SizedBox(height: 14),
-                    _ContactsCard(
-                      coreInfo: coreInfo,
-                      onLaunch: _launch,
-                    ),
-                    const SizedBox(height: 28),
+                        // Контакты
+                        const PiligrimSectionHeader(
+                          label: 'КОНТАКТЫ',
+                          icon: 'assets/images/bird_totem (1).svg',
+                        ),
+                        const SizedBox(height: 14),
+                        _ContactsCard(
+                          coreInfo: coreInfo,
+                          onLaunch: _launch,
+                        ),
+                        const SizedBox(height: 28),
 
-                    // Выход и удаление аккаунта
+                        // Выход и удаление аккаунта
                         if (auth.isLoggedIn) ...[
                           _AccountSessionCard(
                             onLogout: () async {
@@ -204,7 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 28),
                         ],
 
-                    // Юридическое + версия
+                        // Юридическое + версия
                         _LegalFooter(
                           privacyUrl: coreInfo?.privacyPolicy,
                           coreInfo: coreInfo,
@@ -242,15 +243,12 @@ class _HeroHeader extends StatefulWidget {
 }
 
 class _HeroHeaderState extends State<_HeroHeader> {
-
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
-    final hasName = widget.user.name.isNotEmpty &&
-        widget.user.name != widget.user.phone;
-    final displayName = hasName
-        ? widget.user.name.split(' ').first
-        : 'Гость';
+    final hasName =
+        widget.user.name.isNotEmpty && widget.user.name != widget.user.phone;
+    final displayName = hasName ? widget.user.name.split(' ').first : 'Гость';
 
     return SizedBox(
       height: 152 + top,
@@ -347,7 +345,8 @@ class _HeroHeaderState extends State<_HeroHeader> {
                               child: Icon(
                                 Icons.edit_outlined,
                                 size: 16,
-                                color: PiligrimColors.steppe.withValues(alpha: 0.55),
+                                color: PiligrimColors.steppe
+                                    .withValues(alpha: 0.55),
                               ),
                             ),
                           ),
@@ -381,12 +380,14 @@ class _HeroHeaderState extends State<_HeroHeader> {
                         });
                       },
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 4),
                         child: Text(
                           'Ваш путь в PILIGRIM',
                           style: PiligrimTextStyles.caption.copyWith(
                             fontSize: 12,
-                            color: PiligrimColors.steppe.withValues(alpha: 0.50),
+                            color:
+                                PiligrimColors.steppe.withValues(alpha: 0.50),
                             letterSpacing: 1.2,
                           ),
                         ),
@@ -408,7 +409,6 @@ class _HeroHeaderState extends State<_HeroHeader> {
               ],
             ),
           ),
-
         ],
       ),
     );
@@ -444,7 +444,8 @@ class _StatsRow extends StatelessWidget {
       children: [
         _StatCard(
           value: '$bookingsCount',
-          label: _pluralize(bookingsCount, 'Бронирование', 'Бронирования', 'Бронирований'),
+          label: _pluralize(
+              bookingsCount, 'Бронирование', 'Бронирования', 'Бронирований'),
           delay: 0.ms,
           onTap: () => Navigator.of(context).push(
             PiligrimPageRoute(
@@ -456,7 +457,8 @@ class _StatsRow extends StatelessWidget {
           const SizedBox(width: 12),
           _StatCard(
             value: '${user.eventsCount}',
-            label: _pluralize(user.eventsCount, 'Мероприятие', 'Мероприятия', 'Мероприятий'),
+            label: _pluralize(
+                user.eventsCount, 'Мероприятие', 'Мероприятия', 'Мероприятий'),
             delay: 80.ms,
             onTap: () => Navigator.of(context).push(
               PiligrimPageRoute(
@@ -534,10 +536,11 @@ class _StatCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // LOYALTY CARD — карта лояльности: баланс, % кешбэка и QR из Remarked CRM
 // ─────────────────────────────────────────────────────────────────────────────
-String _formatCashback(double value) => value.round().toString().replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+$)'),
-      (m) => '${m[1]} ',
-    );
+String _formatCashback(double value) =>
+    value.round().toString().replaceAllMapped(
+          RegExp(r'(\d)(?=(\d{3})+$)'),
+          (m) => '${m[1]} ',
+        );
 
 /// Матрица `ColorFilter`, перекрашивающая ч/б-растр (0 → [dark], 255 → [light])
 /// в два цвета бренда. Работает по значению R-канала входного пикселя, поэтому
@@ -546,14 +549,34 @@ String _formatCashback(double value) => value.round().toString().replaceAllMappe
 /// читаемости кода сканером на кассе.
 List<double> _duotoneMatrix({required int darkHex, required int lightHex}) {
   double channel(int hex, int shift) => ((hex >> shift) & 0xFF).toDouble();
-  final dr = channel(darkHex, 16), dg = channel(darkHex, 8), db = channel(darkHex, 0);
-  final lr = channel(lightHex, 16), lg = channel(lightHex, 8), lb = channel(lightHex, 0);
+  final dr = channel(darkHex, 16),
+      dg = channel(darkHex, 8),
+      db = channel(darkHex, 0);
+  final lr = channel(lightHex, 16),
+      lg = channel(lightHex, 8),
+      lb = channel(lightHex, 0);
   final sr = (lr - dr) / 255, sg = (lg - dg) / 255, sb = (lb - db) / 255;
   return [
-    sr, 0, 0, 0, dr,
-    sg, 0, 0, 0, dg,
-    sb, 0, 0, 0, db,
-    0, 0, 0, 1, 0,
+    sr,
+    0,
+    0,
+    0,
+    dr,
+    sg,
+    0,
+    0,
+    0,
+    dg,
+    sb,
+    0,
+    0,
+    0,
+    db,
+    0,
+    0,
+    0,
+    1,
+    0,
   ];
 }
 
@@ -613,7 +636,9 @@ class _LoyaltyCard extends StatelessWidget {
           const SizedBox(height: 12),
           Center(
             child: Text(
-              hasCode ? 'Покажите QR-код на кассе' : 'Появится после первого визита',
+              hasCode
+                  ? 'Покажите QR-код на кассе'
+                  : 'Появится после первого визита',
               style: PiligrimTextStyles.caption.copyWith(
                 fontSize: 11,
                 color: PiligrimColors.steppe.withValues(alpha: 0.55),
@@ -622,7 +647,10 @@ class _LoyaltyCard extends StatelessWidget {
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.06, end: 0, duration: 500.ms);
+    )
+        .animate()
+        .fadeIn(duration: 500.ms)
+        .slideY(begin: 0.06, end: 0, duration: 500.ms);
   }
 }
 
@@ -640,47 +668,54 @@ class _LoyaltyQrTile extends StatelessWidget {
   final String url;
 
   static const double _size = 148;
-  static const double _borderWidth = 1.2;
+  static const double _chipRadius = 12.0;
+  static const double _chipPadding = 13.0;
+
+  // Приглушённая слоновая кость — на полтона темнее nomadCream, чтобы
+  // разница яркости с тёмной карточкой была меньше физически, а не за счёт
+  // декора вокруг.
+  static const Color _ivory = Color(0xFFE4D9C4);
 
   static final List<double> _tint = _duotoneMatrix(
     darkHex: 0x2C2825, // PiligrimColors.textDark
     lightHex: 0xF2ECE1, // PiligrimColors.nomadCream
   );
 
+  // Тот же дуотон, но со светлым каналом под цвет плашки этого варианта —
+  // иначе на стыке модулей QR и фона появился бы шов.
+  static final List<double> _tintIvory = _duotoneMatrix(
+    darkHex: 0x2C2825, // PiligrimColors.textDark
+    lightHex: 0xE4D9C4, // _ivory
+  );
+
   @override
   Widget build(BuildContext context) {
-    // Рамка и подсветка нарочно приглушены (тонкая линия + мягкое тёплое
-    // свечение вместо сплошного золотого градиента) — светлая плашка под
-    // QR и так даёт самый сильный контраст на тёмном экране профиля,
-    // яркая окантовка поверх неё превращала карточку в «пятно». Сам QR
-    // (тёмные модули на светлом) не трогаем — это вопрос надёжности
-    // сканирования на кассе, см. комментарий у [_tint].
+    // «Приглушённая слоновая кость»: плашка темнее — не белая бумага, а
+    // тёплая слоновая кость, — так что разница яркости с тёмной карточкой
+    // меньше физически. Рамка едва обозначена, почти не нужна. Контраст
+    // между модулями QR и фоном не трогаем — вопрос надёжности
+    // сканирования на кассе, см. [_tintIvory].
     return PiligrimTap(
-      borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
+      borderRadius: BorderRadius.circular(_chipRadius),
       onTap: () => Navigator.of(context).push(
         PiligrimPageRoute<void>(
           builder: (_) => LoyaltyQrViewer(url: url, tint: _tint),
         ),
       ),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(_chipPadding),
         decoration: BoxDecoration(
-          color: PiligrimColors.nomadCream,
-          borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
+          color: _ivory,
+          borderRadius: BorderRadius.circular(_chipRadius),
           border: Border.all(
-            color: PiligrimColors.steppe.withValues(alpha: 0.30),
-            width: _borderWidth,
+            color: PiligrimColors.steppe.withValues(alpha: 0.20),
+            width: 0.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: PiligrimColors.shadow.withValues(alpha: 0.24),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: PiligrimColors.steppe.withValues(alpha: 0.10),
-              blurRadius: 28,
-              spreadRadius: -4,
+              color: PiligrimColors.shadow.withValues(alpha: 0.26),
+              blurRadius: 18,
+              offset: const Offset(0, 7),
             ),
           ],
         ),
@@ -690,7 +725,7 @@ class _LoyaltyQrTile extends StatelessWidget {
           height: _size,
           fit: BoxFit.contain,
           imageBuilder: (context, imageProvider) => ColorFiltered(
-            colorFilter: ColorFilter.matrix(_tint),
+            colorFilter: ColorFilter.matrix(_tintIvory),
             child: Image(
               image: imageProvider,
               width: _size,
@@ -750,14 +785,14 @@ class _LoyaltyQrPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const size = _LoyaltyQrTile._size + 24;
+    const size = _LoyaltyQrTile._size + _LoyaltyQrTile._chipPadding * 2;
     return Container(
       width: size,
       height: size,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: PiligrimColors.nomadCream.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(PiligrimRadius.md + _LoyaltyQrTile._borderWidth),
+        borderRadius: BorderRadius.circular(_LoyaltyQrTile._chipRadius),
         border: Border.all(
           color: PiligrimColors.steppe.withValues(alpha: 0.22),
         ),
@@ -774,7 +809,8 @@ class _LoyaltyQrPlaceholder extends StatelessWidget {
           Text(
             'Карта появится после первого визита',
             textAlign: TextAlign.center,
-            style: PiligrimTextStyles.caption.copyWith(fontSize: 10, height: 1.4),
+            style:
+                PiligrimTextStyles.caption.copyWith(fontSize: 10, height: 1.4),
           ),
         ],
       ),
@@ -858,9 +894,8 @@ class _ContactsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone = coreInfo?.phone.isNotEmpty == true
-        ? coreInfo!.phone
-        : kRestaurantPhone;
+    final phone =
+        coreInfo?.phone.isNotEmpty == true ? coreInfo!.phone : kRestaurantPhone;
     final address = coreInfo?.address ?? '';
     // Кнопка «карты» теперь открывает выбор приложения (2ГИС/Google/Яндекс/
     // Apple), а не жёстко 2ГИС — см. lib/widgets/piligrim_map_picker_sheet.dart.
@@ -871,9 +906,8 @@ class _ContactsCard extends StatelessWidget {
       longitude: coreInfo?.longitude,
     );
 
-    final messengers = coreInfo?.socialLinks.isNotEmpty == true
-        ? coreInfo!.socialLinks
-        : null;
+    final messengers =
+        coreInfo?.socialLinks.isNotEmpty == true ? coreInfo!.socialLinks : null;
 
     // Мессенджеры — список строк с иконками. WhatsApp/Telegram/Instagram
     // убраны из фолбэка (kMessengers пуст), список наполняется только если
@@ -959,7 +993,8 @@ class _ContactsCard extends StatelessWidget {
             // Адрес — показываем только если пришёл непустым с бэкенда
             if (address.isNotEmpty)
               Padding(
-                padding: EdgeInsets.fromLTRB(18, 18, 18, mapOptions.isNotEmpty ? 10 : 18),
+                padding: EdgeInsets.fromLTRB(
+                    18, 18, 18, mapOptions.isNotEmpty ? 10 : 18),
                 child: Text(
                   'Наш адрес: $address',
                   style: PiligrimTextStyles.body.copyWith(
@@ -973,7 +1008,8 @@ class _ContactsCard extends StatelessWidget {
             // (2ГИС/Google/Яндекс/Apple), а не жёстко открывает 2ГИС.
             if (mapOptions.isNotEmpty)
               Padding(
-                padding: EdgeInsets.fromLTRB(18, address.isNotEmpty ? 0 : 18, 18, 18),
+                padding: EdgeInsets.fromLTRB(
+                    18, address.isNotEmpty ? 0 : 18, 18, 18),
                 child: PiligrimTap(
                   borderRadius: BorderRadius.circular(8),
                   onTap: () => showPiligrimMapPickerSheet(
@@ -1009,7 +1045,8 @@ class _ContactsCard extends StatelessWidget {
                           style: PiligrimTextStyles.caption.copyWith(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: PiligrimColors.steppe.withValues(alpha: 0.75),
+                            color:
+                                PiligrimColors.steppe.withValues(alpha: 0.75),
                             letterSpacing: 0.4,
                           ),
                         ),
@@ -1117,9 +1154,7 @@ class _LegalFooter extends StatelessWidget {
         ),
         const SizedBox(height: 12),
       ],
-    )
-        .animate()
-        .fadeIn(delay: 250.ms, duration: 600.ms);
+    ).animate().fadeIn(delay: 250.ms, duration: 600.ms);
   }
 }
 
@@ -1395,7 +1430,7 @@ class _ProfileGlassCard extends StatelessWidget {
 
     // На Android увеличиваем непрозрачность заливки, чтобы карточки
     // читались без блюра.
-    final double effectiveFillTop    = useBlur ? fillTop    : fillTop    * 2.0;
+    final double effectiveFillTop = useBlur ? fillTop : fillTop * 2.0;
     final double effectiveFillBottom = useBlur ? fillBottom : fillBottom * 2.0;
 
     Widget content = Container(
@@ -1454,4 +1489,3 @@ class _ProfileGlassCard extends StatelessWidget {
 }
 
 // _SectionHeader заменён на PiligrimSectionHeader (lib/widgets/piligrim_section_header.dart)
-

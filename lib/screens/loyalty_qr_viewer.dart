@@ -3,6 +3,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 
 import '../core/theme.dart';
 import '../widgets/piligrim_nav_button.dart';
@@ -25,6 +26,21 @@ class LoyaltyQrViewer extends StatefulWidget {
 class _LoyaltyQrViewerState extends State<LoyaltyQrViewer> {
   double _dragOffset = 0;
   double _bgOpacity = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Максимальная яркость только для этого экрана — так проще
+    // отсканировать код на кассе даже в тёмном зале. Не поддерживается на
+    // некоторых платформах (например, десктоп) — молча игнорируем.
+    ScreenBrightness().setApplicationScreenBrightness(1.0).catchError((_) {});
+  }
+
+  @override
+  void dispose() {
+    ScreenBrightness().resetApplicationScreenBrightness().catchError((_) {});
+    super.dispose();
+  }
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (details.delta.dy <= 0 && _dragOffset <= 0) return;
@@ -117,7 +133,8 @@ class _LoyaltyQrViewerState extends State<LoyaltyQrViewer> {
                             child: Icon(
                               Icons.qr_code_2_rounded,
                               size: 40,
-                              color: PiligrimColors.textDark.withValues(alpha: 0.35),
+                              color: PiligrimColors.textDark
+                                  .withValues(alpha: 0.35),
                             ),
                           ),
                         ),
@@ -145,10 +162,7 @@ class _LoyaltyQrViewerState extends State<LoyaltyQrViewer> {
             ),
           ),
         ],
-      )
-          .animate()
-          .fadeIn(duration: 220.ms)
-          .scale(
+      ).animate().fadeIn(duration: 220.ms).scale(
             begin: const Offset(0.94, 0.94),
             end: const Offset(1.0, 1.0),
             duration: 300.ms,
