@@ -20,6 +20,7 @@ import '../providers/core_info_provider.dart';
 import '../widgets/path_cta.dart';
 import '../widgets/piligrim_background.dart';
 import '../widgets/piligrim_delete_account_dialog.dart';
+import '../widgets/piligrim_map_picker_sheet.dart';
 import '../widgets/piligrim_toast.dart';
 import '../widgets/piligrim_section_header.dart';
 import '../widgets/piligrim_tap.dart';
@@ -27,6 +28,7 @@ import '../core/piligrim_route.dart';
 import '../widgets/piligrim_auth_view.dart';
 import 'booking_history_screen.dart';
 import 'event_reservation_history_screen.dart';
+import 'loyalty_qr_viewer.dart';
 import 'onboarding_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -44,6 +46,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // (см. Consumer<AuthProvider> ниже), чтобы история всё равно подгрузилась,
   // когда авторизация восстановится.
   bool _historyRequested = false;
+
+  // QR-код лояльности должен открываться и при плохом интернете (ТЗ п.5) —
+  // прогреваем дисковый кэш картинки заранее, как только известен URL,
+  // а не только когда гость долистает до _LoyaltyQrTile.
+  String? _precachedQrUrl;
+
+  void _precacheLoyaltyQr(String? url) {
+    if (url == null || url.isEmpty || url == _precachedQrUrl) return;
+    _precachedQrUrl = url;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) precacheImage(CachedNetworkImageProvider(url), context);
+    });
+  }
 
   @override
   void initState() {
@@ -120,6 +135,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         }
         final user = auth.user;
+        _precacheLoyaltyQr(user.loyaltyCardUrl);
         final bottomPad = MediaQuery.paddingOf(context).bottom + 32;
         return Scaffold(
           backgroundColor: PiligrimColors.earthSurface,
@@ -624,7 +640,7 @@ class _LoyaltyQrTile extends StatelessWidget {
   final String url;
 
   static const double _size = 148;
-  static const double _borderWidth = 2.5;
+  static const double _borderWidth = 1.2;
 
   static final List<double> _tint = _duotoneMatrix(
     darkHex: 0x2C2825, // PiligrimColors.textDark
@@ -633,29 +649,40 @@ class _LoyaltyQrTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(_borderWidth),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [PiligrimColors.steppe, PiligrimColors.emberDeep],
+    // Рамка и подсветка нарочно приглушены (тонкая линия + мягкое тёплое
+    // свечение вместо сплошного золотого градиента) — светлая плашка под
+    // QR и так даёт самый сильный контраст на тёмном экране профиля,
+    // яркая окантовка поверх неё превращала карточку в «пятно». Сам QR
+    // (тёмные модули на светлом) не трогаем — это вопрос надёжности
+    // сканирования на кассе, см. комментарий у [_tint].
+    return PiligrimTap(
+      borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
+      onTap: () => Navigator.of(context).push(
+        PiligrimPageRoute<void>(
+          builder: (_) => LoyaltyQrViewer(url: url, tint: _tint),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: PiligrimColors.steppe.withValues(alpha: 0.22),
-            blurRadius: 24,
-            spreadRadius: -6,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: PiligrimColors.nomadCream,
-          borderRadius: PiligrimRadius.mdAll,
+          borderRadius: BorderRadius.circular(PiligrimRadius.md + _borderWidth),
+          border: Border.all(
+            color: PiligrimColors.steppe.withValues(alpha: 0.30),
+            width: _borderWidth,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: PiligrimColors.shadow.withValues(alpha: 0.24),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: PiligrimColors.steppe.withValues(alpha: 0.10),
+              blurRadius: 28,
+              spreadRadius: -4,
+            ),
+          ],
         ),
         child: CachedNetworkImage(
           imageUrl: url,
@@ -723,7 +750,7 @@ class _LoyaltyQrPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const size = _LoyaltyQrTile._size + _LoyaltyQrTile._borderWidth * 2 + 24;
+    const size = _LoyaltyQrTile._size + 24;
     return Container(
       width: size,
       height: size,
@@ -834,16 +861,47 @@ class _ContactsCard extends StatelessWidget {
     final phone = coreInfo?.phone.isNotEmpty == true
         ? coreInfo!.phone
         : kRestaurantPhone;
-    // Карта — только 2ГИС (основной картографический сервис для аудитории РК)
-    final mapLinks = [
-      if (coreInfo?.twogisLink != null)
-        (label: '2ГИС', icon: 'assets/images/map_pin_generic.svg', url: coreInfo!.twogisLink!),
-    ];
     final address = coreInfo?.address ?? '';
+    // Кнопка «карты» теперь открывает выбор приложения (2ГИС/Google/Яндекс/
+    // Apple), а не жёстко 2ГИС — см. lib/widgets/piligrim_map_picker_sheet.dart.
+    final mapOptions = buildMapOptions(
+      address: address,
+      twogisLink: coreInfo?.twogisLink,
+      latitude: coreInfo?.latitude,
+      longitude: coreInfo?.longitude,
+    );
 
     final messengers = coreInfo?.socialLinks.isNotEmpty == true
         ? coreInfo!.socialLinks
         : null;
+
+    // Мессенджеры — список строк с иконками. WhatsApp/Telegram/Instagram
+    // убраны из фолбэка (kMessengers пуст), список наполняется только если
+    // бэкенд когда-нибудь начнёт отдавать social_links.
+    final messengerItems = (messengers != null
+        ? messengers.map((link) {
+            return _MessengerChip(
+              label: link.label,
+              url: link.url,
+              iconAsset: _resolveMessengerIcon(link.label),
+              onLaunch: onLaunch,
+            );
+          }).toList()
+        : kMessengers
+            .map((m) => _MessengerChip(
+                  label: m.label,
+                  url: m.url,
+                  iconAsset: m.iconAsset,
+                  onLaunch: onLaunch,
+                ))
+            .toList());
+    final List<Widget> messengerRows = [];
+    for (int i = 0; i < messengerItems.length; i++) {
+      messengerRows.add(messengerItems[i]);
+      if (i < messengerItems.length - 1) {
+        messengerRows.add(const _ProfileHairlineDivider(inset: 48));
+      }
+    }
 
     return _ProfileGlassCard(
       variant: ProfileGlassVariant.integrated,
@@ -887,45 +945,21 @@ class _ContactsCard extends StatelessWidget {
             ),
           ),
 
-          const _ProfileHairlineDivider(inset: 18),
-
-          // Мессенджеры — список строк с иконками
-          ...() {
-            final items = (messengers != null
-                ? messengers.map((link) {
-                    return _MessengerChip(
-                      label: link.label,
-                      url: link.url,
-                      iconAsset: _resolveMessengerIcon(link.label),
-                      onLaunch: onLaunch,
-                    );
-                  }).toList()
-                : kMessengers
-                    .map((m) => _MessengerChip(
-                          label: m.label,
-                          url: m.url,
-                          iconAsset: m.iconAsset,
-                          onLaunch: onLaunch,
-                        ))
-                    .toList());
-            final List<Widget> rows = [];
-            for (int i = 0; i < items.length; i++) {
-              rows.add(items[i]);
-              if (i < items.length - 1) {
-                rows.add(const _ProfileHairlineDivider(inset: 48));
-              }
-            }
-            return rows;
-          }(),
+          // Разделитель + мессенджеры — рендерятся только если список непуст,
+          // иначе между телефоном и адресом остаётся «осиротевший» разделитель.
+          if (messengerRows.isNotEmpty) ...[
+            const _ProfileHairlineDivider(inset: 18),
+            ...messengerRows,
+          ],
 
           // Адрес + карта — в самом низу карточки
-          if (address.isNotEmpty || mapLinks.isNotEmpty) ...[
+          if (address.isNotEmpty || mapOptions.isNotEmpty) ...[
             const _ProfileHairlineDivider(inset: 18),
 
             // Адрес — показываем только если пришёл непустым с бэкенда
             if (address.isNotEmpty)
               Padding(
-                padding: EdgeInsets.fromLTRB(18, 18, 18, mapLinks.isNotEmpty ? 10 : 18),
+                padding: EdgeInsets.fromLTRB(18, 18, 18, mapOptions.isNotEmpty ? 10 : 18),
                 child: Text(
                   'Наш адрес: $address',
                   style: PiligrimTextStyles.body.copyWith(
@@ -935,58 +969,53 @@ class _ContactsCard extends StatelessWidget {
                 ),
               ),
 
-            // Кнопка 2ГИС — скрываем если ссылка null
-            if (mapLinks.isNotEmpty)
+            // Кнопка «карты» — тап открывает шторку выбора приложения
+            // (2ГИС/Google/Яндекс/Apple), а не жёстко открывает 2ГИС.
+            if (mapOptions.isNotEmpty)
               Padding(
                 padding: EdgeInsets.fromLTRB(18, address.isNotEmpty ? 0 : 18, 18, 18),
-                child: Row(
-                  children: mapLinks.map((t) {
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: t == mapLinks.last ? 0 : 8,
-                        ),
-                        child: PiligrimTap(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () => onLaunch(t.url),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: PiligrimColors.steppe.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: PiligrimColors.steppe.withValues(alpha: 0.16),
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SvgPicture.asset(
-                                  t.icon,
-                                  width: 20,
-                                  height: 20,
-                                  colorFilter: ColorFilter.mode(
-                                    PiligrimColors.steppe.withValues(alpha: 0.85),
-                                    BlendMode.srcIn,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  t.label,
-                                  style: PiligrimTextStyles.caption.copyWith(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: PiligrimColors.steppe.withValues(alpha: 0.75),
-                                    letterSpacing: 0.4,
-                                  ),
-                                ),
-                              ],
-                            ),
+                child: PiligrimTap(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => showPiligrimMapPickerSheet(
+                    context,
+                    options: mapOptions,
+                    onLaunch: onLaunch,
+                  ),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: PiligrimColors.steppe.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: PiligrimColors.steppe.withValues(alpha: 0.16),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/images/map_pin_generic.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter: ColorFilter.mode(
+                            PiligrimColors.steppe.withValues(alpha: 0.85),
+                            BlendMode.srcIn,
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                        const SizedBox(height: 6),
+                        Text(
+                          'карты',
+                          style: PiligrimTextStyles.caption.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: PiligrimColors.steppe.withValues(alpha: 0.75),
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -1113,46 +1142,6 @@ class _AccountSessionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PiligrimTap(
-            borderRadius: BorderRadius.circular(PiligrimRadius.md),
-            onTap: () {
-              debugPrint('[PiligrimToastTest] Tapped test button');
-              PiligrimToast.show(
-                context,
-                'Успешно: Тестовый тост!',
-                type: PiligrimToastType.success,
-              );
-              Future.delayed(const Duration(milliseconds: 400), () {
-                PiligrimToast.show(
-                  context,
-                  'Информация: Новое сообщение',
-                  type: PiligrimToastType.info,
-                );
-              });
-              Future.delayed(const Duration(milliseconds: 800), () {
-                PiligrimToast.show(
-                  context,
-                  'Ошибка: Соединение прервано',
-                  type: PiligrimToastType.error,
-                );
-              });
-            },
-            child: Padding(
-              padding: _rowPadding,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Проверить тосты (тест)',
-                  style: PiligrimTextStyles.body.copyWith(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: PiligrimColors.steppe,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const _ProfileHairlineDivider(inset: 18),
           PiligrimTap(
             borderRadius: BorderRadius.circular(PiligrimRadius.md),
             onTap: onLogout,

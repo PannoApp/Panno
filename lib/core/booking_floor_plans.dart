@@ -155,10 +155,12 @@ const mainHallFloorPlan = FloorPlanConfig(
     FloorPlanTable(name: '24', left: 0.619, top: 0.341, shape: FloorPlanTableShape.diamond, diameter: 58, seatAngles: [45, 135, 225, 315]),
     FloorPlanTable(name: '25', left: 0.431, top: 0.570, shape: FloorPlanTableShape.diamond, diameter: 58, seatAngles: [45, 135, 225, 315]),
     FloorPlanTable(name: '26', left: 0.619, top: 0.570, shape: FloorPlanTableShape.diamond, diameter: 58, seatAngles: [45, 135, 225, 315]),
-    // Правая стена — одиночные столы
-    FloorPlanTable(name: '31', left: 0.841, top: 0.113, shape: FloorPlanTableShape.square, diameter: 48, seatAngles: [0]),
-    FloorPlanTable(name: '32', left: 0.841, top: 0.341, shape: FloorPlanTableShape.square, diameter: 48, seatAngles: [0]),
-    FloorPlanTable(name: '33', left: 0.841, top: 0.570, shape: FloorPlanTableShape.square, diameter: 48, seatAngles: [0]),
+    // Правая стена — одиночные столы. Было по одному стулу (только сверху) —
+    // с одним тиком выглядело как стол на одного; стол на 2 гостей, второй
+    // стул снизу (тот же паттерн top/bottom, что и у пар 11-16).
+    FloorPlanTable(name: '31', left: 0.841, top: 0.113, shape: FloorPlanTableShape.square, diameter: 48),
+    FloorPlanTable(name: '32', left: 0.841, top: 0.341, shape: FloorPlanTableShape.square, diameter: 48),
+    FloorPlanTable(name: '33', left: 0.841, top: 0.570, shape: FloorPlanTableShape.square, diameter: 48),
     // Ряд у входа — прямоугольные столы, стулья по бокам
     FloorPlanTable(name: '41', left: 0.233, top: 0.893, shape: FloorPlanTableShape.rect, diameter: 54, seatAngles: [90, 270]),
     FloorPlanTable(name: '42', left: 0.400, top: 0.893, shape: FloorPlanTableShape.rect, diameter: 54, seatAngles: [90, 270]),

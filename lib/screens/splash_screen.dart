@@ -40,7 +40,6 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _pathReveal;
   late final Animation<double> _logoOpacity;
   late final Animation<double> _logoSlide;
-  late final Animation<double> _taglineOpacity;
   late final Animation<double> _conceptOpacity;
   late final Animation<double> _bottomOpacity;
 
@@ -84,13 +83,9 @@ class _SplashScreenState extends State<SplashScreen>
       parent: _intro,
       curve: const Interval(0.33, 0.71, curve: Curves.easeOutCubic),
     );
-    _taglineOpacity = CurvedAnimation(
-      parent: _intro,
-      curve: const Interval(0.58, 0.88, curve: Curves.easeOut),
-    );
     _conceptOpacity = CurvedAnimation(
       parent: _intro,
-      curve: const Interval(0.67, 0.96, curve: Curves.easeOut),
+      curve: const Interval(0.58, 0.96, curve: Curves.easeOut),
     );
     _bottomOpacity = CurvedAnimation(
       parent: _intro,
@@ -245,8 +240,8 @@ class _SplashScreenState extends State<SplashScreen>
                   const SizedBox(height: 20),
                   _buildLogo(),
                   const SizedBox(height: 20),
-                  _buildTagline(),
-                  const SizedBox(height: 20),
+                  _buildTitle(),
+                  const SizedBox(height: 12),
                   _buildConcept(),
                 ],
               ),
@@ -387,36 +382,28 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Widget _buildTagline() {
+  Widget _buildTitle() {
+    // Статичный заголовок (см. kHeroTitle) — те же первые две строки нового
+    // текста, что и на главном экране. Сплэш — только русский (задача 3).
     return FadeTransition(
-      opacity: _taglineOpacity,
-      child: Column(
-        children: [
-          Text(
-            'дәстүрдің дәмі',
-            style: PiligrimTextStyles.caption.copyWith(
-              color: PiligrimColors.steppe.withValues(alpha: 0.90),
-              letterSpacing: 2.5,
-              fontSize: 11,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'еркіндік лебі',
-            style: PiligrimTextStyles.caption.copyWith(
-              color: PiligrimColors.steppe.withValues(alpha: 0.7),
-              letterSpacing: 2.5,
-              fontSize: 11,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+      opacity: _conceptOpacity,
+      child: Text(
+        kHeroTitle,
+        textAlign: TextAlign.center,
+        style: PiligrimTextStyles.caption.copyWith(
+          color: PiligrimColors.steppe.withValues(alpha: 0.90),
+          letterSpacing: 1.2,
+          fontSize: 13,
+          height: 1.4,
+        ),
       ),
     );
   }
 
   Widget _buildConcept() {
+    // Сплэш — только русский текст (см. docs/piligrim_improvements_plan.md,
+    // задача 3): kModernNomadConcept — RU-фолбэк, пока concept_description
+    // на бэкенде не заполнен новым текстом.
     final concept = context.watch<CoreInfoProvider>().coreInfo?.conceptDescription
         ?? kModernNomadConcept;
     return FadeTransition(
@@ -426,7 +413,7 @@ class _SplashScreenState extends State<SplashScreen>
         child: Text(
           concept,
           textAlign: TextAlign.center,
-          maxLines: 4,
+          maxLines: 8,
           overflow: TextOverflow.ellipsis,
           style: PiligrimTextStyles.body.copyWith(
             fontSize: 11.5,

@@ -28,6 +28,7 @@ import 'package:dio/dio.dart';
 import 'screens/events_screen.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/bottom_nav_bar.dart';
+import 'widgets/piligrim_auth_view.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -264,6 +265,21 @@ class _RootShellState extends State<RootShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Глобальный gate (ТЗ по входу: «Все функции приложения доступны только
+    // участнику системы лояльности»): неавторизованный гость видит только
+    // экран входа/регистрации/восстановления — ни один таб (включая Home/
+    // Menu/Interior/Events) не собирается за IndexedStack ниже. Точечные
+    // guardAuth() внутри отдельных экранов (бронь, закрытые события) остаются
+    // как дополнительная защита, но с этим gate уже избыточны для верхнего
+    // уровня. onSuccess пустой намеренно — PiligrimAuthView сам показывает
+    // номер участника после регистрации и сбрасывает isNewUser; дальше
+    // экран просто перестраивается по notifyListeners() из AuthProvider.
+    if (!context.watch<AuthProvider>().isLoggedIn) {
+      return Scaffold(
+        backgroundColor: PiligrimColors.earth,
+        body: PiligrimAuthView(onSuccess: (_) {}),
+      );
+    }
     return ValueListenableBuilder<bool>(
       valueListenable: DioClient.isOfflineNotifier,
       builder: (context, isOffline, _) {

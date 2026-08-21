@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:piligrim/data/models/api_booking.dart';
 import 'package:piligrim/data/models/core_info.dart';
 import 'package:piligrim/data/models/user_profile.dart';
@@ -27,16 +28,21 @@ UserProfile _sampleProfile() => const UserProfile(
       notificationsEnabled: true,
     );
 
-CoreInfo _coreInfo({String privacyPolicy = 'https://api.piligrim.kz/privacy'}) =>
+CoreInfo _coreInfo({
+  String privacyPolicy = 'https://api.piligrim.kz/privacy',
+  String? twogisLink,
+  List<SocialLink> socialLinks = const [],
+}) =>
     CoreInfo(
       address: 'Астана',
       workingHours: '12:00–23:00',
       isOpenNow: true,
       phone: '+77001234567',
-      socialLinks: const [],
+      socialLinks: socialLinks,
       heroSlides: const [],
       visitRules: const [],
       privacyPolicy: privacyPolicy,
+      twogisLink: twogisLink,
     );
 
 void main() {
@@ -50,6 +56,7 @@ void main() {
     String? launchedUrl;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       adapter = MockDioAdapter();
       final dio = createMockDio(adapter);
       auth = AuthProvider(
@@ -119,10 +126,11 @@ void main() {
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
-      // PiligrimAuthView: мини-заголовок формы и CTA (см.
-      // lib/widgets/piligrim_auth_view.dart, ветка !_awaitingCode).
+      // PiligrimAuthView: единый экран входа — телефон + номер участника
+      // видны сразу, без промежуточного шага (см. lib/widgets/piligrim_auth_view.dart).
       expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
-      expect(find.text('ПОЛУЧИТЬ КОД'), findsOneWidget);
+      expect(find.text('ВОЙТИ'), findsOneWidget);
+      expect(find.byType(TextField), findsNWidgets(2));
     });
 
     testWidgets('При isLoggedIn=true → имя героя из currentUser',
@@ -136,7 +144,7 @@ void main() {
       // _HeroHeader показывает только имя (первое слово из displayName),
       // телефон в шапке не отображается — см. lib/screens/profile_screen.dart.
       expect(find.text('Айдар'), findsOneWidget);
-      expect(find.text('ПОЛУЧИТЬ КОД'), findsNothing);
+      expect(find.text('ПРОДОЛЖИТЬ'), findsNothing);
     });
 
     testWidgets(
@@ -168,6 +176,35 @@ void main() {
 
       // loyaltyCardUrl не задан → карта QR ещё не пришла из Remarked, показан placeholder.
       expect(find.text('Карта появится после первого визита'), findsOneWidget);
+    });
+
+    testWidgets(
+        '_LoyaltyQrTile показывает 4 орнаментальные звезды по углам рамки',
+        (tester) async {
+      auth.currentUser = const UserProfile(
+        id: 1,
+        phone: '+77001234567',
+        firstName: 'Айдар',
+        lastName: 'Нурланов',
+        notifyEvents: true,
+        notifyPromotions: false,
+        notifyClosedEvents: false,
+        notificationsEnabled: true,
+        loyaltyCardUrl: 'https://cdn.piligrim.kz/loyalty/qr.png',
+      );
+      auth.notifyListeners();
+
+      await tester.pumpWidget(buildApp());
+      await settle(tester);
+
+      // _CornerOrnament — приватный класс, ищем по runtimeType (как и
+      // _ProfileHairlineDivider выше). Не зависит от того, успела ли
+      // CachedNetworkImage загрузить саму картинку — звёзды лежат в Stack
+      // рядом с ней, а не внутри.
+      final ornaments = find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_CornerOrnament',
+      );
+      expect(ornaments, findsNWidgets(4));
     });
 
     testWidgets('Тап «Бронирований» → BookingHistoryScreen', (tester) async {
@@ -217,31 +254,156 @@ void main() {
       expect(launchedUrl, 'https://api.piligrim.kz/legal/privacy');
     });
 
-    testWidgets('Ввод телефона и получение кода в _UnauthProfileView', (tester) async {
-      adapter.enqueue(200, {});
+    testWidgets(
+        'Телефон + номер участника видны сразу на одном экране → успешный вход',
+        (tester) async {
+      adapter.enqueue(200, {
+        'access': 'access-token',
+        'refresh': 'refresh-token',
+        'is_new_user': false,
+        'user_id': 1,
+      });
+      adapter.enqueue(200, _sampleProfile());
+      adapter.enqueue(200, {'count': 0, 'results': []});
 
       await tester.pumpWidget(buildApp());
       await settle(tester);
 
+      // PiligrimAuthView (_AuthStep.login, по умолчанию): оба поля — телефон
+      // и номер участника — видны одновременно, без промежуточного шага.
       expect(find.text('НАЧАТЬ ПУТЬ'), findsOneWidget);
+      expect(find.text('ВОЙТИ'), findsOneWidget);
+      final fields = find.byType(TextField);
+      expect(fields, findsNWidgets(2));
 
-      await tester.enterText(find.byType(TextField), '+77001234567');
+      await tester.enterText(fields.at(0), '+77001234567');
+      await tester.pump();
+      await tester.enterText(fields.at(1), '113');
       await tester.pump();
 
-      await tester.tap(find.text('ПОЛУЧИТЬ КОД'));
-      await settle(tester);
-      // AnimatedSwitcher (280ms) + цепочка .animate().fadeIn(delay: до 420ms)
-      // на новых полях формы — даём им доиграть, иначе таймер остаётся
-      // висеть после разрушения дерева виджетов в конце теста.
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('ВОЙТИ'));
+      // Долгий settle: без мока платформенного канала Firebase Messaging
+      // AuthProvider._registerFcmIfPossible() висит до собственного
+      // 5-секундного таймаута (см. auth_provider.dart), прежде чем
+      // финальный notifyListeners() отработает и Consumer<AuthProvider>
+      // перестроит дерево на авторизованный вид.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump(const Duration(seconds: 3));
+      // Добиваем очередь микрозадач, оставшихся после срабатывания таймаута.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(Duration.zero);
+      }
 
-      // PiligrimAuthView (_awaitingCode=true): заголовок «ВВЕДИТЕ КОД» +
-      // введённый номер под ним, отдельными Text-виджетами (без префикса
-      // «Код отправлен на»). KzPhoneInputFormatter форматирует ввод с
-      // пробелами: '+7 700 123 45 67' — тот же номер, что и '+77001234567'.
-      expect(find.text('ВВЕДИТЕ КОД'), findsOneWidget);
-      expect(find.text('+7 700 123 45 67'), findsOneWidget);
-      expect(find.text('ПОДТВЕРДИТЬ'), findsOneWidget);
+      final request = adapter.captured
+          .where((r) => r.path == '/users/auth/loyalty-login/')
+          .single;
+      expect(request.data, {'phone': '+77001234567', 'member_number': '113'});
+      expect(adapter.captured.any((r) => r.path == '/users/profile/'), isTrue);
+      expect(auth.isLoggedIn, isTrue);
+      expect(find.text('Айдар'), findsOneWidget);
+    });
+
+    testWidgets(
+        '«Забыл свой номер лояльности» открывает WhatsApp с номером и текстом из CoreInfo',
+        (tester) async {
+      core.coreInfo = _coreInfo(); // без экрана входа CoreInfoProvider обычно уже загружен
+
+      await tester.pumpWidget(buildApp());
+      await settle(tester);
+
+      // Ссылка видна сразу на экране входа (_AuthStep.login по умолчанию) —
+      // не нужно сначала вводить телефон и жать «Продолжить».
+      final recoveryLink = find.text('Забыл свой номер лояльности');
+      expect(recoveryLink, findsOneWidget);
+      await tester.tap(recoveryLink);
+      await settle(tester);
+
+      // Фолбэк из lib/core/profile_data.dart (kLoyaltyRecoveryWhatsapp/
+      // kLoyaltyRecoveryMessage), так как в _coreInfo() эти поля не заданы.
+      expect(launchedUrl, isNotNull);
+      expect(launchedUrl, startsWith('https://wa.me/77713333044?text='));
+    });
+
+    testWidgets(
+        '_ContactsCard не показывает WhatsApp/Telegram/Instagram — бэкенд их больше не присылает',
+        (tester) async {
+      // Реалистичный сценарий: бэкенд убрал whatsapp/telegram/instagram из
+      // сериализатора (см. RestaurantInfoSerializer) и не отдаёт social_links
+      // как массив — CoreInfo.fromJson(_parseSocialLinks) вернёт socialLinks
+      // пустым (см. core_info_test.dart), а kMessengers-фолбэк тоже пуст.
+      auth.currentUser = _sampleProfile();
+      auth.notifyListeners();
+      core.coreInfo = _coreInfo(); // socialLinks: const [] по умолчанию
+
+      await tester.pumpWidget(buildApp());
+      await settle(tester);
+      // ContactsCard живёт в SliverList — не строится, пока не проскроллено
+      // в зону видимости; без этого findsNothing был бы верен тривиально.
+      await scrollTo(tester, find.textContaining('Наш адрес'));
+
+      expect(find.text('WhatsApp'), findsNothing);
+      expect(find.text('Telegram'), findsNothing);
+      expect(find.text('Instagram'), findsNothing);
+    });
+
+    testWidgets(
+        'Кнопка «карты» (не «2ГИС») открывает шторку выбора приложения',
+        (tester) async {
+      auth.currentUser = _sampleProfile();
+      auth.notifyListeners();
+      core.coreInfo = _coreInfo(twogisLink: 'https://2gis.kz/astana/firm/piligrim');
+
+      await tester.pumpWidget(buildApp());
+      await settle(tester);
+
+      expect(find.text('2ГИС'), findsNothing);
+      final mapButton = find.text('карты');
+      await scrollTo(tester, mapButton);
+      await tester.tap(mapButton);
+      await settle(tester);
+
+      // Тап не запускает ссылку напрямую — открывает шторку с вариантами.
+      expect(launchedUrl, isNull);
+      expect(find.text('Открыть в приложении'), findsOneWidget);
+      expect(find.text('2ГИС'), findsOneWidget);
+      expect(find.text('Google Карты'), findsOneWidget);
+      expect(find.text('Яндекс Карты'), findsOneWidget);
+
+      await tester.tap(find.text('2ГИС'));
+      await settle(tester);
+
+      expect(launchedUrl, 'https://2gis.kz/astana/firm/piligrim');
+    });
+
+    testWidgets(
+        'Без мессенджеров разделитель после телефона не рендерится («осиротевший» divider)',
+        (tester) async {
+      auth.currentUser = _sampleProfile();
+      auth.notifyListeners();
+      // socialLinks пуст и kMessengers пуст (WhatsApp/Telegram/Instagram
+      // убраны) — mapLinks/адрес заданы, значит единственный ожидаемый
+      // разделитель в карточке — перед блоком «адрес + карта».
+      core.coreInfo = _coreInfo(twogisLink: 'https://2gis.kz/astana/firm/piligrim');
+
+      await tester.pumpWidget(buildApp());
+      await settle(tester);
+      await scrollTo(tester, find.textContaining('Наш адрес'));
+
+      // _ProfileHairlineDivider используется и в других карточках экрана
+      // (например _LoyaltyCard) — ограничиваем поиск потомками _ContactsCard.
+      final contactsCard = find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_ContactsCard',
+      );
+      expect(contactsCard, findsOneWidget);
+      final dividers = find.descendant(
+        of: contactsCard,
+        matching: find.byWidgetPredicate(
+          (widget) => widget.runtimeType.toString() == '_ProfileHairlineDivider',
+        ),
+      );
+      expect(dividers, findsOneWidget);
     });
   });
 }

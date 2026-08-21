@@ -42,6 +42,11 @@ class AuthProvider extends ChangeNotifier {
   bool isNewUser = false;
   int eventsCount = 0;
 
+  /// Номер участника, только что присвоенный Remarked при регистрации
+  /// (см. [register]) — фронт должен показать его гостю один раз сразу
+  /// после успешной регистрации, дальше это поле не используется.
+  String? lastRegisteredMemberNumber;
+
   bool get isLoggedIn => currentUser != null;
   bool get isAdmin => currentUser?.isAdmin ?? false;
 
@@ -143,6 +148,75 @@ class AuthProvider extends ChangeNotifier {
     try {
       final result = await _authService.verifySms(phone, code);
       isNewUser = result.isNewUser;
+      await _tokenStorage.saveTokens(
+        access: result.access,
+        refresh: result.refresh,
+      );
+      await _loadProfile();
+      await _loadEventsCount();
+      await _registerFcmIfPossible();
+      return isLoggedIn;
+    } catch (e) {
+      error = dioErrorMessage(e);
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Вход по номеру телефона + номеру участника лояльности — основной
+  /// способ входа (см. docs/piligrim_improvements_plan.md, Фаза D). Только
+  /// для гостей, уже существующих в Remarked; для новых — [register].
+  Future<bool> loginWithMemberNumber(String phone, String memberNumber) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final result = await _authService.loyaltyLogin(phone, memberNumber);
+      isNewUser = result.isNewUser;
+      await _tokenStorage.saveTokens(
+        access: result.access,
+        refresh: result.refresh,
+      );
+      await _loadProfile();
+      await _loadEventsCount();
+      await _registerFcmIfPossible();
+      return isLoggedIn;
+    } catch (e) {
+      error = dioErrorMessage(e);
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Регистрация нового гостя лояльности. Remarked присваивает номер
+  /// участника синхронно — после успеха он доступен в
+  /// [lastRegisteredMemberNumber], его нужно показать гостю один раз.
+  Future<bool> register({
+    required String phone,
+    required String firstName,
+    String? lastName,
+    DateTime? birthday,
+    UserGender? gender,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final result = await _authService.loyaltyRegister(
+        phone: phone,
+        firstName: firstName,
+        lastName: lastName,
+        birthday: birthday,
+        gender: gender?.toJsonValue() ?? 'not_specified',
+      );
+      lastRegisteredMemberNumber = result.memberNumber;
+      isNewUser = true;
       await _tokenStorage.saveTokens(
         access: result.access,
         refresh: result.refresh,
@@ -270,7 +344,14 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _registerFcmIfPossible() async {
     if (!isLoggedIn) return;
     try {
-      await FcmService.instance.registerTokenWithServer(_dio);
+      // Таймаут обязателен: FCM опционален, но без него зависший вызов
+      // (например, недоступный платформенный канал Firebase Messaging)
+      // навсегда блокирует finally-notifyListeners() у вызывающих методов
+      // (init/confirmOtp/loginWithMemberNumber/register) — гость останется
+      // на экране загрузки после успешного входа.
+      await FcmService.instance
+          .registerTokenWithServer(_dio)
+          .timeout(const Duration(seconds: 5));
     } catch (_) {
       // FCM опционален до полной настройки Firebase.
     }

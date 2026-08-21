@@ -356,12 +356,12 @@ DISHES = [
 ]
 
 INTERIOR_PHOTOS = [
-    ("main_hall", "interior_hero_1.png", "Главный зал — свет камина", 1),
-    ("main_hall", "interior_hero_2.png", "Главный зал — вечерний свет", 2),
-    ("bar", "interior_hero_3.png", "Бар — медь и тёплый янтарь", 1),
-    ("terrace", "interior_hero_1.png", "Терраса — вид на огни", 2),
-    ("private", "interior_hero_2.png", "Приватная комната — тишина", 1),
-    ("main_hall", "interior_hero_3.png", "Зал — детали дерева и камня", 3),
+    ("bar", "interior_hero_1.png", "Бар — свет камина", 1),
+    ("bar", "interior_hero_3.png", "Бар — медь и тёплый янтарь", 2),
+    ("cave", "interior_hero_2.png", "Пещера — вечерний свет", 1),
+    ("cave", "interior_hero_3.png", "Пещера — детали дерева и камня", 2),
+    ("event_space", "interior_hero_2.png", "Ауа — тишина", 1),
+    ("veranda", "interior_hero_1.png", "Веранда — вид на огни", 1),
 ]
 
 HERO_SLIDES = [

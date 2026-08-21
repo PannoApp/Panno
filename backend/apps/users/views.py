@@ -2,17 +2,39 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .throttles import PhoneSMSThrottle, SafeScopedRateThrottle
+import logging
+import time
+
+from .throttles import (
+    PhoneSMSThrottle,
+    SafeScopedRateThrottle,
+    LoyaltyLoginPhoneThrottle,
+    LoyaltyRegisterPhoneThrottle,
+)
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import update_last_login
 from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 
-from .serializers import RequestSMSSerializer, VerifySMSSerializer, UserProfileSerializer, LogoutSerializer
-from .services import SMSService, RemarkedGuestService, maybe_push_guest_to_remarked
+from .serializers import (
+    RequestSMSSerializer,
+    VerifySMSSerializer,
+    LoyaltyLoginSerializer,
+    LoyaltyRegisterSerializer,
+    UserProfileSerializer,
+    LogoutSerializer,
+)
+from .services import SMSService, RemarkedGuestService, apply_guest_data_to_user, maybe_push_guest_to_remarked
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
+# LoyaltyRegisterView: сколько раз пробовать get_info_by_phone сразу после
+# успешного create_or_update, и пауза между попытками (см. комментарий в
+# LoyaltyRegisterView.post).
+REMARKED_POST_CREATE_LOOKUP_ATTEMPTS = 3
+REMARKED_POST_CREATE_LOOKUP_DELAY = 0.7
 
 
 _error_401 = OpenApiResponse(description='Токен не передан или недействителен')
@@ -171,6 +193,310 @@ class VerifySMSView(APIView):
             'message': 'Успешная авторизация',
             'is_new_user': created,
             'user_id': user.id,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+        })
+
+
+@extend_schema(tags=['Auth'])
+class LoyaltyLoginView(APIView):
+    """
+    Вход по номеру телефона + номеру участника лояльности (ТЗ по входу, п.2) —
+    альтернатива SMS-коду для гостей, у которых уже есть карта лояльности.
+
+    Работает ТОЛЬКО для гостей, уже существующих в Remarked (есть карта,
+    номер найден в поле `cards` ответа get_info_by_phone — источник
+    подтверждён эмпирически 2026-08-15, см. docs/piligrim_improvements_plan.md).
+    Регистрация новых гостей (без карты) через этот эндпоинт не
+    выполняется — остаётся на SMS-OTP флоу (auth/request-sms/,
+    auth/verify-sms/), пока не проверено, возвращает ли Remarked номер
+    карты сразу синхронно при create_or_update.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [SafeScopedRateThrottle, LoyaltyLoginPhoneThrottle]
+    throttle_scope = 'loyalty_login'
+
+    @extend_schema(
+        summary='Вход по номеру участника лояльности',
+        description=(
+            'Проверяет пару «номер телефона + номер участника» через Remarked '
+            '(поле `cards` в ответе get_info_by_phone). При успехе возвращает '
+            'пару JWT-токенов — как и /auth/verify-sms/.\n\n'
+            'Работает только для гостей, уже имеющих карту лояльности в Remarked. '
+            'Если гость не найден или номер участника не совпадает — 400/404.\n\n'
+            '**Лимит:** 5 попыток в минуту с одного IP и 5 попыток за 10 минут '
+            'на один номер телефона (номер участника — по сути пароль).'
+        ),
+        request=LoyaltyLoginSerializer,
+        responses={
+            200: OpenApiResponse(
+                description='Авторизация успешна',
+                examples=[
+                    OpenApiExample(
+                        'Успех',
+                        value={
+                            'message': 'Успешная авторизация',
+                            'is_new_user': False,
+                            'user_id': 42,
+                            'access': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>',
+                            'refresh': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>',
+                        },
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description='Неверный номер участника, либо ошибка валидации',
+                examples=[
+                    OpenApiExample('Неверный номер участника', value={'error': 'Неверный номер участника.'}),
+                ],
+            ),
+            403: OpenApiResponse(description='Аккаунт заблокирован'),
+            404: OpenApiResponse(
+                description='Гость с таким номером телефона не найден в системе лояльности',
+                examples=[
+                    OpenApiExample('Не найден', value={'error': 'Гость с таким номером телефона не найден.'}),
+                ],
+            ),
+            429: OpenApiResponse(description='Превышен лимит попыток'),
+            503: OpenApiResponse(description='Сервис лояльности временно недоступен'),
+        },
+        examples=[
+            OpenApiExample(
+                'Запрос',
+                value={'phone': '+77001234567', 'member_number': '100'},
+                request_only=True,
+            )
+        ],
+    )
+    def post(self, request):
+        serializer = LoyaltyLoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        phone = serializer.validated_data['phone']
+        member_number = serializer.validated_data['member_number']
+
+        from apps.remarked.client import RemarkedMobileClient
+        from apps.remarked.exceptions import RemarkedAPIError
+
+        try:
+            guest = RemarkedMobileClient().get_info_by_phone(phone)
+        except RemarkedAPIError as exc:
+            logger.warning(
+                "LoyaltyLoginView: Remarked lookup failed for phone=%s code=%s message=%s",
+                phone, exc.code, exc.message,
+            )
+            return Response(
+                {'error': 'Сервис лояльности временно недоступен. Попробуйте позже.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not guest:
+            return Response(
+                {'error': 'Гость с таким номером телефона не найден.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # cards в ответе Remarked — список чисел/строк (наблюдалось ['100']),
+        # тип элементов не документирован в openapi.json — сравниваем как строки.
+        card_numbers = {str(c).strip() for c in (guest.get('cards') or [])}
+        if member_number not in card_numbers:
+            return Response(
+                {'error': 'Неверный номер участника.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user, created = User.objects.get_or_create(phone=phone)
+        if not user.is_active:
+            return Response(
+                {'error': 'Ваш аккаунт заблокирован.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        apply_guest_data_to_user(user, guest)
+
+        update_last_login(None, user)
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'message': 'Успешная авторизация',
+            'is_new_user': created,
+            'user_id': user.id,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+        })
+
+
+@extend_schema(tags=['Auth'])
+class LoyaltyRegisterView(APIView):
+    """
+    Регистрация нового гостя лояльности (ТЗ по входу, п.1) — форма повторяет
+    состав полей выдачи карты в Apple Wallet. Создаёт гостя в Remarked (если
+    его там ещё нет по этому телефону) и возвращает назначенный номер
+    участника — Remarked присваивает его синхронно при создании (подтверждено
+    эмпирически 2026-08-15, см. docs/piligrim_improvements_plan.md, Фаза B
+    вопрос 1b), поэтому его можно сразу показать гостю.
+
+    Если гость с этим телефоном уже есть в Remarked — 400 с указанием
+    использовать вход, а не создавать дубликат/перезаписывать существующие
+    данные.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [SafeScopedRateThrottle, LoyaltyRegisterPhoneThrottle]
+    throttle_scope = 'loyalty_register'
+
+    @extend_schema(
+        summary='Регистрация нового гостя лояльности',
+        description=(
+            'Создаёт гостя в Remarked CRM и локальный аккаунт, возвращает '
+            'назначенный номер участника (`member_number`) и пару JWT-токенов.\n\n'
+            'Если гость с этим телефоном уже существует в Remarked — 400, '
+            'нужно использовать /auth/loyalty-login/.\n\n'
+            '**Лимит:** 3 попытки в минуту с одного IP и 3 попытки за 10 минут '
+            'на один номер телефона.'
+        ),
+        request=LoyaltyRegisterSerializer,
+        responses={
+            200: OpenApiResponse(
+                description='Регистрация успешна',
+                examples=[
+                    OpenApiExample(
+                        'Успех',
+                        value={
+                            'message': 'Регистрация успешна',
+                            'user_id': 42,
+                            'member_number': '113',
+                            'access': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>',
+                            'refresh': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>',
+                        },
+                    )
+                ],
+            ),
+            400: OpenApiResponse(
+                description='Гость с этим телефоном уже зарегистрирован, либо ошибка валидации',
+                examples=[
+                    OpenApiExample(
+                        'Уже зарегистрирован',
+                        value={'error': 'Этот номер уже зарегистрирован. Используйте вход по номеру участника.'},
+                    ),
+                ],
+            ),
+            429: OpenApiResponse(description='Превышен лимит попыток'),
+            503: OpenApiResponse(description='Сервис лояльности временно недоступен'),
+        },
+        examples=[
+            OpenApiExample(
+                'Запрос',
+                value={
+                    'phone': '+77001234567',
+                    'first_name': 'Айдар',
+                    'last_name': 'Нурланов',
+                    'birthday': '1995-03-14',
+                    'gender': 'male',
+                },
+                request_only=True,
+            )
+        ],
+    )
+    def post(self, request):
+        serializer = LoyaltyRegisterSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        phone = data['phone']
+
+        from apps.remarked.client import RemarkedMobileClient
+        from apps.remarked.exceptions import RemarkedAPIError
+
+        client = RemarkedMobileClient()
+
+        try:
+            existing_guest = client.get_info_by_phone(phone)
+        except RemarkedAPIError as exc:
+            logger.warning(
+                "LoyaltyRegisterView: Remarked lookup failed for phone=%s code=%s message=%s",
+                phone, exc.code, exc.message,
+            )
+            return Response(
+                {'error': 'Сервис лояльности временно недоступен. Попробуйте позже.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if existing_guest:
+            return Response(
+                {'error': 'Этот номер уже зарегистрирован. Используйте вход по номеру участника.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Несохранённый User — create_or_update читает только атрибуты
+        # (duck typing), реальную запись создаём отдельно ниже после
+        # успешного ответа от Remarked.
+        temp_user = User(
+            phone=phone,
+            first_name=data['first_name'],
+            last_name=data.get('last_name') or '',
+            gender=data['gender'],
+            birthday=data.get('birthday'),
+        )
+
+        # Статус ответа create_or_update ненадёжен как единственный сигнал:
+        # на staging наблюдалось (2026-08-16), что Remarked возвращает
+        # HTTP 500 на /store/customer/create, даже когда гость фактически
+        # создаётся (подтверждено — гость находился через get_info_by_phone
+        # сразу после "неудачного" create, с корректным cards/registration_date).
+        # Поэтому исключение из create_or_update НЕ приводит к немедленному
+        # 503 — ниже мы в любом случае проверяем реальное состояние через
+        # get_info_by_phone и доверяем только ему.
+        try:
+            client.create_or_update(temp_user)
+        except RemarkedAPIError as exc:
+            logger.warning(
+                "LoyaltyRegisterView: create_or_update raised for phone=%s code=%s message=%s "
+                "(проверяем ниже, не создался ли гость всё же)",
+                phone, exc.code, exc.message,
+            )
+
+        # Читаем реальное состояние с несколькими короткими попытками — либо
+        # из-за задержки индексации на стороне Remarked после успешного
+        # создания, либо потому что create_or_update выше правда не удался.
+        guest = None
+        for attempt in range(REMARKED_POST_CREATE_LOOKUP_ATTEMPTS):
+            try:
+                guest = client.get_info_by_phone(phone)
+                break
+            except RemarkedAPIError as exc:
+                if attempt + 1 >= REMARKED_POST_CREATE_LOOKUP_ATTEMPTS:
+                    logger.warning(
+                        "LoyaltyRegisterView: post-create lookup failed for phone=%s after %d attempts: code=%s message=%s",
+                        phone, REMARKED_POST_CREATE_LOOKUP_ATTEMPTS, exc.code, exc.message,
+                    )
+                else:
+                    time.sleep(REMARKED_POST_CREATE_LOOKUP_DELAY)
+
+        if not guest:
+            # Ни create_or_update, ни повторные попытки чтения не подтвердили
+            # гостя — вот теперь это действительно похоже на настоящий сбой.
+            return Response(
+                {'error': 'Сервис лояльности временно недоступен. Попробуйте позже.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        user, _ = User.objects.get_or_create(phone=phone)
+        apply_guest_data_to_user(user, guest)
+
+        member_number = None
+        cards = guest.get('cards') or []
+        if cards:
+            member_number = str(cards[0])
+
+        update_last_login(None, user)
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'message': 'Регистрация успешна',
+            'user_id': user.id,
+            'member_number': member_number,
             'access': str(refresh.access_token),
             'refresh': str(refresh),
         })

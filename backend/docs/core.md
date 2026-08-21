@@ -134,10 +134,10 @@
 [
   {
     "id": 1,
-    "zone": "main_hall",
-    "zone_display": "Главный зал",
+    "zone": "cave",
+    "zone_display": "Пещера",
     "image": "https://piligrim.kz/media/interior/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6.jpg",
-    "caption": "Главный зал, 40 мест",
+    "caption": "Пещера, 40 мест",
     "order": 0
   },
   {
@@ -153,7 +153,7 @@
 
 Результаты отсортированы по `zone ASC`, затем `order ASC`. Поле `image` — **абсолютный URL**. Фотографии интерьера не обрезаются автоматически — отображаются fullscreen с `BoxFit.contain` во Flutter. Управление исключительно через Django-админку. При замене фото или удалении объекта старый файл удаляется из хранилища автоматически (django-cleanup).
 
-**Зоны (`zone`):** `main_hall`, `bar`, `private`, `terrace`, `other`.
+**Зоны (`zone`):** `bar`, `cave`, `event_space`, `veranda`.
 
 ---
 

@@ -254,6 +254,12 @@ REST_FRAMEWORK = {
         # Точечные лимиты для SMS: жёстче, т.к. каждый запрос стоит денег
         'sms_request': '3/min',  # 3 запроса в минуту с одного IP
         'sms_verify': '5/min',   # 5 проверок в минуту с одного IP
+        # Вход по номеру участника лояльности (ТЗ по входу, п.2) — номер
+        # участника фактически пароль, лимит жёстче общего 'anon' по IP.
+        'loyalty_login': '5/min',
+        # Регистрация нового гостя (ТЗ по входу, п.1) — пишет реальные
+        # данные в Remarked CRM, лимит жёстче входа.
+        'loyalty_register': '3/min',
     },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',

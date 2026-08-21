@@ -117,6 +117,115 @@ void main() {
       expect(auth.isNewUser, isTrue);
     });
 
+    test('loginWithMemberNumber saves tokens and sets currentUser', () async {
+      adapter.enqueue(200, {
+        'access': 'access-token',
+        'refresh': 'refresh-token',
+        'is_new_user': false,
+        'user_id': 42,
+      });
+      adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
+
+      final auth = buildProvider();
+      final ok = await auth.loginWithMemberNumber('+77001234567', '113');
+
+      expect(ok, isTrue);
+      expect(storage.access, 'access-token');
+      expect(storage.refresh, 'refresh-token');
+      expect(auth.currentUser?.phone, '+77001234567');
+      final request = adapter.captured
+          .where((r) => r.path == '/users/auth/loyalty-login/')
+          .single;
+      expect(request.data, {'phone': '+77001234567', 'member_number': '113'});
+    });
+
+    test('loginWithMemberNumber sets error on failure and stays logged out',
+        () async {
+      adapter.enqueue(400, {'error': 'Неверный номер участника.'});
+
+      final auth = buildProvider();
+      final ok = await auth.loginWithMemberNumber('+77001234567', '999');
+
+      expect(ok, isFalse);
+      expect(auth.isLoggedIn, isFalse);
+      expect(auth.error, isNotNull);
+    });
+
+    test('register saves tokens, sets isNewUser and lastRegisteredMemberNumber',
+        () async {
+      adapter.enqueue(200, {
+        'access': 'access-token',
+        'refresh': 'refresh-token',
+        'user_id': 42,
+        'member_number': '113',
+      });
+      adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
+
+      final auth = buildProvider();
+      final ok = await auth.register(
+        phone: '+77001234567',
+        firstName: 'Айдар',
+        lastName: 'Нурланов',
+        birthday: DateTime(1995, 3, 14),
+        gender: UserGender.male,
+      );
+
+      expect(ok, isTrue);
+      expect(auth.isNewUser, isTrue);
+      expect(auth.lastRegisteredMemberNumber, '113');
+      expect(storage.access, 'access-token');
+      final request = adapter.captured
+          .where((r) => r.path == '/users/auth/loyalty-register/')
+          .single;
+      expect(request.data, {
+        'phone': '+77001234567',
+        'first_name': 'Айдар',
+        'last_name': 'Нурланов',
+        'birthday': '1995-03-14',
+        'gender': 'male',
+      });
+    });
+
+    test('register omits unset optional fields and defaults gender to not_specified',
+        () async {
+      adapter.enqueue(200, {
+        'access': 'access-token',
+        'refresh': 'refresh-token',
+        'user_id': 42,
+        'member_number': '5',
+      });
+      adapter.enqueue(200, _sampleProfile());
+      _enqueueEmptyReservations(adapter);
+
+      final auth = buildProvider();
+      await auth.register(phone: '+77001234567', firstName: 'Айдар');
+
+      final request = adapter.captured
+          .where((r) => r.path == '/users/auth/loyalty-register/')
+          .single;
+      expect(request.data, {
+        'phone': '+77001234567',
+        'first_name': 'Айдар',
+        'gender': 'not_specified',
+      });
+    });
+
+    test('register sets error on failure (e.g. phone already registered)',
+        () async {
+      adapter.enqueue(400, {
+        'error': 'Этот номер уже зарегистрирован. Используйте вход по номеру участника.',
+      });
+
+      final auth = buildProvider();
+      final ok = await auth.register(phone: '+77001234567', firstName: 'Айдар');
+
+      expect(ok, isFalse);
+      expect(auth.isLoggedIn, isFalse);
+      expect(auth.error, isNotNull);
+    });
+
     test('user journeyStartLabel from date_joined', () async {
       storage.access = 'stored-access';
       // Дата регистрации — ровно 2 года назад от момента запуска теста.

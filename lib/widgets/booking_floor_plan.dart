@@ -143,7 +143,9 @@ class BookingFloorPlan extends StatelessWidget {
                 child: AspectRatio(
                   aspectRatio: config.aspectRatio,
                   child: InteractiveViewer(
-                    minScale: 1,
+                    // Раньше minScale=1 не давал уменьшить план ниже
+                    // «исходного» размера — можно было только приближать.
+                    minScale: 0.5,
                     maxScale: 3.2,
                     // Запас под панорамирование при зуме — не настолько
                     // большой, чтобы план мог целиком уехать в пустоту при

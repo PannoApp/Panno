@@ -63,3 +63,71 @@ class PhoneSMSThrottle(_RedisResistantThrottleMixin, SimpleRateThrottle):
             'scope': self.scope,
             'ident': phone,
         }
+
+
+class LoyaltyLoginPhoneThrottle(_RedisResistantThrottleMixin, SimpleRateThrottle):
+    """
+    Троттлинг по номеру телефона для входа по номеру участника лояльности
+    (LoyaltyLoginView). Номер участника фактически выполняет роль пароля
+    (ТЗ по входу, открытый вопрос №3) — без лимита по конкретному телефону
+    его можно подбирать перебором в обход общего лимита по IP.
+
+    Ограничение: не более 5 попыток на один номер за 10 минут.
+    При недоступном Redis — пропускает запрос (fail open), как и другие
+    троттлы в этом модуле.
+    """
+
+    scope = 'loyalty_login_phone'
+
+    _NUM_REQUESTS = 5
+    _DURATION = 10 * 60  # 600 секунд
+
+    def get_rate(self):
+        return f'{self._NUM_REQUESTS}/min'
+
+    def parse_rate(self, rate):
+        if rate is None:
+            return (None, None)
+        return (self._NUM_REQUESTS, self._DURATION)
+
+    def get_cache_key(self, request, view):
+        phone = request.data.get('phone')
+        if not phone:
+            return None
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': phone,
+        }
+
+
+class LoyaltyRegisterPhoneThrottle(_RedisResistantThrottleMixin, SimpleRateThrottle):
+    """
+    Троттлинг по номеру телефона для регистрации нового гостя лояльности
+    (LoyaltyRegisterView). Регистрация пишет реальные данные в Remarked CRM —
+    без лимита по телефону возможен спам фиктивными гостями.
+
+    Ограничение: не более 3 попыток на один номер за 10 минут (жёстче входа —
+    в норме на номер приходится ровно одна успешная регистрация).
+    """
+
+    scope = 'loyalty_register_phone'
+
+    _NUM_REQUESTS = 3
+    _DURATION = 10 * 60  # 600 секунд
+
+    def get_rate(self):
+        return f'{self._NUM_REQUESTS}/min'
+
+    def parse_rate(self, rate):
+        if rate is None:
+            return (None, None)
+        return (self._NUM_REQUESTS, self._DURATION)
+
+    def get_cache_key(self, request, view):
+        phone = request.data.get('phone')
+        if not phone:
+            return None
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': phone,
+        }
